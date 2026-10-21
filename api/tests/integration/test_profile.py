@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import datetime as dt
 from collections.abc import Callable
 from typing import Any
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Connection, text
 
+from app.deps import get_now
 from tests.conftest import FixtureUser
 
 Client = Callable[[FixtureUser], TestClient]
@@ -23,6 +26,7 @@ DEFAULTS: dict[str, Any] = {
     "start_date": None,
     "match_tiers": [],
     "vesting_years": None,
+    "birth_year": None,
 }
 FULL: dict[str, Any] = {
     "salary_cents": 6_500_000,
@@ -37,6 +41,7 @@ FULL: dict[str, Any] = {
         {"employee_pct_upto": "5.5", "employer_pct": "50"},
     ],
     "vesting_years": 3,
+    "birth_year": 2001,
 }
 
 
@@ -100,6 +105,9 @@ def test_put_replaces_the_whole_profile(client_as: Client, user_a: FixtureUser) 
         },
         {"match_tiers": [{"employee_pct_upto": str(n), "employer_pct": "10"} for n in range(1, 7)]},
         {"start_date": "September 1"},
+        {"birth_year": 1899},
+        {"birth_year": 3000},
+        {"birth_year": "2001"},
         {"surprise": True},
     ],
 )
@@ -113,3 +121,15 @@ def test_put_validates(client_as: Client, user_a: FixtureUser, change: dict[str,
 def test_profiles_are_per_user(client_as: Client, user_a: FixtureUser, user_b: FixtureUser) -> None:
     assert client_as(user_a).put("/profile", json=FULL).status_code == 200
     assert client_as(user_b).get("/profile").json() == {**DEFAULTS, "updated_at": None}
+
+
+def test_birth_year_up_to_the_current_year(
+    app: FastAPI, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Spec 006 open question 2: the year the user was born, never in the future."""
+    app.dependency_overrides[get_now] = lambda: dt.datetime(2026, 10, 21, 12, 0, tzinfo=dt.UTC)
+    client = client_as(user_a)
+    assert client.put("/profile", json={"birth_year": 2027}).status_code == 422
+    saved = client.put("/profile", json={"birth_year": 2026})
+    assert saved.status_code == 200, saved.text
+    assert client.get("/profile").json()["birth_year"] == 2026

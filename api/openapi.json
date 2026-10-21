@@ -402,7 +402,9 @@
           "tax_season",
           "open_enrollment",
           "goal_target",
-          "election_check"
+          "election_check",
+          "goal_contribution",
+          "goal_review"
         ],
         "title": "CalendarKind",
         "type": "string"
@@ -2848,6 +2850,18 @@
         "additionalProperties": false,
         "description": "The whole profile; a field left out is reset to its default.",
         "properties": {
+          "birth_year": {
+            "anyOf": [
+              {
+                "minimum": 1900.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Year"
+          },
           "dependents": {
             "default": 0,
             "maximum": 20.0,
@@ -2946,6 +2960,18 @@
       "ProfileOut": {
         "additionalProperties": false,
         "properties": {
+          "birth_year": {
+            "anyOf": [
+              {
+                "minimum": 1900.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Year"
+          },
           "dependents": {
             "default": 0,
             "maximum": 20.0,

@@ -147,6 +147,14 @@ class GoalKind(StrEnum):
     CUSTOM = "custom"
 
 
+class GoalStatus(StrEnum):
+    """Where a goal stands (spec 011 rule 15)."""
+
+    ACTIVE = "active"
+    PAUSED = "paused"
+    REACHED = "reached"
+
+
 class CalendarKind(StrEnum):
     ENROLLMENT_DEADLINE = "enrollment_deadline"
     TAX_SEASON = "tax_season"
@@ -154,6 +162,10 @@ class CalendarKind(StrEnum):
     GOAL_TARGET = "goal_target"
     # A saved election should show up on the next pay stub (spec 007 rule 14).
     ELECTION_CHECK = "election_check"
+    # An emergency fund decision's first contribution and its review (spec 011
+    # rule 12); added by 0008_goals_and_birth_year.
+    GOAL_CONTRIBUTION = "goal_contribution"
+    GOAL_REVIEW = "goal_review"
 
 
 class CalendarStatus(StrEnum):
@@ -266,6 +278,12 @@ CHECKIN_ENUMS: dict[str, type[StrEnum]] = {
     "finding_kind": FindingKind,
     "finding_severity": FindingSeverity,
     "finding_action": FindingAction,
+}
+
+
+# Enums created by 0008_goals_and_birth_year, in creation order.
+GOAL_ENUMS: dict[str, type[StrEnum]] = {
+    "goal_status": GoalStatus,
 }
 
 

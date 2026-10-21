@@ -1,4 +1,9 @@
-"""The user's profile: what the calculators need to know (spec 005 rule 25)."""
+"""The user's profile: what the calculators need to know (spec 005 rule 25).
+
+``birth_year`` settles spec 006 open question 2: the client sends the 401(k)
+calculator ``age = tax_year - birth_year`` (the age reached by December 31 of
+the tax year); ``calc/`` keeps taking ``age`` as an input.
+"""
 
 from __future__ import annotations
 
@@ -10,8 +15,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.dialects.postgresql import insert
 
 from app.auth import CurrentUser
-from app.deps import UserSession
-from app.errors import error_responses
+from app.deps import Now, UserSession
+from app.errors import AppError, error_responses
 from app.types import UtcDateTime
 from calc.k401 import MAX_TIERS, MatchTier, tiers_ascending
 from calc.types import PositiveCents
@@ -19,6 +24,8 @@ from db.enums import FilingStatus, HealthcareUsage, PayFrequency
 from db.models import Profile
 
 router = APIRouter(prefix="/profile", tags=["profile"])
+
+MIN_BIRTH_YEAR = 1900
 
 
 class OtherJob(BaseModel):
@@ -41,6 +48,8 @@ class ProfileFields(BaseModel):
     start_date: dt.date | None = None
     match_tiers: list[MatchTier] = Field(default_factory=list, max_length=MAX_TIERS)
     vesting_years: int | None = Field(default=None, ge=0, le=10, strict=True)
+    # The year the user was born; at most the current year (checked by the route).
+    birth_year: int | None = Field(default=None, ge=MIN_BIRTH_YEAR, strict=True)
 
     @model_validator(mode="after")
     def _tiers_ascending(self) -> Self:
@@ -72,8 +81,12 @@ def get_profile(session: UserSession, user: CurrentUser) -> ProfileOut:
 
 
 @router.put("", responses=error_responses(401, 422))
-def put_profile(body: ProfileIn, session: UserSession, user: CurrentUser) -> ProfileOut:
+def put_profile(body: ProfileIn, session: UserSession, user: CurrentUser, now: Now) -> ProfileOut:
     """Replace the profile."""
+    if body.birth_year is not None and body.birth_year > now.year:
+        raise AppError(
+            f"birth_year: must be at most {now.year}", code="validation_error", status_code=422
+        )
     values: dict[str, Any] = body.model_dump(exclude={"other_jobs", "match_tiers"})
     # The jsonb columns hold JSON: percentages as two-place strings.
     values["other_jobs"] = [job.model_dump(mode="json") for job in body.other_jobs]
