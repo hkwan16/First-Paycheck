@@ -4,7 +4,10 @@ Supabase provides ``auth.users``, ``auth.uid()`` and the ``anon`` and
 ``authenticated`` roles. Migrations depend on them but never create them; the
 test suite (and the CI migrations job, through this module) installs this shim
 when the ``auth`` schema is missing. ``auth.uid()`` mirrors Supabase's
-definition: the ``sub`` claim from ``request.jwt.claims``.
+definition: the ``sub`` claim from ``request.jwt.claims``. The shim also
+copies Supabase's default privileges on ``public``, which hand every new
+table, sequence and function to ``anon`` and ``authenticated`` unless a
+migration revokes them.
 
 Run ``python -m tests.support.auth_shim [DATABASE_URL]`` from ``api/`` to
 install it into TEST_DATABASE_URL (or the given URL).
@@ -49,6 +52,13 @@ _SCHEMA = (
     """,
     "GRANT USAGE ON SCHEMA auth TO anon, authenticated",
     "GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated",
+    # Supabase grants every new object in public to its API roles by default,
+    # so migrations must revoke what they do not mean to expose. Mirror that
+    # here or a missing revoke passes locally and leaks on the hosted project.
+    "GRANT USAGE ON SCHEMA public TO anon, authenticated",
+    "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated",
+    "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated",
+    "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated",
 )
 
 

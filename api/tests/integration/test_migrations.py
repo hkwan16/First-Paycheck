@@ -58,6 +58,57 @@ def test_0001_sets_up_the_app_api_role(scratch_database: tuple[str, Engine]) -> 
         assert reads_version
 
 
+def tables_granted_to(engine: Engine, *roles: str) -> list[str]:
+    with engine.connect() as connection:
+        return list(
+            connection.execute(
+                text(
+                    "SELECT DISTINCT table_name FROM information_schema.role_table_grants "
+                    "WHERE table_schema = 'public' AND grantee = ANY(:roles) ORDER BY 1"
+                ),
+                {"roles": list(roles)},
+            ).scalars()
+        )
+
+
+def functions_executable_by(engine: Engine, role: str) -> list[str]:
+    with engine.connect() as connection:
+        return list(
+            connection.execute(
+                text(
+                    "SELECT p.oid::regprocedure::text FROM pg_proc p "
+                    "JOIN pg_namespace n ON n.oid = p.pronamespace "
+                    "WHERE n.nspname = 'public' "
+                    "AND has_function_privilege(:role, p.oid, 'EXECUTE') ORDER BY 1"
+                ),
+                {"role": role},
+            ).scalars()
+        )
+
+
+def test_supabase_api_roles_hold_only_the_grants_migrations_intend(
+    scratch_database: tuple[str, Engine],
+) -> None:
+    """The shim copies Supabase's default grants; every object must revoke them.
+
+    ``anon`` is the Data API role behind the publishable key, so it may hold
+    nothing in ``public``. ``authenticated`` keeps the per-table grants from
+    ``enable_rls`` and the two functions its own queries run, and nothing else.
+    """
+    url, engine = scratch_database
+    upgrade(url, "head")
+
+    assert tables_granted_to(engine, "anon", "PUBLIC") == []
+    assert functions_executable_by(engine, "anon") == []
+
+    assert "alembic_version" not in tables_granted_to(engine, "authenticated")
+    assert "alembic_version" in tables_granted_to(engine, "app_api")
+    assert functions_executable_by(engine, "authenticated") == [
+        "current_user_id()",
+        "set_updated_at()",
+    ]
+
+
 def test_0001_is_idempotent_when_the_role_already_exists(
     scratch_database: tuple[str, Engine],
 ) -> None:

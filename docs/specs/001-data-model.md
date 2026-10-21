@@ -436,6 +436,7 @@ Reference data, no `user_id` (RLS exception).
 | `0004_decisions` | `decisions` with its constraints, triggers and `current_decisions` view, `goals`, `calendar_events`, `explanations`, `irs_citations` |
 | `0005_checkins` | `recurring_charges`, `check_ins`, `check_in_findings`, and the deferred foreign keys `decisions.check_in_id` and `explanations.finding_id` |
 | `0006_webhook_fn` | `enqueue_sync_for_plaid_item(text)` |
+| `0007_lock_alembic_version` | Nothing new. Revokes Supabase's default grants to `anon` and `authenticated` from `alembic_version` and the `public` functions, which `enable_rls` never touched, then grants back only what 0001, 0002 and 0006 intended. The test auth shim copies those defaults so a future object that skips its revoke fails `test_migrations` |
 
 CI runs upgrade, downgrade, upgrade and `alembic check` on every pull request.
 

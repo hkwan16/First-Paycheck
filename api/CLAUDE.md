@@ -127,7 +127,13 @@ Rules:
   job (rules, reuse of earlier LLM labels, then 50 merchants per gateway call)
   and `record_user_label` for `PATCH /transactions/{id}` (spec 003).
 - Migration names follow spec 001: `0006_webhook_fn` revises `0002_core`, and
-  the next revision (`0003_documents`) revises `0006_webhook_fn`.
+  the next revision (`0003_documents`) revises `0006_webhook_fn`;
+  `0007_lock_alembic_version` revises `0003_documents`.
+- Supabase grants every new table and function in `public` to `anon` and
+  `authenticated` by default. `enable_rls` revokes that per table; a function
+  needs its own `REVOKE ALL ... FROM PUBLIC, anon, authenticated` plus the
+  intended grant (see 0007). The test auth shim copies those defaults, and
+  `test_migrations` fails on any object left granted to `anon`.
 
 ## Documents, extraction and confirm (from M2)
 
