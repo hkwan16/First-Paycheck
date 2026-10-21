@@ -18,7 +18,7 @@ interface NavItem {
 
 const SETUP: readonly NavItem[] = [
   { key: 'link', label: 'Accounts and documents', step: 1, href: '/setup/link' },
-  { key: 'confirm', label: 'Confirm pay stub', step: 2 },
+  { key: 'confirm', label: 'Confirm pay stub', step: 2, href: '/setup/confirm' },
   { key: 'spending', label: 'Spending map', step: 3, href: '/setup/spending' },
   { key: 'decisions', label: 'Decisions', step: 4, href: '/setup/decisions' },
 ];
@@ -31,7 +31,7 @@ const PLAN: readonly NavItem[] = [
 
 const PATHS: readonly [RegExp, NavKey][] = [
   [/^\/setup\/link$/, 'link'],
-  [/^\/setup\/confirm\/[^/]+$/, 'confirm'],
+  [/^\/setup\/confirm(?:\/[^/]+)?$/, 'confirm'],
   [/^\/setup\/spending$/, 'spending'],
   [/^\/setup\/decisions$/, 'decisions'],
   [/^\/why(?:\/[^/]+)?$/, 'why'],
