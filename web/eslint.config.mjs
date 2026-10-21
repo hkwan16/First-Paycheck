@@ -84,7 +84,7 @@ export default defineConfig([
   // App code outside the design system: no hex, no status color classes.
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/components/ui/**', 'src/components/sankey/palette.ts', 'src/lib/design/**'],
+    ignores: ['src/components/ui/**', 'src/lib/design/**'],
     rules: { 'no-restricted-syntax': ['error', ...emDashRules, ...hexRules, ...statusRules] },
   },
   // The tone map may name status colors, but never a raw hex.

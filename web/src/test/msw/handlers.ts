@@ -34,6 +34,7 @@ import {
 import { samplePayStub } from '../fixtures/documents';
 import { sampleJob, SAMPLE_NOW, SAMPLE_SYNCED_AT } from '../fixtures/sample';
 import { db } from './db';
+import { spendingHandlers } from './spending-handlers';
 
 export const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
 
@@ -602,6 +603,8 @@ export const handlers = [
     const job = db.jobs.get(params.id);
     return job ? HttpResponse.json(job) : notFound('Job not found');
   }),
+
+  ...spendingHandlers,
 ];
 
 /** Forget scripted job states (called with resetDb after every test). */

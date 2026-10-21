@@ -1,14 +1,17 @@
 'use client';
 
+import type { ReactNode } from 'react';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Money } from '@/components/ui/Money';
+import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatTile } from '@/components/ui/StatTile';
-import { useAccounts } from '@/lib/api/hooks';
-import { useSpendingSummary } from '@/lib/api/pending';
-import type { Account } from '@/lib/api/types';
-import { formatNumber, formatPct } from '@/lib/money';
 import { maskLabel } from '@/lib/accounts';
+import { apiErrorMessage } from '@/lib/api/errors';
+import { useAccounts } from '@/lib/api/hooks';
+import type { Account, SpendingSummary } from '@/lib/api/types';
+import { formatNumber, formatPct } from '@/lib/money';
 import { periodText } from './spending-format';
 
 const list = new Intl.ListFormat('en-US', { style: 'long', type: 'conjunction' });
@@ -26,32 +29,77 @@ function accountsText(accounts: readonly Account[]): string {
   return list.format([...byInstitution].map(([name, masks]) => `${name} ${list.format(masks)}`));
 }
 
+const NO_INCOME = 'No income to compare yet';
+
+/** A bucket's share as the API rounded it, or why there is none. */
+const share = (pct: string | null, words: (pct: string) => string) =>
+  pct === null ? NO_INCOME : words(formatPct(pct));
+
+/** "Not yet spent: $1,618.94 ..." or, when spending ran past income, by how much. */
+function LeftOver({ cents }: { cents: number }) {
+  const amount = (
+    <strong className="text-ink">
+      <Money cents={cents} />
+    </strong>
+  );
+  return cents < 0 ? (
+    <>Spent more than came in: {amount} from your accounts.</>
+  ) : (
+    <>Not yet spent: {amount} is still in your accounts.</>
+  );
+}
+
+export interface SummaryCardProps {
+  /** The period's totals from `GET /cashflow` (`spending`); undefined while loading. */
+  summary: SpendingSummary | undefined;
+  /** Another period is on its way; the last one stays on screen. */
+  updating?: boolean;
+  error?: unknown;
+  onRetry?: () => void;
+  /** The period picker, in the header row. */
+  picker?: ReactNode;
+}
+
 /**
  * The mockup's summary card: income, essentials, flexible and savings for
- * the period. Every total comes from `GET /spending/summary`; until that
- * route exists the tiles stay skeletons rather than adding up transactions
- * here (no money math in the client).
+ * the period, and what is left. Every total and percentage is the API's
+ * (`calc/spending.py`); the card only formats them.
  */
-export function SummaryCard() {
-  const summary = useSpendingSummary();
+export function SummaryCard({ summary, updating, error, onRetry, picker }: SummaryCardProps) {
   const accounts = useAccounts().data ?? [];
   const loading = summary === undefined;
+  const failed = loading && error != null;
   const paychecks =
     summary &&
     `${formatNumber(summary.paycheck_count)} ${summary.paycheck_count === 1 ? 'paycheck' : 'paychecks'}`;
 
   return (
-    <Card aria-labelledby="summary-title" aria-busy={loading || undefined}>
+    <Card aria-labelledby="summary-title" aria-busy={(loading && !failed) || updating || undefined}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="summary-title" className="m-0">
-          {summary
-            ? `${periodText(summary.start, summary.end)} · ${paychecks}`
-            : 'Your month so far'}
-        </h2>
-        {accounts.length > 0 && (
-          <span className="text-small text-ink-3">{accountsText(accounts)}</span>
-        )}
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h2 id="summary-title" className="m-0">
+            {summary
+              ? `${periodText(summary.start, summary.end)} · ${paychecks}`
+              : 'Your month so far'}
+          </h2>
+          {accounts.length > 0 && (
+            <span className="text-small text-ink-3">{accountsText(accounts)}</span>
+          )}
+        </div>
+        {picker}
       </div>
+      {failed && (
+        <Notice tone="warning" compact role="alert" className="items-center">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>
+              Could not load your totals. {apiErrorMessage(error, 'Check your connection.')}
+            </span>
+            <Button size="sm" onClick={onRetry}>
+              Try again
+            </Button>
+          </div>
+        </Notice>
+      )}
       <div className="grid grid-cols-4 gap-3 max-wide:grid-cols-2">
         <StatTile
           tone="plum"
@@ -65,30 +113,26 @@ export function SummaryCard() {
           label="Essentials"
           loading={loading}
           value={summary && <Money cents={summary.essentials_cents} />}
-          sub={summary && `${formatPct(summary.essentials_pct)} of income`}
+          sub={summary && share(summary.essentials_pct, (p) => `${p} of income`)}
         />
         <StatTile
           tone="coral"
           label="Flexible"
           loading={loading}
           value={summary && <Money cents={summary.flexible_cents} />}
-          sub={summary && `${formatPct(summary.flexible_pct)} of income`}
+          sub={summary && share(summary.flexible_pct, (p) => `${p} of income`)}
         />
         <StatTile
           tone="teal"
           label="Savings"
           loading={loading}
           value={summary && <Money cents={summary.savings_cents} />}
-          sub={summary && `Savings rate ${formatPct(summary.savings_rate_pct)}`}
+          sub={summary && share(summary.savings_rate_pct, (p) => `Savings rate ${p}`)}
         />
       </div>
       {summary ? (
         <p className="m-0 text-small text-ink-3">
-          Not yet spent:{' '}
-          <strong className="text-ink">
-            <Money cents={summary.left_cents} />
-          </strong>{' '}
-          is still in your accounts.
+          <LeftOver cents={summary.left_over_cents} />
         </p>
       ) : (
         <p className="m-0 text-small text-ink-3">

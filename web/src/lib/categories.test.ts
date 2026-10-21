@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '@/lib/api/schema';
-import { BUCKETS, CATEGORIES, categoryGroups, categoryInfo } from './categories';
+import { BUCKETS, CATEGORIES, categoryGroups, categoryInfo, categoryLabel } from './categories';
 
 type Category = components['schemas']['CategoryPatch']['category'];
 
@@ -74,5 +74,11 @@ describe('categories', () => {
     ]);
     const ids = groups.flatMap((g) => g.categories.map((c) => c.id));
     expect(ids.sort()).toEqual([...API_CATEGORIES].sort());
+  });
+
+  it('labels a category id the API sends as a plain string, readable even when unknown', () => {
+    expect(categoryLabel('phone_internet')).toBe('Phone and internet');
+    expect(categoryLabel('savings_investment')).toBe('Savings transfer');
+    expect(categoryLabel('pet_care')).toBe('Pet care');
   });
 });

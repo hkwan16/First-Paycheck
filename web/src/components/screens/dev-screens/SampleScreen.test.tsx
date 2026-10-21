@@ -41,7 +41,7 @@ describe('SampleScreen', () => {
     expect(requests).toEqual([]);
   });
 
-  it('renders the Spending screen from the sample data, with no requests', async () => {
+  it('renders the Spending screen from the sample data with the Sankey on, with no requests', async () => {
     const requests = countRequests();
     render(<SampleScreen screen="spending" />);
     const table = await screen.findByRole('table', { name: 'Transactions' });
@@ -50,6 +50,13 @@ describe('SampleScreen', () => {
       'aria-current',
       'page',
     );
+    expect(screen.getByRole('region', { name: 'October 1 to 17 · 2 paychecks' })).toHaveTextContent(
+      '$3,992.08',
+    );
+    const flow = screen.getByRole('region', { name: 'Where each dollar of October pay went' });
+    expect(within(flow).getByRole('button', { name: 'Take-home $3,992.08' })).toBeInTheDocument();
+    const recurring = screen.getByRole('region', { name: 'Recurring charges' });
+    expect(within(recurring).getAllByRole('listitem')).toHaveLength(5);
     expect(requests).toEqual([]);
   });
 

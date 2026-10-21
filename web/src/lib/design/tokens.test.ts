@@ -7,8 +7,8 @@ import { findHexColors } from './tokens';
 const SRC = join(import.meta.dirname, '..', '..');
 const GLOBALS = join(SRC, 'app', 'globals.css');
 
-/** The only two files allowed to spell a color as hex. */
-const HEX_ALLOWED = new Set(['app/globals.css', 'components/sankey/palette.ts']);
+/** The only file allowed to spell a color as hex; the Sankey reads flow colors from tone.ts. */
+const HEX_ALLOWED = new Set(['app/globals.css']);
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -43,7 +43,7 @@ describe('findHexColors', () => {
 });
 
 describe('design tokens', () => {
-  it('no file under src/ spells a hex color except globals.css and sankey/palette.ts', () => {
+  it('no file under src/ spells a hex color except globals.css', () => {
     const offenders = walk(SRC)
       .filter((path) => !HEX_ALLOWED.has(rel(path)))
       .filter((path) => /\.(tsx?|css|mjs|js|json|svg|html)$/.test(path))

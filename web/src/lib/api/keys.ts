@@ -67,9 +67,13 @@ export const queryKeys = {
 
   // Routes that do not exist yet (see pending.ts). Their keys are reserved here
   // so job invalidation already covers them when they land.
+  /** Prefixes of every period's read (hooks/spending.ts). */
   spendingSummary: () => ['get', '/spending/summary'] as const,
   cashflow: () => ['get', '/cashflow'] as const,
   recurring: () => ['get', '/recurring'] as const,
+
+  // Routes that do not exist yet (see pending.ts). Their keys are reserved here
+  // so job invalidation already covers them when they land.
   checkIns: () => ['get', '/check-ins'] as const,
   /** The plan screen's read (M4); a saved decision changes it. */
   plan: () => ['get', '/plan'] as const,
@@ -105,7 +109,14 @@ export const invalidateAccounts = (client: QueryClient) =>
 /** After a category fix: the list, per-account reads and every total built from them. */
 export const invalidateSpending = (client: QueryClient) => invalidateAll(client, spendingReads);
 
-/** After unlinking: the institution's accounts and transactions are gone. */
+/** After a recurring charge is marked or renamed. */
+export const invalidateRecurring = (client: QueryClient) =>
+  invalidateAll(client, [queryKeys.recurring()]);
+
+/**
+ * After unlinking (the institution's accounts and transactions are gone) or
+ * a CSV import (a new account and its transactions are there).
+ */
 export const invalidateLinkedData = (client: QueryClient) =>
   invalidateAll(client, [queryKeys.accounts(), ...spendingReads]);
 

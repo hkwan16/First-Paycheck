@@ -63,6 +63,18 @@ export function categoryInfo(category: Category): CategoryInfo {
   return CATEGORIES[category];
 }
 
+const isCategory = (id: string): id is Category => Object.hasOwn(CATEGORIES, id);
+
+/**
+ * The label for a category id read as a plain string (the summary's
+ * `CategoryTotal.category`); an id this file does not know yet reads as words.
+ */
+export function categoryLabel(id: string): string {
+  if (isCategory(id)) return CATEGORIES[id].label;
+  const words = id.replaceAll('_', ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export interface CategoryGroup {
   bucket: Bucket;
   label: string;

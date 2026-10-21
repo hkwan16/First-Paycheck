@@ -12,13 +12,15 @@ over a generated OpenAPI client, and Supabase Auth. The visual target is Mockup 
   Confirm screen's consistency check (`mathGate`, below): a display-side gate over the person's
   own entries, with the server's 422 as the authority.
 - **Tokens only.** Colors, radii, shadows, type sizes and durations are the `@theme` tokens in
-  `src/app/globals.css`. No raw hex anywhere else in `src/` (only `globals.css` and
-  `components/sankey/palette.ts`); `src/lib/design/tokens.test.ts` and ESLint both enforce it.
+  `src/app/globals.css`. No raw hex anywhere else in `src/`; `src/lib/design/tokens.test.ts` and
+  ESLint both enforce it.
 - **Color means something.** Components take a `Tone`, not a color (`lib/design/tone.ts`): a
   `Hue` (`blue | coral | teal | plum | neutral`) marks a kind of thing, a `Status`
   (`confirmed | warning | off`) marks a state. Green is reachable only as `confirmed`, amber as
   `warning`, red as `off`. ESLint rejects `bg-|text-|border-|fill-|stroke-|ring-` plus
-  `green|amber|red` outside `components/ui/**`, `lib/design/**` and `sankey/palette.ts`.
+  `green|amber|red` outside `components/ui/**` and `lib/design/**`. The cash-flow diagram and
+  legend swatches take a `FlowColor` (token names, mapped to classes by `flowBg`, `flowFill`,
+  `flowRing`), never a status.
 - **Tests first.** Every component, hook, reducer and lib function gets a failing `*.test.ts(x)`
   before the implementation. Config files are exempt.
 - **No em dash** in any text, code, comment or commit. ESLint flags it in strings and JSX.
@@ -44,8 +46,9 @@ run `corepack enable` once, or prefix commands with `corepack pnpm`. Node 22.13+
 | `pnpm check:api`                        | Regenerate and fail if the committed schema drifted (CI)                    |
 
 `pnpm e2e` starts `next dev` on :3100 (`/dev/kit` is a 404 in production builds) with
-`NEXT_PUBLIC_FEATURES=e2e`. `playwright.config.ts` loads `web/.env.local` (variables already in the
-environment win), so local runs use your Supabase project; see "End-to-end auth tests" below.
+`NEXT_PUBLIC_FEATURES=e2e,sankey`. `playwright.config.ts` loads `web/.env.local` (variables
+already in the environment win), so local runs use your Supabase project; see "End-to-end auth
+tests" below.
 Screenshot baselines live in `e2e/__screenshots__/` per platform: `*-darwin.png` for local macOS
 runs, `*-linux.png` for CI.
 CI runs Playwright inside `mcr.microsoft.com/playwright:v1.64.1-noble`; regenerate Linux
@@ -65,12 +68,14 @@ src/proxy.ts        Next 16 proxy (formerly middleware): refreshes the Supabase 
 src/components/ui/  design system (below)
 src/components/chrome/  app frame (below)
 src/components/screens/<screen>/  one 'use client' screen component per page
+src/components/sankey/  the cash-flow diagram: layout.ts, popover.ts, keyboard.ts, useFlowPopover,
+                    useContainerWidth, CashFlowSankey, FlowStack (see "Cash flow diagram")
 src/components/icons.tsx  the mockup's SVG glyphs, decorative, drawn in currentColor
 src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts, client.ts,
-                    upload.ts, keys.ts, errors.ts, pending.ts, hooks/), auth/ (next-path,
-                    protected, validation, errors, account), supabase/ (env, client, server,
-                    proxy), design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts,
-                    categories.ts, documents.ts, decisions.ts, deep-equal.ts, features.ts,
+                    upload.ts, keys.ts, errors.ts, hooks/), auth/ (next-path, protected,
+                    validation, errors, account), supabase/ (env, client, server, proxy),
+                    design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
+                    documents.ts, decisions.ts, deep-equal.ts, features.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts
 src/app/dev/screens/{link,spending,confirm,confirm/manual,decisions,why,why/fallback}  a screen on
                     the sample data, no API (development only)
@@ -78,11 +83,13 @@ src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fa
                     fixtures/sample.ts (the Acme / J. Rivera dataset), fixtures/documents.ts (the
                     Acme pay stub as the API proposes it), fixtures/decisions.ts (profile, 401(k)
                     decision, explanations, calendar event), fixtures/k401-results.json (calculator
-                    results made by api/calc, with make-k401-results.py), msw/db.ts (in-memory API
-                    state), msw/handlers.ts (every route, stateful)
-e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions),
-                    support/auth.ts, support/api.ts, fixtures/ (synthetic acme-paystub.pdf and
-                    the script that makes it), baselines
+                    results made by api/calc, with make-k401-results.py), fixtures/cashflow.ts (the
+                    sample period's cash flow, spending summary and recurring charges), msw/db.ts
+                    (in-memory API state), msw/handlers.ts (every route, stateful),
+                    msw/spending-handlers.ts (cash flow, summary, recurring; `spendingDb`)
+e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions,
+                    import), support/auth.ts, support/api.ts, fixtures/ (synthetic
+                    acme-paystub.pdf and the script that makes it, bank-export.csv), baselines
 ```
 
 ## Component map
@@ -131,9 +138,10 @@ next is a real disabled button, never a dead link).
   `apiErrorMessage(error, fallback)` (`lib/api/errors.ts`), never by printing the object.
 - **Keys** (`lib/api/keys.ts`): `$api` caches under `[method, path, init?]`, so `['get', path]` is a
   prefix of every read of a route. Invalidate through the helpers there (`invalidateAccounts`,
-  `invalidateSpending`, `invalidateLinkedData`, `invalidateForJob`), not with keys spelled at call
-  sites. `useTransactions` is an infinite query under `queryKeys.transactionPages(filters)`; the
-  trailing `'pages'` keeps its `InfiniteData` apart from plain reads under the same prefix.
+  `invalidateSpending`, `invalidateLinkedData`, `invalidateRecurring`, `invalidateForJob`), not
+  with keys spelled at call sites. `useTransactions` is an infinite query under
+  `queryKeys.transactionPages(filters)`; the trailing `'pages'` keeps its `InfiniteData` apart
+  from plain reads under the same prefix.
   Documents: `invalidateDocuments` after an upload or extraction, `invalidateAfterConfirm`
   (documents and pay stubs) after a confirm. Decisions: `invalidateDecisions` (the list and every
   `GET /decisions/{id}`) and `invalidateAfterDecision` (also calendar, plan and goals) after a save.
@@ -171,19 +179,32 @@ next is a real disabled button, never a dead link).
   a job kind starts mattering to a screen). Show it with
   `<JobProgress job={job.data} failed={job.isFailed} onRetry={...} />`. Sync jobs report no
   percent, so the bar stays indeterminate until they end.
-- **Pending routes** (`lib/api/pending.ts`): a screen that needs a route the API does not have yet
-  calls a hook there with the signature it will keep, returning `undefined`, next to a shape with
-  a `TODO(<route>)`. Screens render `undefined` as a skeleton (totals) or an empty state (lists),
-  never a client-side substitute. Current: `useSpendingSummary` (`GET /spending/summary`: the
-  Spending tiles, and the category-to-bucket map that replaces `lib/categories.ts`; the route
-  is now in `schema.d.ts`, so it is ready to wire). To wire one: `make types`, delete its shape, return
-  `$api.useQuery(...).data` under the key reserved in `keys.ts`, and add the MSW handler.
-- **Uploads** (`lib/api/upload.ts`): `POST /docs` goes over XMLHttpRequest, because fetch cannot
-  report upload progress. It shares `sessionTokens` with the fetch middleware (one refresh and one
-  resend on a 401), and fails with `UploadError` (`status`, `code`, `retryAfterSeconds`; `error`
-  reads like any API error). `useUploadDocument` wraps it; the Link documents card then calls
-  `useExtractDocument` and follows the job with `useJob`. `lib/documents.ts` maps a document's
-  status to its badge and reason text; `isReviewable`/`newestReviewable` pick what Confirm opens.
+- **A route the API does not have yet**: a screen that needs one gets a hook with the signature
+  it will keep, returning `undefined`, next to a shape with a `TODO(<route>)` (the pattern
+  `lib/api/pending.ts` held until every route landed). Screens render `undefined` as a skeleton
+  (totals) or an empty state (lists), never a client-side substitute. To wire one: `make types`,
+  delete its shape, return `$api.useQuery(...).data` under the key reserved in `keys.ts`, and add
+  the MSW handler.
+- **Spending reads** (`hooks/spending.ts`, `hooks/recurring.ts`): `useCashflow(period)` is
+  `GET /cashflow`, the withholding lines beside the period's spending summary; the Spending screen
+  reads its tiles and its diagram from that one response, and keeps the last period on screen
+  while another loads (`keepPreviousData`). `useSpendingSummary(period?)` is the summary alone
+  (setup progress reads it). A `Period` is `{ start, end }`; `null` sends no dates and the API
+  reads the last complete UTC month. `lib/periods.ts` builds the picker's options from
+  `useToday()` (null on the server, so nothing reads the clock while rendering).
+  `useRecurring()` lists recurring charges; `useUpdateRecurring()` PATCHes `user_status` or
+  `name` optimistically, with rollback.
+- **Uploads** (`lib/api/upload.ts`): `POST /docs` and `POST /accounts/import` (`importCsv`,
+  wrapped by `useImportCsv`) go over XMLHttpRequest, because fetch cannot report upload progress.
+  They share `sessionTokens` with the fetch middleware (one refresh and one resend on a 401), and
+  fail with `UploadError` (`status`, `code`, `retryAfterSeconds`; `error` reads like any API
+  error). `useUploadDocument` wraps the document upload; the Link documents card then calls
+  `useExtractDocument` and follows the job with `useJob`. A CSV import refused with 422
+  `csv_invalid` carries its row errors: `csvProblems(error)` reads `{ errors, total }` (the first
+  50 and how many in all); the Link screen's `CsvImport` lists them, offers Try again on 409
+  `import_conflict`, and follows the two job ids the import returns. `lib/documents.ts` maps a
+  document's status to its badge and reason text; `isReviewable`/`newestReviewable` pick what
+  Confirm opens.
 - **Money** is formatted only. Transactions keep Plaid's sign (positive is money out):
   `formatTransactionAmount` and `transactionFlow` in `lib/money.ts` turn that into "-$84.12" and
   "+$1,996.04". Counting rows (the source badges) is fine; summing amounts is not.
@@ -194,6 +215,9 @@ next is a real disabled button, never a dead link).
   from `src/test/fixtures/sample.ts` and reset after every test, so a refetch after a PATCH reads
   the new value. `emptyDb()` gives a new user; assign `db.transactions` for pagination cases;
   `server.use(...)` overrides one route for an error or a delay.
+- Spending routes (`GET /cashflow`, `GET /spending/summary`, `GET /recurring`,
+  `PATCH /recurring/{id}`) live in `src/test/msw/spending-handlers.ts` over `spendingDb`, seeded
+  from `fixtures/cashflow.ts` and reset after every test.
 - `scriptJob(states, onSucceeded)` scripts what `GET /jobs/{id}` returns poll by poll;
   `syncJobStates(id)` is queued, running at 40%, succeeded. Drive polling with
   `vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) })` and
@@ -278,6 +302,29 @@ that is on but not built says "Coming in a later milestone."
   notice, with the calculator result still shown. An unknown decision is "Decision not found"
   with a link back to `/why`.
 
+## Cash flow diagram
+
+`components/sankey` draws `GET /cashflow` as the mockup does: absolutely positioned HTML buttons
+for the amounts over one SVG of cubic bands. Not d3-sankey and not a chart library.
+
+- **Layout** (`layoutCashFlow(flow, containerWidth)`) is pure geometry: four columns (gross pay;
+  withholding lines and take-home; buckets; categories), node heights from a scale fixed by a
+  400 px target for gross pay (income when there is no confirmed stub), so the "1 px is about $N"
+  badge is computed, not hand-tuned. Amounts are placed, never added: a node is as tall as its own
+  value or the bands leaving it, whichever is more. Colors are `FlowColor` token names.
+  `hostW = max(880, containerWidth)`; narrower containers scroll sideways. Under 640 px the
+  Spending card draws `FlowStack` (stacked bars and lists) instead.
+- **Popover** state is `flowPopoverReducer` (`popover.ts`) through `useFlowPopover`: hover opens
+  after leaving another node only past an 80 ms grace, focus opens, pointer-down pins, outside
+  click and Escape close and return focus to the node. The popover is `role="group"`, named by
+  its title, and the open node points at it with `aria-controls`.
+- **Keyboard** (`nextFocus` in `keyboard.ts`): one tab stop (roving tabindex); Up and Down move
+  within a column, Home and End to its ends, Right and Left follow a band (or the nearest node in
+  the next column).
+- `useContainerWidth` measures with a ResizeObserver and renders at 928 px on the server.
+- The popover enters with `animate-pop-in` (a fade under reduced motion). Playwright waits for
+  that animation before axe runs: mid-fade text is translucent and fails contrast.
+
 ## Adding a screen
 
 1. Write the spec's tests first: `src/components/screens/<screen>/<Screen>Screen.test.tsx`, with
@@ -350,6 +397,12 @@ previews without secrets).
 | `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                                                                     |
 | `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                                                             |
 | `E2E_API_URL`                                                      | `link.spec.ts`, `confirm.spec.ts`, `spending.spec.ts` and `decisions.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it |
+| Variable                                                           | Needed for                                                                                                                                                                                                   |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------    |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)                                                                                                                                           |
+| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                                                                     |
+| `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                                                             |
+| `E2E_API_URL`                                                      | `link.spec.ts`, `confirm.spec.ts`, `spending.spec.ts` and `import.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it    |
 
 Missing variables skip those tests with a message saying which to set. The e2e user must be a
 confirmed user: the hosted project requires email confirmation, so create it in the Supabase
@@ -359,7 +412,11 @@ tests share.
 
 `link.spec.ts` (project `authenticated-link`) unlinks everything, links Plaid's sandbox bank with
 the e2e-only button, follows the sync and sets roles; `spending.spec.ts` (project
-`authenticated-spending`, which depends on it) reads those transactions and saves a category fix.
+`authenticated-spending`, which depends on it) reads those transactions, checks that the
+diagram's buckets match the summary tiles, drives a node from the keyboard, changes the period
+and saves a category fix; `import.spec.ts` (project `authenticated-import`, after Spending)
+imports `e2e/fixtures/bank-export.csv` (five synthetic rows) into a new CSV account, imports it
+again without making a second account, and checks a broken file's row errors.
 Both change the e2e user's data, so they are ordered projects with serial files rather than
 parallel tests. `confirm.spec.ts` (project `authenticated-confirm`) uploads
 `e2e/fixtures/acme-paystub.pdf`, a synthetic stub with an example SSN the API must redact and a
@@ -378,7 +435,7 @@ fixture.
 | Flag                    | Effect                                                                                                                                                                                       |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `calculators=<id>+<id>` | Live calculators (`401k_match`, `emergency_fund`, `health_plan`, `w4`); the rest render as muted "After alpha" placeholders. Unset means all live. The alpha ships `calculators=401k_match`. |
-| `sankey`                | Show the cash-flow Sankey on the Spending screen.                                                                                                                                            |
+| `sankey`                | Show the cash-flow diagram on the Spending screen (`/dev/screens/spending` shows it regardless).                                                                                             |
 | `e2e`                   | Test affordances: the sandbox-link button, and no React Query devtools.                                                                                                                      |
 
 ## Gotchas

@@ -41,7 +41,8 @@ describe('AppSideNav', () => {
         'Confirm pay stub, done',
       ),
     );
-    expect(screen.getByRole('link', { name: 'Spending map' })).toBeInTheDocument();
+    // Transactions, and a summary (GET /spending/summary) with none uncategorized: step 3 is done.
+    expect(await screen.findByRole('link', { name: 'Spending map, done' })).toBeInTheDocument();
   });
 
   it('marks nothing done before the data arrives', () => {

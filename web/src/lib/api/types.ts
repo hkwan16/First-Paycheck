@@ -57,3 +57,19 @@ export type Explanation = Schemas['ExplanationOut'];
 export type ExplainIn = Schemas['ExplainIn'];
 export type Citation = Schemas['CitationOut'];
 export type NumberClaim = Schemas['NumberClaim'];
+
+// Spending, cash flow, recurring charges and CSV import (M5).
+export type SpendingSummary = Schemas['SpendingSummary'];
+export type SpendingBucket = Schemas['CategoryTotal']['bucket'];
+export type CategoryTotal = Schemas['CategoryTotal'];
+export type CashFlow = Schemas['CashFlow'];
+export type PayStubFlow = Schemas['PayStubFlow'];
+export type WithholdingTotal = Schemas['WithholdingTotal'];
+export type WithholdingLine = Schemas['WithholdingLine'];
+export type RecurringCharge = Schemas['RecurringChargeOut'];
+export type RecurringPatch = Schemas['RecurringPatch'];
+export type RecurringStatus = Schemas['RecurringStatus'];
+export type RecurringUserStatus = Schemas['RecurringUserStatus'];
+export type RecurringCadence = Schemas['RecurringCadence'];
+export type CsvImport = Schemas['CsvImport'];
+export type AmountSign = Schemas['AmountSign'];
