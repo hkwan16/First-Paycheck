@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import { features } from '@/lib/features';
 import { setupProgress, type SetupFacts, type SetupProgress } from '@/lib/setup-progress';
-import { useDecisions, useSpendingSummary } from '../pending';
+import { useDecisions } from '../pending';
 import { useAccounts } from './accounts';
 import { useDocuments } from './documents';
 import { usePayStubs } from './profile';
+import { useSpendingSummary } from './spending';
 import { useTransactions } from './transactions';
 
 /** The page size the Spending screen reads; sharing it shares the cache. */
@@ -19,7 +20,8 @@ export function useSetupFacts(): SetupFacts {
   const { transactions } = useTransactions({ limit: TRANSACTIONS_PAGE_SIZE });
   const documents = useDocuments().data;
   const payStubs = usePayStubs().data;
-  const summary = useSpendingSummary();
+  // The default period, as the Spending screen opens on it.
+  const summary = useSpendingSummary().data;
   const decisions = useDecisions();
 
   return useMemo(

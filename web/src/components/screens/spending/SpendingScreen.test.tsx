@@ -1,9 +1,11 @@
 import { delay, http, HttpResponse } from 'msw';
-import { afterEach, describe, expect, it } from 'vitest';
-import { sampleTransactions } from '@/test/fixtures/sample';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { emptyCashflow } from '@/test/fixtures/cashflow';
+import { SAMPLE_NOW, sampleTransactions } from '@/test/fixtures/sample';
 import { db, emptyDb } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
+import { spendingDb } from '@/test/msw/spending-handlers';
 import { renderWithProviders, screen, waitFor, within } from '@/test/render';
 import { SpendingScreen } from './SpendingScreen';
 
@@ -12,36 +14,234 @@ const row = (merchant: string, index = 0) =>
 const categoryOf = (merchant: string, index = 0) =>
   within(row(merchant, index)).getByRole('combobox', { name: `Category for ${merchant}` });
 
-async function renderSpending() {
-  const rendered = renderWithProviders(<SpendingScreen />);
+async function renderSpending(props: Parameters<typeof SpendingScreen>[0] = {}) {
+  const rendered = renderWithProviders(<SpendingScreen {...props} />, {
+    advanceTimers: vi.isFakeTimers() ? vi.advanceTimersByTime : undefined,
+  });
   await screen.findAllByRole('row', { name: /Sweetgreen/ });
   return rendered;
 }
 
 afterEach(() => server.events.removeAllListeners());
 
+const summaryRegion = () => screen.getByRole('region', { name: /paychecks?$|Your month so far/ });
+const tile = (label: string) => within(summaryRegion()).getByText(label).parentElement!;
+
+/** Query strings of every `GET /cashflow`. */
+function cashflowReads() {
+  const seen: string[] = [];
+  server.events.on('request:start', ({ request }) => {
+    const url = new URL(request.url);
+    if (url.pathname === '/cashflow') seen.push(url.search);
+  });
+  return seen;
+}
+
 describe('SpendingScreen summary', () => {
-  it('shows the four bucket tiles as skeletons until the summary route exists', async () => {
+  beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) }));
+  afterEach(() => vi.useRealTimers());
+
+  it('shows the four bucket tiles from GET /cashflow, exactly as the API totals them', async () => {
+    await renderSpending();
+    await waitFor(() => expect(summaryRegion()).not.toHaveAttribute('aria-busy'));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      "Where October's money went",
+    );
+    expect(summaryRegion()).toHaveAccessibleName('October 1 to 17 · 2 paychecks');
+    expect(tile('Income')).toHaveTextContent('$3,992.08');
+    expect(tile('Income')).toHaveTextContent('2 paychecks, after taxes and deductions');
+    expect(tile('Essentials')).toHaveTextContent('$1,823.25');
+    expect(tile('Essentials')).toHaveTextContent('46% of income');
+    expect(tile('Flexible')).toHaveTextContent('$249.89');
+    expect(tile('Flexible')).toHaveTextContent('6% of income');
+    expect(tile('Savings')).toHaveTextContent('$300.00');
+    expect(tile('Savings')).toHaveTextContent('Savings rate 8%');
+    expect(summaryRegion()).toHaveTextContent(
+      'Not yet spent: $1,618.94 is still in your accounts.',
+    );
+  });
+
+  it('shows skeletons, never client sums, until the totals arrive', async () => {
+    server.use(
+      http.get(apiUrl('/cashflow'), async () => {
+        await delay('infinite');
+        return HttpResponse.json({});
+      }),
+    );
     await renderSpending();
     const summary = screen.getByRole('region', { name: /Your month so far/ });
     expect(summary).toHaveAttribute('aria-busy', 'true');
-    for (const label of ['Income', 'Essentials', 'Flexible', 'Savings']) {
-      expect(within(summary).getByText(label)).toBeInTheDocument();
-    }
-    // No total is computed on the client: no dollar amount appears.
     expect(summary).not.toHaveTextContent('$');
     expect(summary.querySelectorAll('[data-skeleton]').length).toBeGreaterThanOrEqual(8);
   });
 
   it('names the linked accounts the summary covers', async () => {
     await renderSpending();
-    const summary = screen.getByRole('region', { name: /Your month so far/ });
-    expect(summary).toHaveTextContent('Chase ··4821 and ··7730');
+    expect(summaryRegion()).toHaveTextContent('Chase ··4821 and ··7730');
+  });
+
+  it('says when more went out than came in', async () => {
+    spendingDb.cashflow.spending.left_over_cents = -12_345;
+    await renderSpending();
+    expect(await within(summaryRegion()).findByText(/Spent more than came in/)).toHaveTextContent(
+      'Spent more than came in: -$123.45 from your accounts.',
+    );
+  });
+
+  it('leaves the percentages out when there was no income', async () => {
+    spendingDb.cashflow = emptyCashflow('2026-10-01', '2026-10-17');
+    await renderSpending();
+    await waitFor(() => expect(tile('Essentials')).toHaveTextContent('$0.00'));
+    expect(tile('Essentials')).toHaveTextContent('No income to compare yet');
+    expect(tile('Savings')).toHaveTextContent('No income to compare yet');
+  });
+
+  it('offers a retry when the totals cannot be read', async () => {
+    server.use(
+      http.get(apiUrl('/cashflow'), () =>
+        HttpResponse.json({ error: { code: 'x', message: 'Database is busy' } }, { status: 503 }),
+      ),
+    );
+    const { user } = await renderSpending();
+    const alert = await within(summaryRegion()).findByRole('alert');
+    expect(alert).toHaveTextContent('Could not load your totals. Database is busy');
+    server.resetHandlers();
+    await user.click(within(alert).getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(tile('Income')).toHaveTextContent('$3,992.08'));
+  });
+
+  it("picks a period: this month so far, the API's last complete month, or one before", async () => {
+    const reads = cashflowReads();
+    const { user } = await renderSpending();
+    const picker = await screen.findByRole('combobox', { name: 'Period' });
+    await waitFor(() => expect(picker).toHaveValue('2026-10'));
+    expect(
+      within(picker)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual([
+      'October 2026 so far',
+      'September 2026',
+      'August 2026',
+      'July 2026',
+      'June 2026',
+      'May 2026',
+    ]);
+
+    await user.selectOptions(picker, 'August 2026');
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+        "Where August's money went",
+      ),
+    );
+    expect(picker).toHaveValue('2026-08');
+
+    await user.selectOptions(picker, 'October 2026 so far');
+    await waitFor(() => expect(reads).toContain('?start=2026-10-01&end=2026-10-17'));
+
+    // The last complete month is the API's default: no dates are sent.
+    await user.selectOptions(picker, 'September 2026');
+    expect(reads).toEqual([
+      '',
+      '?start=2026-08-01&end=2026-08-31',
+      '?start=2026-10-01&end=2026-10-17',
+    ]);
+  });
+
+  it('opens on a given period', async () => {
+    const reads = cashflowReads();
+    renderWithProviders(
+      <SpendingScreen initialPeriod={{ start: '2026-10-01', end: '2026-10-17' }} />,
+    );
+    await waitFor(() => expect(reads).toEqual(['?start=2026-10-01&end=2026-10-17']));
   });
 
   it('has no cash flow diagram while the sankey flag is off', async () => {
     await renderSpending();
     expect(screen.queryByRole('heading', { name: /Where each dollar/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('SpendingScreen cash flow (sankey flag on)', () => {
+  beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) }));
+  afterEach(() => vi.useRealTimers());
+
+  const card = () => screen.getByRole('region', { name: /Where each dollar/ });
+  const node = (name: string) => within(card()).getByRole('button', { name });
+
+  it('draws the period as a Sankey with the computed scale', async () => {
+    await renderSpending({ showSankey: true });
+    expect(
+      await screen.findByRole('heading', { name: 'Where each dollar of October pay went' }),
+    ).toBeInTheDocument();
+    expect(within(card()).getByText('Scale: 1 px is about $14')).toBeInTheDocument();
+    expect(node('Gross pay, 2 stubs $5,416.66')).toBeInTheDocument();
+    expect(node('Take-home $3,992.08')).toBeInTheDocument();
+    expect(within(card()).getByText('Pay stubs, October')).toBeInTheDocument();
+  });
+
+  it("lists a category's transactions in its popover, with who labeled each", async () => {
+    const { user } = await renderSpending({ showSankey: true });
+    await user.hover(await within(card()).findByRole('button', { name: 'Shopping $204.90' }));
+    const popover = within(card()).getByRole('group', { name: 'Shopping' });
+    expect(popover).toHaveTextContent('2 transactions in this period');
+    const lines = within(popover).getAllByRole('listitem');
+    expect(lines.map((l) => l.textContent)).toEqual([
+      'Costco WholesaleAI · 62%-$142.60Oct 13 · ··4821',
+      'AmazonAI · 78%-$62.30Oct 9 · ··4821',
+    ]);
+  });
+
+  it('explains take-home from both sides: the pay stubs and the deposits', async () => {
+    const { user } = await renderSpending({ showSankey: true });
+    await user.hover(await within(card()).findByRole('button', { name: 'Take-home $3,992.08' }));
+    const popover = within(card()).getByRole('group', { name: 'Take-home' });
+    expect(popover).toHaveTextContent('Net pay on 2 pay stubs: $3,992.08');
+    expect(popover).toHaveTextContent('Deposited as income: $3,992.08');
+  });
+
+  it("gives the buckets' shares of income as the API rounded them", async () => {
+    const { user } = await renderSpending({ showSankey: true });
+    await user.hover(await within(card()).findByRole('button', { name: 'Essentials $1,823.25' }));
+    expect(within(card()).getByRole('group', { name: 'Essentials' })).toHaveTextContent(
+      '45.7% of income',
+    );
+  });
+
+  it('points from a $0 401(k) to the decision that sets it', async () => {
+    const { user } = await renderSpending({ showSankey: true });
+    await user.click(
+      await within(card()).findByRole('button', { name: '401(k), not elected $0.00' }),
+    );
+    const popover = within(card()).getByRole('group', { name: '401(k), not elected' });
+    expect(
+      within(popover).getByRole('link', { name: 'See what a 401(k) match is worth' }),
+    ).toHaveAttribute('href', '/setup/decisions');
+  });
+
+  it('stacks bars instead under 640 px, with the same amounts and no scale', async () => {
+    const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(358);
+    await renderSpending({ showSankey: true });
+    width.mockRestore();
+    await waitFor(() =>
+      expect(within(card()).getByRole('region', { name: 'Take-home' })).toBeInTheDocument(),
+    );
+    expect(within(card()).queryByRole('img', { name: /Cash flow bands/ })).not.toBeInTheDocument();
+    expect(within(card()).queryByText(/1 px is about/)).not.toBeInTheDocument();
+    expect(within(card()).getByRole('region', { name: 'Gross pay, 2 stubs' })).toHaveTextContent(
+      'Federal tax$595.52',
+    );
+  });
+
+  it('says there is nothing to draw for an empty period', async () => {
+    spendingDb.cashflow = emptyCashflow('2026-10-01', '2026-10-17');
+    await renderSpending({ showSankey: true });
+    expect(
+      await within(card()).findByText(
+        'Nothing to draw for October 1 to 17 yet. Confirm a pay stub and link the account your pay lands in.',
+      ),
+    ).toBeInTheDocument();
+    expect(within(card()).queryByRole('img')).not.toBeInTheDocument();
   });
 });
 

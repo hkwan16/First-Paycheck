@@ -11,6 +11,7 @@ import { SpendingScreen } from '@/components/screens/spending/SpendingScreen';
 import { $api } from '@/lib/api/client';
 import { ACCOUNT_COUNT_LIMIT, TRANSACTIONS_PAGE_SIZE } from '@/lib/api/hooks';
 import { queryKeys } from '@/lib/api/keys';
+import { SAMPLE_PERIOD, sampleCashflow, sampleRecurring } from '@/test/fixtures/cashflow';
 import {
   manualEntryProposal,
   PAY_STUB_DOC_ID,
@@ -44,7 +45,10 @@ const SCREENS: Record<SampleScreenName, { nav: NavKey; render: () => ReactNode }
   link: { nav: 'link', render: () => <LinkScreen showSandboxLink={false} /> },
   confirm: { nav: 'confirm', render: () => <ConfirmScreen documentId={PAY_STUB_DOC_ID} /> },
   'confirm-manual': { nav: 'confirm', render: () => <ConfirmScreen documentId={MANUAL_DOC_ID} /> },
-  spending: { nav: 'spending', render: () => <SpendingScreen /> },
+  spending: {
+    nav: 'spending',
+    render: () => <SpendingScreen showSankey initialPeriod={SAMPLE_PERIOD} />,
+  },
 };
 
 /**
@@ -79,6 +83,9 @@ export function seededClient() {
     pages: [{ items: [...sampleTransactions], next_cursor: null }],
     pageParams: [null],
   });
+  const period = { params: { query: { ...SAMPLE_PERIOD } } };
+  seed($api.queryOptions('get', '/cashflow', period).queryKey, sampleCashflow());
+  seed(queryKeys.recurring(), [...sampleRecurring]);
   for (const account of sampleAccounts) {
     const { queryKey } = $api.queryOptions('get', '/transactions', {
       params: { query: { account_id: account.id, limit: ACCOUNT_COUNT_LIMIT } },
