@@ -1,0 +1,78 @@
+name: e2e
+
+# The web's real-API Playwright specs (alpha.spec.ts and the authenticated-*
+# projects) against the API and worker built from this commit, through the
+# same harness as `make e2e-full` (scripts/e2e_stack.py): a Postgres service,
+# a local stand-in for Supabase Auth with its own JWKS, LLM_FAKE=true. No
+# Plaid secrets here, so the link steps skip and say so. The smoke and visual
+# checks run in web.yml.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.12.3"
+  PYTHON_VERSION: "3.12"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  e2e:
+    name: playwright against the API
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # The image web.yml's smoke job uses, with Chromium and its fonts.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --ipc=host
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # The service is reachable by its name from the job container. The
+      # harness drops and recreates this database.
+      E2E_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/first_paycheck_e2e
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --locked
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+      - run: pnpm --dir web install --frozen-lockfile
+      - name: Install Chromium (already in the image; verifies the version)
+        run: pnpm --dir web exec playwright install chromium
+      - name: real-API specs
+        run: >-
+          uv run python -m scripts.e2e_stack run --
+          pnpm --dir web exec playwright test --project=alpha --project='authenticated*'
+      - name: Upload the report and the stack's logs on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-report
+          path: |
+            web/playwright-report
+            web/test-results
+            .e2e-stack
+          include-hidden-files: true
+          retention-days: 7
