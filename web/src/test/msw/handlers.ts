@@ -3,13 +3,20 @@ import { API_BASE_URL } from '@/lib/api/base-url';
 import type {
   Account,
   AccountPatch,
+  CalculatorDecisions,
+  CalculatorKind,
   Category,
   CategoryFix,
   ConfirmIn,
   Confirmed,
+  Decision,
+  DecisionIn,
+  DecisionSaved,
   DocumentDetail,
   DocumentSummary,
   DocumentType,
+  ExplainIn,
+  Explanation,
   Job,
   LinkItemRequest,
   LinkedItem,
@@ -17,6 +24,13 @@ import type {
   ProfileIn,
   Transaction,
 } from '@/lib/api/types';
+import { deepEqual } from '@/lib/deep-equal';
+import {
+  k401Result,
+  sampleCalendarEvent,
+  sampleExplanation,
+  sampleFallbackExplanation,
+} from '../fixtures/decisions';
 import { samplePayStub } from '../fixtures/documents';
 import { sampleJob, SAMPLE_NOW, SAMPLE_SYNCED_AT } from '../fixtures/sample';
 import { db } from './db';
@@ -190,6 +204,142 @@ function listTransactions(url: URL) {
   const items = rows.slice(offset, offset + limit);
   const more = offset + limit < rows.length;
   return { items, next_cursor: more ? encodeCursor(offset + limit) : null };
+}
+
+/** `calculator_kind` order, which `GET /decisions` lists calculators in. */
+const CALCULATOR_ORDER: readonly CalculatorKind[] = [
+  'emergency_fund',
+  'k401_match',
+  'health_plans',
+  'w4',
+];
+
+/** A decision as the API reads it: current when no other version supersedes it. */
+const withCurrent = (decision: Decision): Decision => ({
+  ...decision,
+  is_current: !db.decisions.some((d) => d.supersedes_id === decision.id),
+});
+
+function listDecisions(): CalculatorDecisions[] {
+  return CALCULATOR_ORDER.flatMap((calculator) => {
+    const chain = db.decisions
+      .filter((d) => d.calculator === calculator)
+      .map(withCurrent)
+      .sort((a, b) => b.version - a.version);
+    const current = chain.find((d) => d.is_current);
+    if (!current) return [];
+    return [
+      {
+        calculator,
+        current,
+        versions: chain.map(({ id, version, supersedes_id, created_at }) => ({
+          id,
+          version,
+          supersedes_id,
+          created_at,
+        })),
+      },
+    ];
+  });
+}
+
+/**
+ * `POST /decisions` (spec 007 rules 2, 4 and 5, and 14 for the calendar): the
+ * result must be the calculator's own (here, k401-results.json), and the
+ * version chain must not fork.
+ */
+async function saveDecision(request: Request) {
+  const body = (await request.json()) as DecisionIn;
+  if (body.calculator !== 'k401_match') {
+    return appError(422, 'calculator_unavailable', `${body.calculator} cannot be saved yet`);
+  }
+  const computed = k401Result(body.inputs);
+  if (!computed) return invalid('inputs: no k401-results.json case for these inputs');
+  const fields = Object.keys(computed).filter(
+    (key) => !deepEqual(computed[key as keyof typeof computed], body.result[key]),
+  );
+  if (fields.length > 0) {
+    return appError(422, 'result_mismatch', "The result does not match the calculator's result", {
+      fields,
+    });
+  }
+  const conflict = () =>
+    appError(
+      409,
+      'decision_conflict',
+      'This decision has changed since you loaded it; reload and try again',
+    );
+  const chain = db.decisions.filter((d) => d.calculator === body.calculator);
+  let version = 1;
+  if (body.supersedes_id == null) {
+    if (chain.length > 0) return conflict();
+  } else {
+    const parent = db.decisions.find((d) => d.id === body.supersedes_id);
+    if (!parent) return notFound('Decision not found');
+    if (parent.calculator !== body.calculator) {
+      return appError(422, 'supersedes_mismatch', 'supersedes_id belongs to another calculator');
+    }
+    if (db.decisions.some((d) => d.supersedes_id === parent.id)) return conflict();
+    version = parent.version + 1;
+  }
+  const decision: Decision = {
+    id: nextId('dec00000'),
+    calculator: body.calculator,
+    version,
+    supersedes_id: body.supersedes_id ?? null,
+    check_in_id: null,
+    inputs: body.inputs,
+    result: { ...computed },
+    created_at: SAMPLE_NOW,
+    is_current: true,
+  };
+  const chainIds = new Set(chain.map((d) => d.id));
+  for (const event of db.calendar) {
+    if (event.decision_id && chainIds.has(event.decision_id) && event.status === 'upcoming') {
+      event.status = 'dismissed';
+    }
+  }
+  const event = sampleCalendarEvent({ id: nextId('ca000000'), decision_id: decision.id });
+  db.decisions.push(decision);
+  db.calendar.push(event);
+  const saved: DecisionSaved = {
+    decision_id: decision.id,
+    calculator: decision.calculator,
+    version,
+    supersedes_id: decision.supersedes_id,
+    created_at: decision.created_at,
+    calendar_event_id: event.id,
+    goal_id: null,
+  };
+  return HttpResponse.json(saved, { status: 201 });
+}
+
+/** The rows one explain run writes (spec 008 rules 15 and 16). */
+function explainRun(decisionId: string): Explanation[] {
+  const outcome = db.explainOutcomes.shift() ?? 'verified';
+  const row = (overrides: Partial<Explanation>) =>
+    sampleExplanation({ id: nextId('e0000000'), decision_id: decisionId, ...overrides });
+  if (outcome === 'verified') return [row({})];
+  const failed = { verified: false, prompt_version: 'explain/v1' };
+  return [
+    row({ ...failed, attempt: 1, retries: 0 }),
+    row({ ...failed, attempt: 2, retries: 1 }),
+    sampleFallbackExplanation({ id: nextId('e0000000'), decision_id: decisionId }),
+  ];
+}
+
+async function explain(request: Request) {
+  const { decision_id: decisionId, force = false } = (await request.json()) as ExplainIn;
+  if (!db.decisions.some((d) => d.id === decisionId)) return notFound('Decision not found');
+  const rows = db.explanations.get(decisionId) ?? [];
+  const verified = rows.filter((r) => r.verified).at(-1);
+  if (!force && verified) return HttpResponse.json(verified);
+  if (!db.llmConfigured) {
+    return appError(503, 'llm_unavailable', 'Explanations are not available right now');
+  }
+  const run = explainRun(decisionId);
+  db.explanations.set(decisionId, [...rows, ...run]);
+  return HttpResponse.json(run.at(-1));
 }
 
 /** Default handlers: the happy path for every route the web app calls. */
@@ -394,6 +544,48 @@ export const handlers = [
     };
     return HttpResponse.json(db.profile);
   }),
+
+  // The calculator itself: answers from the API's own results (k401-results.json).
+  http.post(apiUrl('/calc/401k-match'), async ({ request }) => {
+    const inputs: unknown = await request.json();
+    const result = k401Result(inputs);
+    if (!result) {
+      return appError(
+        500,
+        'test_fixture_missing',
+        'k401-results.json has no case for these inputs',
+        {
+          inputs,
+        },
+      );
+    }
+    return HttpResponse.json(result);
+  }),
+
+  http.get(apiUrl('/decisions'), () => HttpResponse.json({ items: listDecisions() })),
+
+  http.post(apiUrl('/decisions'), ({ request }) => saveDecision(request)),
+
+  http.get<{ id: string }>(apiUrl('/decisions/:id'), ({ params }) => {
+    const decision = db.decisions.find((d) => d.id === params.id);
+    return decision ? HttpResponse.json(withCurrent(decision)) : notFound('Decision not found');
+  }),
+
+  http.get<{ id: string }>(apiUrl('/decisions/:id/explanation'), ({ params }) => {
+    if (!db.decisions.some((d) => d.id === params.id)) return notFound('Decision not found');
+    const latest = db.explanations.get(params.id)?.at(-1);
+    return latest ? HttpResponse.json(latest) : notFound('This decision has no explanation yet');
+  }),
+
+  http.post(apiUrl('/explain'), ({ request }) => explain(request)),
+
+  http.get(apiUrl('/calendar'), () =>
+    HttpResponse.json(
+      db.calendar
+        .filter((event) => event.status === 'upcoming')
+        .sort((a, b) => a.due_at.localeCompare(b.due_at)),
+    ),
+  ),
 
   http.get<{ id: string }>(apiUrl('/jobs/:id'), ({ params }) => {
     const script = jobScripts.get(params.id);

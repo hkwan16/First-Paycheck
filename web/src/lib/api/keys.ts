@@ -41,12 +41,40 @@ export const queryKeys = {
   payStubs: () => ['get', '/pay-stubs'] as const,
   profile: () => ['get', '/profile'] as const,
 
+  /**
+   * A calculator result: `POST /calc/*` read as a query, cached per input
+   * body. Without a body, the prefix of every result of that calculator.
+   */
+  calc: (path: string, body?: unknown) =>
+    body === undefined ? (['post', path] as const) : (['post', path, { body }] as const),
+  decisions: () => ['get', '/decisions'] as const,
+  /** One decision version; without an id, the prefix of every version read. */
+  decision: (decisionId?: string) =>
+    decisionId === undefined
+      ? (['get', '/decisions/{decision_id}'] as const)
+      : ([
+          'get',
+          '/decisions/{decision_id}',
+          { params: { path: { decision_id: decisionId } } },
+        ] as const),
+  explanation: (decisionId: string) =>
+    [
+      'get',
+      '/decisions/{decision_id}/explanation',
+      { params: { path: { decision_id: decisionId } } },
+    ] as const,
+  calendar: () => ['get', '/calendar'] as const,
+
   // Routes that do not exist yet (see pending.ts). Their keys are reserved here
   // so job invalidation already covers them when they land.
   spendingSummary: () => ['get', '/spending/summary'] as const,
   cashflow: () => ['get', '/cashflow'] as const,
   recurring: () => ['get', '/recurring'] as const,
   checkIns: () => ['get', '/check-ins'] as const,
+  /** The plan screen's read (M4); a saved decision changes it. */
+  plan: () => ['get', '/plan'] as const,
+  /** Savings goals (M6); a saved emergency fund decision creates one. */
+  goals: () => ['get', '/goals'] as const,
 };
 
 /** The documents list and every document's detail (its own route, so not under the list's prefix). */
@@ -87,3 +115,21 @@ export const invalidateDocuments = (client: QueryClient) => invalidateAll(client
 /** After a confirm: the document is confirmed and a pay stub row exists. */
 export const invalidateAfterConfirm = (client: QueryClient) =>
   invalidateAll(client, [...documentReads, queryKeys.payStubs()]);
+
+/** The list and every version read (`is_current` changes when a version lands). */
+const decisionReads = [queryKeys.decisions(), queryKeys.decision()];
+
+/** A save lost a race (409): read the decisions again. */
+export const invalidateDecisions = (client: QueryClient) => invalidateAll(client, decisionReads);
+
+/**
+ * After a saved decision: the decisions, and what a decision creates or
+ * changes (spec 007 rule 14): calendar checks, the plan and goals.
+ */
+export const invalidateAfterDecision = (client: QueryClient) =>
+  invalidateAll(client, [
+    ...decisionReads,
+    queryKeys.calendar(),
+    queryKeys.plan(),
+    queryKeys.goals(),
+  ]);

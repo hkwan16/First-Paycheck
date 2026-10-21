@@ -39,6 +39,24 @@ const SCREENS: readonly Screen[] = [
     heading: 'Where your money went',
     sample: true,
   },
+  {
+    path: '/dev/screens/decisions',
+    name: 'decisions',
+    heading: 'Four decisions for your first month',
+    sample: true,
+  },
+  {
+    path: '/dev/screens/why',
+    name: 'why',
+    heading: 'Why contribute 4% to your 401(k)',
+    sample: true,
+  },
+  {
+    path: '/dev/screens/why/fallback',
+    name: 'why-fallback',
+    heading: 'Why contribute 4% to your 401(k)',
+    sample: true,
+  },
 ];
 
 /** Collect console errors and uncaught exceptions for the life of the page. */

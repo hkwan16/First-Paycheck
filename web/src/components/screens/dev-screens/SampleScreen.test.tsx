@@ -1,7 +1,8 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { render, renderHook, screen, within } from '@testing-library/react';
+import { act, render, renderHook, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useAccounts } from '@/lib/api/hooks';
+import { useAccounts, useCalc } from '@/lib/api/hooks';
+import { sampleK401, sampleK401Inputs } from '@/test/fixtures/decisions';
 import { SAMPLE_NOW, sampleAccounts } from '@/test/fixtures/sample';
 import { server } from '@/test/msw/server';
 import { SampleScreen, seededClient } from './SampleScreen';
@@ -74,22 +75,86 @@ describe('SampleScreen', () => {
   });
 });
 
+describe('SampleScreen after Confirm', () => {
+  beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) }));
+  afterEach(() => {
+    vi.useRealTimers();
+    server.events.removeAllListeners();
+  });
+
+  it('renders the Decisions screen on the saved 401(k) decision, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="decisions" />);
+    const card = await screen.findByRole('region', { name: '401(k) match' });
+    expect(within(card).getByRole('group', { name: 'Calculator result' })).toHaveTextContent(
+      'You capture the full $2,600 match',
+    );
+    expect(within(card).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
+    expect(screen.getByText(/of 4 saved/)).toHaveTextContent('1 of 4 saved');
+    expect(screen.getAllByText('After alpha')).toHaveLength(3);
+    expect(screen.getByRole('link', { name: 'Decisions' })).toHaveAttribute('aria-current', 'page');
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
+    expect(requests).toEqual([]);
+  });
+
+  it('renders the verified explanation, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="why" />);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Why contribute 4% to your 401(k)' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Verified against calculator')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'What happens next' })).toHaveTextContent(
+      'Oct 31, 2026',
+    );
+    expect(requests).toEqual([]);
+  });
+
+  it('renders the fallback, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="why-fallback" />);
+    expect(await screen.findByText('Could not verify the explanation')).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: '401(k) match calculator result' }),
+    ).toBeInTheDocument();
+    expect(requests).toEqual([]);
+  });
+});
+
 describe('seededClient', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('seeds every query at the sample time without reading the clock', () => {
-    // It runs while the page renders: next dev prerenders the route to
-    // validate it, and reports a Date.now() there as an unstable value.
+  it.each(['link', 'decisions', 'why', 'why-fallback'] as const)(
+    'seeds every %s query at the sample time without reading the clock',
+    (name) => {
+      // It runs while the page renders: next dev prerenders the route to
+      // validate it, and reports a Date.now() there as an unstable value.
+      const now = vi.spyOn(Date, 'now');
+      const client = seededClient(name);
+      expect(now).not.toHaveBeenCalled();
+      const queries = client.getQueryCache().getAll();
+      expect(queries.length).toBeGreaterThan(5);
+      for (const query of queries) {
+        expect(query.state.dataUpdatedAt, JSON.stringify(query.queryKey)).toBe(
+          Date.parse(SAMPLE_NOW),
+        );
+      }
+    },
+  );
+
+  it("serves the calculator's result without asking the clock whether it is stale", () => {
+    // useCalc keeps results fresh with staleTime Infinity, which compares the
+    // data's age with Date.now(); on the 'static' sample client it is static too.
+    const client = seededClient('decisions');
     const now = vi.spyOn(Date, 'now');
-    const client = seededClient();
+    const { result } = renderHook(() => useCalc('/calc/401k-match', sampleK401Inputs(4)), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    });
+    expect(result.current.data).toEqual(sampleK401(4).result);
+    expect(result.current.isCurrent).toBe(true);
     expect(now).not.toHaveBeenCalled();
-    const queries = client.getQueryCache().getAll();
-    expect(queries.length).toBeGreaterThan(5);
-    for (const query of queries) {
-      expect(query.state.dataUpdatedAt, JSON.stringify(query.queryKey)).toBe(
-        Date.parse(SAMPLE_NOW),
-      );
-    }
   });
 
   it('serves reads without asking the clock whether the data is stale', () => {

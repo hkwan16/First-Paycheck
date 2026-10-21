@@ -57,7 +57,8 @@ baselines in that same image (mount `web/` read-only, copy it without `node_modu
 
 ```
 src/app/            routes. (auth)/sign-in; (app)/setup/{link,confirm,confirm/[documentId],spending,decisions},
-                    (app)/why/[decisionId], (app)/plan, (app)/check-in/[checkInId]; dev/kit
+                    (app)/why (index of saved decisions), (app)/why/[decisionId], (app)/plan,
+                    (app)/check-in/[checkInId]; dev/kit
 src/app/auth/callback/route.ts  exchanges the email-link code for a session
 src/proxy.ts        Next 16 proxy (formerly middleware): refreshes the Supabase session, sends
                     signed-out requests for (app) screens to /sign-in, forwards the requested path
@@ -69,15 +70,17 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     upload.ts, keys.ts, errors.ts, pending.ts, hooks/), auth/ (next-path,
                     protected, validation, errors, account), supabase/ (env, client, server,
                     proxy), design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts,
-                    categories.ts, documents.ts, features.ts, setup-progress.ts, routes.ts,
-                    navigation.ts, query-client.ts, cn.ts
-src/app/dev/screens/{link,spending,confirm,confirm/manual}  a screen on the sample data, no API
-                    (development only)
+                    categories.ts, documents.ts, decisions.ts, deep-equal.ts, features.ts,
+                    setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts
+src/app/dev/screens/{link,spending,confirm,confirm/manual,decisions,why,why/fallback}  a screen on
+                    the sample data, no API (development only)
 src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fake-xhr.ts,
                     fixtures/sample.ts (the Acme / J. Rivera dataset), fixtures/documents.ts (the
-                    Acme pay stub as the API proposes it), msw/db.ts (in-memory API state),
-                    msw/handlers.ts (every route, stateful)
-e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending),
+                    Acme pay stub as the API proposes it), fixtures/decisions.ts (profile, 401(k)
+                    decision, explanations, calendar event), fixtures/k401-results.json (calculator
+                    results made by api/calc, with make-k401-results.py), msw/db.ts (in-memory API
+                    state), msw/handlers.ts (every route, stateful)
+e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions),
                     support/auth.ts, support/api.ts, fixtures/ (synthetic acme-paystub.pdf and
                     the script that makes it), baselines
 ```
@@ -101,7 +104,7 @@ comment.
 | `Skeleton`                                      | none                                              | decorative placeholder for a value on its way; pulses, still under reduced motion; the region around it carries `aria-busy`                                                                                                         |
 | `RelativeTime`                                  | none                                              | "4 minutes ago" in a `<time>`, kept current; server and hydration render the plain date, so the HTML never depends on the clock                                                                                                     |
 | `KV`, `KVList`                                  | `.kv`                                             | a `<dl>`; `verified` adds the "=" mark; `spacing` compact, comfortable, panel; `rules`                                                                                                                                              |
-| `Seg`                                           | `.seg`                                            | generic options; role group of `aria-pressed` buttons; one tab stop; arrows, Home, End                                                                                                                                              |
+| `Seg`                                           | `.seg`                                            | generic options; role group of `aria-pressed` buttons; one tab stop; arrows, Home, End; `value` may be `null` (nothing chosen yet)                                                                                                  |
 | `Input`, `Select`, `Label`, `Range`, `Checkbox` | `.input`, `.label`, `.range`, `.check`            | `Range` shows the two-sided label row and speaks `valueLabel`                                                                                                                                                                       |
 | `FieldError`                                    | none (follows the input's invalid border)         | inline message under an invalid field; `id` for `aria-describedby`; renders nothing when empty                                                                                                                                      |
 | `Notice`                                        | `.notice` and inline result rows                  | `tone` blue, confirmed, warning; `compact`                                                                                                                                                                                          |
@@ -132,7 +135,31 @@ next is a real disabled button, never a dead link).
   sites. `useTransactions` is an infinite query under `queryKeys.transactionPages(filters)`; the
   trailing `'pages'` keeps its `InfiniteData` apart from plain reads under the same prefix.
   Documents: `invalidateDocuments` after an upload or extraction, `invalidateAfterConfirm`
-  (documents and pay stubs) after a confirm.
+  (documents and pay stubs) after a confirm. Decisions: `invalidateDecisions` (the list and every
+  `GET /decisions/{id}`) and `invalidateAfterDecision` (also calendar, plan and goals) after a save.
+- **Calculators**: `useCalc(path, inputs)` (`hooks/calc.ts`) runs a `POST /calc/*` route as a
+  query keyed by its body (`queryKeys.calc(path, body)`), so the same inputs never ask twice. It
+  waits `CALC_DEBOUNCE_MS` (150 ms) after the inputs stop changing, keeps the previous result on
+  screen while the next one loads (`placeholderData: keepPreviousData`), and returns `isBusy`
+  for the result panel's `aria-busy` and `isCurrent` (the result is for the inputs on screen; only
+  then can it be saved). Pass `null` inputs while the form is incomplete. Its `staleTime` is
+  `'static'` when the client default is (the sample QueryClient), so it never reads the clock
+  while rendering; otherwise `Infinity`, which still lets a 422 refetch it.
+- **Decisions**: `useDecisions`, `useDecision(id)`, `useCalendar`, and
+  `useSaveDecision(calculator)`, which posts `{ calculator, inputs, result, supersedes_id }` with
+  `supersedes_id` set to the current version's id. A 409 `decision_conflict` (someone saved first)
+  reloads the decisions; a 422 `result_mismatch` throws `ResultMismatch` (`fields` from the
+  details) and invalidates that calculator's results so the card recalculates and asks to save
+  again. `decisionSaveState(current, inputs)` (`lib/decisions.ts`) drives the save button and
+  badge: unsaved, `saved` ("Saved as v2"), or `dirty` ("Save as v3"), comparing inputs
+  structurally (`lib/deep-equal.ts`, so key order and object identity do not matter). The API
+  names calculators `k401_match` and `health_plans`; the feature flags say `401k_match` and
+  `health_plan`: convert with `calculatorIdOf`.
+- **Explanations**: `useExplanation(decisionId)` reads `GET /decisions/{id}/explanation` (a 404
+  means none yet); `useExplain()` posts `{ decisionId, force }` to `POST /explain` and writes the
+  row it returns into that cache. `POST /explain` answers only once the explanation is final
+  (verified or fallback), so there is nothing to poll; `force` makes a new attempt after a
+  fallback. A 503 `llm_unavailable` means the API has no model configured.
 - **Optimistic writes** cancel the affected reads, patch every cached copy (`setQueriesData` over
   the prefix, paged or not), keep a snapshot for rollback in `onError`, and invalidate in
   `onSettled`. Mirror what the server will write: `useFixCategory` also relabels the merchant's
@@ -148,8 +175,8 @@ next is a real disabled button, never a dead link).
   calls a hook there with the signature it will keep, returning `undefined`, next to a shape with
   a `TODO(<route>)`. Screens render `undefined` as a skeleton (totals) or an empty state (lists),
   never a client-side substitute. Current: `useSpendingSummary` (`GET /spending/summary`: the
-  Spending tiles, and the category-to-bucket map that replaces `lib/categories.ts`),
-  `useDecisions` (`GET /decisions`: nav marks). To wire one: `make types`, delete its shape, return
+  Spending tiles, and the category-to-bucket map that replaces `lib/categories.ts`; the route
+  is now in `schema.d.ts`, so it is ready to wire). To wire one: `make types`, delete its shape, return
   `$api.useQuery(...).data` under the key reserved in `keys.ts`, and add the MSW handler.
 - **Uploads** (`lib/api/upload.ts`): `POST /docs` goes over XMLHttpRequest, because fetch cannot
   report upload progress. It shares `sessionTokens` with the fetch middleware (one refresh and one
@@ -181,7 +208,19 @@ next is a real disabled button, never a dead link).
 - Third-party widgets are mocked at the module (`vi.mock('react-plaid-link', ...)`, see
   `LinkScreen.test.tsx`), and the test calls the callbacks the widget would.
 - Screen tests cannot name status colors (ESLint): test a tone through a pure helper
-  (`sourceBadge`) or in the `components/ui` tests.
+  (`sourceBadge`, `saveBadgeTone`) or in the `components/ui` tests.
+- Decisions: `decisionsReady()` seeds a confirmed pay stub and a profile with match tiers;
+  `savedDecision()` adds v1 at 4%. `POST /calc/401k-match` answers from
+  `fixtures/k401-results.json`, results the API's own calculator produced; a case not in it is a
+  500 `test_fixture_missing`, never a result worked out in the test. To add cases, edit
+  `make-k401-results.py`, run it from the repo root with
+  `uv run --project api python web/src/test/fixtures/make-k401-results.py`, then `pnpm format`.
+  `db.llmConfigured = false` makes `POST /explain` a 503; `db.explainOutcomes` scripts whether
+  each attempt comes back verified or fallback.
+- Debounces: measure them on the fake clock instead of asserting "nothing yet at 149 ms", which
+  races `shouldAdvanceTime`. Record `Date.now()` when the input stops and when the request starts
+  (`request:start`), and assert the difference is at least the debounce. Set inputs with
+  `fireEvent.change` so typing does not spread over the window being measured.
 
 ## Confirm screen
 
@@ -204,6 +243,40 @@ offer letter states).
   its own.
 - **Source pane**: the redacted lines the AI saw, with redactions drawn as labeled bars
   (`role="img"`, "Redacted") and the selected field's line marked `aria-current`.
+
+## Decisions screen
+
+`/setup/decisions` (`DecisionsScreen`) shows one card per calculator in the mockup's order
+(emergency fund, 401(k), health plan, W-4) with an "n of 4 saved" badge. Only the 401(k) card is
+built; a calculator off in `features.calculators` is a muted "After alpha" placeholder, and one
+that is on but not built says "Coming in a later milestone."
+
+- **`Match401kCard`** always renders the same `DecisionCard` frame (a region named by its title)
+  and swaps its body: skeleton, error, a link to Confirm when there is no confirmed pay stub,
+  `PlanDetailsForm` when the profile has no salary or match tiers (saved with `PUT /profile`;
+  the mockup has no such form), or the calculator. Inputs come from the confirmed pay stub and
+  profile; contribution and age start from the saved decision. Age is not in the profile (spec
+  006, open question 2), so the card asks for it and it lives in the decision's inputs.
+- Every figure in the result (`K401ResultRows`, `K401Notices`, `matchHeadline`) is a field of the
+  calculator's result. Percent inputs are sent as the API stores them, two-place strings
+  (`percentInput`), so a saved decision compares equal to the inputs on screen.
+- Save is enabled only when `useCalc` says the result is current. A 422 `result_mismatch`
+  refetches the result and asks to save again; a 409 reloads the decisions and says another save
+  came first.
+
+## Why screen
+
+`/why/[decisionId]` (`WhyScreen`) reads the decision and its explanation; `/why`
+(`WhyIndexScreen`) lists current decisions with their versions.
+
+- **Verified**: status checks (numbers checked, citations, retries), the concept, "Your numbers"
+  with the verifier's "=" marks, what would change the answer, sources (IRS citations as outbound
+  links in a new tab, with the quoted passage) and next steps from the calendar.
+- **Fallback**: the plain calculator result (`CalculatorResultCard`) with a notice and "Try
+  again", which calls `useExplain` with `force: true`.
+- **None yet** (404): offers "Write the explanation". A 503 `llm_unavailable` is a calm blue
+  notice, with the calculator result still shown. An unknown decision is "Decision not found"
+  with a link back to `/why`.
 
 ## Adding a screen
 
@@ -271,12 +344,12 @@ previews without secrets).
 (git-ignored) for the `authenticated` project, which runs `e2e/auth.spec.ts`. Set these in
 `web/.env.local` or the environment:
 
-| Variable                                                           | Needed for                                                                                                                                                                              |
-| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)                                                                                                                      |
-| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                                                |
-| `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                                        |
-| `E2E_API_URL`                                                      | `link.spec.ts`, `confirm.spec.ts` and `spending.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it |
+| Variable                                                           | Needed for                                                                                                                                                                                                   |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)                                                                                                                                           |
+| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                                                                     |
+| `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                                                             |
+| `E2E_API_URL`                                                      | `link.spec.ts`, `confirm.spec.ts`, `spending.spec.ts` and `decisions.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it |
 
 Missing variables skip those tests with a message saying which to set. The e2e user must be a
 confirmed user: the hosted project requires email confirmation, so create it in the Supabase
@@ -291,7 +364,12 @@ Both change the e2e user's data, so they are ordered projects with serial files 
 parallel tests. `confirm.spec.ts` (project `authenticated-confirm`) uploads
 `e2e/fixtures/acme-paystub.pdf`, a synthetic stub with an example SSN the API must redact and a
 masked account number (regenerate it with `node e2e/fixtures/make-acme-paystub.mjs`), waits for
-the read, confirms every field and continues to Spending. Never use a real document as a fixture.
+the read, confirms every field and continues to Spending. `decisions.spec.ts` (project
+`authenticated-decisions`, after confirm) fills in the plan details if the profile has none,
+saves a 401(k) decision, changes it and saves the next version, then opens its explanation and
+accepts verified, fallback, or "not available" when the API has no model. Decisions cannot be
+deleted, so it reads the current version instead of assuming v1. Never use a real document as a
+fixture.
 
 ## Feature flags
 

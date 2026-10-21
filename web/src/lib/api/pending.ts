@@ -1,4 +1,3 @@
-import type { CalculatorId } from '@/lib/features';
 import type { Category } from './types';
 
 /*
@@ -42,16 +41,5 @@ export interface SpendingSummary {
 }
 
 export function useSpendingSummary(): SpendingSummary | undefined {
-  return undefined;
-}
-
-/** TODO(GET /decisions, M3): wire `useDecisions` to the route. */
-export interface DecisionSummary {
-  id: string;
-  calculator: CalculatorId;
-  version: number;
-}
-
-export function useDecisions(): DecisionSummary[] | undefined {
   return undefined;
 }

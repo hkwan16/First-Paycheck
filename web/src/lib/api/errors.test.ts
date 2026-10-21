@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apiErrorMessage } from './errors';
+import { apiErrorCode, apiErrorMessage } from './errors';
 
 const FALLBACK = 'Something went wrong. Try again.';
 
@@ -18,6 +18,21 @@ describe('apiErrorMessage', () => {
     'falls back for %j',
     (error) => {
       expect(apiErrorMessage(error, FALLBACK)).toBe(FALLBACK);
+    },
+  );
+});
+
+describe('apiErrorCode', () => {
+  it("reads the code of the API's error shape", () => {
+    expect(apiErrorCode({ error: { code: 'decision_conflict', message: 'Reload' } })).toBe(
+      'decision_conflict',
+    );
+  });
+
+  it.each([[new TypeError('Failed to fetch')], [null], [{ detail: [] }], [{ error: { code: 4 } }]])(
+    'is undefined for %j',
+    (error) => {
+      expect(apiErrorCode(error)).toBeUndefined();
     },
   );
 });

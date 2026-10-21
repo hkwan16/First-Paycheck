@@ -41,6 +41,20 @@ describe('Seg', () => {
     );
   });
 
+  it('can start with nothing chosen: none pressed, the first option is the tab stop', async () => {
+    const onChange = vi.fn();
+    render(
+      <Seg label="Expected healthcare use" options={options} value={null} onChange={onChange} />,
+    );
+    for (const button of screen.getAllByRole('button')) {
+      expect(button).toHaveAttribute('aria-pressed', 'false');
+    }
+    await userEvent.tab();
+    expect(screen.getByRole('button', { name: /Low/ })).toHaveFocus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(onChange).toHaveBeenCalledWith('medium');
+  });
+
   it('selects on click', async () => {
     const onChange = vi.fn();
     render(<Controlled onChange={onChange} />);

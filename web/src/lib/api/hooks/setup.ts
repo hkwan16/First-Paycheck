@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
 import { features } from '@/lib/features';
 import { setupProgress, type SetupFacts, type SetupProgress } from '@/lib/setup-progress';
-import { useDecisions, useSpendingSummary } from '../pending';
+import { calculatorIdOf } from '@/lib/decisions';
+import { useSpendingSummary } from '../pending';
 import { useAccounts } from './accounts';
+import { useDecisions } from './decisions';
 import { useDocuments } from './documents';
 import { usePayStubs } from './profile';
 import { useTransactions } from './transactions';
@@ -20,7 +22,7 @@ export function useSetupFacts(): SetupFacts {
   const documents = useDocuments().data;
   const payStubs = usePayStubs().data;
   const summary = useSpendingSummary();
-  const decisions = useDecisions();
+  const decisions = useDecisions().data;
 
   return useMemo(
     () => ({
@@ -30,7 +32,7 @@ export function useSetupFacts(): SetupFacts {
       confirmedPayStubs: payStubs?.length ?? 0,
       categorizationFinished: summary !== undefined && summary.uncategorized_count === 0,
       liveCalculators: features.calculators,
-      savedDecisionCalculators: decisions?.map((d) => d.calculator) ?? [],
+      savedDecisionCalculators: decisions?.items.map((d) => calculatorIdOf(d.calculator)) ?? [],
     }),
     [accounts, transactions, documents, payStubs, summary, decisions],
   );

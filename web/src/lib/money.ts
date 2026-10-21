@@ -96,6 +96,21 @@ export function formatPct(points: number | string, options: FormatPctOptions = {
   return `${formatNumber(value, { decimals })}%`;
 }
 
+const rate = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+
+/**
+ * A rate the API sends as a two-place Decimal string (`"4.50"`), with the
+ * digits it carries and no padding: `"4.5%"`, `"4%"`, `"12.25%"`. The API
+ * never sends more than two places, so nothing is rounded.
+ */
+export function formatRate(points: number | string): string {
+  const value = typeof points === 'string' ? Number(points.trim() || Number.NaN) : points;
+  if (!Number.isFinite(value)) {
+    throw new RangeError(`Not a percentage: ${String(points)}`);
+  }
+  return `${rate.format(value)}%`;
+}
+
 export interface FormatNumberOptions {
   decimals?: number;
   signed?: boolean;

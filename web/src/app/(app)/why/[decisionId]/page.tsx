@@ -1,14 +1,14 @@
 import type { Metadata } from 'next';
-import { PageTitle } from '@/components/chrome/PageTitle';
+import { WhyScreen } from '@/components/screens/why/WhyScreen';
 import { HydrationMarker } from '@/app/hydration-marker';
 
 export const metadata: Metadata = { title: 'Why this decision' };
 
-/** Placeholder until the Why this decision screen lands. */
-export default function WhyPage() {
+export default async function WhyPage({ params }: PageProps<'/why/[decisionId]'>) {
+  const { decisionId } = await params;
   return (
     <>
-      <PageTitle title="Why this decision" lead="This screen is on its way." />
+      <WhyScreen decisionId={decisionId} />
       <HydrationMarker />
     </>
   );
