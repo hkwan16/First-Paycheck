@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from evals.suites import calc, categorization_rules, extraction, extraction_smoke
+from evals.suites import (
+    calc,
+    categorization_rules,
+    explain,
+    explain_smoke,
+    extraction,
+    extraction_smoke,
+)
 from evals.suites.base import Suite
 
 SUITES: dict[str, Suite] = {
@@ -10,6 +17,8 @@ SUITES: dict[str, Suite] = {
     for suite in (
         calc.SUITE,
         categorization_rules.SUITE,
+        explain.SUITE,
+        explain_smoke.SUITE,
         extraction.SUITE,
         extraction_smoke.SUITE,
     )

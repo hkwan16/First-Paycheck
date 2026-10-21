@@ -48,6 +48,23 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   with `FakeGateway`; checks every stub yields a proposal, SSNs are redacted,
   and neither the SSN nor an unmasked account number reaches the model input
   (image pages are OCR'd again to check). Needs the tesseract binary.
+- `fixtures/calc/k401.json`: every spec 006 example (ids are the spec's test
+  names, `spec-006-<name>`) plus the no-match edge case. A test fails if a row
+  of the spec's example table has no case.
+- `fixtures/explain/decisions.json`: 10 synthetic `k401_match` inputs (with
+  optional benefits passages) covering under-match, capped, catch-up,
+  compensation-capped, already-full and no-match cases. Results are computed
+  by the suite, never stored.
+- `suites/explain.py` (`explain`, LLM): the real draft-verify-retry-fallback
+  flow (`verify.flow.run_explain`) with `LLMGateway` over those decisions, the
+  seed citations read from `api/db/seed/irs_citations/`, no database.
+  `first_try_verified`, `no_fallback`, `cited`; baseline at the spec 008
+  targets (0.8, 0.95, 1.0) until the first live run. `SuiteUnavailable`
+  without `ANTHROPIC_API_KEY`.
+- `suites/explain_smoke.py` (`explain-smoke`, free): the same flow with
+  `ScriptedGateway` over three scripted runs (pass, fail-then-pass,
+  fail-twice); `flow_correct` checks rows, the retry's feedback and that the
+  fallback verifies and is cited.
 - `baseline.json`: the committed metrics every run is compared with.
 
 ## Rules

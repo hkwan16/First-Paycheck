@@ -106,7 +106,9 @@ def test_the_reader_sees_only_redacted_text() -> None:
 
 
 def test_extraction_needs_an_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(extraction, "_settings", lambda: extraction.Settings(_env_file=None))
+    # Explicitly no key: a key in the shell's environment must not make this a live call.
+    no_key = extraction.Settings(_env_file=None, anthropic_api_key=None)
+    monkeypatch.setattr(extraction, "_settings", lambda: no_key)
     with pytest.raises(SuiteUnavailable, match="ANTHROPIC_API_KEY"):
         extraction.run(Budget(100))
 
