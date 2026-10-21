@@ -3,6 +3,7 @@ import {
   formatMoney,
   formatNumber,
   formatPct,
+  formatRate,
   formatTransactionAmount,
   parseMoney,
   transactionFlow,
@@ -99,6 +100,23 @@ describe('formatPct', () => {
 
   it('rejects text that is not a number', () => {
     expect(() => formatPct('four')).toThrow(RangeError);
+  });
+});
+
+describe('formatRate', () => {
+  it.each([
+    ['4.00', '4%'],
+    ['4.50', '4.5%'],
+    ['12.25', '12.25%'],
+    ['100.00', '100%'],
+    ['0.00', '0%'],
+    [6, '6%'],
+  ] as const)('shows the API rate %j with the digits it carries: %s', (points, out) => {
+    expect(formatRate(points)).toBe(out);
+  });
+
+  it('rejects text that is not a number', () => {
+    expect(() => formatRate('')).toThrow(RangeError);
   });
 });
 
