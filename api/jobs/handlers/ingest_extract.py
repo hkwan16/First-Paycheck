@@ -57,8 +57,6 @@ class _Outcome:
 
 def run(ctx: JobContext) -> dict[str, Any]:
     extractor = ctx.services.extractor
-    if extractor is None:
-        raise RuntimeError("no LLM gateway is configured for this worker")
     document_id = uuid.UUID(str(ctx.job.payload["document_id"]))
 
     with ctx.user_session() as session:
@@ -106,7 +104,7 @@ def _is_current(document: Document | None, job_id: uuid.UUID) -> TypeGuard[Docum
 
 def _extract(
     ctx: JobContext,
-    extractor: DocumentExtractor,
+    extractor: DocumentExtractor | None,
     document_type: DocumentType,
     data: bytes,
     content_type: str,
@@ -124,6 +122,10 @@ def _extract(
     pages = prepared.model_pages
     if not pages:
         return manual(DocumentStatusReason.NO_READABLE_PAGE)
+    if extractor is None:
+        # No gateway on this worker (spec 004 rule 22): the pages were still
+        # read and redacted, so the user can type the fields from them.
+        return manual(DocumentStatusReason.NO_MODEL)
     try:
         proposal = _propose(ctx, extractor, document_type, prepared)
     except LLMRefused:

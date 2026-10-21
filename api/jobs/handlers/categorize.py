@@ -9,13 +9,11 @@ from sync.categorize import categorize_user
 
 
 def run(ctx: JobContext) -> dict[str, Any]:
-    labeler = ctx.services.labeler
-    if labeler is None:
-        raise RuntimeError("no LLM gateway is configured for this worker")
+    # A worker without a gateway still applies the rules (spec 003 rule 12a).
     result = categorize_user(
         user_id=ctx.user_id,
         sessions=ctx.user_session,
-        labeler=labeler,
+        labeler=ctx.services.labeler,
         job_id=ctx.job.id,
         progress=ctx.progress,
     )

@@ -1136,7 +1136,8 @@ export interface components {
       | 'budget'
       | 'extraction_failed'
       | 'unreadable_file'
-      | 'expired';
+      | 'expired'
+      | 'no_model';
     /**
      * DocumentType
      * @enum {string}

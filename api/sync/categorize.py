@@ -126,7 +126,7 @@ class CategorizeResult:
     llm_labeled: int = 0
     unresolved: int = 0
     batches: int = 0
-    stopped: Literal["budget", "refused"] | None = None
+    stopped: Literal["budget", "refused", "no_model"] | None = None
 
     def as_job_result(self) -> dict[str, Any]:
         return asdict(self)
@@ -156,11 +156,14 @@ def categorize_user(
     *,
     user_id: uuid.UUID,
     sessions: Sessions,
-    labeler: CategoryLabeler,
+    labeler: CategoryLabeler | None,
     job_id: uuid.UUID | None = None,
     progress: Callable[[int], None] | None = None,
 ) -> CategorizeResult:
     """Label the user's uncategorized transactions: rules, reuse, then the LLM.
+
+    Without a labeler (no gateway configured, spec 003 rule 12a) the rules and
+    reuse steps still run and the unknown merchants wait for a later run.
 
     No database transaction is open while the gateway is called; each batch's
     labels are written in their own short session, so a later failure keeps
@@ -183,6 +186,9 @@ def categorize_user(
             )
             for index, sample in enumerate(batch, start=1)
         ]
+        if labeler is None:
+            result.stopped = "no_model"
+            break
         result.batches += 1
         try:
             answer = labeler.categorize(user_id, items, job_id=job_id)

@@ -127,6 +127,7 @@ class DocumentStatusReason(StrEnum):
     EXTRACTION_FAILED = "extraction_failed"
     UNREADABLE_FILE = "unreadable_file"
     EXPIRED = "expired"
+    NO_MODEL = "no_model"
 
 
 class PlanKind(StrEnum):

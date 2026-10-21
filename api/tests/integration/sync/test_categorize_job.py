@@ -89,7 +89,10 @@ def labels(connection: Connection, user: FixtureUser) -> dict[str, list[tuple[An
 
 
 def run(
-    connection: Connection, user: FixtureUser, labeler: SpyLabeler, job_id: uuid.UUID | None = None
+    connection: Connection,
+    user: FixtureUser,
+    labeler: SpyLabeler | None,
+    job_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     result = categorize_user(
         user_id=user.id,
@@ -433,20 +436,46 @@ def test_categorize_run_job(
     assert labeler.job_ids == [job_id]
 
 
-def test_categorize_run_without_a_labeler_fails_clearly(
-    seeded_rules: Connection, user_a: FixtureUser
+def test_without_a_model_the_rules_still_label_and_the_job_succeeds(
+    seeded_rules: Connection, user_a: FixtureUser, account: uuid.UUID
 ) -> None:
+    """No ANTHROPIC_API_KEY (spec 003 rule 12a): rules and reuse run, the rest waits."""
+    make_transaction(seeded_rules, user_a.id, account, merchant_raw="SAFEWAY #1234")
+    make_transaction(seeded_rules, user_a.id, account, merchant_raw="ZZ LOCAL BAKERY 42")
+
+    result = run(seeded_rules, user_a, None)
+
+    found = labels(seeded_rules, user_a)
+    assert found["safeway"] == [("groceries", "rule", None)]
+    assert found["zz local bakery"] == [(None, None, None)]
+    assert result == {
+        "rule_labeled": 1,
+        "reused": 0,
+        "llm_labeled": 0,
+        "unresolved": 1,
+        "batches": 0,
+        "stopped": "no_model",
+    }
+
+
+def test_the_worker_runs_categorize_without_a_labeler(
+    seeded_rules: Connection, user_a: FixtureUser, account: uuid.UUID
+) -> None:
+    make_transaction(seeded_rules, user_a.id, account, merchant_raw="SAFEWAY #1234")
+    make_transaction(seeded_rules, user_a.id, account, merchant_raw="ZZ LOCAL BAKERY 42")
     seeded_rules.execute(text("DELETE FROM jobs"))
     with user_session_for(user_a.id, bind=seeded_rules) as session:
-        job_id = queue.enqueue(session, user_id=user_a.id, kind=JobKind.CATEGORIZE_RUN)
+        job_id = queue.enqueue(session, user_id=user_a.id, kind=JobKind.CATEGORIZE_RUN, payload={})
     worker = Worker(
         handlers=default_handlers(),
-        services=Services(),
+        services=Services(labeler=None),
         queue_bind=seeded_rules,
         user_bind=seeded_rules,
     )
     assert worker.run_once()
-    last_error = seeded_rules.execute(
-        text("SELECT last_error FROM jobs WHERE id = :id"), {"id": job_id}
-    ).scalar_one()
-    assert "no LLM gateway" in last_error
+    status, result = seeded_rules.execute(
+        text("SELECT status::text, result FROM jobs WHERE id = :id"), {"id": job_id}
+    ).one()
+    assert status == "succeeded"
+    assert result["stopped"] == "no_model"
+    assert labels(seeded_rules, user_a)["safeway"] == [("groceries", "rule", None)]

@@ -316,15 +316,6 @@ def test_a_superseded_job_changes_nothing(empty_queue: Connection, user_a: Fixtu
     assert document_row(empty_queue, document)["status"] == "extracting"
 
 
-def test_without_an_extractor_the_job_fails_clearly(
-    empty_queue: Connection, user_a: FixtureUser
-) -> None:
-    document = make_document(empty_queue, user_a.id, data=STUB_PDF)
-    job_id = queue_extract(empty_queue, user_a, document)
-    run_worker(empty_queue, None)
-    assert "no LLM gateway" in job_row(empty_queue, job_id)["last_error"]
-
-
 def test_user_b_cannot_extract_user_a_document(
     empty_queue: Connection, user_a: FixtureUser, user_b: FixtureUser
 ) -> None:
@@ -342,3 +333,19 @@ def test_user_b_cannot_extract_user_a_document(
     assert job_row(empty_queue, job_id)["result"] == {"status": "skipped"}
     assert gateway.contents == []
     assert document_row(empty_queue, document)["status"] == "uploaded"
+
+
+def test_without_a_model_the_document_goes_to_manual_entry(
+    empty_queue: Connection, user_a: FixtureUser
+) -> None:
+    """No ANTHROPIC_API_KEY (spec 004 rule 22): the user types the fields in by hand."""
+    document = make_document(empty_queue, user_a.id, data=STUB_PDF)
+    job_id = queue_extract(empty_queue, user_a, document)
+    run_worker(empty_queue, None)
+
+    assert job_row(empty_queue, job_id)["status"] == "succeeded"
+    row = document_row(empty_queue, document)
+    assert (row["status"], row["status_reason"]) == ("manual_entry_required", "no_model")
+    assert row["proposal"]["fields"]
+    assert all(field["value"] is None for field in row["proposal"]["fields"])
+    assert row["redaction_count"] >= 1

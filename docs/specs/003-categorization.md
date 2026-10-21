@@ -22,7 +22,7 @@ Give every synced transaction a spending category the user can trust and correct
 - `normalize_merchant(raw) -> str`.
 - `RuleBook.match(merchant_norm) -> CategoryRule | None` (`apply_rules` is the module-level entry point).
 - Transactions with `category`, `category_source` (`rule`, `user`, `llm`) and `confidence` (set only for `llm`).
-- `categorize.run` job result: `{"rule": n, "llm": n, "reused": n, "unresolved": n, "llm_calls": n, "stopped": null | "budget" | "refused"}`.
+- `categorize.run` job result: `{"rule": n, "llm": n, "reused": n, "unresolved": n, "llm_calls": n, "stopped": null | "budget" | "refused" | "no_model"}`.
 - One `llm_calls` row per gateway call, including blocked and failed calls.
 - `GET /transactions` page `{items, next_cursor}`; `PATCH /transactions/{id}` `{transaction, rule, relabeled}`.
 
@@ -48,6 +48,7 @@ Give every synced transaction a spending category the user can trust and correct
 10. The model returns `{"items": [{"id", "category", "confidence"}]}` (`CategoryBatch`). Every uncategorized transaction with that `merchant_norm` gets the category, `category_source = 'llm'` and the confidence rounded half-up to 3 decimals. Ids outside the batch are ignored; merchants the model skipped stay uncategorized.
 11. LLM labels never become `category_rules` rows. Only user corrections do.
 12. **Stopping.** A budget block stops the job's LLM work (`stopped: "budget"`), and a refusal skips that batch (`stopped: "refused"` if any batch was refused); the job still succeeds and the remaining merchants stay uncategorized. A schema error or an API error fails the job so the queue retries it (spec 002 rule 34); batches already written stay written.
+12a. **No model.** When the worker has no gateway (no `ANTHROPIC_API_KEY` and `LLM_FAKE` off), the job still runs the rules and the reuse steps, makes no batches, and succeeds with `stopped: "no_model"`; the unknown merchants stay uncategorized until a later run has a model. A missing key never fails a job.
 
 ### User corrections (`PATCH /transactions/{id}`)
 

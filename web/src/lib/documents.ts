@@ -33,6 +33,7 @@ const REASON: Record<DocumentStatusReason, string> = {
     'No page could be redacted safely, so none was sent to the AI. Type the fields yourself.',
   budget: "Today's reading limit is used up. Type the fields yourself, or try again tomorrow.",
   extraction_failed: 'Reading did not finish after several tries, so type the fields yourself.',
+  no_model: 'Automatic reading is off right now, so type the fields from the lines shown.',
   unreadable_file: 'This file could not be opened. Upload it again as a PDF, PNG or JPEG.',
   expired: 'The file was deleted because it was not confirmed within a week. Upload it again.',
 };
