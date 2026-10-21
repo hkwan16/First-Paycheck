@@ -65,10 +65,22 @@ def test_the_live_suite_needs_a_key(monkeypatch: pytest.MonkeyPatch) -> None:
         explain.run(Budget(100))
 
 
+def test_w4_smoke_decision_is_spec_014_example_9() -> None:
+    [decision] = explain.load_decisions(explain.W4_FIXTURES)
+    assert decision.calculator == "w4"
+    assert decision.result["suggestion"] == "increase_deductions"
+    assert decision.result["suggested_deductions_cents"] == 1_068_300
+    keys = {citation.key for citation in explain.seed_citations(2026, "w4")}
+    assert set(decision.result["citation_keys"]) <= keys
+    result = explain.score([decision], fake())
+    assert result.metrics == {"first_try_verified": 1.0, "no_fallback": 1.0, "cited": 1.0}
+
+
 def test_smoke_passes() -> None:
     result = explain_smoke.run(Budget(0))
     assert result.metrics == {"flow_correct": 1.0}
-    assert result.cases == 3
+    assert result.cases == 5
+    assert {scenario.calculator for scenario in explain_smoke.SCENARIOS} == {"k401_match", "w4"}
     assert result.failures == []
     assert result.cost_cents == 0
 

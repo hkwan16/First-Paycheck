@@ -2,7 +2,8 @@
 and model over 10 synthetic 401(k) decisions.
 
 Each decision in ``evals/fixtures/explain/decisions.json`` is a ``k401_match``
-input; its result is computed here with ``calc/k401.py``, and its citations
+input; its result is computed here through ``calc/registry.py`` (the
+explain-smoke suite also loads ``w4_decisions.json`` this way), and its citations
 are the verified seed passages read from ``api/db/seed/irs_citations/``, so no
 database is needed. The flow is ``verify.flow.run_explain`` exactly as
 ``POST /explain`` runs it. The gateway records to an in-memory ledger that
@@ -25,18 +26,21 @@ from pathlib import Path
 from typing import Any
 
 from app.config import Settings
-from calc.k401 import K401MatchInput, k401_match
+from calc.registry import calculator as registered_calculator
 from db.seed.load import read_seed_citations
 from evals.suites.base import Budget, Suite, SuiteResult, SuiteUnavailable
 from llm.gateway import MICROCENTS_PER_CENT, LedgerEntry, LLMGateway, MemoryLedger
 from retrieval.benefits_search import BenefitsPassage
 from retrieval.citations import Citation
-from retrieval.context import explain_context
+from retrieval.context import explain_context, name_numbers
 from verify.allowed import AllowedNumbers
 from verify.fallback import fallback_draft
 from verify.flow import Attempt, Drafter, run_explain
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "explain" / "decisions.json"
+# The explain-smoke suite's W-4 decision (spec 014 rule 19); the live suite stays on
+# the ten 401(k) decisions its baseline was set on.
+W4_FIXTURES = FIXTURES.with_name("w4_decisions.json")
 EVAL_USER = uuid.UUID("00000000-0000-4000-8000-0000000e7a1e")
 CALCULATOR = "k401_match"
 # The gateway's per-user daily cap is not the eval's limit: --max-cost-cents is.
@@ -50,26 +54,32 @@ class EvalDecision:
     result: dict[str, Any]
     tax_year: int
     benefits_passages: tuple[str, ...]
+    calculator: str = CALCULATOR
 
 
 def load_decisions(path: Path = FIXTURES) -> list[EvalDecision]:
-    """The fixture decisions, inputs and results in the stored (JSON) form."""
+    """The fixture decisions, inputs and results in the stored (JSON) form. An entry
+    names its ``calculator`` (default ``k401_match``); the registry computes its result."""
     decisions = []
     for entry in json.loads(path.read_text()):
-        data = K401MatchInput.model_validate(entry["inputs"])
+        name = entry.get("calculator", CALCULATOR)
+        spec = registered_calculator(name)
+        data = spec.input_model.model_validate(entry["inputs"])
+        inputs = data.model_dump(mode="json")
         decisions.append(
             EvalDecision(
                 id=entry["id"],
-                inputs=data.model_dump(mode="json"),
-                result=k401_match(data).model_dump(mode="json"),
-                tax_year=data.tax_year,
+                inputs=inputs,
+                result=spec.run(data).model_dump(mode="json"),
+                tax_year=int(inputs["tax_year"]),
                 benefits_passages=tuple(entry["benefits_passages"]),
+                calculator=name,
             )
         )
     return decisions
 
 
-def seed_citations(tax_year: int) -> list[Citation]:
+def seed_citations(tax_year: int, calculator: str = CALCULATOR) -> list[Citation]:
     """The verified seed passages for the calculator, ordered by key (as loaded)."""
     return sorted(
         (
@@ -82,7 +92,7 @@ def seed_citations(tax_year: int) -> list[Citation]:
                 tax_year=entry.tax_year,
             )
             for entry in read_seed_citations()
-            if entry.verified and entry.calculator == CALCULATOR and entry.tax_year == tax_year
+            if entry.verified and entry.calculator == calculator and entry.tax_year == tax_year
         ),
         key=lambda citation: citation.key,
     )
@@ -90,7 +100,8 @@ def seed_citations(tax_year: int) -> list[Citation]:
 
 def explain_decision(drafter: Drafter, decision: EvalDecision) -> list[Attempt]:
     """One run of the flow, as POST /explain runs it, without the database."""
-    citations = seed_citations(decision.tax_year)
+    name = decision.calculator
+    citations = seed_citations(decision.tax_year, name)
     passages = [
         BenefitsPassage(document_id=EVAL_USER, chunk_index=index, text=text, rank=1.0)
         for index, text in enumerate(decision.benefits_passages)
@@ -99,10 +110,12 @@ def explain_decision(drafter: Drafter, decision: EvalDecision) -> list[Attempt]:
     return run_explain(
         drafter,
         EVAL_USER,
-        explain_context(CALCULATOR, decision.inputs, decision.result, citations, passages),
-        AllowedNumbers.from_decision(decision.inputs, decision.result),
+        explain_context(name, decision.inputs, decision.result, citations, passages),
+        AllowedNumbers.from_decision(
+            decision.inputs, decision.result, name_numbers(name, decision.inputs)
+        ),
         keys,
-        fallback_draft(CALCULATOR, decision.inputs, decision.result, keys),
+        fallback_draft(name, decision.inputs, decision.result, keys),
     )
 
 

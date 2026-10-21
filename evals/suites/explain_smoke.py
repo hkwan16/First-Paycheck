@@ -1,9 +1,11 @@
 """The explain-smoke suite (free, spec 008 rule 25): the explain flow with a
-scripted ``FakeGateway`` over three scenarios.
+scripted ``FakeGateway`` over five scenarios.
 
-Each scenario scripts the model's drafts for the first fixture decision and
-states the rows the flow must produce: verified on the first try, a failing
-draft then a verified one, and two failing drafts then the fallback.
+Each scenario scripts the model's drafts for the first fixture decision of its
+calculator and states the rows the flow must produce: verified on the first
+try, a failing draft then a verified one, and two failing drafts then the
+fallback, for a 401(k) decision; and verified on the first try and the
+fallback after two failing drafts for a W-4 decision (spec 014 rule 19).
 ``flow_correct`` is the share of scenarios whose rows (count, ``attempt``,
 ``retries``, ``verified``, ``fallback``) match, whose fallback (when there is
 one) verifies and is cited, and whose retry carried the first failure. No
@@ -18,7 +20,13 @@ from dataclasses import dataclass
 
 from app.config import Settings
 from evals.suites.base import Budget, Suite, SuiteResult
-from evals.suites.explain import EvalDecision, explain_decision, load_decisions
+from evals.suites.explain import (
+    CALCULATOR,
+    W4_FIXTURES,
+    EvalDecision,
+    explain_decision,
+    load_decisions,
+)
 from llm.gateway import MemoryLedger, ScriptedGateway, ScriptStep, reply_with
 from llm.schemas import ExplanationDraft
 
@@ -44,16 +52,19 @@ class Scenario:
     script: tuple[ScriptStep, ...]
     # (attempt, retries, verified, fallback) per row.
     expected: tuple[Row, ...]
+    # Which fixture decision the scenario explains: the first one of this calculator.
+    calculator: str = CALCULATOR
 
+
+FAIL_TWICE: tuple[Row, ...] = ((1, 0, False, False), (2, 1, False, False), (3, 1, False, True))
 
 SCENARIOS = (
     Scenario("pass", (GOOD,), ((1, 0, True, False),)),
     Scenario("fail-then-pass", (BAD, GOOD), ((1, 0, False, False), (2, 1, True, False))),
-    Scenario(
-        "fail-twice",
-        (BAD, BAD),
-        ((1, 0, False, False), (2, 1, False, False), (3, 1, False, True)),
-    ),
+    Scenario("fail-twice", (BAD, BAD), FAIL_TWICE),
+    # Spec 014 rule 19: a W-4 decision's facts verify, and its fallback verifies and is cited.
+    Scenario("w4-pass", (GOOD,), ((1, 0, True, False),), calculator="w4"),
+    Scenario("w4-fail-twice", (BAD, BAD), FAIL_TWICE, calculator="w4"),
 )
 
 
@@ -78,11 +89,13 @@ def check(scenario: Scenario, decision: EvalDecision) -> list[str]:
 
 
 def score(decisions: Sequence[EvalDecision], scenarios: Sequence[Scenario]) -> SuiteResult:
-    decision = decisions[0]
+    def decision_for(scenario: Scenario) -> EvalDecision:
+        return next(d for d in decisions if d.calculator == scenario.calculator)
+
     failures = [
         f"{scenario.name}: {problem}"
         for scenario in scenarios
-        for problem in check(scenario, decision)
+        for problem in check(scenario, decision_for(scenario))
     ]
     failed = {failure.split(":", 1)[0] for failure in failures}
     correct = sum(scenario.name not in failed for scenario in scenarios)
@@ -94,7 +107,7 @@ def score(decisions: Sequence[EvalDecision], scenarios: Sequence[Scenario]) -> S
 
 
 def run(budget: Budget) -> SuiteResult:
-    return score(load_decisions(), SCENARIOS)
+    return score([*load_decisions(), *load_decisions(W4_FIXTURES)], SCENARIOS)
 
 
 SUITE = Suite(name="explain-smoke", llm=False, run=run)
