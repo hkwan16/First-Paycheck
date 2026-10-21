@@ -5,8 +5,10 @@
  */
 export * from './accounts';
 export * from './debounce';
+export * from './documents';
 export * from './health';
 export * from './jobs';
+export * from './profile';
 export * from './setup';
 export * from './sync';
 export * from './transactions';

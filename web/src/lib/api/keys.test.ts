@@ -1,7 +1,13 @@
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 import { $api } from './client';
-import { invalidateForJob, JOB_INVALIDATES, queryKeys } from './keys';
+import {
+  invalidateAfterConfirm,
+  invalidateDocuments,
+  invalidateForJob,
+  JOB_INVALIDATES,
+  queryKeys,
+} from './keys';
 
 function seeded() {
   const client = new QueryClient();
@@ -64,5 +70,58 @@ describe('invalidateForJob', () => {
         'sync.initial',
       ].sort(),
     );
+  });
+});
+
+describe('document keys', () => {
+  function seededDocs() {
+    const client = new QueryClient();
+    const keys = {
+      list: $api.queryOptions('get', '/docs').queryKey,
+      detail: $api.queryOptions('get', '/docs/{document_id}', {
+        params: { path: { document_id: 'd1' } },
+      }).queryKey,
+      payStubs: $api.queryOptions('get', '/pay-stubs').queryKey,
+      profile: $api.queryOptions('get', '/profile').queryKey,
+      accounts: $api.queryOptions('get', '/accounts').queryKey,
+    };
+    for (const key of Object.values(keys)) client.setQueryData(key, {});
+    const invalidated = (key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
+    return { client, keys, invalidated };
+  }
+
+  it("match the keys $api's hooks cache under", () => {
+    expect(queryKeys.documents()).toEqual($api.queryOptions('get', '/docs').queryKey);
+    expect(queryKeys.document('d1')).toEqual(
+      $api.queryOptions('get', '/docs/{document_id}', { params: { path: { document_id: 'd1' } } })
+        .queryKey,
+    );
+    expect(queryKeys.payStubs()).toEqual($api.queryOptions('get', '/pay-stubs').queryKey);
+    expect(queryKeys.profile()).toEqual($api.queryOptions('get', '/profile').queryKey);
+  });
+
+  it('a finished extraction refreshes the list and every document read', async () => {
+    const { client, keys, invalidated } = seededDocs();
+    await invalidateForJob(client, 'ingest.extract');
+    expect(invalidated(keys.list)).toBe(true);
+    expect(invalidated(keys.detail)).toBe(true);
+    expect(invalidated(keys.payStubs)).toBe(false);
+  });
+
+  it('invalidateDocuments refreshes the list and details only', async () => {
+    const { client, keys, invalidated } = seededDocs();
+    await invalidateDocuments(client);
+    expect(invalidated(keys.list)).toBe(true);
+    expect(invalidated(keys.detail)).toBe(true);
+    expect(invalidated(keys.accounts)).toBe(false);
+  });
+
+  it('a confirmed document refreshes documents and pay stubs', async () => {
+    const { client, keys, invalidated } = seededDocs();
+    await invalidateAfterConfirm(client);
+    expect(invalidated(keys.list)).toBe(true);
+    expect(invalidated(keys.detail)).toBe(true);
+    expect(invalidated(keys.payStubs)).toBe(true);
+    expect(invalidated(keys.accounts)).toBe(false);
   });
 });

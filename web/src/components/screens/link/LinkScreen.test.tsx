@@ -3,7 +3,7 @@ import type { PlaidLinkOptionsWithLinkToken } from 'react-plaid-link';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JOB_POLL_MS } from '@/lib/api/hooks';
 import { CHASE_ITEM_ID, CHECKING_ID, SAMPLE_NOW, sampleJob } from '@/test/fixtures/sample';
-import { db, emptyDb } from '@/test/msw/db';
+import { db, emptyDb, emptyDocuments } from '@/test/msw/db';
 import { apiUrl, scriptJob } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { act, renderWithProviders, screen, waitFor, within } from '@/test/render';
@@ -165,7 +165,8 @@ describe('LinkScreen accounts', () => {
     expect(screen.getByRole('button', { name: 'Link a bank with Plaid' })).toBeEnabled();
   });
 
-  it('lets the next step go to spending once accounts exist', async () => {
+  it('lets the next step go to spending once accounts exist and nothing waits for review', async () => {
+    emptyDocuments();
     renderLink();
     await screen.findByRole('group', { name: 'Chase Total Checking' });
     expect(screen.getByRole('link', { name: /Continue to spending/ })).toHaveAttribute(

@@ -45,25 +45,6 @@ export function useSpendingSummary(): SpendingSummary | undefined {
   return undefined;
 }
 
-/**
- * TODO(GET /docs, M2 documents package): wire `useDocuments` to the route.
- * Uploads (`POST /docs`) and extraction (`POST /docs/{id}/extract`) arrive
- * with the Confirm screen.
- */
-export interface DocumentSummary {
-  id: string;
-  kind: 'pay_stub' | 'offer_letter' | 'benefits';
-  filename: string;
-  page_count: number | null;
-  redaction_count: number | null;
-  status: 'uploaded' | 'extracting' | 'extracted' | 'confirmed' | 'failed';
-  created_at: string;
-}
-
-export function useDocuments(): DocumentSummary[] | undefined {
-  return undefined;
-}
-
 /** TODO(GET /decisions, M3): wire `useDecisions` to the route. */
 export interface DecisionSummary {
   id: string;

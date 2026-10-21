@@ -8,10 +8,11 @@ import { IconTile } from '@/components/ui/IconTile';
 import { ListRows } from '@/components/ui/ListRows';
 import { Notice } from '@/components/ui/Notice';
 import { RelativeTime } from '@/components/ui/RelativeTime';
-import { type DocumentSummary, useDocuments } from '@/lib/api/pending';
+import { useDocuments } from '@/lib/api/hooks';
+import type { DocumentSummary } from '@/lib/api/types';
 import { formatNumber } from '@/lib/money';
 
-const KIND_LABEL: Record<DocumentSummary['kind'], string> = {
+const KIND_LABEL: Record<DocumentSummary['type'], string> = {
   pay_stub: 'Pay stub',
   offer_letter: 'Offer letter',
   benefits: 'Benefits summary',
@@ -22,24 +23,23 @@ function DocumentRow({ doc }: { doc: DocumentSummary }) {
     doc.page_count === null
       ? null
       : `${formatNumber(doc.page_count)} ${doc.page_count === 1 ? 'page' : 'pages'}`;
-  const redacted = doc.redaction_count ?? 0;
+  const redacted = doc.redaction_count;
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
-        <IconTile tone={doc.kind === 'benefits' ? 'plum' : 'coral'}>
+        <IconTile tone={doc.type === 'benefits' ? 'plum' : 'coral'}>
           <DocumentIcon />
         </IconTile>
         <div className="min-w-0">
-          <div className="font-semibold">{KIND_LABEL[doc.kind]}</div>
+          <div className="font-semibold">{KIND_LABEL[doc.type]}</div>
           <div className="text-small break-all text-ink-3">
-            {doc.filename}
-            {pages && ` \u00b7 ${pages}`}
-            {' \u00b7 uploaded '}
-            <RelativeTime value={doc.created_at} />
+            {pages && `${pages} \u00b7 `}
+            {'uploaded '}
+            <RelativeTime value={doc.uploaded_at} />
           </div>
         </div>
       </div>
-      {doc.redaction_count !== null && (
+      {doc.page_count !== null && (
         <Badge
           tone={redacted > 0 ? 'coral' : 'neutral'}
           icon={redacted > 0 ? <CheckIcon /> : undefined}
@@ -57,7 +57,7 @@ function DocumentRow({ doc }: { doc: DocumentSummary }) {
  * which has no data, and the drop zone is shown but disabled.
  */
 export function DocumentsCard() {
-  const documents = useDocuments() ?? [];
+  const documents = useDocuments().data ?? [];
 
   return (
     <Card aria-labelledby="docs-title">

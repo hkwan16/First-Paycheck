@@ -10,6 +10,7 @@ import { SpendingScreen } from '@/components/screens/spending/SpendingScreen';
 import { $api } from '@/lib/api/client';
 import { ACCOUNT_COUNT_LIMIT, TRANSACTIONS_PAGE_SIZE } from '@/lib/api/hooks';
 import { queryKeys } from '@/lib/api/keys';
+import { sampleBenefitsDocument, sampleDocument } from '@/test/fixtures/documents';
 import { SAMPLE_USER, sampleAccounts, sampleTransactions } from '@/test/fixtures/sample';
 
 /*
@@ -35,6 +36,7 @@ function seededClient() {
     },
   });
   client.setQueryData(queryKeys.accounts(), [...sampleAccounts]);
+  client.setQueryData(queryKeys.documents(), [sampleDocument(), sampleBenefitsDocument]);
   client.setQueryData(queryKeys.transactionPages({ limit: TRANSACTIONS_PAGE_SIZE }), {
     pages: [{ items: [...sampleTransactions], next_cursor: null }],
     pageParams: [null],

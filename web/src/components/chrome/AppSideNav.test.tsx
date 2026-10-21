@@ -1,18 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import type * as Pending from '@/lib/api/pending';
-import type { DocumentSummary } from '@/lib/api/pending';
-import { renderWithProviders as render, screen } from '@/test/render';
+import { samplePayStub } from '@/test/fixtures/documents';
+import { db } from '@/test/msw/db';
+import { renderWithProviders as render, screen, waitFor } from '@/test/render';
 import { AppSideNav } from './AppSideNav';
 
 const pathname = vi.hoisted(() => ({ current: '/setup/spending' }));
 vi.mock('next/navigation', () => ({ usePathname: () => pathname.current }));
-
-// GET /docs does not exist yet; stand in for it to show the marks follow data.
-const documents = vi.hoisted(() => ({ current: undefined as DocumentSummary[] | undefined }));
-vi.mock('@/lib/api/pending', async (importOriginal) => ({
-  ...(await importOriginal<typeof Pending>()),
-  useDocuments: () => documents.current,
-}));
 
 describe('AppSideNav', () => {
   it('marks the screen for the current path', () => {
@@ -36,24 +29,19 @@ describe('AppSideNav', () => {
 
   it('derives done marks from API data', async () => {
     pathname.current = '/setup/link';
-    documents.current = [
-      {
-        id: 'doc-1',
-        kind: 'pay_stub',
-        filename: 'acme-paystub.pdf',
-        page_count: 1,
-        redaction_count: 2,
-        status: 'extracted',
-        created_at: '2026-10-17T15:58:00Z',
-      },
-    ];
+    db.payStubs = [samplePayStub()];
     render(<AppSideNav />);
-    // Accounts (from GET /accounts) and a document: step 1 is done.
+    // Accounts (GET /accounts) and a document (GET /docs): step 1 is done.
     expect(
       await screen.findByRole('link', { name: 'Accounts and documents, done' }),
     ).toBeInTheDocument();
+    // A confirmed pay stub (GET /pay-stubs): step 2 is done.
+    await waitFor(() =>
+      expect(screen.getByText('Confirm pay stub').closest('li')).toHaveTextContent(
+        'Confirm pay stub, done',
+      ),
+    );
     expect(screen.getByRole('link', { name: 'Spending map' })).toBeInTheDocument();
-    documents.current = undefined;
   });
 
   it('marks nothing done before the data arrives', () => {
