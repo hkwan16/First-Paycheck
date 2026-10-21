@@ -114,6 +114,28 @@ class CategorizeItem:
 
 
 @dataclass(frozen=True)
+class TextPage:
+    """A text-layer page, already redacted (spec 004 rule 17)."""
+
+    number: int
+    text: str
+
+
+@dataclass(frozen=True)
+class ImagePage:
+    """A page image as PNG bytes, already redacted in the image (spec 004 rule 17)."""
+
+    number: int
+    png: bytes
+
+    def __repr__(self) -> str:
+        return f"ImagePage(number={self.number}, png=<{len(self.png)} bytes>)"
+
+
+ModelPage = TextPage | ImagePage
+
+
+@dataclass(frozen=True)
 class Usage:
     """Token counts. ``input_tokens`` is uncached input only."""
 
