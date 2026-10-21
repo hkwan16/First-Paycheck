@@ -42,7 +42,7 @@ export function DecisionsScreen({ calculators = features.calculators }: Decision
           )
         }
       />
-      <div className="grid grid-cols-2 gap-6 max-wide:grid-cols-1">
+      <div className="grid grid-cols-2 items-start gap-6 max-wide:grid-cols-1">
         {ORDER.map((calculator) =>
           live.has(calculator) && BUILT.has(calculator) ? (
             <Match401kCard key={calculator} />

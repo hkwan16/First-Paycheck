@@ -4,7 +4,6 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { KV, KVList } from '@/components/ui/KV';
-import { StatTile } from '@/components/ui/StatTile';
 import type { CalendarEvent, Explanation } from '@/lib/api/types';
 import { formatDate, formatDateTime } from '@/lib/dates';
 
@@ -22,6 +21,16 @@ const paragraphs = (text: string) =>
     .map((part) => part.trim())
     .filter(Boolean);
 
+/** From the mockup's `.status` boxes: a white box with a small caps label over the value. */
+function Check({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-control bg-surface px-3.5 py-3 shadow-raised">
+      <div className="text-tiny font-semibold tracking-[0.02em] text-ink-3 uppercase">{label}</div>
+      <div className="mt-0.5 font-semibold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
 const retriesText = (count: number) => (count === 1 ? '1 retry' : `${count} retries`);
 
 function Checks({ explanation }: { explanation: Explanation }) {
@@ -32,16 +41,11 @@ function Checks({ explanation }: { explanation: Explanation }) {
   const resolved = citations_checked - citations_unknown.length;
   return (
     <>
-      <StatTile
-        className="bg-surface"
+      <Check
         label="Numbers checked"
         value={`${matched} of ${numbers_checked} match the calculator`}
       />
-      <StatTile
-        className="bg-surface"
-        label="Citations"
-        value={`${resolved} of ${citations_checked} resolve to a source`}
-      />
+      <Check label="Citations" value={`${resolved} of ${citations_checked} resolve to a source`} />
     </>
   );
 }
@@ -83,7 +87,7 @@ export function VerifiedStatus({ explanation }: { explanation: Explanation }) {
     >
       <div className={STATUS_GRID}>
         <Checks explanation={explanation} />
-        <StatTile className="bg-surface" label="Retries" value={String(explanation.retries)} />
+        <Check label="Retries" value={String(explanation.retries)} />
       </div>
     </StatusCard>
   );
@@ -102,13 +106,9 @@ export function FallbackStatus({ explanation }: { explanation: Explanation }) {
       meta={`${explanation.prompt_version} · ${retriesText(explanation.retries)} · ${formatDateTime(explanation.created_at)}`}
     >
       <div className={STATUS_GRID}>
-        <StatTile className="bg-surface" label="Retries" value={String(explanation.retries)} />
-        <StatTile
-          className="bg-surface"
-          label="Citations"
-          value={`${explanation.citations.length} resolve to a source`}
-        />
-        <StatTile className="bg-surface" label="Shown instead" value="Plain calculator result" />
+        <Check label="Retries" value={String(explanation.retries)} />
+        <Check label="Citations" value={`${explanation.citations.length} resolve to a source`} />
+        <Check label="Shown instead" value="Plain calculator result" />
       </div>
       <p className="m-0 text-small text-ink-3">
         {retried
