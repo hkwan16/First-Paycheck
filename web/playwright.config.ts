@@ -66,6 +66,14 @@ export default defineConfig({
       dependencies: ['setup'],
       use: { ...desktop, storageState: STORAGE_STATE },
     },
+    // Uploads and confirms a pay stub; documents are apart from linked data, so
+    // it needs only the saved session.
+    {
+      name: 'authenticated-confirm',
+      testMatch: 'confirm.spec.ts',
+      dependencies: ['setup'],
+      use: { ...desktop, storageState: STORAGE_STATE },
+    },
     {
       name: 'authenticated-spending',
       testMatch: 'spending.spec.ts',

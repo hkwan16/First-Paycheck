@@ -2,8 +2,7 @@
 
 import { PageTitle } from '@/components/chrome/PageTitle';
 import { StepFooter, type StepFooterProps } from '@/components/chrome/StepFooter';
-import { useAccounts } from '@/lib/api/hooks';
-import { useDocuments } from '@/lib/api/pending';
+import { newestReviewable, useAccounts, useDocuments } from '@/lib/api/hooks';
 import { features } from '@/lib/features';
 import { confirmRoute } from '@/lib/routes';
 import { AccountsCard } from './AccountsCard';
@@ -21,7 +20,7 @@ export interface LinkScreenProps {
  */
 export function LinkScreen({ showSandboxLink = features.e2e }: LinkScreenProps) {
   const accounts = useAccounts().data ?? [];
-  const firstDocument = useDocuments()?.[0];
+  const firstDocument = newestReviewable(useDocuments().data);
 
   let next: StepFooterProps['next'];
   if (accounts.length === 0) {

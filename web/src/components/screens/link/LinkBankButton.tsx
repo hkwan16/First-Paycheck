@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { apiErrorMessage } from '@/lib/api/errors';
 import { useCreateSyncItem, useLinkToken } from '@/lib/api/hooks';
 import type { LinkedItem } from '@/lib/api/types';
+import { loadPlaidScript, usePlaidScript } from '@/lib/plaid-script';
 
 export interface LinkBankButtonProps {
   label: string;
@@ -21,22 +22,27 @@ export interface LinkBankButtonProps {
   onError: (message: string | null) => void;
 }
 
+const SCRIPT_FAILED = 'Could not load Plaid Link. Check your connection and reload the page.';
+
 const exitMessage = (error: PlaidLinkError) =>
   `Plaid Link closed. ${error.display_message ?? error.error_message}`;
 
 /**
- * Links a bank through Plaid Link. A press asks the API for a link token,
- * Plaid Link opens as soon as its script is ready, and the public token it
- * returns is exchanged by `POST /sync/items`. The button stays in its loading
- * state from the press until Link is open or the exchange is done, so the
- * person always sees that something is happening.
+ * Links a bank through Plaid Link. Plaid's script starts loading on mount
+ * (`usePlaidScript`), so a press rarely waits for it. A press asks the API for
+ * a link token, Plaid Link opens as soon as the script and the token are both
+ * there, and the public token it returns is exchanged by `POST /sync/items`.
+ * The button stays in its loading state from the press until Link is open or
+ * the exchange is done, so the person always sees that something is happening.
  */
 export function LinkBankButton({ label, disabled, onLinked, onError }: LinkBankButtonProps) {
+  const script = usePlaidScript();
   const linkToken = useLinkToken();
   const createItem = useCreateSyncItem();
+  // A token waiting for the script, then the token Link opens with.
+  const [waitingForScript, setWaitingForScript] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  // Open Link once per token: `open` changes identity as Plaid re-renders.
-  const openedFor = useRef<string | null>(null);
+  const [openedToken, setOpenedToken] = useState<string | null>(null);
 
   const onSuccess = (publicToken: string | null, metadata: PlaidLinkOnSuccessMetadata) => {
     setToken(null);
@@ -55,33 +61,28 @@ export function LinkBankButton({ label, disabled, onLinked, onError }: LinkBankB
     );
   };
 
-  const plaid = usePlaidLink({
-    token,
-    onSuccess,
-    onExit: (error) => {
-      setToken(null);
-      if (error) onError(exitMessage(error));
-    },
-  });
-
-  useEffect(() => {
-    if (token && plaid.ready && openedFor.current !== token) {
-      openedFor.current = token;
-      plaid.open();
-    }
-  }, [token, plaid]);
-
-  // Plaid's script loads on mount, so by the time of a press a failure is known.
-  const scriptFailed = plaid.error !== null && plaid.error !== undefined;
+  const onExit = (error: PlaidLinkError | null) => {
+    setToken(null);
+    if (error) onError(exitMessage(error));
+  };
 
   const start = () => {
     onError(null);
-    if (scriptFailed) {
-      onError('Could not load Plaid Link. Check your connection and reload the page.');
+    if (script === 'failed') {
+      onError(SCRIPT_FAILED);
       return;
     }
     linkToken.mutate(undefined, {
-      onSuccess: (created) => setToken(created.link_token),
+      onSuccess: (created) => {
+        // Usually loaded by now; otherwise Link opens when it is.
+        setWaitingForScript(true);
+        loadPlaidScript()
+          .then(
+            () => setToken(created.link_token),
+            () => onError(SCRIPT_FAILED),
+          )
+          .finally(() => setWaitingForScript(false));
+      },
       onError: (error) =>
         onError(`Could not start Plaid Link. ${apiErrorMessage(error, 'Try again shortly.')}`),
     });
@@ -89,13 +90,50 @@ export function LinkBankButton({ label, disabled, onLinked, onError }: LinkBankB
 
   const busy =
     linkToken.isPending ||
-    (token !== null && !plaid.ready && !scriptFailed) ||
+    waitingForScript ||
+    (token !== null && openedToken !== token) ||
     createItem.isPending;
 
   return (
-    <Button variant="primary" onClick={start} loading={busy} disabled={disabled}>
-      <LinkIcon />
-      {label}
-    </Button>
+    <>
+      <Button variant="primary" onClick={start} loading={busy} disabled={disabled}>
+        <LinkIcon />
+        {label}
+      </Button>
+      {token !== null && (
+        <PlaidLinkOpener
+          key={token}
+          token={token}
+          onSuccess={onSuccess}
+          onExit={onExit}
+          onOpen={setOpenedToken}
+        />
+      )}
+    </>
   );
+}
+
+interface PlaidLinkOpenerProps {
+  token: string;
+  onSuccess: (publicToken: string | null, metadata: PlaidLinkOnSuccessMetadata) => void;
+  onExit: (error: PlaidLinkError | null) => void;
+  onOpen: (token: string) => void;
+}
+
+/**
+ * Plaid Link for one token, mounted only once the script has run, so
+ * react-plaid-link finds the script on the page instead of adding its own.
+ * Opens Link as soon as Plaid is ready; renders nothing itself.
+ */
+function PlaidLinkOpener({ token, onSuccess, onExit, onOpen }: PlaidLinkOpenerProps) {
+  const plaid = usePlaidLink({ token, onSuccess, onExit });
+  // Open once: `open` changes identity as Plaid re-renders.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!plaid.ready || opened.current) return;
+    opened.current = true;
+    plaid.open();
+    onOpen(token);
+  }, [plaid, token, onOpen]);
+  return null;
 }

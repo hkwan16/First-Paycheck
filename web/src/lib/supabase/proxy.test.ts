@@ -46,8 +46,9 @@ describe('updateSession', () => {
 
   it('passes the request through untouched without Supabase env vars', async () => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
-    const response = await updateSession(request());
+    const { response, signedIn } = await updateSession(request());
     expect(response.headers.get('x-middleware-next')).toBe('1');
+    expect(signedIn).toBeNull();
     expect(mocks.createServerClient).not.toHaveBeenCalled();
   });
 
@@ -58,7 +59,7 @@ describe('updateSession', () => {
 
   it('reads request cookies and writes refreshed ones to the request and the response', async () => {
     refreshDuringGetClaims();
-    const response = await updateSession(request());
+    const { response } = await updateSession(request());
     expect(response.cookies.get('sb-access')?.value).toBe('new');
     expect(response.headers.get('cache-control')).toContain('no-store');
     // Server Components in this same request see the refreshed cookie.
@@ -68,13 +69,56 @@ describe('updateSession', () => {
   it('forwards extra request headers, with or without Supabase', async () => {
     const extra = { 'x-first-paycheck-path': '/setup/link' };
     refreshDuringGetClaims();
-    const refreshed = await updateSession(request(), extra);
+    const { response: refreshed } = await updateSession(request(), extra);
     expect(refreshed.headers.get('x-middleware-request-x-first-paycheck-path')).toBe('/setup/link');
 
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
-    const passthrough = await updateSession(request(), extra);
+    const { response: passthrough } = await updateSession(request(), extra);
     expect(passthrough.headers.get('x-middleware-request-x-first-paycheck-path')).toBe(
       '/setup/link',
+    );
+  });
+
+  it('reports whether the request carries a verified session', async () => {
+    expect((await updateSession(request())).signedIn).toBe(false);
+
+    mocks.getClaims.mockResolvedValueOnce({ data: null, error: new Error('expired') });
+    expect((await updateSession(request())).signedIn).toBe(false);
+
+    refreshDuringGetClaims();
+    expect((await updateSession(request())).signedIn).toBe(true);
+  });
+
+  it('builds a redirect that keeps the cookies and no-store headers the refresh wrote', async () => {
+    refreshDuringGetClaims();
+    const session = await updateSession(request());
+    const redirect = session.redirectTo(new URL('http://localhost:3000/sign-in?next=/setup/link'));
+    expect(redirect.status).toBe(307);
+    expect(redirect.headers.get('location')).toBe('http://localhost:3000/sign-in?next=/setup/link');
+    expect(redirect.cookies.get('sb-access')?.value).toBe('new');
+    expect(redirect.headers.get('cache-control')).toContain('no-store');
+    // A redirect renders nothing, so it forwards no request headers to the app.
+    expect(redirect.headers.get('x-middleware-next')).toBeNull();
+  });
+
+  it('keeps every cookie write, since the cache headers come only with the first', async () => {
+    mocks.getClaims.mockImplementationOnce(async () => {
+      const options = mocks.createServerClient.mock.calls.at(-1)?.[2];
+      options?.cookies.setAll([{ name: 'sb-access', value: 'new', options: { path: '/' } }], {
+        'Cache-Control': 'private, no-cache, no-store, must-revalidate, max-age=0',
+      });
+      options?.cookies.setAll([{ name: 'sb-refresh', value: 'r2', options: { path: '/' } }], {});
+      return { data: { claims: { sub: 'u1' } }, error: null };
+    });
+    const session = await updateSession(request());
+    const redirect = session.redirectTo(new URL('http://localhost:3000/sign-in'));
+    for (const response of [session.response, redirect]) {
+      expect(response.cookies.get('sb-access')?.value).toBe('new');
+      expect(response.cookies.get('sb-refresh')?.value).toBe('r2');
+      expect(response.headers.get('cache-control')).toContain('no-store');
+    }
+    expect(session.response.headers.get('x-middleware-request-cookie')).toBe(
+      'sb-access=new; sb-refresh=r2',
     );
   });
 });

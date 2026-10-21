@@ -4,7 +4,10 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
-  const getClaims = vi.fn(async () => ({ data: null, error: null }));
+  const getClaims = vi.fn(async (): Promise<{ data: object | null; error: null }> => ({
+    data: { claims: { sub: 'u1' } },
+    error: null,
+  }));
   return { getClaims, createServerClient: vi.fn(() => ({ auth: { getClaims } })) };
 });
 vi.mock('@supabase/ssr', () => ({ createServerClient: mocks.createServerClient }));
@@ -47,6 +50,29 @@ describe('proxy', () => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '');
     const response = await proxy(new NextRequest('http://localhost:3000/setup/link'));
     expect(forwarded(response, 'x-first-paycheck-path')).toBe('/setup/link');
+  });
+
+  it('sends a signed-out request for a signed-in screen to sign-in, keeping where it was going', async () => {
+    mocks.getClaims.mockResolvedValueOnce({ data: null, error: null });
+    const response = await proxy(new NextRequest('http://localhost:3000/plan?tab=goals&_rsc=1x'));
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/sign-in?next=/plan%3Ftab%3Dgoals',
+    );
+  });
+
+  it('lets a signed-out request through to pages that do not need an account', async () => {
+    for (const path of ['/', '/sign-in?next=/plan', '/auth/callback?code=abc', '/dev/kit']) {
+      mocks.getClaims.mockResolvedValueOnce({ data: null, error: null });
+      const response = await proxy(new NextRequest(`http://localhost:3000${path}`));
+      expect(response.headers.get('x-middleware-next'), path).toBe('1');
+    }
+  });
+
+  it('lets a signed-in request through to the signed-in screens', async () => {
+    const response = await proxy(new NextRequest('http://localhost:3000/setup/confirm/doc_1'));
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+    expect(response.headers.get('location')).toBeNull();
   });
 });
 

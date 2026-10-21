@@ -46,10 +46,18 @@ describe('SideNav', () => {
 
   it('shows id-bound screens as unavailable until an href is known', () => {
     render(<SideNav />);
-    expect(screen.queryByRole('link', { name: 'Confirm pay stub' })).not.toBeInTheDocument();
-    expect(screen.getByText('Confirm pay stub').closest('[aria-disabled]')).toHaveAttribute(
+    expect(screen.queryByRole('link', { name: 'Why this decision' })).not.toBeInTheDocument();
+    expect(screen.getByText('Why this decision').closest('[aria-disabled]')).toHaveAttribute(
       'aria-disabled',
       'true',
+    );
+  });
+
+  it('links Confirm to the page that finds the pay stub waiting for review', () => {
+    render(<SideNav />);
+    expect(screen.getByRole('link', { name: 'Confirm pay stub' })).toHaveAttribute(
+      'href',
+      '/setup/confirm',
     );
   });
 
@@ -105,6 +113,7 @@ describe('navKeyForPath', () => {
   it.each([
     ['/setup/link', 'link'],
     ['/setup/confirm/doc_1', 'confirm'],
+    ['/setup/confirm', 'confirm'],
     ['/setup/spending', 'spending'],
     ['/setup/decisions', 'decisions'],
     ['/why/dec_1', 'why'],

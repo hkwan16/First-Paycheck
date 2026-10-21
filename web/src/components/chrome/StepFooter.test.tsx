@@ -40,6 +40,15 @@ describe('StepFooter', () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
+  it('keeps the next action busy while it runs', async () => {
+    const onClick = vi.fn();
+    render(<StepFooter next={{ label: 'Confirm and continue', onClick, loading: true }} />);
+    const next = screen.getByRole('button', { name: 'Confirm and continue' });
+    expect(next).toHaveAttribute('aria-busy', 'true');
+    await userEvent.click(next);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
   it('uses a secondary next when asked', () => {
     render(<StepFooter next={{ href: '/plan', label: 'Skip', primary: false }} />);
     expect(screen.getByRole('link', { name: 'Skip' })).toHaveClass('bg-fill');

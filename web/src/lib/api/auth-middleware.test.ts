@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import createFetchClient from 'openapi-fetch';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '@/test/msw/server';
-import { createAuthMiddleware, type SessionAuth } from './auth-middleware';
+import { createAuthMiddleware, createSessionTokens, type SessionAuth } from './auth-middleware';
 
 const BASE = 'http://api.test';
 
@@ -34,7 +34,7 @@ function clientWith(auth: SessionAuth, onSessionExpired = vi.fn()) {
     baseUrl: BASE,
     fetch: (request) => globalThis.fetch(request),
   });
-  client.use(createAuthMiddleware({ getAuth: () => auth, onSessionExpired }));
+  client.use(createAuthMiddleware(createSessionTokens({ getAuth: () => auth, onSessionExpired })));
   return client;
 }
 
@@ -91,6 +91,58 @@ describe('createAuthMiddleware', () => {
     auth.signOut.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     const onSessionExpired = vi.fn();
     await clientWith(auth, onSessionExpired).GET('/ping');
+    expect(onSessionExpired).toHaveBeenCalledOnce();
+  });
+});
+
+describe('createSessionTokens', () => {
+  it('reads the current access token, or null when auth is off or signed out', async () => {
+    const auth = fakeAuth();
+    expect(
+      await createSessionTokens({ getAuth: () => auth, onSessionExpired: vi.fn() }).current(),
+    ).toBe('old');
+    expect(
+      await createSessionTokens({ getAuth: () => null, onSessionExpired: vi.fn() }).current(),
+    ).toBeNull();
+    auth.getSession.mockResolvedValueOnce({ data: { session: null }, error: null });
+    expect(
+      await createSessionTokens({ getAuth: () => auth, onSessionExpired: vi.fn() }).current(),
+    ).toBeNull();
+  });
+
+  it('shares one refresh with the fetch middleware, so an upload and a read never race', async () => {
+    server.use(
+      http.get(`${BASE}/ping`, ({ request }) =>
+        isFresh(request)
+          ? HttpResponse.json({ ok: true })
+          : new HttpResponse(null, { status: 401 }),
+      ),
+    );
+    const auth = fakeAuth();
+    // A refresh in flight while the read comes back 401.
+    auth.refreshSession.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () => resolve({ data: { session: { access_token: 'new' } }, error: null }),
+            30,
+          ),
+        ),
+    );
+    const tokens = createSessionTokens({ getAuth: () => auth, onSessionExpired: vi.fn() });
+    const client = createFetchClient<Paths>({ baseUrl: BASE, fetch: (r) => globalThis.fetch(r) });
+    client.use(createAuthMiddleware(tokens));
+    const [read, refreshed] = await Promise.all([client.GET('/ping'), tokens.refreshed()]);
+    expect(read.response.status).toBe(200);
+    expect(refreshed).toBe('new');
+    expect(auth.refreshSession).toHaveBeenCalledOnce();
+  });
+
+  it('signs out locally and reports the expiry', async () => {
+    const auth = fakeAuth();
+    const onSessionExpired = vi.fn();
+    await createSessionTokens({ getAuth: () => auth, onSessionExpired }).expire();
+    expect(auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: 'local' });
     expect(onSessionExpired).toHaveBeenCalledOnce();
   });
 });

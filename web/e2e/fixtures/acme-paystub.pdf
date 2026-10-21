@@ -1,0 +1,51 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 549 >>
+stream
+BT /F1 11 Tf 15 TL 72 720 Td
+(ACME CORP EARNINGS STATEMENT) Tj T*
+(Employee Rivera, J) Tj T*
+(SSN 123-45-6789) Tj T*
+(Direct Deposit Acct ****4821) Tj T*
+(Pay Frequency Semi-monthly) Tj T*
+(Pay Date 10/15/2026) Tj T*
+(Period 10/01/2026 - 10/15/2026) Tj T*
+(Gross Pay 2,708.33) Tj T*
+(Federal Income Tax 297.76) Tj T*
+(Social Security 167.92) Tj T*
+(Medicare 39.27) Tj T*
+(CA State Tax 98.14) Tj T*
+(CA SDI 32.50) Tj T*
+(401\(k\) -) Tj T*
+(Medical Pretax 62.50) Tj T*
+(Dental/Vision 14.20) Tj T*
+(Net Pay 1,996.04) Tj T*
+(YTD Gross 5,416.66) Tj T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000185 00000 n 
+0000000785 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+911
+%%EOF

@@ -77,6 +77,9 @@
   --text-small--letter-spacing: 0.004em;
   --text-control: 14px;
   --text-control--line-height: 1.5;
+  --text-code: 12.5px;
+  --text-code--line-height: 1.5;
+  --text-code--letter-spacing: 0.01em;
   --text-body: 15px;
   --text-body--line-height: 1.5;
   --text-lead: 16px;
