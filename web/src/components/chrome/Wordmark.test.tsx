@@ -9,6 +9,12 @@ describe('Wordmark', () => {
     expect(link).toHaveAttribute('href', '/');
     expect(link).toHaveTextContent('First Paycheck');
     expect(link.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
-    expect(link).toHaveClass('font-semibold', 'text-ink', 'no-underline');
+    expect(link).toHaveClass(
+      'font-semibold',
+      'text-ink',
+      'no-underline',
+      'whitespace-nowrap',
+      'flex-none',
+    );
   });
 });

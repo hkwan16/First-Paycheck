@@ -11,7 +11,7 @@ export function Label({ aside, className, children, ...rest }: LabelProps) {
   return (
     <label
       className={cn(
-        'mb-1.5 text-small font-semibold text-ink-2',
+        'mb-1.5 text-small leading-[1.5] font-semibold text-ink-2',
         aside === undefined ? 'block' : 'flex justify-between gap-2',
         className,
       )}

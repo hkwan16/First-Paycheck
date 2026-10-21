@@ -216,8 +216,8 @@ export function KitGallery() {
 
       <Section id="kit-cards" title="Cards">
         <div className="grid grid-cols-2 gap-4 max-wide:grid-cols-1">
-          <Card as="div" className="bg-tile shadow-none">
-            <strong>Inside a card: padding 20, gap 16</strong>
+          <Card as="div">
+            <strong>Default: padding 20, gap 16</strong>
             <span className="text-small text-ink-3">The default for every screen section.</span>
           </Card>
           <Card as="div" padding={24}>
@@ -253,7 +253,7 @@ export function KitGallery() {
               Target <Money cents={546975} decimals={0} />, reached around Oct 2027
             </div>
             <Bar value={39} tone="confirmed" label="Emergency fund progress" />
-            <KVList rules="all">
+            <KVList rules="all" spacing="panel">
               <KV
                 label="Saved so far"
                 value={
@@ -270,7 +270,7 @@ export function KitGallery() {
             <div className={cn('text-headline font-bold', toneText.plum)}>
               You capture the full match
             </div>
-            <KVList rules="all">
+            <KVList rules="all" spacing="panel">
               <KV label="You put in per year" value={<Money cents={260000} />} />
               <KV
                 label="Acme adds per year"

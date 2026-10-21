@@ -103,7 +103,7 @@ export function SignInScreen() {
         <Button type="submit" variant="primary" block>
           Sign in
         </Button>
-        <div className="flex items-center gap-3 text-tiny tracking-[0.04em] text-ink-3 uppercase before:h-px before:flex-1 before:bg-ink/10 after:h-px after:flex-1 after:bg-ink/10">
+        <div className="flex items-center gap-3 text-tiny leading-[1.5] tracking-[0.04em] text-ink-3 uppercase before:h-px before:flex-1 before:bg-ink/10 after:h-px after:flex-1 after:bg-ink/10">
           or
         </div>
         <Button block>

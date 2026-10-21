@@ -45,6 +45,15 @@ describe('KV and KVList', () => {
     expect(container.firstElementChild).toHaveClass('[&>div]:py-2', '[&>div:first-child]:pt-0');
   });
 
+  it('spaces rows with the result panel gap inside a Tile', () => {
+    const { container } = render(
+      <KVList spacing="panel">
+        <KV label="a" value="1" />
+      </KVList>,
+    );
+    expect(container.firstElementChild).toHaveClass('flex', 'flex-col', 'gap-2.5');
+  });
+
   it('marks a value the verifier matched to the calculator', () => {
     render(
       <KVList>

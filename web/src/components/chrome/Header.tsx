@@ -17,7 +17,8 @@ export function Header({ chips = [], minimal = false }: HeaderProps) {
   return (
     <header
       className={cn(
-        'sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-line px-6 py-3',
+        // min-h keeps the bar the same height with or without the chip row.
+        'sticky top-0 z-10 flex min-h-[51px] items-center justify-between gap-4 border-b border-line px-6 py-3',
         'bg-ground/72 backdrop-blur-[20px] backdrop-saturate-180',
         'reduce-transparency:bg-ground reduce-transparency:backdrop-blur-none reduce-transparency:backdrop-saturate-100',
       )}

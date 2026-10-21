@@ -67,7 +67,7 @@
 
   --text-*: initial;
   --text-micro: 11px;
-  --text-micro--line-height: 1.4;
+  --text-micro--line-height: 1.5;
   --text-micro--letter-spacing: 0.06em;
   --text-tiny: 12px;
   --text-tiny--line-height: 1.4;
@@ -76,7 +76,7 @@
   --text-small--line-height: 1.45;
   --text-small--letter-spacing: 0.004em;
   --text-control: 14px;
-  --text-control--line-height: 1.45;
+  --text-control--line-height: 1.5;
   --text-body: 15px;
   --text-body--line-height: 1.5;
   --text-lead: 16px;

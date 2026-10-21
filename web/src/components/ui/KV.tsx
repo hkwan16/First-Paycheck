@@ -3,8 +3,11 @@ import { cn } from '@/lib/cn';
 import { Badge } from './Badge';
 
 export interface KVListProps {
-  /** compact (6px rows) for result panels; comfortable (8px) for reading screens. */
-  spacing?: 'compact' | 'comfortable';
+  /**
+   * compact: 6px rows. comfortable: 8px rows, for reading screens.
+   * panel: 6px rows 10px apart, matching a result panel's (Tile) gap.
+   */
+  spacing?: 'compact' | 'comfortable' | 'panel';
   /** between: no rule above the first row; all: rule it too (when a headline sits above). */
   rules?: 'between' | 'all';
   className?: string;
@@ -23,6 +26,7 @@ export function KVList({
       className={cn(
         'm-0',
         spacing === 'comfortable' && '[&>div]:py-2 [&>div:first-child]:pt-0',
+        spacing === 'panel' && 'flex flex-col gap-2.5',
         rules === 'all' && '[&>div:first-child]:border-t',
         className,
       )}

@@ -7,7 +7,7 @@ export function Wordmark() {
     <Link
       href="/"
       aria-label="First Paycheck home"
-      className="inline-flex items-center gap-2 text-body font-semibold tracking-[-0.01em] text-ink no-underline hover:text-ink"
+      className="inline-flex flex-none items-center gap-2 text-body font-semibold tracking-[-0.01em] whitespace-nowrap text-ink no-underline hover:text-ink"
     >
       <LogoMark size={22} />
       First Paycheck

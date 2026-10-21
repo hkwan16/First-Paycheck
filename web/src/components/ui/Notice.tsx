@@ -41,7 +41,7 @@ export function Notice({
     <div
       className={cn(
         'flex items-start text-small',
-        compact ? 'gap-2.5 rounded-control px-3.5 py-3' : 'gap-3 rounded-tile px-4 py-3.5',
+        compact ? 'gap-3 rounded-control px-3.5 py-3' : 'gap-3 rounded-tile px-4 py-3.5',
         TONE[tone],
         className,
       )}
