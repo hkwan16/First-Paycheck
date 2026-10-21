@@ -23,6 +23,7 @@ from app.routers import (
     decisions,
     docs,
     explain,
+    goals,
     health,
     jobs,
     pay_stubs,
@@ -110,6 +111,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(decisions.router)
     app.include_router(explain.router)
     app.include_router(calendar.router)
+    app.include_router(goals.router)
     app.include_router(spending.router)
     app.include_router(recurring.router)
     app.include_router(cashflow.router)
