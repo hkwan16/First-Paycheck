@@ -133,7 +133,12 @@ def test_system_jobs_have_no_user_session(empty_queue: Connection) -> None:
 
 
 def test_default_handlers_cover_the_m1_kinds() -> None:
-    assert set(default_handlers()) >= {JobKind.RECURRING_DETECT, JobKind.SCHEDULE_TICK}
+    assert set(default_handlers()) >= {
+        JobKind.SYNC_INITIAL,
+        JobKind.SYNC_INCREMENTAL,
+        JobKind.RECURRING_DETECT,
+        JobKind.SCHEDULE_TICK,
+    }
 
 
 def test_recurring_detect_is_a_recorded_no_op(empty_queue: Connection, user_a: FixtureUser) -> None:

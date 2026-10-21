@@ -6,17 +6,18 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from db.enums import JobKind
+from jobs import scheduler
 from jobs.context import JobContext
 from jobs.errors import UnknownJobKind
+from jobs.handlers import recurring, sync
 
 Handler = Callable[[JobContext], Mapping[str, Any]]
 
 
 def default_handlers() -> dict[JobKind, Handler]:
-    from jobs import scheduler
-    from jobs.handlers import recurring
-
     return {
+        JobKind.SYNC_INITIAL: sync.run,
+        JobKind.SYNC_INCREMENTAL: sync.run,
         JobKind.RECURRING_DETECT: recurring.detect,
         JobKind.SCHEDULE_TICK: scheduler.run_tick,
     }

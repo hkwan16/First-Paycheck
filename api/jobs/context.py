@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Connection, Engine
 from sqlalchemy.orm import Session
@@ -13,10 +14,18 @@ from app.db import user_session_for
 from jobs import queue
 from jobs.queue import ClaimedJob, QueueBind
 
+if TYPE_CHECKING:
+    from sync.pipeline import ProviderFactory
+
 
 @dataclass(frozen=True)
 class Services:
-    """Collaborators built once per worker process and shared by every job."""
+    """Collaborators built once per worker process and shared by every job.
+
+    Tests pass fakes; ``jobs.services.default_services`` builds the real ones.
+    """
+
+    provider_for: ProviderFactory | None = None
 
 
 @dataclass
