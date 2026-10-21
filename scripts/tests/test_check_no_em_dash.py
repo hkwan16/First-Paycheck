@@ -42,6 +42,21 @@ def test_missing_files_are_skipped(tmp_path: Path) -> None:
     assert check_no_em_dash.main([str(tmp_path / "deleted.txt")]) == 0
 
 
+def test_vendored_skill_files_are_skipped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Third-party skills under .agents/skills are hash-locked; we do not edit their prose."""
+    monkeypatch.setattr(check_no_em_dash, "REPO_ROOT", tmp_path)
+    vendored = tmp_path / ".agents" / "skills" / "some-skill" / "SKILL.md"
+    vendored.parent.mkdir(parents=True)
+    vendored.write_text(f"their words {EM_DASH} their style\n")
+    ours = tmp_path / "docs" / "notes.md"
+    ours.parent.mkdir()
+    ours.write_text(f"our words {EM_DASH} not allowed\n")
+    assert check_no_em_dash.is_vendored(vendored)
+    assert not check_no_em_dash.is_vendored(ours)
+    assert check_no_em_dash.main([str(vendored)]) == 0
+    assert check_no_em_dash.main([str(vendored), str(ours)]) == 1
+
+
 def test_without_arguments_it_checks_tracked_files(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[list[Path]] = []
 
