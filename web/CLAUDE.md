@@ -63,13 +63,17 @@ src/components/ui/  design system (below)
 src/components/chrome/  app frame (below)
 src/components/screens/<screen>/  one 'use client' screen component per page
 src/components/icons.tsx  the mockup's SVG glyphs, decorative, drawn in currentColor
-src/lib/            api/ (schema.d.ts, base-url.ts, auth-middleware.ts, client.ts, hooks.ts),
-                    auth/ (next-path, validation, errors, account), supabase/ (env, client,
-                    server, proxy), design/ (tone.ts, tokens.ts), money.ts, dates.ts,
-                    features.ts, setup-progress.ts, routes.ts, navigation.ts,
-                    query-client.ts, cn.ts
-src/test/           setup.ts (jest-dom, MSW lifecycle), render.tsx, msw/handlers.ts
-e2e/                Playwright specs (smoke, auth.setup, auth), support/auth.ts, baselines
+src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts, client.ts,
+                    keys.ts, errors.ts, pending.ts, hooks/), auth/ (next-path, validation,
+                    errors, account), supabase/ (env, client, server, proxy), design/ (tone.ts,
+                    tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts, features.ts,
+                    setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts
+src/app/dev/screens/{link,spending}  a screen on the sample data, no API (development only)
+src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx,
+                    fixtures/sample.ts (the Acme / J. Rivera dataset), msw/db.ts (in-memory API
+                    state), msw/handlers.ts (every route, stateful)
+e2e/                Playwright specs (smoke, auth.setup, auth, link, spending), support/auth.ts,
+                    support/api.ts, baselines
 ```
 
 ## Component map
@@ -84,9 +88,12 @@ comment.
 | `Chip`                                          | `.chip`                                           | header context                                                                                                                                                                                                                      |
 | `Card`                                          | `.card`, `.fallback`                              | `as`, `padding` 20 or 24, `gap`, `tint` confirmed or warning, `inset`                                                                                                                                                               |
 | `Tile`                                          | `.result`, `.tile`                                | recessed panel, `tone` washes it in a hue                                                                                                                                                                                           |
-| `StatTile`                                      | `.tile .k .v`, `.stat`                            | `label`, `value`, `sub`, `tone`, `size` md or sm                                                                                                                                                                                    |
+| `StatTile`                                      | `.tile .k .v`, `.stat`                            | `label`, `value`, `sub`, `tone`, `size` md or sm; `loading` shows skeletons and sets `aria-busy`                                                                                                                                    |
 | `IconTile`                                      | `.ico`, `.sev`                                    | `tone`, `label` (initials), `muted`                                                                                                                                                                                                 |
-| `Bar`                                           | `.bar`, `.track`                                  | progressbar; `value` clamped 0-100; `tone` required; `height` 8 or 6                                                                                                                                                                |
+| `Bar`                                           | `.bar`, `.track`                                  | progressbar; `value` clamped 0-100; `tone` required; `height` 8 or 6; `indeterminate` slides a segment and drops `aria-valuenow`                                                                                                    |
+| `JobProgress`                                   | `.bar` with a label row                           | a background job from `useJob`: label, status words in a polite live region, percent, blue bar (indeterminate until the job reports progress); dead or unreadable becomes a warning with Try again                                  |
+| `Skeleton`                                      | none                                              | decorative placeholder for a value on its way; pulses, still under reduced motion; the region around it carries `aria-busy`                                                                                                         |
+| `RelativeTime`                                  | none                                              | "4 minutes ago" in a `<time>`, kept current; server and hydration render the plain date, so the HTML never depends on the clock                                                                                                     |
 | `KV`, `KVList`                                  | `.kv`                                             | a `<dl>`; `verified` adds the "=" mark; `spacing` compact, comfortable, panel; `rules`                                                                                                                                              |
 | `Seg`                                           | `.seg`                                            | generic options; role group of `aria-pressed` buttons; one tab stop; arrows, Home, End                                                                                                                                              |
 | `Input`, `Select`, `Label`, `Range`, `Checkbox` | `.input`, `.label`, `.range`, `.check`            | `Range` shows the two-sided label row and speaks `valueLabel`                                                                                                                                                                       |
@@ -106,13 +113,66 @@ row under 780px), `AppSideNav` (current item from the URL), `Shell` (header, nav
 `eyebrow`), `StepFooter` (`back`, `next` with `primary` and `disabled`; a disabled next is a real
 disabled button, never a dead link).
 
+## Data layer
+
+- **Hooks** live in `src/lib/api/hooks/` (one file per area, re-exported from `hooks/index.ts`);
+  screens import them from `@/lib/api/hooks`. Reads use `$api.useQuery`; paginated reads and
+  mutations use TanStack directly over `fetchClient`, through `unwrap()`, so every hook's `error`
+  is the API's `{ error: { code, message } }` body. Turn errors into sentences with
+  `apiErrorMessage(error, fallback)` (`lib/api/errors.ts`), never by printing the object.
+- **Keys** (`lib/api/keys.ts`): `$api` caches under `[method, path, init?]`, so `['get', path]` is a
+  prefix of every read of a route. Invalidate through the helpers there (`invalidateAccounts`,
+  `invalidateSpending`, `invalidateLinkedData`, `invalidateForJob`), not with keys spelled at call
+  sites. `useTransactions` is an infinite query under `queryKeys.transactionPages(filters)`; the
+  trailing `'pages'` keeps its `InfiniteData` apart from plain reads under the same prefix.
+- **Optimistic writes** cancel the affected reads, patch every cached copy (`setQueriesData` over
+  the prefix, paged or not), keep a snapshot for rollback in `onError`, and invalidate in
+  `onSettled`. Mirror what the server will write: `useFixCategory` also relabels the merchant's
+  other rows as `rule` and sets `confidence: null`, as the API does. Destructive writes (unlink)
+  are not optimistic: the rows leave when the server says they are gone.
+- **Job polling**: a route that queues work returns a `job_id`; pass it to `useJob(jobId)`, which
+  polls `GET /jobs/{id}` every 1.5 s (`JOB_POLL_MS`), stops at `succeeded`, `dead` or a read error,
+  and on finishing invalidates what its kind changes (`JOB_INVALIDATES` in keys.ts; add a row when
+  a job kind starts mattering to a screen). Show it with
+  `<JobProgress job={job.data} failed={job.isFailed} onRetry={...} />`. Sync jobs report no
+  percent, so the bar stays indeterminate until they end.
+- **Pending routes** (`lib/api/pending.ts`): a screen that needs a route the API does not have yet
+  calls a hook there with the signature it will keep, returning `undefined`, next to a shape with
+  a `TODO(<route>)`. Screens render `undefined` as a skeleton (totals) or an empty state (lists),
+  never a client-side substitute. Current: `useSpendingSummary` (`GET /spending/summary`: the
+  Spending tiles, and the category-to-bucket map that replaces `lib/categories.ts`),
+  `useDocuments` (`GET /docs`: the Link documents card and nav marks), `useDecisions`
+  (`GET /decisions`: nav marks). To wire one: `make types`, delete its shape, return
+  `$api.useQuery(...).data` under the key reserved in `keys.ts`, and add the MSW handler.
+- **Money** is formatted only. Transactions keep Plaid's sign (positive is money out):
+  `formatTransactionAmount` and `transactionFlow` in `lib/money.ts` turn that into "-$84.12" and
+  "+$1,996.04". Counting rows (the source badges) is fine; summing amounts is not.
+
+## Screen tests
+
+- MSW handlers in `src/test/msw/handlers.ts` read and write `db` (`src/test/msw/db.ts`), seeded
+  from `src/test/fixtures/sample.ts` and reset after every test, so a refetch after a PATCH reads
+  the new value. `emptyDb()` gives a new user; assign `db.transactions` for pagination cases;
+  `server.use(...)` overrides one route for an error or a delay.
+- `scriptJob(states, onSucceeded)` scripts what `GET /jobs/{id}` returns poll by poll;
+  `syncJobStates(id)` is queued, running at 40%, succeeded. Drive polling with
+  `vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) })` and
+  `await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS))`, and render with
+  `renderWithProviders(ui, { advanceTimers: vi.advanceTimersByTime })` so userEvent keeps up.
+- Assert requests with `server.events.on('request:start', ...)` and remove the listeners in
+  `afterEach`. For hooks, `renderHookWithClient(hook)` returns the `queryClient` for cache checks.
+- Third-party widgets are mocked at the module (`vi.mock('react-plaid-link', ...)`, see
+  `LinkScreen.test.tsx`), and the test calls the callbacks the widget would.
+- Screen tests cannot name status colors (ESLint): test a tone through a pure helper
+  (`sourceBadge`) or in the `components/ui` tests.
+
 ## Adding a screen
 
 1. Write the spec's tests first: `src/components/screens/<screen>/<Screen>Screen.test.tsx`, with
-   MSW handlers in `src/test/msw/handlers.ts` for every route it reads.
+   MSW handlers in `src/test/msw/handlers.ts` for every route it reads (see "Screen tests").
 2. Build `<Screen>Screen.tsx` as a `'use client'` component from `ui` and `chrome` parts only.
-   Read data with `$api.useQuery(...)` from `lib/api/client.ts`; render numbers with
-   `<Money>`/`<Num>` exactly as the API returns them.
+   Read data with the hooks in `@/lib/api/hooks` (or `$api.useQuery(...)` for a one-off read);
+   render numbers with `<Money>`/`<Num>` exactly as the API returns them.
 3. Keep `page.tsx` a thin server component that renders the screen and exports `metadata`.
 4. Link id-bound screens with the builders in `lib/routes.ts` (`confirmRoute(id)`, `whyRoute(id)`,
    `checkInRoute(id)`): Next's typed `Route` accepts dynamic segments only as literals.
@@ -123,7 +183,10 @@ disabled button, never a dead link).
 6. Render `<HydrationMarker />` as the page's last child (a unit test checks every `page.tsx`).
    The App Router hydrates each segment in its own commit, so a marker in a layout fires while
    the page is still inert, and Playwright then races hydration.
-7. Add the screen to the Playwright visual spec once it has real data fixtures.
+7. Add the screen to the Playwright visual spec: render it on the sample data under
+   `/dev/screens/<screen>` (`SampleScreen` seeds a QueryClient that never fetches) and add it to
+   `SCREENS` in `e2e/smoke.spec.ts` with `sample: true` (frozen clock, Plaid's script stubbed). An
+   end-to-end spec against the real API goes in an `authenticated-*` project (below).
 
 ## Auth
 
@@ -160,17 +223,24 @@ sends no token (unit tests, CI e2e, previews without secrets).
 (git-ignored) for the `authenticated` project, which runs `e2e/auth.spec.ts`. Set these in
 `web/.env.local` or the environment:
 
-| Variable                                                    | Needed for                                                                       |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)               |
-| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                       | the signed-in tests (sign in, return to `next`, sign out, saved session)         |
-| `NEXT_PUBLIC_E2E_USER_EMAIL`                                | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip |
+| Variable                                                    | Needed for                                                                                                                                                           |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)                                                                                                   |
+| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                       | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                             |
+| `NEXT_PUBLIC_E2E_USER_EMAIL`                                | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                     |
+| `E2E_API_URL`                                               | `link.spec.ts` and `spending.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it |
 
 Missing variables skip those tests with a message saying which to set. The e2e user must be a
 confirmed user: the hosted project requires email confirmation, so create it in the Supabase
 dashboard (Authentication > Users > Add user, "Auto Confirm User") with synthetic data only.
 Tests that sign out sign in through the form first, so they never end the saved session the other
 tests share.
+
+`link.spec.ts` (project `authenticated-link`) unlinks everything, links Plaid's sandbox bank with
+the e2e-only button, follows the sync and sets roles; `spending.spec.ts` (project
+`authenticated-spending`, which depends on it) reads those transactions and saves a category fix.
+Both change the e2e user's data, so they are ordered projects with serial files rather than
+parallel tests.
 
 ## Feature flags
 
