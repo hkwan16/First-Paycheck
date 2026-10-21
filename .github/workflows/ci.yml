@@ -123,6 +123,10 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
       - run: uv sync --all-packages --locked
+      # OCR tests and the extraction-smoke eval need the tesseract binary; with
+      # CI set they fail rather than skip without it.
+      - name: install tesseract
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
       - name: pytest with coverage
         run: >-
           uv run pytest -m "${{ env.PYTEST_MARKS }}"
@@ -130,6 +134,18 @@ jobs:
 
   ingest-in-docker:
     runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: first_paycheck_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -141,8 +157,13 @@ jobs:
           docker run --rm first-paycheck-api:ci python -c "import app.main"
       - name: build test image
         run: docker buildx build --load -f api/Dockerfile --target test -t first-paycheck-api-test:ci .
+      # The unit and integration ingest tests against the image's pinned
+      # tesseract; host networking reaches the Postgres service.
       - name: ingest tests inside the image
-        run: docker run --rm first-paycheck-api-test:ci
+        run: >-
+          docker run --rm --network host
+          -e TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/first_paycheck_test
+          first-paycheck-api-test:ci
 
   types-drift:
     runs-on: ubuntu-24.04
@@ -185,6 +206,8 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
       - run: uv sync --all-packages --locked
+      - name: install tesseract
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
       - name: deterministic eval suites
         run: make eval
 

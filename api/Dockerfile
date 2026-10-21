@@ -19,11 +19,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH=/opt/venv/bin:$PATH
 
-# tesseract for OCR; pango, harfbuzz and a font for WeasyPrint PDF export.
+# tesseract for OCR, pinned to the exact Debian package: redaction finds what
+# OCR reads, so a tesseract upgrade is a deliberate change made here (and the
+# ingest tests below rerun against it). pango, harfbuzz and a font for
+# WeasyPrint PDF export.
+ARG TESSERACT_VERSION=5.3.0-2
+ARG TESSDATA_ENG_VERSION=1:4.1.0-2
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      tesseract-ocr \
-      tesseract-ocr-eng \
+      tesseract-ocr=${TESSERACT_VERSION} \
+      libtesseract5=${TESSERACT_VERSION} \
+      tesseract-ocr-eng=${TESSDATA_ENG_VERSION} \
       libpango-1.0-0 \
       libpangoft2-1.0-0 \
       libharfbuzz0b \
@@ -46,16 +52,23 @@ RUN uv sync --frozen --no-dev --package first-paycheck-api --no-install-workspac
 
 
 # ---------------------------------------------------------------- test
-# Adds the api dev group and runs the ingest tests, which depend on the
-# image's tesseract build. Exit code 5 (no tests collected) counts as a pass
-# until the ingest tests exist.
+# Adds the api dev group and runs the ingest tests (unit and integration)
+# against the image's own tesseract build. The integration tests need a
+# Postgres: pass TEST_DATABASE_URL, for example
+#
+#   docker run --rm --network host \
+#     -e TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/first_paycheck_test \
+#     first-paycheck-test
+#
+# CI=true makes a missing tesseract or database a failure instead of a skip.
 FROM base AS test
 RUN uv sync --frozen --package first-paycheck-api --no-install-workspace
 COPY api/ api/
 RUN uv sync --frozen --package first-paycheck-api
 WORKDIR /app/api
 USER app
-CMD ["sh", "-c", "pytest -p no:cacheprovider tests/unit/ingest; rc=$?; if [ \"$rc\" -eq 5 ]; then echo 'no ingest tests collected yet'; exit 0; fi; exit \"$rc\""]
+ENV CI=true
+CMD ["pytest", "-p", "no:cacheprovider", "tests/unit/ingest", "tests/integration/ingest"]
 
 
 # ---------------------------------------------------------------- runtime
