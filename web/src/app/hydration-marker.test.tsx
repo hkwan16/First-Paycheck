@@ -1,10 +1,12 @@
 import { render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { resetPageHydration, usePageHydrated } from '@/lib/page-hydration';
 import { HydrationMarker } from './hydration-marker';
 
 describe('HydrationMarker', () => {
   afterEach(() => {
     delete document.documentElement.dataset.hydrated;
+    resetPageHydration();
   });
 
   it('marks <html> once React has hydrated, so tests can wait for an interactive page', () => {
@@ -12,6 +14,19 @@ describe('HydrationMarker', () => {
     const { container } = render(<HydrationMarker />);
     expect(document.documentElement).toHaveAttribute('data-hydrated', 'true');
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('tells layout readers the page has hydrated', () => {
+    function Reader() {
+      return usePageHydrated() ? 'page hydrated' : 'waiting';
+    }
+    const { container } = render(
+      <>
+        <Reader />
+        <HydrationMarker />
+      </>,
+    );
+    expect(container).toHaveTextContent('page hydrated');
   });
 });
 
