@@ -33,10 +33,68 @@ test('lists the synced transactions with who labeled each one', async ({ page })
   const rows = table.getByRole('row');
   expect(await rows.count()).toBeGreaterThan(2);
   await expect(table.getByText(/^(Rule|You|AI( · \d+%)?|Not labeled)$/).first()).toBeVisible();
-  // The summary waits for GET /spending/summary: skeletons, never client sums.
-  const summary = page.getByRole('region', { name: /Your month so far/ });
-  await expect(summary).toHaveAttribute('aria-busy', 'true');
-  await expect(summary).not.toContainText('$');
+});
+
+/** The summary card, once GET /cashflow has answered (its heading names the period). */
+async function loadedSummary(page: Page) {
+  const summary = page.getByRole('region', { name: /^\w+ \d+.* to .+ · \d+ paychecks?$/ });
+  await expect(summary).toBeVisible({ timeout: 30_000 });
+  await expect(summary).not.toHaveAttribute('aria-busy', 'true');
+  return summary;
+}
+
+const flowCard = (page: Page) =>
+  page.getByRole('region', { name: /^Where each dollar of (\w+ )?pay went$/ });
+
+test('the cash flow and the summary tiles show the same totals from the API', async ({ page }) => {
+  await openSpending(page);
+  const summary = await loadedSummary(page);
+  const card = flowCard(page);
+  await expect(card).not.toHaveAttribute('aria-busy', 'true');
+  if ((await card.getByText(/^Nothing to draw for /).count()) > 0) {
+    test.info().annotations.push({ type: 'note', description: 'No money in the default period' });
+    return;
+  }
+  await expect(card.getByText(/^Scale: 1 px is about \$[\d,]+$/)).toBeVisible();
+  // Both routes compute the period with the same code (spec 010 rule 5):
+  // every bucket the diagram draws matches its tile.
+  for (const bucket of ['Essentials', 'Flexible', 'Savings']) {
+    // Anchored on the amount: "Savings transfer" is a category under Savings.
+    const node = card.getByRole('button', { name: new RegExp(`^${bucket} \\$`) });
+    const amount = ((await node.textContent()) ?? '').replace(bucket, '').trim();
+    expect(amount).toMatch(/^\$[\d,]+\.\d{2}$/);
+    await expect(summary).toContainText(amount);
+  }
+});
+
+test('a node opens its details from the keyboard and Escape returns focus', async ({ page }) => {
+  await openSpending(page);
+  await loadedSummary(page);
+  const card = flowCard(page);
+  const first = card.getByRole('button').first();
+  test.skip((await first.count()) === 0, 'No money in the default period to draw');
+  await first.focus();
+  await expect(card.getByRole('group')).toHaveCount(1);
+  await expect(first).toHaveAttribute('aria-expanded', 'true');
+  await page.keyboard.press('ArrowRight');
+  await expect(card.getByRole('group')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(card.getByRole('group')).toHaveCount(0);
+  await expect(card.locator(':focus')).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('choosing another period reloads the totals and the diagram together', async ({ page }) => {
+  await openSpending(page);
+  const before = await loadedSummary(page);
+  const heading = await before.getByRole('heading', { level: 2 }).textContent();
+  const picker = page.getByRole('combobox', { name: 'Period' });
+  // The first option is the current month so far; the default is the last complete one.
+  const label = (await picker.locator('option').first().textContent()) ?? '';
+  await picker.selectOption({ label });
+  const after = await loadedSummary(page);
+  await expect(after.getByRole('heading', { level: 2 })).not.toHaveText(heading ?? '');
+  await expect(flowCard(page)).not.toHaveAttribute('aria-busy', 'true');
+  await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
 test('a category fix is saved as a rule and survives a reload', async ({ page }) => {

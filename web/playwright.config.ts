@@ -16,7 +16,7 @@ const desktop = { ...devices['Desktop Chrome'], viewport: { width: 1280, height:
  * Smoke and visual checks at the two widths the mockup targets, plus the auth
  * flows against the configured Supabase project. The server is `next dev`
  * because /dev/kit is a 404 in production builds; the e2e flag hides dev-only
- * overlays from the screenshots.
+ * overlays from the screenshots, and the sankey flag draws the cash flow.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -80,6 +80,13 @@ export default defineConfig({
       dependencies: ['authenticated-link'],
       use: { ...desktop, storageState: STORAGE_STATE },
     },
+    // Adds a CSV account to the linked data, so it runs after Spending reads it.
+    {
+      name: 'authenticated-import',
+      testMatch: 'import.spec.ts',
+      dependencies: ['authenticated-spending'],
+      use: { ...desktop, storageState: STORAGE_STATE },
+    },
   ],
   webServer: {
     command: `next dev --port ${PORT}`,
@@ -89,7 +96,9 @@ export default defineConfig({
     stdout: 'ignore',
     stderr: 'pipe',
     env: {
-      NEXT_PUBLIC_FEATURES: 'e2e',
+      // The sample screens turn the Sankey on themselves; the flag shows it on
+      // the real Spending screen for spending.spec.ts.
+      NEXT_PUBLIC_FEATURES: 'e2e,sankey',
       // The e2e account's header shows the "Sample data" chip.
       NEXT_PUBLIC_E2E_USER_EMAIL:
         process.env.NEXT_PUBLIC_E2E_USER_EMAIL ?? process.env.E2E_USER_EMAIL ?? '',
