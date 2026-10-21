@@ -10,6 +10,11 @@ export interface BarProps {
   label: string;
   /** Spoken value when the percent alone is not enough, e.g. "25% of plan". */
   valueText?: string;
+  /**
+   * Work has started but reports no percent yet: a segment slides along the
+   * track (a slow pulse under reduced motion) and `aria-valuenow` is omitted.
+   */
+  indeterminate?: boolean;
   height?: 8 | 6;
   className?: string;
 }
@@ -17,7 +22,15 @@ export interface BarProps {
 const clamp = (value: number) => (Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0);
 
 /** From the mockup's `.bar` and `.track`. */
-export function Bar({ value, tone, label, valueText, height = 8, className }: BarProps) {
+export function Bar({
+  value,
+  tone,
+  label,
+  valueText,
+  indeterminate = false,
+  height = 8,
+  className,
+}: BarProps) {
   const pct = clamp(value);
   return (
     <div
@@ -25,7 +38,7 @@ export function Bar({ value, tone, label, valueText, height = 8, className }: Ba
       aria-label={label}
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-valuenow={pct}
+      aria-valuenow={indeterminate ? undefined : pct}
       aria-valuetext={valueText}
       className={cn(
         'overflow-hidden rounded-full bg-line',
@@ -33,13 +46,22 @@ export function Bar({ value, tone, label, valueText, height = 8, className }: Ba
         className,
       )}
     >
-      <div
-        className={cn(
-          'h-full rounded-full transition-[width] duration-(--duration-bar) ease-out',
-          toneFill[tone],
-        )}
-        style={{ width: `${pct}%` }}
-      />
+      {indeterminate ? (
+        <div
+          className={cn(
+            'h-full w-2/5 animate-indeterminate rounded-full motion-reduce:animate-pulse',
+            toneFill[tone],
+          )}
+        />
+      ) : (
+        <div
+          className={cn(
+            'h-full rounded-full transition-[width] duration-(--duration-bar) ease-out',
+            toneFill[tone],
+          )}
+          style={{ width: `${pct}%` }}
+        />
+      )}
     </div>
   );
 }
