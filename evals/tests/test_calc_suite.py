@@ -132,6 +132,23 @@ def test_every_spec_006_example_is_a_case() -> None:
         assert f"spec-006-{name.replace('_', '-')}" in ids, name
 
 
+SPECS = Path(__file__).resolve().parents[2] / "docs" / "specs"
+
+
+@pytest.mark.parametrize(("spec", "rows"), [("011-emergency-fund.md", 8)])
+def test_every_new_calculator_example_is_a_case(spec: str, rows: int) -> None:
+    """Spec 011 and 012 example tables, by test name (`spec-NNN-x-y`)."""
+    number = spec[:3]
+    text = (SPECS / spec).read_text()
+    names = re.findall(r"^\| \d+ \| `test_(\w+)`", text, flags=re.MULTILINE)
+    # Only the calculator table: the decisions table that follows uses other ids.
+    calculator_names = names[:rows]
+    assert len(calculator_names) == rows
+    ids = {case.id for case in calc.load_cases()}
+    for name in calculator_names:
+        assert f"spec-{number}-{name.replace('_', '-')}" in ids, name
+
+
 def test_the_committed_cases_pass_through_the_route() -> None:
     result = calc.run(Budget(0))
     assert result.failures == []

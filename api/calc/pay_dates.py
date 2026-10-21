@@ -5,6 +5,9 @@ schedule strictly after ``today``. The schedule runs through ``anchor`` (the
 latest confirmed pay stub's pay date) when there is one; without an anchor
 weekly and biweekly pay is assumed to land one period from today, and
 semimonthly and monthly pay on the 15th and the last day of the month.
+
+``add_months(start, months)`` is the same day ``months`` later, clamped to the
+month's last day (spec 011 rules 11-12).
 """
 
 from __future__ import annotations
@@ -13,7 +16,7 @@ import calendar
 import datetime as dt
 from typing import Literal
 
-__all__ = ["PERIODS", "PayFrequency", "frequency_for_periods", "next_pay_date"]
+__all__ = ["PERIODS", "PayFrequency", "add_months", "frequency_for_periods", "next_pay_date"]
 
 PayFrequency = Literal["weekly", "biweekly", "semimonthly", "monthly"]
 PERIODS: dict[PayFrequency, int] = {"weekly": 52, "biweekly": 26, "semimonthly": 24, "monthly": 12}
@@ -72,3 +75,11 @@ def next_pay_date(frequency: PayFrequency, anchor: dt.date | None, today: dt.dat
         _on_day(year, month, day) for year, month in _months_from(today) for day in days
     )
     return next(date for date in candidates if date > today)
+
+
+def add_months(start: dt.date, months: int) -> dt.date:
+    """``start`` moved ``months`` calendar months on, the day clamped to the month's end."""
+    if months < 0:
+        raise ValueError(f"months must not be negative, not {months}")
+    index = start.year * 12 + (start.month - 1) + months
+    return _on_day(index // 12, index % 12 + 1, start.day)

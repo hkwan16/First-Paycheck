@@ -83,3 +83,35 @@ def test_invalid_input_is_422(client: TestClient, change: dict[str, Any], fragme
 def test_requires_a_signed_in_user() -> None:
     response = TestClient(create_app()).post("/calc/401k-match", json=EXAMPLE_1)
     assert response.status_code == 401
+
+
+EMERGENCY_FUND: dict[str, Any] = {
+    "monthly_essentials_cents": 250_000,
+    "target_months": 3,
+    "current_balance_cents": 0,
+    "monthly_contribution_cents": 50_000,
+    "pay_periods_per_year": 26,
+}
+
+
+def test_emergency_fund_over_http(client: TestClient) -> None:
+    response = client.post("/calc/emergency-fund", json=EMERGENCY_FUND)
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "target_cents": 750_000,
+        "three_month_target_cents": 750_000,
+        "six_month_target_cents": 1_500_000,
+        "shortfall_cents": 750_000,
+        "funded": False,
+        "funded_pct": "0.00",
+        "months_to_target": 15,
+        "reachable": True,
+        "per_paycheck_contribution_cents": 23_077,
+        "horizon_months": 120,
+    }
+
+
+def test_emergency_fund_rejects_a_zero_month_target(client: TestClient) -> None:
+    response = client.post("/calc/emergency-fund", json={**EMERGENCY_FUND, "target_months": 0})
+    assert response.status_code == 422
+    assert "target_months" in response.json()["error"]["message"]

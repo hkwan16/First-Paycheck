@@ -12,13 +12,20 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal, localcontext
 from itertools import pairwise
-from typing import Annotated, Literal, Self
+from typing import Self
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from calc.data import FilingStatus, K401Limits, TaxYearData, UnknownTaxYear, tax_year
 from calc.money import CONTEXT, pct_of, per_period, round_half_up
-from calc.types import Cents, Percent, PositiveCents, PositivePercent
+from calc.types import (
+    Cents,
+    PayPeriods,
+    Percent,
+    PositiveCents,
+    PositivePercent,
+    ResultPercent,
+)
 
 __all__ = [
     "BASE_CITATION_KEYS",
@@ -34,7 +41,6 @@ __all__ = [
     "tiers_ascending",
 ]
 
-PayPeriods = Literal[12, 24, 26, 52]
 MAX_TIERS = 5
 
 # Spec 006 rule 11, in this order.
@@ -99,14 +105,6 @@ class K401MatchInput(BaseModel):
     def _tiers_ascending(self) -> Self:
         tiers_ascending(self.match_tiers)
         return self
-
-
-def _two_places(value: Decimal) -> Decimal:
-    return value.quantize(Decimal("0.01"))
-
-
-# A rate the calculator reports, with exactly two places ("5.00").
-ResultPercent = Annotated[Decimal, AfterValidator(_two_places)]
 
 
 class K401MatchResult(BaseModel):
