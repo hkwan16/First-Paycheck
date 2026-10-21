@@ -1,4 +1,9 @@
 {
+  "benefits-extraction": {
+    "document_accuracy": 0.6,
+    "plan_field_accuracy": 0.9,
+    "retirement_accuracy": 0.8
+  },
   "calc": {
     "pass_rate": 1.0
   },

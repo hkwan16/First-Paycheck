@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from evals.suites import (
+    benefits_extraction,
     calc,
     categorization_rules,
     explain,
@@ -16,6 +17,7 @@ from evals.suites.base import Suite
 SUITES: dict[str, Suite] = {
     suite.name: suite
     for suite in (
+        benefits_extraction.SUITE,
         calc.SUITE,
         categorization_rules.SUITE,
         explain.SUITE,

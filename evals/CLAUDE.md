@@ -51,6 +51,27 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
 - `fixtures/calc/k401.json`: every spec 006 example (ids are the spec's test
   names, `spec-006-<name>`) plus the no-match edge case. A test fails if a row
   of the spec's example table has no case.
+- `fixtures/calc/emergency_fund.json` and `health_plans.json`: every spec 011
+  and 012 example (`spec-011-<name>`, `spec-012-<name>`), posted to `POST
+  /calc/emergency-fund` and `POST /calc/health-plans`; the same coverage test
+  runs over `NEW_CALCULATOR_SPECS`. `expected` holds only the fields an example
+  states; a list in it (the plan costs, the break-even pairs) is compared item
+  by item, each item by its stated fields.
+- `fixtures/benefits/`: 5 synthetic benefits summaries (`summary-0N.pdf`, text
+  PDFs written by hand in Helvetica with no embedded font) and labels beside
+  each, from `gen/make_benefits.py` with a fixed seed (`uv run python -m
+  evals.gen.make_benefits`). They vary the layout (plan table or prose), 1 to
+  3 plans, the match wording (tiered, single, dollar for dollar, none) and the
+  vesting wording; one prints a 900-area SSN and an HSA account number. The
+  bytes depend only on the seed, so a test compares both the PDFs and the
+  labels with a fresh generation. Tier labels are cumulative, the way the
+  proposal computes them from the printed bands.
+- `suites/benefits_extraction.py` (`benefits-extraction`, LLM): the real
+  pipeline, `extract_benefits/v2` and `benefits_proposal` over those
+  summaries; `plan_field_accuracy`, `retirement_accuracy`,
+  `document_accuracy`. `SuiteUnavailable` without `ANTHROPIC_API_KEY`; its
+  baseline holds the spec 013 targets (0.90, 0.80, 0.60) until the first live
+  run. Scoring is unit-tested with a reader that answers from the labels.
 - `fixtures/explain/decisions.json`: 10 synthetic `k401_match` inputs (with
   optional benefits passages) covering under-match, capped, catch-up,
   compensation-capped, already-full and no-match cases. Results are computed

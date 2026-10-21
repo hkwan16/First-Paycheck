@@ -1,0 +1,33 @@
+{
+  "account_number": null,
+  "content_type": "application/pdf",
+  "employer": "Lumen Data Co",
+  "file": "summary-04.pdf",
+  "id": "summary-04",
+  "layout": "prose",
+  "match_tiers": [],
+  "plans": [
+    {
+      "coinsurance_pct": "10.00",
+      "deductible_cents": 50000,
+      "employer_hsa_cents": null,
+      "enrollment_deadline": null,
+      "kind": "hmo",
+      "name": "Community HMO",
+      "oop_max_cents": 375000,
+      "premium_per_period_cents": 5950
+    },
+    {
+      "coinsurance_pct": "20.00",
+      "deductible_cents": 205000,
+      "employer_hsa_cents": 55000,
+      "enrollment_deadline": null,
+      "kind": "hdhp",
+      "name": "Bronze HSA",
+      "oop_max_cents": 675000,
+      "premium_per_period_cents": 600
+    }
+  ],
+  "ssn": null,
+  "vesting_years": null
+}
