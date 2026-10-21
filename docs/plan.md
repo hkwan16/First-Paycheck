@@ -2,7 +2,7 @@
 
 This is the repo copy of the First Paycheck build plan, condensed. The product is defined in [`technical-spec.md`](technical-spec.md) and [`proposal.md`](proposal.md); the look and interactions are settled by Mockup B in [`mockup/`](mockup/README.md); feature-level detail lives in [`specs/`](specs/README.md). Every issue below is in [`backlog.yaml`](backlog.yaml) and on the GitHub Project.
 
-- Backlog board: GitHub Project link to be added once the Project is created (M0 issue "GitHub Project, labels, milestones, backlog.yaml and sync_backlog.py").
+- Backlog board: [GitHub Project "First Paycheck"](https://github.com/users/hkwan16/projects/1), 104 issues across milestones M0 to M10, synced from `backlog.yaml` by `scripts/sync_backlog.py --project 1 --owner hkwan16`.
 - AI tool log: [`ai-log.md`](ai-log.md).
 
 ## Context

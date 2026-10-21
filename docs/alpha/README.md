@@ -42,7 +42,7 @@ TODO (M4): one screenshot per functional row above, each with a one-line caption
 
 The backlog is a GitHub Project. Every issue has a title, description, status, priority and assignee; the source of truth for issue text is [`docs/backlog.yaml`](../backlog.yaml), synced to GitHub by `scripts/sync_backlog.py`.
 
-- Project board: TODO (link)
+- Project board: https://github.com/users/hkwan16/projects/1 (issues: https://github.com/hkwan16/First-Paycheck/issues)
 - Board screenshot: TODO (`screenshots/backlog.png`)
 
 TODO (M4): two or three sentences on how the milestones are ordered and what is left after the alpha.
