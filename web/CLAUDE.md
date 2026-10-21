@@ -71,8 +71,9 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     protected, validation, errors, account), supabase/ (env, client, server,
                     proxy), design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts,
                     categories.ts, documents.ts, decisions.ts, deep-equal.ts, features.ts,
-                    setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts
-src/app/dev/screens/{link,spending,confirm,confirm/manual,decisions,why,why/fallback}  a screen on
+                    setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts,
+                    page-hydration.ts
+src/app/dev/screens/{link,spending,confirm,confirm/manual,decisions,why,why/fallback,why-index}  a screen on
                     the sample data, no API (development only)
 src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fake-xhr.ts,
                     fixtures/sample.ts (the Acme / J. Rivera dataset), fixtures/documents.ts (the
@@ -80,7 +81,7 @@ src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fa
                     decision, explanations, calendar event), fixtures/k401-results.json (calculator
                     results made by api/calc, with make-k401-results.py), msw/db.ts (in-memory API
                     state), msw/handlers.ts (every route, stateful)
-e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions),
+e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions, alpha),
                     support/auth.ts, support/api.ts, fixtures/ (synthetic acme-paystub.pdf and
                     the script that makes it), baselines
 ```
@@ -371,6 +372,25 @@ accepts verified, fallback, or "not available" when the API has no model. Decisi
 deleted, so it reads the current version instead of assuming v1. Never use a real document as a
 fixture.
 
+### Local real-API stack
+
+`make e2e-full` (`scripts/e2e_stack.py`) runs `pnpm e2e` against a stack it starts and stops: a
+disposable `first_paycheck_e2e` database (migrated, seeded, two synthetic users), a stand-in for
+Supabase Auth that signs ES256 tokens and serves its JWKS (the web signs in through its real form;
+the API verifies the same tokens), and the API and worker with `LLM_FAKE=true`. It sets every
+variable above itself, plus `E2E_ALPHA_USER_EMAIL`/`E2E_ALPHA_USER_PASSWORD` and
+`E2E_PLAID_SANDBOX`; the web runs on `E2E_PORT` 3247. Plaid comes from `PLAID_CLIENT_ID` and
+`PLAID_SECRET` in the environment or `.env`; without them `E2E_PLAID_SANDBOX=0` skips
+`link.spec.ts` and the alpha's link steps and leaves the spending project out.
+`uv run python -m scripts.e2e_stack run -- <command>` runs any command against it (CI's `e2e`
+workflow picks the real-API projects), and `up` keeps it running. Logs go to `.e2e-stack/`.
+
+`alpha.spec.ts` (project `alpha`) is the whole alpha as a new user (`E2E_ALPHA_USER_*`, which the
+stack makes per run; against a hosted API, a fresh confirmed user): it signs in through the form,
+links the sandbox bank and fixes a category, uploads and confirms the Acme stub, reads the
+Spending tiles, saves the 401(k) at 4% as v1 and a change as v2, and expects "Verified against
+calculator" with an irs.gov source (what the fake model produces).
+
 ## Feature flags
 
 `NEXT_PUBLIC_FEATURES` is a comma-separated list, parsed by `lib/features.ts`:
@@ -397,5 +417,9 @@ fixture.
   nothing may `redirect()` from inside a layout's Suspense (redirect in the proxy instead). Do
   not use `page.route` in the smoke spec: it turns off Chromium's cache, every request then says
   `Cache-Control: no-cache`, and dev skips that validation (and logs that it did).
+- A layout component that reads the API waits for `usePageHydrated()` (`lib/page-hydration.ts`,
+  set by `HydrationMarker`), as `AppSideNav` does. The layout hydrates before the page; reads it
+  starts earlier can fill the cache before the page hydrates, and the page then hydrates with data
+  its server HTML did not have (a hydration mismatch).
 - Plaid Link's script loads through `lib/plaid-script.ts`, once per page, and `usePlaidLink` is
   mounted only after it has run. Letting react-plaid-link add it runs it twice under Strict Mode.
