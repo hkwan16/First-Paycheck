@@ -119,9 +119,14 @@ def test_cli_with_no_matching_suites_is_a_no_op(tmp_path: Path) -> None:
 def test_update_baseline_writes_the_new_metrics(tmp_path: Path) -> None:
     baseline = write_baseline(tmp_path / "baseline.json", {"calc": {"pass_rate": 0.5}})
     argv = [
-        "--suite", "free", "--max-cost-cents", "0", "--baseline", str(baseline),
+        "--suite",
+        "free",
+        "--max-cost-cents",
+        "0",
+        "--baseline",
+        str(baseline),
         "--update-baseline",
-    ]  # fmt: skip
+    ]
     assert run.main(argv, registry=REGISTRY) == 0
     assert json.loads(baseline.read_text()) == {
         "calc": {"pass_rate": 1.0},
@@ -133,9 +138,15 @@ def test_report_is_written_as_json(tmp_path: Path) -> None:
     baseline = write_baseline(tmp_path / "baseline.json", {"calc": {"pass_rate": 1.0}})
     report = tmp_path / "out" / "report.json"
     argv = [
-        "--suite", "calc", "--max-cost-cents", "0", "--baseline", str(baseline),
-        "--report", str(report),
-    ]  # fmt: skip
+        "--suite",
+        "calc",
+        "--max-cost-cents",
+        "0",
+        "--baseline",
+        str(baseline),
+        "--report",
+        str(report),
+    ]
     assert run.main(argv, registry=REGISTRY) == 0
     data = json.loads(report.read_text())
     assert data["suites"]["calc"]["metrics"] == {"pass_rate": 1.0}
