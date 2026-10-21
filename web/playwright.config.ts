@@ -57,6 +57,21 @@ export default defineConfig({
       dependencies: ['setup'],
       use: { ...desktop, storageState: STORAGE_STATE },
     },
+    // The same saved session against the real API (E2E_API_URL; skipped without it).
+    // Two projects in order, because both change the e2e user's linked data:
+    // Spending reads what Link linked.
+    {
+      name: 'authenticated-link',
+      testMatch: 'link.spec.ts',
+      dependencies: ['setup'],
+      use: { ...desktop, storageState: STORAGE_STATE },
+    },
+    {
+      name: 'authenticated-spending',
+      testMatch: 'spending.spec.ts',
+      dependencies: ['authenticated-link'],
+      use: { ...desktop, storageState: STORAGE_STATE },
+    },
   ],
   webServer: {
     command: `next dev --port ${PORT}`,
@@ -71,6 +86,8 @@ export default defineConfig({
       NEXT_PUBLIC_E2E_USER_EMAIL:
         process.env.NEXT_PUBLIC_E2E_USER_EMAIL ?? process.env.E2E_USER_EMAIL ?? '',
       NEXT_TELEMETRY_DISABLED: '1',
+      // Link and Spending e2e tests run against this API (e2e/support/api.ts).
+      ...(process.env.E2E_API_URL ? { NEXT_PUBLIC_API_URL: process.env.E2E_API_URL } : {}),
     },
   },
 });
