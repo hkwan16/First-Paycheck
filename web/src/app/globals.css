@@ -1,1 +1,207 @@
 @import 'tailwindcss';
+
+/*
+ * First Paycheck design tokens, ported from the Mockup B :root line
+ * (docs/mockup/*.dc.html). This file and src/components/sankey/palette.ts are
+ * the only places a color may be spelled as hex; tokens.test.ts enforces it.
+ */
+
+@custom-variant reduce-transparency (@media (prefers-reduced-transparency: reduce));
+
+@theme static {
+  /* Only these colors exist: the default Tailwind palette is removed. */
+  --color-*: initial;
+  --color-white: #ffffff;
+
+  /* Ink and surfaces */
+  --color-ink: #16181d;
+  --color-ink-2: #3f4650;
+  --color-ink-3: #5b6370;
+  --color-ground: #f3f4f6;
+  --color-surface: #ffffff;
+  --color-tile: #f7f8fa;
+  --color-well: #fafafb;
+  --color-paper: #fbfbf9;
+  --color-line: rgb(22 24 29 / 0.08);
+  --color-fill: rgb(22 24 29 / 0.06);
+  --color-fill-strong: rgb(22 24 29 / 0.1);
+  --color-border: rgb(22 24 29 / 0.18);
+
+  /* Hues mark kinds of things. Text pairs are 4.5:1 or better on their tint. */
+  --color-blue: #1d4ed8;
+  --color-blue-text: #1e40af;
+  --color-blue-tint: #e8eefc;
+  --color-blue-deep: #1e40af;
+  --color-coral: #ea580c;
+  --color-coral-text: #9a3412;
+  --color-coral-tint: #ffede3;
+  --color-teal: #14b8a6;
+  --color-teal-text: #115e59;
+  --color-teal-tint: #d5f3ee;
+  --color-plum: #7c3aed;
+  --color-plum-text: #5b21b6;
+  --color-plum-tint: #ede9fe;
+
+  /* Statuses mark states. Reach them only through Tone (lib/design/tone.ts). */
+  --color-green: #0f7a4b;
+  --color-green-text: #0f6b42;
+  --color-green-tint: #e6f5ee;
+  --color-amber: #d97706;
+  --color-amber-text: #8a5a00;
+  --color-amber-tint: #fff1d6;
+  --color-red: #dc2626;
+  --color-red-text: #b42318;
+  --color-red-tint: #fee4e2;
+
+  /* Sankey only */
+  --color-flow-tax: #8a919c;
+  --color-flow-idle: #b8bec7;
+  --color-blue-soft: #6b93ee;
+  --color-coral-soft: #f2925f;
+
+  /* Type: the platform system font, sized and tracked per step. */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, Helvetica,
+    Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --text-*: initial;
+  --text-micro: 11px;
+  --text-micro--line-height: 1.4;
+  --text-micro--letter-spacing: 0.06em;
+  --text-tiny: 12px;
+  --text-tiny--line-height: 1.4;
+  --text-tiny--letter-spacing: 0.01em;
+  --text-small: 13px;
+  --text-small--line-height: 1.45;
+  --text-small--letter-spacing: 0.004em;
+  --text-control: 14px;
+  --text-control--line-height: 1.45;
+  --text-body: 15px;
+  --text-body--line-height: 1.5;
+  --text-lead: 16px;
+  --text-lead--line-height: 1.5;
+  --text-heading: 17px;
+  --text-heading--line-height: 1.3;
+  --text-heading--letter-spacing: -0.012em;
+  --text-headline: 20px;
+  --text-headline--line-height: 1.25;
+  --text-headline--letter-spacing: -0.015em;
+  --text-stat: 22px;
+  --text-stat--line-height: 1.2;
+  --text-stat--letter-spacing: -0.015em;
+  --text-title: 28px;
+  --text-title--line-height: 1.15;
+  --text-title--letter-spacing: -0.02em;
+  --text-display: 30px;
+  --text-display--line-height: 1.12;
+  --text-display--letter-spacing: -0.022em;
+
+  /* Radii */
+  --radius-card: 14px;
+  --radius-tile: 12px;
+  --radius-control: 10px;
+  --radius-seg: 8px;
+  --radius-node: 6px;
+
+  /* Depth: hairline rings plus soft shadows, heavier for larger surfaces. */
+  --shadow-hairline: 0 0 0 1px rgb(22 24 29 / 0.05);
+  --shadow-thumb: 0 1px 2px rgb(22 24 29 / 0.12);
+  --shadow-card: 0 1px 2px rgb(22 24 29 / 0.06), 0 0 0 1px rgb(22 24 29 / 0.06);
+  --shadow-raised: 0 1px 2px rgb(22 24 29 / 0.08), 0 0 0 1px rgb(22 24 29 / 0.05);
+  --shadow-pop:
+    0 1px 2px rgb(22 24 29 / 0.08), 0 10px 28px rgb(22 24 29 / 0.18), 0 0 0 1px rgb(22 24 29 / 0.08);
+  --shadow-paper:
+    0 1px 2px rgb(22 24 29 / 0.08), 0 8px 24px rgb(22 24 29 / 0.08), 0 0 0 1px rgb(22 24 29 / 0.06);
+
+  /* Breakpoints from the mockup: 640 phone, 780 nav collapse, 900 two-up grids. */
+  --breakpoint-nav: 48.75rem;
+  --breakpoint-wide: 56.25rem;
+
+  /* Motion: short, ease-out, and zeroed under reduced motion (below). */
+  --duration-press: 100ms;
+  --duration-fast: 120ms;
+  --duration-bar: 160ms;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1 {
+    font-size: var(--text-title);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+
+  h2 {
+    font-size: var(--text-heading);
+    line-height: 1.3;
+    letter-spacing: -0.012em;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-size: var(--text-body);
+    line-height: 1.35;
+    letter-spacing: -0.005em;
+    font-weight: 600;
+  }
+
+  a {
+    color: var(--color-blue);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  a:hover {
+    color: var(--color-blue-deep);
+  }
+
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  label[for] {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-blue);
+    outline-offset: 2px;
+  }
+
+  /* Reduced motion keeps feedback but drops movement: durations go to zero. */
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --duration-press: 0ms;
+      --duration-fast: 0ms;
+      --duration-bar: 0ms;
+    }
+
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  /* More contrast: hairlines and control borders get darker. */
+  @media (prefers-contrast: more) {
+    :root {
+      --color-line: rgb(22 24 29 / 0.24);
+      --color-fill: rgb(22 24 29 / 0.1);
+      --color-border: rgb(22 24 29 / 0.5);
+    }
+  }
+}
