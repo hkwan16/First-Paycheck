@@ -41,3 +41,5 @@ Specs may add an **Open questions** section for decisions not yet made. A spec w
 | [006 401(k) match calculator](006-401k-match.md) | Implemented, M3 |
 | [007 Decisions, versioning, the calendar and the spending summary](007-decisions-and-versioning.md) | Implemented, M3 |
 | [008 Explain, verify, citations and retrieval](008-explain-and-verify.md) | Implemented, M3 |
+| [009 Recurring charges](009-recurring-charges.md) | Implemented, M5 |
+| [010 Cash flow and CSV import](010-cash-flow-and-csv-import.md) | Implemented, M5 |

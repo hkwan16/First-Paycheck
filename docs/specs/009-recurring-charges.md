@@ -1,6 +1,6 @@
 # 009: Recurring charges
 
-Status: Ready, M5. Settles spec 001 open question 3 (recurring charges after unlink).
+Status: Implemented, M5. Settles spec 001 open question 3 (recurring charges after unlink).
 
 ## Goal
 

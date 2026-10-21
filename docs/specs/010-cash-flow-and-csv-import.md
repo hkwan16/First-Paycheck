@@ -1,6 +1,6 @@
 # 010: Cash flow and CSV import
 
-Status: Ready, M5. Settles spec 001 open question 5 (CSV transaction ids).
+Status: Implemented, M5. Settles spec 001 open question 5 (CSV transaction ids).
 
 ## Goal
 
