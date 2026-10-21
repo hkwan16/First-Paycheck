@@ -54,10 +54,14 @@ function watchErrors(page: Page) {
 async function open(page: Page, { path, heading, sample }: Screen) {
   if (sample) {
     await page.clock.setFixedTime(SAMPLE_NOW);
-    // Plaid Link's script loads on mount; these pages never open Link.
-    await page.route('https://cdn.plaid.com/**', (route) =>
-      route.fulfill({ status: 200, contentType: 'text/javascript', body: '' }),
-    );
+    // Plaid Link's script loads on mount unless Plaid is already on the page
+    // (lib/plaid-script.ts); these pages never open Link. A stand-in keeps it
+    // off the network without page.route, which turns off the browser cache:
+    // Chromium then sends `Cache-Control: no-cache`, and `next dev` logs that
+    // it rendered the route with its server caches disabled.
+    await page.addInitScript(() => {
+      Object.assign(window, { Plaid: { create: () => undefined } });
+    });
   }
   await page.goto(path);
   // Interacting or screenshotting before hydration races React (Playwright's
