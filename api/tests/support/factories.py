@@ -88,9 +88,11 @@ def make_transaction(
     category_source: CategorySource | None = None,
     confidence: Decimal | None = None,
     provider_txn_id: str | None = None,
+    pending: bool = False,
 ) -> uuid.UUID:
     with user_session_for(user_id, bind=connection) as session:
         txn = Transaction(
+            pending=pending,
             user_id=user_id,
             account_id=account_id,
             provider_txn_id=provider_txn_id or f"txn-{uuid.uuid4().hex[:12]}",

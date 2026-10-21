@@ -38,9 +38,19 @@ from llm.gateway import (
     TextPage,
     get_gateway,
 )
-from llm.schemas import BenefitsExtraction, CategoryBatch, PayStubExtraction
+from llm.schemas import (
+    BenefitsExtraction,
+    CategoryBatch,
+    ExplainCitation,
+    ExplainContext,
+    ExplainFact,
+    ExplanationDraft,
+    PayStubExtraction,
+)
 from tests.conftest import FixtureUser
 from tests.support.factories import make_job
+from verify.allowed import AllowedNumbers
+from verify.verify import verify_explanation
 
 NOW = dt.datetime(2026, 10, 21, 15, 0, tzinfo=dt.UTC)
 ITEMS = [
@@ -468,3 +478,70 @@ def test_a_memory_ledger_needs_no_database(user_a: FixtureUser) -> None:
         0,
     )
     assert memory.spent_today(user_a.id) == 0
+
+
+# Explain (spec 008 rule 10) ---------------------------------------------------
+
+EXPLAIN_CONTEXT = ExplainContext(
+    calculator="k401_match",
+    tax_year=2026,
+    facts=[
+        ExplainFact(label="Your contribution rate", value="3%"),
+        ExplainFact(label="Match you miss per year", value="$600.00"),
+    ],
+    notes=[],
+    citations=[
+        ExplainCitation(key="k401.employer_match", title="Matching", passage="An employer..."),
+    ],
+    benefits_passages=["Matching contributions vest after one year."],
+)
+EXPLAIN_ANSWER = {
+    "concept": "Your employer matches what you put in.",
+    "text": "At 3% you miss $600.00 a year.",
+    "numbers": [{"value": "$600.00", "label": "Match you miss per year"}],
+    "what_ifs": [],
+    "citation_keys": ["k401.employer_match"],
+}
+
+
+def test_explain_sends_the_context_and_the_feedback(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    api = Api(ok(EXPLAIN_ANSWER), ok(EXPLAIN_ANSWER))
+    model = gateway(db_connection, api)
+
+    draft = model.explain(user_a.id, EXPLAIN_CONTEXT)
+    assert draft == ExplanationDraft.model_validate(EXPLAIN_ANSWER)
+    first = api.requests[0]
+    assert first["model"] == "claude-sonnet-5-5"
+    assert first["output_config"]["effort"] == "medium"
+    assert "citation_keys" in first["output_config"]["format"]["schema"]["properties"]
+    [sent] = first["messages"]
+    assert json.loads(sent["content"]) == {"context": EXPLAIN_CONTEXT.model_dump(mode="json")}
+
+    model.explain(user_a.id, EXPLAIN_CONTEXT, feedback="Unmatched number: $650.00")
+    retry = json.loads(api.requests[1]["messages"][0]["content"])
+    assert retry["feedback"] == "Unmatched number: $650.00"
+
+    rows = ledger(db_connection, user_a)
+    assert [(row["purpose"], row["prompt_version"]) for row in rows] == [
+        ("explain", "explain/v1"),
+        ("explain", "explain/v1"),
+    ]
+
+
+def test_explain_refusal_raises(db_connection: Connection, user_a: FixtureUser) -> None:
+    api = Api(ok("I can't help with that.", stop_reason="refusal"))
+    with pytest.raises(LLMRefused):
+        gateway(db_connection, api).explain(user_a.id, EXPLAIN_CONTEXT)
+
+
+def test_fake_explains_with_facts_that_verify(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    draft = fake(db_connection).explain(user_a.id, EXPLAIN_CONTEXT)
+    assert draft.citation_keys == ["k401.employer_match"]
+    assert [claim.value for claim in draft.numbers] == ["3%", "$600.00"]
+    allowed = AllowedNumbers.from_decision({"missed_cents": 60_000, "contribution_pct": "3.00"})
+    assert verify_explanation(draft, allowed, {"k401.employer_match"}).passed
+    assert ledger(db_connection, user_a)[0]["prompt_version"] == "explain/v1"

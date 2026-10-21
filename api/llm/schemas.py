@@ -25,11 +25,15 @@ __all__ = [
     "CategoryBatch",
     "Cents",
     "DateField",
+    "ExplainCitation",
+    "ExplainContext",
+    "ExplainFact",
     "ExplanationDraft",
     "ExtractedField",
     "LineItem",
     "LineItemKind",
     "MoneyField",
+    "NumberClaim",
     "PayFrequencyField",
     "PayFrequencyValue",
     "PayStubExtraction",
@@ -167,15 +171,50 @@ class BenefitsExtraction(_Strict):
     notes: str | None = Field(description="Anything the reviewer should check, or null")
 
 
-class ExplanationDraft(_Strict):
-    """``explain`` output (M4, spec 007). The verifier checks every number and
-    citation key against the calculator result before anything is shown."""
+class NumberClaim(_Strict):
+    """A figure the explanation states, for the UI to show beside the text."""
 
-    concept: str
-    body: str
-    numbers: list[str] = Field(description="Every number in body, verbatim")
-    citation_keys: list[str]
-    what_ifs: list[str]
+    value: str = Field(description="The number exactly as written in the text, e.g. $2,400.00")
+    label: str = Field(description="What the number is, in a few words")
+
+
+class ExplanationDraft(_Strict):
+    """``explain`` output (spec 008 rule 9). Nothing here is shown until
+    ``verify/verify.py`` has checked every number and citation key."""
+
+    concept: str = Field(description="One sentence naming the idea behind the decision")
+    text: str = Field(description="Two to five short paragraphs explaining the decision")
+    numbers: list[NumberClaim] = Field(description="The key figures the text states")
+    what_ifs: list[str] = Field(
+        max_length=3, description="Up to three short what-if sentences using only the facts"
+    )
+    citation_keys: list[str] = Field(description="Keys of the allowed citations the text relies on")
+
+
+class ExplainFact(_Strict):
+    """One number the explanation may use, already formatted ("$2,400.00", "5%")."""
+
+    label: str
+    value: str
+
+
+class ExplainCitation(_Strict):
+    key: str
+    title: str
+    passage: str
+
+
+class ExplainContext(_Strict):
+    """What ``explain`` sends the model (spec 008 rule 7): the calculator's
+    numbers, the curated passages it may cite and redacted benefits text."""
+
+    calculator: str
+    tax_year: int
+    facts: list[ExplainFact]
+    # Situations the explanation should mention (a deferral limit that binds).
+    notes: list[str]
+    citations: list[ExplainCitation]
+    benefits_passages: list[str]
 
 
 SCHEMAS: dict[str, type[BaseModel]] = {

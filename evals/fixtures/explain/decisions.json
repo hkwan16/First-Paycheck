@@ -1,0 +1,166 @@
+[
+  {
+    "id": "tiered-under-match",
+    "note": "Spec 006 example 1: 3% of a 5% full match, biweekly.",
+    "inputs": {
+      "salary_cents": 6000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "3",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 24
+    },
+    "benefits_passages": [
+      "Acme matches 100% of the first 3% of pay you contribute and 50% of the next 2%. Matching contributions vest 25% a year over four years."
+    ]
+  },
+  {
+    "id": "simple-semimonthly",
+    "note": "Spec 006 example 2: 100% up to 4%, contributing 2%, semimonthly.",
+    "inputs": {
+      "salary_cents": 6500000,
+      "pay_periods_per_year": 24,
+      "match_tiers": [{"employee_pct_upto": "4", "employer_pct": "100"}],
+      "contribution_pct": "2",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 23
+    },
+    "benefits_passages": []
+  },
+  {
+    "id": "half-match-22-bracket",
+    "note": "Spec 006 example 3: 50% up to 6%, in the 22% bracket.",
+    "inputs": {
+      "salary_cents": 8500000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [{"employee_pct_upto": "6", "employer_pct": "50"}],
+      "contribution_pct": "4",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 27
+    },
+    "benefits_passages": [
+      "The company contributes 50 cents for every dollar you save, up to 6% of your eligible pay. You are always 100% vested in your own contributions."
+    ]
+  },
+  {
+    "id": "zero-contribution",
+    "note": "Spec 006 example 10: contributing nothing, missing the whole match.",
+    "inputs": {
+      "salary_cents": 6000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "0",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 22
+    },
+    "benefits_passages": []
+  },
+  {
+    "id": "already-full-match",
+    "note": "Spec 006 example 6: above the full-match rate, nothing missed.",
+    "inputs": {
+      "salary_cents": 7000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [{"employee_pct_upto": "4", "employer_pct": "100"}],
+      "contribution_pct": "8",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 29
+    },
+    "benefits_passages": []
+  },
+  {
+    "id": "capped-high-earner",
+    "note": "Spec 006 example 4: 10% of $300,000 runs into the yearly limit.",
+    "inputs": {
+      "salary_cents": 30000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "10",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "benefits_passages": []
+  },
+  {
+    "id": "catch-up-61",
+    "note": "Spec 006 example 7b: the 60-63 catch-up lifts the limit.",
+    "inputs": {
+      "salary_cents": 30000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "12",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 61
+    },
+    "benefits_passages": []
+  },
+  {
+    "id": "compensation-limit",
+    "note": "Spec 006 example 9: salary above the compensation limit.",
+    "inputs": {
+      "salary_cents": 50000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "6",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 35
+    },
+    "benefits_passages": []
+  },
+  {
+    "id": "fractional-rate-married",
+    "note": "Spec 006 example 8 inputs, filing jointly: 4.5% of an odd salary.",
+    "inputs": {
+      "salary_cents": 4512345,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "4.5",
+      "tax_year": 2026,
+      "filing_status": "married_filing_jointly",
+      "age": 26
+    },
+    "benefits_passages": [
+      "Employer matching contributions are made each pay period and are fully vested after two years of service."
+    ]
+  },
+  {
+    "id": "no-match-monthly",
+    "note": "A plan with no employer match, paid monthly, head of household.",
+    "inputs": {
+      "salary_cents": 5500000,
+      "pay_periods_per_year": 12,
+      "match_tiers": [],
+      "contribution_pct": "5",
+      "tax_year": 2026,
+      "filing_status": "head_of_household",
+      "age": 31
+    },
+    "benefits_passages": []
+  }
+]

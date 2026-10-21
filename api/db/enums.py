@@ -135,6 +135,33 @@ class PlanKind(StrEnum):
     HMO = "hmo"
 
 
+class CalculatorKind(StrEnum):
+    EMERGENCY_FUND = "emergency_fund"
+    K401_MATCH = "k401_match"
+    HEALTH_PLANS = "health_plans"
+    W4 = "w4"
+
+
+class GoalKind(StrEnum):
+    EMERGENCY_FUND = "emergency_fund"
+    CUSTOM = "custom"
+
+
+class CalendarKind(StrEnum):
+    ENROLLMENT_DEADLINE = "enrollment_deadline"
+    TAX_SEASON = "tax_season"
+    OPEN_ENROLLMENT = "open_enrollment"
+    GOAL_TARGET = "goal_target"
+    # A saved election should show up on the next pay stub (spec 007 rule 14).
+    ELECTION_CHECK = "election_check"
+
+
+class CalendarStatus(StrEnum):
+    UPCOMING = "upcoming"
+    DONE = "done"
+    DISMISSED = "dismissed"
+
+
 # Postgres type name for each enum created by 0002_core, in creation order.
 CORE_ENUMS: dict[str, type[StrEnum]] = {
     "pay_frequency": PayFrequency,
@@ -160,6 +187,15 @@ DOCUMENT_ENUMS: dict[str, type[StrEnum]] = {
     "document_status": DocumentStatus,
     "document_status_reason": DocumentStatusReason,
     "plan_kind": PlanKind,
+}
+
+
+# Enums created by 0004_decisions, in creation order.
+DECISION_ENUMS: dict[str, type[StrEnum]] = {
+    "calculator_kind": CalculatorKind,
+    "goal_kind": GoalKind,
+    "calendar_kind": CalendarKind,
+    "calendar_status": CalendarStatus,
 }
 
 

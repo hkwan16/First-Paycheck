@@ -1,0 +1,530 @@
+[
+  {
+    "id": "spec-006-tiered-3-at-100-plus-2-at-50",
+    "route": "/calc/401k-match",
+    "request": {
+      "salary_cents": 6000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {
+          "employee_pct_upto": "3",
+          "employer_pct": "100"
+        },
+        {
+          "employee_pct_upto": "5",
+          "employer_pct": "50"
+        }
+      ],
+      "contribution_pct": "3",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "expected": {
+      "full_match_pct": "5.00",
+      "employer_match_cents_current": 180000,
+      "employer_match_cents_full": 240000,
+      "missed_cents": 60000,
+      "employee_annual_cents_current": 180000,
+      "employee_annual_cents_full": 300000,
+      "per_paycheck_cost_delta_cents": 4615,
+      "per_paycheck_after_tax_cost_cents": 4062,
+      "marginal_rate_used": "12.00",
+      "deferral_limit_cents": 2450000,
+      "capped": false,
+      "compensation_capped": false,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets"
+      ]
+    }
+  },
+  {
+    "id": "spec-006-simple-100-to-4-semimonthly",
+    "route": "/calc/401k-match",
+    "request": {
+      "salary_cents": 6500000,
+      "pay_periods_per_year": 24,
+      "match_tiers": [
+        {
+          "employee_pct_upto": "4",
+          "employer_pct": "100"
+        }
+      ],
+      "contribution_pct": "2",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "expected": {
+      "full_match_pct": "4.00",
+      "employer_match_cents_current": 130000,
+      "employer_match_cents_full": 260000,
+      "missed_cents": 130000,
+      "employee_annual_cents_current": 130000,
+      "employee_annual_cents_full": 260000,
+      "per_paycheck_cost_delta_cents": 5417,
+      "per_paycheck_after_tax_cost_cents": 4767,
+      "marginal_rate_used": "12.00",
+      "deferral_limit_cents": 2450000,
+      "capped": false,
+      "compensation_capped": false,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets"
+      ]
+    }
+  },
+  {
+    "id": "spec-006-50-to-6",
+    "route": "/calc/401k-match",
+    "request": {
+      "salary_cents": 8500000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {
+          "employee_pct_upto": "6",
+          "employer_pct": "50"
+        }
+      ],
+      "contribution_pct": "4",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "expected": {
+      "full_match_pct": "6.00",
+      "employer_match_cents_current": 170000,
+      "employer_match_cents_full": 255000,
+      "missed_cents": 85000,
+      "employee_annual_cents_current": 340000,
+      "employee_annual_cents_full": 510000,
+      "per_paycheck_cost_delta_cents": 6538,
+      "per_paycheck_after_tax_cost_cents": 5100,
+      "marginal_rate_used": "22.00",
+      "deferral_limit_cents": 2450000,
+      "capped": false,
+      "compensation_capped": false,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets"
+      ]
+    }
+  },
+  {
+    "id": "spec-006-402g-cap-2026",
+    "route": "/calc/401k-match",
+    "request": {
+      "salary_cents": 30000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {
+          "employee_pct_upto": "3",
+          "employer_pct": "100"
+        },
+        {
+          "employee_pct_upto": "5",
+          "employer_pct": "50"
+        }
+      ],
+      "contribution_pct": "10",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "expected": {
+      "full_match_pct": "5.00",
+      "employer_match_cents_current": 1200000,
+      "employer_match_cents_full": 1200000,
+      "missed_cents": 0,
+      "employee_annual_cents_current": 2450000,
+      "employee_annual_cents_full": 1500000,
+      "per_paycheck_cost_delta_cents": 0,
+      "per_paycheck_after_tax_cost_cents": 0,
+      "marginal_rate_used": "35.00",
+      "deferral_limit_cents": 2450000,
+      "capped": true,
+      "compensation_capped": false,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets"
+      ]
+    }
+  },
+  {
+    "id": "spec-006-26-periods",
+    "route": "/calc/401k-match",
+    "request": {
+      "salary_cents": 5200000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {
+          "employee_pct_upto": "3",
+          "employer_pct": "100"
+        },
+        {
+          "employee_pct_upto": "5",
+          "employer_pct": "50"
+        }
+      ],
+      "contribution_pct": "2",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "expected": {
+      "full_match_pct": "5.00",
+      "employer_match_cents_current": 104000,
+      "employer_match_cents_full": 208000,
+      "missed_cents": 104000,
+      "employee_annual_cents_current": 104000,
+      "employee_annual_cents_full": 260000,
+      "per_paycheck_cost_delta_cents": 6000,
+      "per_paycheck_after_tax_cost_cents": 5280,
+      "marginal_rate_used": "12.00",
+      "deferral_limit_cents": 2450000,
+      "capped": false,
+      "compensation_capped": false,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets"
+      ]
+    }
+  },
+  {
+    "id": "spec-006-24-periods",
+    "route": "/calc/401k-match",
+    "request": {
+      "salary_cents": 5200000,
+      "pay_periods_per_year": 24,
+      "match_tiers": [
+        {
+          "employee_pct_upto": "3",
+          "employer_pct": "100"
+        },
+        {
+          "employee_pct_upto": "5",
+          "employer_pct": "50"
+        }
+      ],
+      "contribution_pct": "2",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "expected": {
+      "full_match_pct": "5.00",
+      "employer_match_cents_current": 104000,
+      "employer_match_cents_full": 208000,
+      "missed_cents": 104000,
+      "employee_annual_cents_current": 104000,
+      "employee_annual_cents_full": 260000,
+      "per_paycheck_cost_delta_cents": 6500,
+      "per_paycheck_after_tax_cost_cents": 5720,
+      "marginal_rate_used": "12.00",
+      "deferral_limit_cents": 2450000,
+      "capped": false,
+      "compensation_capped": false,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets"
+      ]
+    }
+  },
+  {
+    "id": "spec-006-contribution-above-full-match",
+    "route": "/calc/401k-match",
+    "request": {
+      "salary_cents": 7000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {
+          "employee_pct_upto": "4",
+          "employer_pct": "100"
+        }
+      ],
+      "contribution_pct": "8",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "expected": {
+      "full_match_pct": "4.00",
+      "employer_match_cents_current": 280000,
+      "employer_match_cents_full": 280000,
+      "missed_cents": 0,
+      "employee_annual_cents_current": 560000,
+      "employee_annual_cents_full": 280000,
+      "per_paycheck_cost_delta_cents": 0,
+      "per_paycheck_after_tax_cost_cents": 0,
+      "marginal_rate_used": "12.00",
+      "deferral_limit_cents": 2450000,
+      "capped": false,
+      "compensation_capped": false,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets"
+      ]
+    }
+  },
+  {
+    "id": "spec-006-catch-up-age-52-lifts-cap",
+    "route": "/calc/401k-match",
+    "request": {
+      "salary_cents": 30000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {
+          "employee_pct_upto": "3",
+          "employer_pct": "100"
+        },
+        {
+          "employee_pct_upto": "5",
+          "employer_pct": "50"
+        }
+      ],
+      "contribution_pct": "10",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 52
+    },
+    "expected": {
+      "full_match_pct": "5.00",
+      "employer_match_cents_current": 1200000,
+      "employer_match_cents_full": 1200000,
+      "missed_cents": 0,
+      "employee_annual_cents_current": 3000000,
+      "employee_annual_cents_full": 1500000,
+      "per_paycheck_cost_delta_cents": 0,
+      "per_paycheck_after_tax_cost_cents": 0,
+      "marginal_rate_used": "32.00",
+      "deferral_limit_cents": 3250000,
+      "capped": false,
+      "compensation_capped": false,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets",
+        "k401.catch_up"
+      ]
+    }
+  },
+  {
+    "id": "spec-006-catch-up-age-61",
+    "route": "/calc/401k-match",
+    "request": {
+      "salary_cents": 30000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {
+          "employee_pct_upto": "3",
+          "employer_pct": "100"
+        },
+        {
+          "employee_pct_upto": "5",
+          "employer_pct": "50"
+        }
+      ],
+      "contribution_pct": "12",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 61
+    },
+    "expected": {
+      "full_match_pct": "5.00",
+      "employer_match_cents_current": 1200000,
+      "employer_match_cents_full": 1200000,
+      "missed_cents": 0,
+      "employee_annual_cents_current": 3575000,
+      "employee_annual_cents_full": 1500000,
+      "per_paycheck_cost_delta_cents": 0,
+      "per_paycheck_after_tax_cost_cents": 0,
+      "marginal_rate_used": "32.00",
+      "deferral_limit_cents": 3575000,
+      "capped": true,
+      "compensation_capped": false,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets",
+        "k401.catch_up"
+      ]
+    }
+  },
+  {
+    "id": "spec-006-fractional-cents-round-half-up",
+    "route": "/calc/401k-match",
+    "request": {
+      "salary_cents": 4512345,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {
+          "employee_pct_upto": "3",
+          "employer_pct": "100"
+        },
+        {
+          "employee_pct_upto": "5",
+          "employer_pct": "50"
+        }
+      ],
+      "contribution_pct": "4.5",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "expected": {
+      "full_match_pct": "5.00",
+      "employer_match_cents_current": 169213,
+      "employer_match_cents_full": 180494,
+      "missed_cents": 11281,
+      "employee_annual_cents_current": 203056,
+      "employee_annual_cents_full": 225617,
+      "per_paycheck_cost_delta_cents": 868,
+      "per_paycheck_after_tax_cost_cents": 764,
+      "marginal_rate_used": "12.00",
+      "deferral_limit_cents": 2450000,
+      "capped": false,
+      "compensation_capped": false,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets"
+      ]
+    }
+  },
+  {
+    "id": "spec-006-cap-below-full-match-pct",
+    "route": "/calc/401k-match",
+    "request": {
+      "salary_cents": 50000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {
+          "employee_pct_upto": "3",
+          "employer_pct": "100"
+        },
+        {
+          "employee_pct_upto": "5",
+          "employer_pct": "50"
+        }
+      ],
+      "contribution_pct": "6",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "expected": {
+      "full_match_pct": "5.00",
+      "employer_match_cents_current": 1440000,
+      "employer_match_cents_full": 1440000,
+      "missed_cents": 0,
+      "employee_annual_cents_current": 2450000,
+      "employee_annual_cents_full": 2450000,
+      "per_paycheck_cost_delta_cents": 0,
+      "per_paycheck_after_tax_cost_cents": 0,
+      "marginal_rate_used": "35.00",
+      "deferral_limit_cents": 2450000,
+      "capped": true,
+      "compensation_capped": true,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets",
+        "k401.compensation_limit"
+      ]
+    }
+  },
+  {
+    "id": "spec-006-zero-contribution",
+    "route": "/calc/401k-match",
+    "request": {
+      "salary_cents": 6000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {
+          "employee_pct_upto": "3",
+          "employer_pct": "100"
+        },
+        {
+          "employee_pct_upto": "5",
+          "employer_pct": "50"
+        }
+      ],
+      "contribution_pct": "0",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "expected": {
+      "full_match_pct": "5.00",
+      "employer_match_cents_current": 0,
+      "employer_match_cents_full": 240000,
+      "missed_cents": 240000,
+      "employee_annual_cents_current": 0,
+      "employee_annual_cents_full": 300000,
+      "per_paycheck_cost_delta_cents": 11538,
+      "per_paycheck_after_tax_cost_cents": 10154,
+      "marginal_rate_used": "12.00",
+      "deferral_limit_cents": 2450000,
+      "capped": false,
+      "compensation_capped": false,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets"
+      ]
+    }
+  },
+  {
+    "id": "spec-006-no-match",
+    "route": "/calc/401k-match",
+    "request": {
+      "salary_cents": 6000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [],
+      "contribution_pct": "6",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "expected": {
+      "full_match_pct": "0.00",
+      "employer_match_cents_current": 0,
+      "employer_match_cents_full": 0,
+      "missed_cents": 0,
+      "employee_annual_cents_current": 360000,
+      "employee_annual_cents_full": 0,
+      "per_paycheck_cost_delta_cents": 0,
+      "per_paycheck_after_tax_cost_cents": 0,
+      "marginal_rate_used": "12.00",
+      "deferral_limit_cents": 2450000,
+      "capped": false,
+      "compensation_capped": false,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets"
+      ]
+    }
+  }
+]

@@ -1,0 +1,110 @@
+# IRS passages the 401(k) match explanation may cite (spec 008 rules 1-2).
+#
+# Every passage is quoted exactly from the page at `url`, fetched on
+# `verified_on`; "..." marks omitted words, and each part between them appears
+# verbatim in the page text (curly apostrophes included). Passages stay under
+# 80 words. An entry whose page could not be fetched is marked
+# `verified: false` and is not loaded. `make seed` upserts these rows on
+# (calculator, key, tax_year) and deletes rows this file no longer lists.
+
+- key: k401.deferral_limit
+  calculator: k401_match
+  tax_year: 2026
+  title: 2026 limit on 401(k) elective deferrals
+  source: IRS Notice 2025-67
+  url: https://www.irs.gov/pub/irs-drop/n-25-67.pdf
+  passage: >-
+    The limitation under section 402(g)(1) on the exclusion for elective
+    deferrals described in section 402(g)(3), which includes elective deferrals
+    made to the Thrift Savings Plan, is increased from $23,500 to $24,500.
+  verified: true
+  verified_on: 2026-10-21
+
+- key: k401.catch_up
+  calculator: k401_match
+  tax_year: 2026
+  title: 2026 catch-up contributions for ages 50 and over and 60 to 63
+  source: IRS News Release IR-2025-111
+  url: https://www.irs.gov/newsroom/401k-limit-increases-to-24500-for-2026-ira-limit-increases-to-7500
+  passage: >-
+    The catch-up contribution limit that generally applies for employees aged
+    50 and over who participate in most 401(k), 403(b), governmental 457 plans,
+    and the federal government’s Thrift Savings Plan is increased to $8,000, up
+    from $7,500 for 2025. ... a higher catch-up contribution limit applies for
+    employees aged 60, 61, 62 and 63 who participate in these plans. For 2026,
+    this higher catch-up contribution limit remains $11,250 instead of the
+    $8,000 noted above.
+  verified: true
+  verified_on: 2026-10-21
+
+- key: k401.compensation_limit
+  calculator: k401_match
+  tax_year: 2026
+  title: 2026 limit on compensation a plan can count
+  source: IRS Notice 2025-67
+  url: https://www.irs.gov/pub/irs-drop/n-25-67.pdf
+  passage: >-
+    The annual compensation limitation under sections 401(a)(17), 404(l),
+    408(k)(3)(C), and 408(k)(6)(D)(ii) is increased from $350,000 to $360,000.
+  verified: true
+  verified_on: 2026-10-21
+
+- key: k401.employer_match
+  calculator: k401_match
+  tax_year: 2026
+  title: Matching contributions help you save more for retirement
+  source: IRS, Retirement Plans
+  url: https://www.irs.gov/retirement-plans/matching-contributions-help-you-save-more-for-retirement
+  passage: >-
+    Many retirement plans, such as SIMPLE IRAs and 401(k)s, provide that your
+    employer will match some portion of the amount you contribute to your
+    retirement account. ... Generally, the more you contribute to the plan, up
+    to the plan’s match limit, the more you receive in matching contributions.
+  verified: true
+  verified_on: 2026-10-21
+
+- key: k401.pretax_deferral
+  calculator: k401_match
+  tax_year: 2026
+  title: How 401(k) elective deferrals are taxed
+  source: IRS 401(k) Resource Guide, Plan Participants
+  url: https://www.irs.gov/retirement-plans/plan-participant-employee/401k-resource-guide-plan-participants-401k-plan-overview
+  passage: >-
+    These deferred wages (elective deferrals) are generally not subject to
+    federal income tax withholding at the time of deferral ... Although
+    elective deferrals are not treated as current income for federal income tax
+    purposes, they are included as wages subject to Social Security (FICA),
+    Medicare, and federal unemployment taxes (FUTA).
+  verified: true
+  verified_on: 2026-10-21
+
+- key: k401.vesting
+  calculator: k401_match
+  tax_year: 2026
+  title: Retirement topics - Vesting
+  source: IRS, Retirement Plans
+  url: https://www.irs.gov/retirement-plans/plan-participant-employee/retirement-topics-vesting
+  passage: >-
+    An employee's own contributions to the plan (for example, employee elective
+    deferrals deducted from salary) are always 100% vested, or owned, by the
+    employee. ... Qualified defined contribution plans (for example,
+    profit-sharing or 401(k) plans) can offer a variety of different vesting
+    schedules that are determined by the plan document.
+  verified: true
+  verified_on: 2026-10-21
+
+- key: k401.federal_brackets
+  calculator: k401_match
+  tax_year: 2026
+  title: 2026 federal income tax rates
+  source: IRS News Release IR-2025-103
+  url: https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2026-including-amendments-from-the-one-big-beautiful-bill
+  passage: >-
+    For tax year 2026, the top tax rate remains 37% for individual single
+    taxpayers with incomes greater than $640,600 ($768,700 for married couples
+    filing jointly). ... 24% for incomes over $105,700 ($211,400 for married
+    couples filing jointly); 22% for incomes over $50,400 ($100,800 for married
+    couples filing jointly); 12% for incomes over $12,400 ($24,800 for married
+    couples filing jointly).
+  verified: true
+  verified_on: 2026-10-21

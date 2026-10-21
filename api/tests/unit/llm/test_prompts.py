@@ -78,6 +78,22 @@ def test_pay_stub_prompt_names_every_line_kind_and_field() -> None:
         assert f"`{frequency}`" in prompt.system
 
 
+def test_explain_v1() -> None:
+    prompt = load_prompt("explain", "v1")
+    assert prompt.version == "explain/v1"
+    assert prompt.purpose is LlmPurpose.EXPLAIN
+    assert prompt.effort == "medium"
+    assert prompt.schema is schemas.ExplanationDraft
+    # The prompt explains every field it writes and every part of the context it reads.
+    for field in schemas.ExplanationDraft.model_fields:
+        assert f"`{field}`" in prompt.system, field
+    for field in schemas.ExplainContext.model_fields:
+        assert f"`context.{field}`" in prompt.system, field
+    assert "`feedback`" in prompt.system
+    # No em dash anywhere in what the model reads.
+    assert chr(0x2014) not in prompt.system
+
+
 def test_parse_valid_prompt() -> None:
     prompt = parse_prompt(VALID, source=Path("demo/v1.md"))
     assert prompt == Prompt(

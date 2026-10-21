@@ -1,0 +1,53 @@
+{
+  "tax_year": 2026,
+  "k401": {
+    "elective_deferral_limit_cents": 2450000,
+    "catch_up_50_cents": 800000,
+    "catch_up_60_63_cents": 1125000,
+    "compensation_limit_cents": 36000000,
+    "source": "IRS Notice 2025-67: 402(g)(1) elective deferral limit $24,500; 414(v)(2)(B)(i) catch-up, age 50 and over, $8,000; 414(v)(2)(E)(i) catch-up, ages 60-63, $11,250; 401(a)(17) annual compensation limit $360,000",
+    "url": "https://www.irs.gov/pub/irs-drop/n-25-67.pdf"
+  },
+  "standard_deduction": {
+    "cents": {
+      "single": 1610000,
+      "married_filing_jointly": 3220000,
+      "head_of_household": 2415000
+    },
+    "source": "Rev. Proc. 2025-32, section 4.14",
+    "url": "https://www.irs.gov/pub/irs-drop/rp-25-32.pdf"
+  },
+  "brackets": {
+    "by_status": {
+      "single": [
+        {"rate_pct": "10", "up_to_cents": 1240000},
+        {"rate_pct": "12", "up_to_cents": 5040000},
+        {"rate_pct": "22", "up_to_cents": 10570000},
+        {"rate_pct": "24", "up_to_cents": 20177500},
+        {"rate_pct": "32", "up_to_cents": 25622500},
+        {"rate_pct": "35", "up_to_cents": 64060000},
+        {"rate_pct": "37", "up_to_cents": null}
+      ],
+      "married_filing_jointly": [
+        {"rate_pct": "10", "up_to_cents": 2480000},
+        {"rate_pct": "12", "up_to_cents": 10080000},
+        {"rate_pct": "22", "up_to_cents": 21140000},
+        {"rate_pct": "24", "up_to_cents": 40355000},
+        {"rate_pct": "32", "up_to_cents": 51245000},
+        {"rate_pct": "35", "up_to_cents": 76870000},
+        {"rate_pct": "37", "up_to_cents": null}
+      ],
+      "head_of_household": [
+        {"rate_pct": "10", "up_to_cents": 1770000},
+        {"rate_pct": "12", "up_to_cents": 6745000},
+        {"rate_pct": "22", "up_to_cents": 10570000},
+        {"rate_pct": "24", "up_to_cents": 20175000},
+        {"rate_pct": "32", "up_to_cents": 25620000},
+        {"rate_pct": "35", "up_to_cents": 64060000},
+        {"rate_pct": "37", "up_to_cents": null}
+      ]
+    },
+    "source": "Rev. Proc. 2025-32, section 4.01, Tables 1-3 (upper bound of each rate, \"not over\")",
+    "url": "https://www.irs.gov/pub/irs-drop/rp-25-32.pdf"
+  }
+}

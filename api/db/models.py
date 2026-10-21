@@ -42,11 +42,15 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from db.enums import (
     AccountKind,
     AccountRole,
+    CalculatorKind,
+    CalendarKind,
+    CalendarStatus,
     CategorySource,
     DocumentStatus,
     DocumentStatusReason,
     DocumentType,
     FilingStatus,
+    GoalKind,
     HealthcareUsage,
     JobKind,
     JobStatus,
@@ -608,3 +612,188 @@ class RateLimitCounter(Base):
     window_start: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
     count: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[dt.datetime] = _created_at()
+
+
+# ---------------------------------------------------------------- decisions (0004)
+
+
+class Decision(Base):
+    """A saved calculator result: append-only and versioned (spec 007).
+
+    ``POST /decisions`` is the only writer. Triggers written in the migration
+    check the parent's version and reject every UPDATE and DELETE except the
+    cascade from deleting the owner's account. ``current_decisions`` (a view)
+    holds the rows nothing supersedes.
+    """
+
+    __tablename__ = "decisions"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id"),
+        # Also serves a calculator's version history.
+        UniqueConstraint("user_id", "calculator", "version"),
+        ForeignKeyConstraint(
+            ["supersedes_id", "user_id"],
+            ["decisions.id", "decisions.user_id"],
+            ondelete="CASCADE",
+        ),
+        CheckConstraint("version >= 1", name="version_positive"),
+        CheckConstraint(
+            "(version = 1) = (supersedes_id IS NULL)", name="first_version_has_no_parent"
+        ),
+        CheckConstraint("jsonb_typeof(inputs) = 'object'", name="inputs_object"),
+        CheckConstraint("jsonb_typeof(result) = 'object'", name="result_object"),
+        Index(
+            "uq_decisions_supersedes_id",
+            "supersedes_id",
+            unique=True,
+            postgresql_where=text("supersedes_id IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = _id()
+    user_id: Mapped[uuid.UUID] = _owner()
+    calculator: Mapped[CalculatorKind] = mapped_column(pg_enum(CalculatorKind, "calculator_kind"))
+    # The calculator's input and result models as JSON: money in integer cents.
+    inputs: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    version: Mapped[int] = mapped_column(Integer)
+    supersedes_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    # Set when a check-in finding led to this version; foreign key in 0005.
+    check_in_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    created_at: Mapped[dt.datetime] = _created_at()
+
+
+def _decision_fk() -> ForeignKeyConstraint:
+    return ForeignKeyConstraint(
+        ["decision_id", "user_id"], ["decisions.id", "decisions.user_id"], ondelete="CASCADE"
+    )
+
+
+class Goal(Base):
+    __tablename__ = "goals"
+    __table_args__ = (
+        _decision_fk(),
+        # Postgres 15's column list: unlinking clears account_id and keeps the
+        # goal's owner. SQLAlchemy's DDL compiler cannot emit it, so the
+        # migration writes this key by hand; reflection reads it back as is.
+        ForeignKeyConstraint(
+            ["account_id", "user_id"],
+            ["accounts.id", "accounts.user_id"],
+            ondelete="SET NULL (account_id)",
+        ),
+        CheckConstraint("target_amount_cents > 0", name="target_positive"),
+        CheckConstraint("monthly_contribution_cents >= 0", name="contribution_non_negative"),
+        Index("ix_goals_user_id", "user_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _id()
+    user_id: Mapped[uuid.UUID] = _owner()
+    kind: Mapped[GoalKind] = mapped_column(pg_enum(GoalKind, "goal_kind"))
+    target_amount_cents: Mapped[int] = mapped_column(BigInteger)
+    monthly_contribution_cents: Mapped[int] = mapped_column(BigInteger)
+    account_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    decision_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    target_date: Mapped[dt.date | None] = mapped_column(Date)
+    created_at: Mapped[dt.datetime] = _created_at()
+    updated_at: Mapped[dt.datetime] = _updated_at()
+
+
+class CalendarEvent(Base):
+    """A dated checkpoint derived from a decision or a plan (spec 007 rule 14)."""
+
+    __tablename__ = "calendar_events"
+    __table_args__ = (
+        _decision_fk(),
+        CheckConstraint("title <> ''", name="title_not_empty"),
+        Index("ix_calendar_events_user_due", "user_id", "due_at"),
+        Index("ix_calendar_events_decision_id", "decision_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _id()
+    user_id: Mapped[uuid.UUID] = _owner()
+    kind: Mapped[CalendarKind] = mapped_column(pg_enum(CalendarKind, "calendar_kind"))
+    title: Mapped[str] = mapped_column(Text)
+    due_at: Mapped[dt.date] = mapped_column(Date)
+    decision_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    status: Mapped[CalendarStatus] = mapped_column(
+        pg_enum(CalendarStatus, "calendar_status"), server_default=text("'upcoming'")
+    )
+    created_at: Mapped[dt.datetime] = _created_at()
+    updated_at: Mapped[dt.datetime] = _updated_at()
+
+
+# Defined outside the class: Explanation's ``text`` column shadows the function there.
+_JSON_ARRAY = text("'[]'::jsonb")
+_JSON_OBJECT = text("'{}'::jsonb")
+_CLOCK_TIMESTAMP = text("clock_timestamp()")
+
+
+class Explanation(Base):
+    """One explanation attempt, or the fallback that ends a failed run (spec 008).
+
+    Append-only. ``created_at`` defaults to ``clock_timestamp()`` so the rows
+    of one run, written in one transaction, keep their order.
+    """
+
+    __tablename__ = "explanations"
+    __table_args__ = (
+        _decision_fk(),
+        CheckConstraint("num_nonnulls(decision_id, finding_id) = 1", name="one_subject"),
+        CheckConstraint("attempt BETWEEN 1 AND 3", name="attempt_range"),
+        CheckConstraint("retries IN (0, 1)", name="retries_range"),
+        CheckConstraint("NOT (verified AND fallback)", name="verified_or_fallback"),
+        CheckConstraint("jsonb_typeof(numbers) = 'array'", name="numbers_array"),
+        CheckConstraint("jsonb_typeof(what_ifs) = 'array'", name="what_ifs_array"),
+        CheckConstraint("jsonb_typeof(citations) = 'array'", name="citations_array"),
+        CheckConstraint("jsonb_typeof(verification) = 'object'", name="verification_object"),
+        Index("ix_explanations_decision_created", "decision_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _id()
+    user_id: Mapped[uuid.UUID] = _owner()
+    decision_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    # A check-in finding; foreign key in 0005.
+    finding_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    attempt: Mapped[int] = mapped_column(SmallInteger)
+    retries: Mapped[int] = mapped_column(SmallInteger)
+    concept: Mapped[str] = mapped_column(Text)
+    text: Mapped[str] = mapped_column(Text)
+    # [{"value": "$600.00", "label": "..."}]
+    numbers: Mapped[list[Any]] = mapped_column(JSONB, server_default=_JSON_ARRAY)
+    what_ifs: Mapped[list[Any]] = mapped_column(JSONB, server_default=_JSON_ARRAY)
+    # irs_citations keys, in the order the explanation cites them.
+    citations: Mapped[list[Any]] = mapped_column(JSONB, server_default=_JSON_ARRAY)
+    prompt_version: Mapped[str] = mapped_column(Text)
+    verified: Mapped[bool] = mapped_column(Boolean)
+    fallback: Mapped[bool] = mapped_column(Boolean)
+    # The verifier's counts (spec 008 rule 14).
+    verification: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=_JSON_OBJECT)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=_CLOCK_TIMESTAMP
+    )
+
+
+class IrsCitation(Base):
+    """A curated IRS passage per calculator and tax year (spec 008). No owner:
+    readable by every signed-in user, written only by the seed loader."""
+
+    __tablename__ = "irs_citations"
+    __table_args__ = (
+        UniqueConstraint("calculator", "key", "tax_year"),
+        CheckConstraint("url LIKE 'https://%'", name="url_https"),
+        CheckConstraint("key <> ''", name="key_not_empty"),
+        CheckConstraint("passage <> ''", name="passage_not_empty"),
+    )
+
+    id: Mapped[uuid.UUID] = _id()
+    calculator: Mapped[CalculatorKind] = mapped_column(pg_enum(CalculatorKind, "calculator_kind"))
+    key: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(Text)
+    url: Mapped[str] = mapped_column(Text)
+    passage: Mapped[str] = mapped_column(Text)
+    # The IRS document's name, for example "Notice 2025-67".
+    source: Mapped[str] = mapped_column(Text)
+    tax_year: Mapped[int] = mapped_column(SmallInteger)
+    verified_on: Mapped[dt.date] = mapped_column(Date)
+    created_at: Mapped[dt.datetime] = _created_at()
+    updated_at: Mapped[dt.datetime] = _updated_at()

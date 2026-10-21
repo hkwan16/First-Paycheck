@@ -38,4 +38,6 @@ Specs may add an **Open questions** section for decisions not yet made. A spec w
 | [003 Categorization, the LLM gateway and transaction routes](003-categorization.md) | Implemented, M1 |
 | [004 Upload, ingest and redaction](004-ingest-and-redaction.md) | Implemented, M2 |
 | [005 Pay stub and benefits extraction, review and confirm](005-pay-stub-extraction.md) | Implemented, M2 |
-| [006 401(k) match calculator](006-401k-match.md) | Draft, M3 |
+| [006 401(k) match calculator](006-401k-match.md) | Implemented, M3 |
+| [007 Decisions, versioning, the calendar and the spending summary](007-decisions-and-versioning.md) | Implemented, M3 |
+| [008 Explain, verify, citations and retrieval](008-explain-and-verify.md) | Implemented, M3 |

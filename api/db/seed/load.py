@@ -1,31 +1,41 @@
 """Load reference data: ``python -m db.seed.load``.
 
 Runs on every deploy after ``alembic upgrade head`` (Render pre-deploy) on the
-privileged connection, so it must be idempotent: it upserts the seed category
-rules from ``category_rules.csv`` and deletes seed rows the file no longer
-lists. User rules are never touched.
+privileged connection, so it must be idempotent. It upserts the seed category
+rules from ``category_rules.csv`` and the IRS citations from
+``irs_citations/*.yaml`` (spec 008), and deletes seed rows the files no
+longer list, in one transaction. User rules are never touched.
 """
 
 from __future__ import annotations
 
 import csv
+import datetime as dt
 import logging
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
+import yaml
+from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 from sqlalchemy import Connection, Engine, text
 
 from app.db import get_privileged_engine
 from app.logs import configure_logging
-from db.enums import RuleMatch, RuleSource
+from db.enums import CalculatorKind, RuleMatch, RuleSource
 from sync.categories import CATEGORIES
 from sync.categorize import CategoryRule, normalize_merchant
 
 logger = logging.getLogger("db.seed")
 
-SEED_CSV = Path(__file__).resolve().parent / "category_rules.csv"
+SEED_DIR = Path(__file__).resolve().parent
+SEED_CSV = SEED_DIR / "category_rules.csv"
+SEED_CITATIONS_DIR = SEED_DIR / "irs_citations"
 _HEADER = ["merchant_norm", "match", "category"]
+_CITATION_KEY = re.compile(r"[a-z0-9]+(?:\.[a-z0-9_]+)+")
+MAX_PASSAGE_WORDS = 80
 
 
 class SeedError(ValueError):
@@ -121,18 +131,146 @@ def load_category_rules(connection: Connection, rules: Sequence[CategoryRule]) -
     return SeedResult(inserted=inserted, updated=len(written) - inserted, deleted=deleted)
 
 
+# ---------------------------------------------------------------- IRS citations
+
+
+class SeedCitation(BaseModel):
+    """One curated passage (spec 008 rule 1)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    key: str
+    calculator: CalculatorKind
+    tax_year: int
+    title: str
+    source: str
+    url: str
+    passage: str
+    # False when the page could not be fetched to check the quote; not loaded.
+    verified: bool
+    verified_on: dt.date
+
+    @field_validator("key")
+    @classmethod
+    def _key_shape(cls, value: str) -> str:
+        if not _CITATION_KEY.fullmatch(value):
+            raise ValueError(f"key {value!r} must look like 'k401.deferral_limit'")
+        return value
+
+    @field_validator("url")
+    @classmethod
+    def _irs_https(cls, value: str) -> str:
+        if not value.startswith("https://www.irs.gov/"):
+            raise ValueError("url must be an https://www.irs.gov/ page")
+        return value
+
+    @field_validator("passage")
+    @classmethod
+    def _short(cls, value: str) -> str:
+        if len(value.split()) >= MAX_PASSAGE_WORDS:
+            raise ValueError(f"passage must be under {MAX_PASSAGE_WORDS} words")
+        return value.strip()
+
+
+def read_seed_citations(directory: Path = SEED_CITATIONS_DIR) -> list[SeedCitation]:
+    """Parse and validate every ``*.yaml`` file; any bad entry fails the whole load."""
+    citations: list[SeedCitation] = []
+    seen: set[tuple[str, str, int]] = set()
+    for path in sorted(directory.glob("*.yaml")):
+        entries: Any = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if not isinstance(entries, list):
+            raise SeedError(f"{path.name}: expected a list of citations")
+        for number, entry in enumerate(entries, start=1):
+            where = f"{path.name}: entry {number}"
+            try:
+                citation = SeedCitation.model_validate(entry)
+            except ValidationError as exc:
+                problems = "; ".join(
+                    f"{'.'.join(map(str, error['loc']))}: {error['msg']}" for error in exc.errors()
+                )
+                raise SeedError(f"{where}: {problems}") from None
+            identity = (citation.calculator.value, citation.key, citation.tax_year)
+            if identity in seen:
+                raise SeedError(f"{where}: duplicate citation {citation.key} ({citation.tax_year})")
+            seen.add(identity)
+            citations.append(citation)
+    return citations
+
+
+_UPSERT_CITATIONS = text(
+    """
+    INSERT INTO irs_citations (calculator, key, tax_year, title, url, passage, source, verified_on)
+    SELECT * FROM unnest(
+      CAST(:calculators AS calculator_kind[]), CAST(:keys AS text[]), CAST(:years AS smallint[]),
+      CAST(:titles AS text[]), CAST(:urls AS text[]), CAST(:passages AS text[]),
+      CAST(:sources AS text[]), CAST(:verified_on AS date[])
+    )
+    ON CONFLICT ON CONSTRAINT uq_irs_citations_calculator_key_tax_year
+    DO UPDATE SET title = EXCLUDED.title, url = EXCLUDED.url, passage = EXCLUDED.passage,
+      source = EXCLUDED.source, verified_on = EXCLUDED.verified_on
+    WHERE (irs_citations.title, irs_citations.url, irs_citations.passage, irs_citations.source,
+           irs_citations.verified_on)
+      IS DISTINCT FROM (EXCLUDED.title, EXCLUDED.url, EXCLUDED.passage, EXCLUDED.source,
+           EXCLUDED.verified_on)
+    RETURNING (xmax = 0) AS inserted
+    """
+)
+
+_DELETE_DROPPED_CITATIONS = text(
+    """
+    DELETE FROM irs_citations
+    WHERE (calculator::text, key, tax_year) NOT IN (
+      SELECT * FROM unnest(
+        CAST(:calculators AS text[]), CAST(:keys AS text[]), CAST(:years AS smallint[])
+      )
+    )
+    """
+)
+
+
+def load_irs_citations(connection: Connection, citations: Sequence[SeedCitation]) -> SeedResult:
+    """Make the table equal the verified ``citations``. Runs in the caller's transaction."""
+    verified = [citation for citation in citations if citation.verified]
+    params = {
+        "calculators": [citation.calculator.value for citation in verified],
+        "keys": [citation.key for citation in verified],
+        "years": [citation.tax_year for citation in verified],
+        "titles": [citation.title for citation in verified],
+        "urls": [citation.url for citation in verified],
+        "passages": [citation.passage for citation in verified],
+        "sources": [citation.source for citation in verified],
+        "verified_on": [citation.verified_on for citation in verified],
+    }
+    written = connection.execute(_UPSERT_CITATIONS, params).scalars().all()
+    inserted = sum(1 for was_insert in written if was_insert)
+    deleted = connection.execute(_DELETE_DROPPED_CITATIONS, params).rowcount
+    return SeedResult(inserted=inserted, updated=len(written) - inserted, deleted=deleted)
+
+
 def load(bind: Engine | None = None) -> int:
     """Load every seed; returns the number of seed category rules."""
     rules = read_seed_rules()
+    citations = read_seed_citations()
     engine = bind if bind is not None else get_privileged_engine()
     with engine.begin() as connection:
         result = load_category_rules(connection, rules)
+        cited = load_irs_citations(connection, citations)
     logger.info(
         "category rules: %d seed rows (%d inserted, %d updated, %d deleted)",
         len(rules),
         result.inserted,
         result.updated,
         result.deleted,
+    )
+    unverified = [citation.key for citation in citations if not citation.verified]
+    logger.info(
+        "irs citations: %d verified (%d inserted, %d updated, %d deleted);"
+        " unverified, not loaded: %s",
+        len(citations) - len(unverified),
+        cited.inserted,
+        cited.updated,
+        cited.deleted,
+        ", ".join(unverified) or "none",
     )
     return len(rules)
 
