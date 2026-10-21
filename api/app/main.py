@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 
 from app.config import Settings, get_settings
+from app.db import dispose_engines
 from app.errors import install_error_handlers
 from app.routers import health
 from app.version import resolve_git_sha
@@ -23,12 +27,20 @@ def operation_id(route: APIRoute) -> str:
     return route.name
 
 
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    yield
+    # Return pooled connections to Postgres on shutdown instead of dropping them.
+    dispose_engines()
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     app = FastAPI(
         title="First Paycheck API",
         version=API_VERSION,
         generate_unique_id_function=operation_id,
+        lifespan=lifespan,
     )
     app.state.git_sha = resolve_git_sha(settings.git_sha)
     app.add_middleware(

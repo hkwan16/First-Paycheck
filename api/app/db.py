@@ -66,6 +66,17 @@ def get_privileged_engine() -> Engine:
     )
 
 
+def dispose_engines() -> None:
+    """Close every pooled connection and forget the cached engines.
+
+    Called on application shutdown and by tests that change database settings.
+    """
+    for factory in (get_engine, get_privileged_engine):
+        if factory.cache_info().currsize:
+            factory().dispose()
+        factory.cache_clear()
+
+
 def _claims_json(claims: Mapping[str, Any]) -> str:
     if not claims.get("sub"):
         raise ValueError("JWT claims must carry a 'sub'")

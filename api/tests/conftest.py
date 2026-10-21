@@ -28,7 +28,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Connection, Engine, make_url, text
 
 from app.config import get_settings
-from app.db import make_engine
+from app.db import dispose_engines, make_engine
 from app.deps import get_db_bind
 from app.main import create_app
 from tests.support.auth_shim import ensure_auth_shim
@@ -56,6 +56,13 @@ class FixtureUser:
 
 USER_A = FixtureUser(uuid.UUID("00000000-0000-4000-8000-00000000000a"), "a@example.test")
 USER_B = FixtureUser(uuid.UUID("00000000-0000-4000-8000-00000000000b"), "b@example.test")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _dispose_app_engines() -> Iterator[None]:
+    """Close the app's own pooled connections when the session ends."""
+    yield
+    dispose_engines()
 
 
 @pytest.fixture(scope="session")
