@@ -1,0 +1,18 @@
+# Eval runner. A virtual member: its dependencies are installed into the
+# workspace environment and the `evals` package is imported from the repo
+# root (`uv run python -m evals.run ...`).
+[project]
+name = "first-paycheck-evals"
+version = "0.1.0"
+description = "Offline evals for First Paycheck (calculators, extraction, categorization, explain)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "first-paycheck-api",
+  "httpx>=0.28",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+first-paycheck-api = { workspace = true }

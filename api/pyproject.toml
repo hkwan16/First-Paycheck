@@ -1,0 +1,32 @@
+[project]
+name = "first-paycheck-api"
+version = "0.1.0"
+description = "First Paycheck FastAPI backend and worker"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "alembic>=1.20",
+  "fastapi>=0.158",
+  "psycopg[binary]>=3.3",
+  "pydantic>=2.14",
+  "pydantic-settings>=2.16",
+  "pyjwt[crypto]>=2.15",
+  "sqlalchemy>=2.1.6",
+  "uvicorn[standard]>=0.54",
+]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28",
+  "pytest>=9.1",
+  "pytest-cov>=7.1",
+]
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+# The api directory is the import root: `app`, `db`, `calc`, ... are
+# top-level packages, matching `python -m app.openapi`, `python -m jobs.worker`
+# and `python -m db.seed.load`. Add each new top-level package here.
+[tool.hatch.build.targets.wheel]
+packages = ["app", "calc", "db", "jobs", "llm"]
