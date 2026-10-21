@@ -9,14 +9,17 @@ from typing import Any
 
 import pytest
 
+from calc.health_plans import HealthPlansInput, health_plans
 from calc.k401 import K401MatchInput, k401_match
 from llm.schemas import ExplanationDraft
 from retrieval.benefits_search import BenefitsPassage
 from retrieval.citations import Citation
-from retrieval.context import explain_context
+from retrieval.context import explain_context, name_numbers
+from tests.unit.calc import test_health_plans_examples as health_examples
 from verify.allowed import AllowedNumbers
 from verify.fallback import fallback_draft
 from verify.format import dollars, percent
+from verify.numbers import extract_numbers
 from verify.verify import verify_explanation
 
 TIERED = [
@@ -186,3 +189,145 @@ def test_fallback_and_context_need_a_registered_calculator() -> None:
         fallback_draft("w4", {}, {}, set())
     with pytest.raises(ValueError, match="w4"):
         explain_context("w4", {}, {}, [], [])
+    with pytest.raises(ValueError, match="emergency_fund"):
+        explain_context("emergency_fund", {}, {}, [], [])
+
+
+# ---------------------------------------------------------------- health plans (spec 012)
+
+A, A_LOW, B, B_TWIN, C = (
+    health_examples.A,
+    health_examples.A_LOW_DEDUCTIBLE,
+    health_examples.B,
+    health_examples.B_TWIN,
+    health_examples.C,
+)
+# Spec 012's examples as (plans, salary, employee HSA, extra inputs).
+HEALTH_EXAMPLES: dict[str, tuple[list[dict[str, Any]], int, int, dict[str, Any]]] = {
+    "1": ([A, B], 6_500_000, 100_000, {}),
+    "2": ([A, B, C], 6_500_000, 100_000, {}),
+    "3": ([A, B], 9_000_000, 500_000, {}),
+    "4": ([A_LOW, B], 6_500_000, 100_000, {}),
+    "5": ([A], 2_500_000, 12_345, {}),
+    "6": ([A, B], 1_500_000, 100_000, {}),
+    "7": ([B, B_TWIN], 6_500_000, 100_000, {}),
+    "8": ([A, B], 6_500_000, 100_000, {"expected_usage": "high", "selected_plan_index": 1}),
+}
+HEALTH_SEEDED = [
+    citation(key)
+    for key in ("health.federal_brackets", "health.hdhp_definition", "health.hsa_limit")
+]
+
+
+def health_decision(example: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    plans, salary, employee_hsa, extra = HEALTH_EXAMPLES[example]
+    data = HealthPlansInput.model_validate(
+        {"selected_plan_index": 0, **health_examples.payload(plans, salary, employee_hsa, **extra)}
+    )
+    return data.model_dump(mode="json"), health_plans(data).model_dump(mode="json")
+
+
+def test_health_context_for_example_1() -> None:
+    inputs, result = health_decision("1")
+    passage = BenefitsPassage(
+        document_id=uuid.uuid4(), chunk_index=0, text="The Bronze HSA deductible...", rank=0.5
+    )
+    context = explain_context("health_plans", inputs, result, HEALTH_SEEDED, [passage])
+    facts = {fact.label: fact.value for fact in context.facts}
+    assert facts["Federal marginal tax rate used"] == "12%"
+    assert facts["Yearly HSA contribution limit, self-only"] == "$4,400.00"
+    assert facts["Bronze HSA: premiums per year"] == "$650.00"
+    assert facts["Bronze HSA: federal tax your HSA contribution saves"] == "$120.00"
+    assert facts["Bronze HSA: cost per year at medium medical use"] == "$1,740.00"
+    assert facts["Gold PPO: cost per year at medium medical use"] == "$2,375.00"
+    assert facts["Medical spending per year at medium use"] == "$3,000.00"
+    assert (
+        facts["Bronze HSA versus Gold PPO: yearly medical spending where the cheaper plan changes"]
+        == "$9,400.00, $17,100.00"
+    )
+    assert context.calculator == "health_plans"
+    assert context.tax_year == 2026
+    assert [c.key for c in context.citations] == result["citation_keys"]
+    assert context.benefits_passages == ["The Bronze HSA deductible..."]
+    assert context.notes == [
+        "Expected medical use is medium; at that use Bronze HSA costs the least.",
+        "The plan picked is Bronze HSA.",
+    ]
+    # Facts are numbers only, so any fact a draft repeats shows a figure.
+    for fact in context.facts:
+        assert extract_numbers(fact.value), fact
+
+
+def test_health_context_notes() -> None:
+    inputs, result = health_decision("2")
+    notes = explain_context("health_plans", inputs, result, HEALTH_SEEDED, []).notes
+    assert "Silver HMO costs less than Gold PPO at every level of medical spending." in notes
+    inputs, result = health_decision("3")
+    assert any(
+        "limit" in note
+        for note in explain_context("health_plans", inputs, result, HEALTH_SEEDED, []).notes
+    )
+    inputs, result = health_decision("4")
+    assert any(
+        "minimum" in note
+        for note in explain_context("health_plans", inputs, result, HEALTH_SEEDED, []).notes
+    )
+
+
+@pytest.mark.parametrize("example", sorted(HEALTH_EXAMPLES))
+def test_every_health_fact_passes_the_verifier(example: str) -> None:
+    inputs, result = health_decision(example)
+    context = explain_context("health_plans", inputs, result, HEALTH_SEEDED, [])
+    allowed = AllowedNumbers.from_decision(inputs, result, name_numbers("health_plans", inputs))
+    for fact in [*context.facts]:
+        check = verify_explanation(
+            ExplanationDraft(
+                concept="c",
+                text=" ".join([f"{fact.label}: {fact.value}.", *context.notes]),
+                numbers=[],
+                what_ifs=[],
+                citation_keys=["health.hsa_limit"],
+            ),
+            allowed,
+            {"health.hsa_limit"},
+        )
+        assert check.passed, (fact, check)
+
+
+@pytest.mark.parametrize("example", sorted(HEALTH_EXAMPLES))
+def test_health_fallback_passes_the_verifier(example: str) -> None:
+    inputs, result = health_decision(example)
+    keys = {c.key for c in HEALTH_SEEDED}
+    draft = fallback_draft("health_plans", inputs, result, keys)
+    check = verify_explanation(
+        draft,
+        AllowedNumbers.from_decision(inputs, result, name_numbers("health_plans", inputs)),
+        keys,
+    )
+    assert check.passed, (draft.text, check)
+    assert draft.citation_keys == [key for key in result["citation_keys"] if key in keys]
+
+
+def test_health_fallback_for_example_1_reads_plainly() -> None:
+    inputs, result = health_decision("1")
+    draft = fallback_draft("health_plans", inputs, result, {"health.hsa_limit"})
+    assert "Bronze HSA" in draft.text
+    assert "$1,740.00" in draft.text
+    assert "$9,400.00" in draft.text
+    assert "$120.00" in draft.text
+    assert draft.citation_keys == ["health.hsa_limit"]
+
+
+def test_numbers_in_plan_names_are_allowed() -> None:
+    """Spec 012 rule 16: "Gold PPO 2" names a plan; its 2 is not a claim."""
+    inputs = health_decision("7")[0]
+    extras = name_numbers("health_plans", inputs)
+    assert extras == {"plan_name_numbers": [2]}
+    renamed = {**inputs["plans"][0], "name": "Gold $500 PPO 10%"}
+    named = {**inputs, "plans": [renamed, inputs["plans"][1]]}
+    assert name_numbers("health_plans", named) == {
+        "plan_name_numbers": [2],
+        "plan_name_cents": [50_000],
+        "plan_name_pct": ["10"],
+    }
+    assert name_numbers("k401_match", decision("1")[0]) == {}

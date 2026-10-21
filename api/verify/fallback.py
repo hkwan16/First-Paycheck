@@ -1,4 +1,4 @@
-"""The plain calculator result, written by code (spec 008 rule 17).
+"""The plain calculator result, written by code (spec 008 rule 17, spec 012 rule 16).
 
 Shown when two drafts fail verification or the model cannot be reached. It
 uses only the decision's numbers, so it verifies, and it cites the result's
@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Collection, Mapping
 from typing import Any
 
+from calc.health_plans import HealthPlansInput, HealthPlansResult
 from calc.k401 import K401MatchInput, K401MatchResult
 from llm.schemas import ExplanationDraft, NumberClaim
 from verify.format import dollars, percent
@@ -21,6 +22,7 @@ __all__ = ["FALLBACK_VERSION", "fallback_draft"]
 FALLBACK_VERSION = "fallback/v1"
 
 K401_CONCEPT = "Your employer's 401(k) match and what it costs you to earn all of it."
+HEALTH_CONCEPT = "Comparing health plans by what each costs you in a year, not just by the premium."
 
 
 def _k401(data: K401MatchInput, result: K401MatchResult) -> tuple[str, list[NumberClaim]]:
@@ -78,12 +80,76 @@ def _k401(data: K401MatchInput, result: K401MatchResult) -> tuple[str, list[Numb
     return " ".join(sentences), claims
 
 
+def _health(data: HealthPlansInput, result: HealthPlansResult) -> tuple[str, list[NumberClaim]]:
+    names = [plan.name for plan in result.plans]
+    usage = {
+        "low": data.usage_low_cents,
+        "medium": data.usage_medium_cents,
+        "high": data.usage_high_cents,
+    }[data.expected_usage]
+
+    def cost_at_usage(index: int) -> int:
+        plan = result.plans[index]
+        return {
+            "low": plan.low_cost_cents,
+            "medium": plan.medium_cost_cents,
+            "high": plan.high_cost_cents,
+        }[data.expected_usage]
+
+    best = result.recommended_index
+    best_cost = dollars(cost_at_usage(best))
+    sentences = [
+        f"At {data.expected_usage} medical use, about {dollars(usage)} of care a year,"
+        f" {names[best]} costs you the least: {best_cost} a year after premiums, your share of"
+        " the care, the employer's HSA money and the tax an HSA contribution saves."
+    ]
+    claims = [NumberClaim(value=best_cost, label=f"{names[best]} yearly cost")]
+    selected = result.selected_index
+    if selected is not None and selected != best:
+        picked = dollars(cost_at_usage(selected))
+        sentences.append(f"You picked {names[selected]}, which costs {picked} a year at that use.")
+        claims.append(NumberClaim(value=picked, label=f"{names[selected]} yearly cost"))
+    for pair in result.pairs:
+        if pair.break_even_spends_cents:
+            spends = " and ".join(dollars(spend) for spend in pair.break_even_spends_cents)
+            sentences.append(
+                f"Between {names[pair.plan_a_index]} and {names[pair.plan_b_index]}, the cheaper"
+                f" plan changes at {spends} of care a year."
+            )
+    for plan in result.plans:
+        if plan.hsa_eligible and plan.employee_hsa_cents > 0:
+            saved = dollars(plan.hsa_tax_savings_cents)
+            sentences.append(
+                f"With {plan.name}, your HSA contribution of {dollars(plan.employee_hsa_cents)}"
+                f" saves {saved} of federal income tax at your"
+                f" {percent(result.marginal_rate_used)} rate."
+            )
+            claims.append(NumberClaim(value=saved, label=f"{plan.name} HSA tax saved"))
+    if any(plan.kind == "hdhp" for plan in result.plans):
+        sentences.append(
+            f"The {data.tax_year} limit on HSA contributions for self-only coverage is"
+            f" {dollars(result.hsa_limit_cents)}."
+        )
+    return " ".join(sentences), claims
+
+
 def fallback_draft(
     calculator: str,
     inputs: Mapping[str, Any],
     result: Mapping[str, Any],
     allowed_citation_keys: Collection[str],
 ) -> ExplanationDraft:
+    if calculator == "health_plans":
+        plans = HealthPlansInput.model_validate(inputs)
+        compared = HealthPlansResult.model_validate(result)
+        text, claims = _health(plans, compared)
+        return ExplanationDraft(
+            concept=HEALTH_CONCEPT,
+            text=text,
+            numbers=claims,
+            what_ifs=[],
+            citation_keys=[key for key in compared.citation_keys if key in allowed_citation_keys],
+        )
     if calculator != "k401_match":
         raise ValueError(f"no fallback text for calculator {calculator!r} yet")
     data = K401MatchInput.model_validate(inputs)

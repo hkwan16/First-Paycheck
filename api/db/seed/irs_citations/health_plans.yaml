@@ -1,0 +1,53 @@
+# IRS passages the health plan comparison may cite (spec 012 rule 11).
+#
+# Every passage is quoted exactly from the page at `url`, fetched on
+# `verified_on`; "..." marks omitted words, and each part between them appears
+# verbatim in the page text (curly quotes included). Passages stay under 80
+# words. `make seed` upserts these rows on (calculator, key, tax_year).
+
+- key: health.hsa_limit
+  calculator: health_plans
+  tax_year: 2026
+  title: 2026 limit on HSA contributions
+  source: Rev. Proc. 2025-19
+  url: https://www.irs.gov/pub/irs-drop/rp-25-19.pdf
+  passage: >-
+    For calendar year 2026, the annual limitation on deductions under §
+    223(b)(2)(A) for an individual with self-only coverage under a high
+    deductible health plan is $4,400. For calendar year 2026, the annual
+    limitation on deductions under § 223(b)(2)(B) for an individual with
+    family coverage under a high deductible health plan is $8,750.
+  verified: true
+  verified_on: 2026-10-21
+
+- key: health.hdhp_definition
+  calculator: health_plans
+  tax_year: 2026
+  title: What counts as a high deductible health plan in 2026
+  source: Rev. Proc. 2025-19
+  url: https://www.irs.gov/pub/irs-drop/rp-25-19.pdf
+  passage: >-
+    For calendar year 2026, a “high deductible health plan” is defined under §
+    223(c)(2)(A) as a health plan with an annual deductible that is not less
+    than $1,700 for self-only coverage or $3,400 for family coverage, and for
+    which the annual out-of-pocket expenses (deductibles, co-payments, and
+    other amounts, but not premiums) do not exceed $8,500 for self-only
+    coverage or $17,000 for family coverage.
+  verified: true
+  verified_on: 2026-10-21
+
+- key: health.federal_brackets
+  calculator: health_plans
+  tax_year: 2026
+  title: 2026 federal income tax rates
+  source: IRS News Release IR-2025-103
+  url: https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2026-including-amendments-from-the-one-big-beautiful-bill
+  passage: >-
+    For tax year 2026, the top tax rate remains 37% for individual single
+    taxpayers with incomes greater than $640,600 ($768,700 for married couples
+    filing jointly). ... 24% for incomes over $105,700 ($211,400 for married
+    couples filing jointly); 22% for incomes over $50,400 ($100,800 for married
+    couples filing jointly); 12% for incomes over $12,400 ($24,800 for married
+    couples filing jointly).
+  verified: true
+  verified_on: 2026-10-21
