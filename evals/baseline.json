@@ -11,6 +11,11 @@
     "rules_coverage": 0.808,
     "rules_precision": 0.9702970297029703
   },
+  "checkin": {
+    "fields_exact": 1.0,
+    "precision": 1.0,
+    "recall": 1.0
+  },
   "explain": {
     "cited": 1.0,
     "first_try_verified": 0.8,
