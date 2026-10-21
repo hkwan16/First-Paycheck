@@ -65,6 +65,20 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   `ScriptedGateway` over three scripted runs (pass, fail-then-pass,
   fail-twice); `flow_correct` checks rows, the retry's feedback and that the
   fallback verifies and is cited.
+- `suites/recurring.py` (`recurring`, free): spec 009's `sync.recurring.detect`
+  over two labeled histories, no database. `recorded-sandbox` is the recorded
+  Plaid `/transactions/sync` page in `api/tests/fixtures/plaid/recorded/`,
+  parsed by the production `PlaidProvider`, with hand labels in
+  `fixtures/recurring/recorded_sandbox_labels.json`. `custom-user` is a Plaid
+  custom sandbox user (`fixtures/recurring/custom_user.json`, pasteable into
+  the dashboard as a `user_custom` password) with labels in
+  `custom_user_labels.json`, both written by `gen/recurring_user.py` from a
+  fixed seed (`uv run python -m evals.gen.recurring_user`; a test fails on
+  drift). Labels come from how each series was built, never from the detector.
+  `precision`, `recall` (matched by `merchant_norm` and cadence) and
+  `fields_exact` (typical amount and overdue flag of the matches). The baseline
+  records one known miss: a utility bill swinging about 22% around its median
+  falls partly outside the 15% series (spec 009, edge cases).
 - `baseline.json`: the committed metrics every run is compared with.
 
 ## Rules

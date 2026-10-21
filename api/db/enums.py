@@ -162,6 +162,63 @@ class CalendarStatus(StrEnum):
     DISMISSED = "dismissed"
 
 
+class RecurringCadence(StrEnum):
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
+
+
+class RecurringStatus(StrEnum):
+    """The detector's view of a charge (spec 009 rules 11-14)."""
+
+    ACTIVE = "active"
+    NEW = "new"
+    CHANGED = "changed"
+    STOPPED = "stopped"
+
+
+class RecurringUserStatus(StrEnum):
+    """What the user said about a charge (spec 009 rule 17)."""
+
+    CONFIRMED = "confirmed"
+    IGNORED = "ignored"
+    CANCELLED = "cancelled"
+
+
+class CheckinTrigger(StrEnum):
+    SCHEDULE = "schedule"
+    SYNC = "sync"
+    MANUAL = "manual"
+
+
+class CheckinStatus(StrEnum):
+    OPEN = "open"
+    COMPLETED = "completed"
+
+
+class FindingKind(StrEnum):
+    ELECTION_MISMATCH = "election_mismatch"
+    GOAL_OFF_PACE = "goal_off_pace"
+    RECURRING_NEW = "recurring_new"
+    RECURRING_CHANGED = "recurring_changed"
+    RECURRING_STOPPED = "recurring_stopped"
+    PAY_CHANGE = "pay_change"
+    DEDUCTION_CHANGE = "deduction_change"
+    UPCOMING_DEADLINE = "upcoming_deadline"
+
+
+class FindingSeverity(StrEnum):
+    INFO = "info"
+    WARNING = "warning"
+    ALERT = "alert"
+
+
+class FindingAction(StrEnum):
+    ACKNOWLEDGED = "acknowledged"
+    ACTED = "acted"
+    DISMISSED = "dismissed"
+
+
 # Postgres type name for each enum created by 0002_core, in creation order.
 CORE_ENUMS: dict[str, type[StrEnum]] = {
     "pay_frequency": PayFrequency,
@@ -196,6 +253,19 @@ DECISION_ENUMS: dict[str, type[StrEnum]] = {
     "goal_kind": GoalKind,
     "calendar_kind": CalendarKind,
     "calendar_status": CalendarStatus,
+}
+
+
+# Enums created by 0005_checkins, in creation order.
+CHECKIN_ENUMS: dict[str, type[StrEnum]] = {
+    "recurring_cadence": RecurringCadence,
+    "recurring_status": RecurringStatus,
+    "recurring_user_status": RecurringUserStatus,
+    "checkin_trigger": CheckinTrigger,
+    "checkin_status": CheckinStatus,
+    "finding_kind": FindingKind,
+    "finding_severity": FindingSeverity,
+    "finding_action": FindingAction,
 }
 
 

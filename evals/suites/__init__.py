@@ -9,6 +9,7 @@ from evals.suites import (
     explain_smoke,
     extraction,
     extraction_smoke,
+    recurring,
 )
 from evals.suites.base import Suite
 
@@ -21,5 +22,6 @@ SUITES: dict[str, Suite] = {
         explain_smoke.SUITE,
         extraction.SUITE,
         extraction_smoke.SUITE,
+        recurring.SUITE,
     )
 }

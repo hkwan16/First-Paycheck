@@ -24,6 +24,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/accounts/import': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Import Csv
+     * @description Import a bank's CSV export through the sync pipeline, then queue
+     *     categorization and recurring detection.
+     */
+    post: operations['import_csv'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/accounts/{account_id}': {
     parameters: {
       query?: never;
@@ -79,6 +100,27 @@ export interface paths {
      * @description Upcoming events, soonest first; done and dismissed ones stay for the plan export.
      */
     get: operations['list_calendar'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/cashflow': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Cashflow
+     * @description Gross-to-net lines of each pay stub and the spending summary; the last full UTC
+     *     month by default.
+     */
+    get: operations['get_cashflow'];
     put?: never;
     post?: never;
     delete?: never;
@@ -340,6 +382,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/recurring': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Recurring
+     * @description Every detected charge, ignored ones included, by name.
+     */
+    get: operations['list_recurring'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/recurring/{charge_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update Recurring
+     * @description Rename a charge, or mark it confirmed, not recurring (ignored) or cancelled.
+     */
+    patch: operations['update_recurring'];
+    trace?: never;
+  };
   '/spending/summary': {
     parameters: {
       query?: never;
@@ -538,6 +620,12 @@ export interface components {
      * @enum {string}
      */
     AccountRole: 'spending' | 'emergency_fund' | 'retirement';
+    /**
+     * AmountSign
+     * @description How the file's ``amount`` column is signed (rule 12).
+     * @enum {string}
+     */
+    AmountSign: 'negative_is_out' | 'positive_is_out';
     /** BenefitsPlanOut */
     BenefitsPlanOut: {
       /** Coinsurance Pct */
@@ -565,6 +653,36 @@ export interface components {
     BenefitsValues: {
       /** Plans */
       plans: components['schemas']['PlanValues'][];
+    };
+    /** Body_import_csv */
+    Body_import_csv: {
+      /**
+       * Account Id
+       * @description An earlier CSV import's account to add to
+       */
+      account_id?: string | null;
+      /**
+       * File
+       * @description A CSV export of at most 10 MB
+       */
+      file: string;
+      /**
+       * Institution Name
+       * @description For a new account
+       */
+      institution_name?: string | null;
+      /** @description For a new account */
+      kind?: components['schemas']['AccountKind'] | null;
+      /**
+       * Name
+       * @description For a new account
+       */
+      name?: string | null;
+      /**
+       * @description How the amount column is signed
+       * @default negative_is_out
+       */
+      sign: components['schemas']['AmountSign'];
     };
     /** Body_upload_document */
     Body_upload_document: {
@@ -617,6 +735,23 @@ export interface components {
      * @enum {string}
      */
     CalendarStatus: 'upcoming' | 'done' | 'dismissed';
+    /** CashFlow */
+    CashFlow: {
+      /**
+       * End
+       * Format: date
+       */
+      end: string;
+      /** Pay Stubs */
+      pay_stubs: components['schemas']['PayStubFlow'][];
+      spending: components['schemas']['SpendingSummary'];
+      /**
+       * Start
+       * Format: date
+       */
+      start: string;
+      withholding: components['schemas']['WithholdingTotal'];
+    };
     /** CategoryFix */
     CategoryFix: {
       /** Relabeled */
@@ -700,6 +835,22 @@ export interface components {
       pay_stub: components['schemas']['PayStubOut'] | null;
       /** Plans */
       plans: components['schemas']['BenefitsPlanOut'][];
+    };
+    /** CsvImport */
+    CsvImport: {
+      account: components['schemas']['AccountOut'];
+      /**
+       * Categorize Job Id
+       * Format: uuid
+       */
+      categorize_job_id: string;
+      /** Imported */
+      imported: number;
+      /**
+       * Recurring Job Id
+       * Format: uuid
+       */
+      recurring_job_id: string;
     };
     /** DecisionIn */
     DecisionIn: {
@@ -1213,6 +1364,28 @@ export interface components {
      * @enum {string}
      */
     PayFrequency: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
+    /** PayStubFlow */
+    PayStubFlow: {
+      /** Deductions Cents */
+      deductions_cents: number;
+      /** Gross Cents */
+      gross_cents: number;
+      /** Lines */
+      lines: components['schemas']['WithholdingLine'][];
+      /** Net Cents */
+      net_cents: number;
+      /**
+       * Pay Date
+       * Format: date
+       */
+      pay_date: string;
+      /**
+       * Pay Stub Id
+       * Format: uuid
+       */
+      pay_stub_id: string;
+      roles: components['schemas']['RoleTotals'];
+    };
     /** PayStubOut */
     PayStubOut: {
       /**
@@ -1444,6 +1617,78 @@ export interface components {
        */
       job_id: string;
     };
+    /**
+     * RecurringCadence
+     * @enum {string}
+     */
+    RecurringCadence: 'weekly' | 'monthly' | 'yearly';
+    /** RecurringChargeOut */
+    RecurringChargeOut: {
+      cadence: components['schemas']['RecurringCadence'];
+      /**
+       * First Seen
+       * Format: date
+       */
+      first_seen: string;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Last Seen
+       * Format: date
+       */
+      last_seen: string;
+      /** Merchant Clean */
+      merchant_clean: string;
+      /** Merchant Norm */
+      merchant_norm: string;
+      status: components['schemas']['RecurringStatus'];
+      /** Typical Amount Cents */
+      typical_amount_cents: number;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+      user_status: components['schemas']['RecurringUserStatus'] | null;
+    };
+    /**
+     * RecurringPatch
+     * @description Omitted fields are unchanged; ``user_status: null`` clears it.
+     */
+    RecurringPatch: {
+      /**
+       * Merchant Clean
+       * @description A new display name
+       */
+      merchant_clean?: string | null;
+      user_status?: components['schemas']['RecurringUserStatus'] | null;
+    };
+    /**
+     * RecurringStatus
+     * @description The detector's view of a charge (spec 009 rules 11-14).
+     * @enum {string}
+     */
+    RecurringStatus: 'active' | 'new' | 'changed' | 'stopped';
+    /**
+     * RecurringUserStatus
+     * @description What the user said about a charge (spec 009 rule 17).
+     * @enum {string}
+     */
+    RecurringUserStatus: 'confirmed' | 'ignored' | 'cancelled';
+    /** RoleTotals */
+    RoleTotals: {
+      /** Health Cents */
+      health_cents: number;
+      /** Other Cents */
+      other_cents: number;
+      /** Retirement Cents */
+      retirement_cents: number;
+      /** Tax Cents */
+      tax_cents: number;
+    };
     /** RuleOut */
     RuleOut: {
       /**
@@ -1654,6 +1899,44 @@ export interface components {
       /** Numbers Unmatched */
       numbers_unmatched: string[];
     };
+    /** WithholdingLine */
+    WithholdingLine: {
+      /** Amount Cents */
+      amount_cents: number;
+      /**
+       * Key
+       * @enum {string}
+       */
+      key:
+        | 'federal_withholding'
+        | 'social_security'
+        | 'medicare'
+        | 'state_tax'
+        | 'retirement_contribution'
+        | 'medical_premium'
+        | 'other_deductions';
+      /** Label */
+      label: string;
+      /**
+       * Role
+       * @enum {string}
+       */
+      role: 'tax' | 'retirement' | 'health' | 'other';
+    };
+    /** WithholdingTotal */
+    WithholdingTotal: {
+      /** Deductions Cents */
+      deductions_cents: number;
+      /** Gross Cents */
+      gross_cents: number;
+      /** Lines */
+      lines: components['schemas']['WithholdingLine'][];
+      /** Net Cents */
+      net_cents: number;
+      /** Paycheck Count */
+      paycheck_count: number;
+      roles: components['schemas']['RoleTotals'];
+    };
   };
   responses: never;
   parameters: never;
@@ -1683,6 +1966,75 @@ export interface operations {
       };
       /** @description Unauthorized */
       401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  import_csv: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Body_import_csv'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CsvImport'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Request Entity Too Large */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
         headers: {
           [name: string]: unknown;
         };
@@ -1807,6 +2159,49 @@ export interface operations {
       };
       /** @description Unauthorized */
       401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  get_cashflow: {
+    parameters: {
+      query?: {
+        /** @description First day, inclusive */
+        start?: string | null;
+        /** @description Last day, inclusive */
+        end?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CashFlow'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
         headers: {
           [name: string]: unknown;
         };
@@ -2499,6 +2894,88 @@ export interface operations {
       };
       /** @description Unauthorized */
       401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  list_recurring: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RecurringChargeOut'][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  update_recurring: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        charge_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RecurringPatch'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RecurringChargeOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

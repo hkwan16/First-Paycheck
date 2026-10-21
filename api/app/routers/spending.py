@@ -55,7 +55,8 @@ def last_complete_month(today: dt.date) -> tuple[dt.date, dt.date]:
     return end.replace(day=1), end
 
 
-def _period(start: dt.date | None, end: dt.date | None, today: dt.date) -> tuple[dt.date, dt.date]:
+def period(start: dt.date | None, end: dt.date | None, today: dt.date) -> tuple[dt.date, dt.date]:
+    """The inclusive period from ``start`` and ``end``, both or neither (also for /cashflow)."""
     if start is None and end is None:
         return last_complete_month(today)
     if start is None or end is None:
@@ -107,7 +108,12 @@ def spending_summary(
     end: Annotated[dt.date | None, Query(description="Last day, inclusive")] = None,
 ) -> SpendingSummary:
     """Income, spending by bucket and what is left over; the last full UTC month by default."""
-    first, last = _period(start, end, now.date())
+    first, last = period(start, end, now.date())
+    return summary_for(session, first, last)
+
+
+def summary_for(session: Session, first: dt.date, last: dt.date) -> SpendingSummary:
+    """The summary of an already validated period (``GET /cashflow`` shares it)."""
     totals = summarize(_category_sums(session, first, last), CATEGORY_BUCKETS)
     paychecks = session.scalar(
         select(func.count()).select_from(PayStub).where(PayStub.pay_date.between(first, last))

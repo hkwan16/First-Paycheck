@@ -30,6 +30,7 @@ from tests.support.factories import (
     make_item,
     make_job,
     make_pay_stub,
+    make_recurring_charge,
     make_transaction,
 )
 
@@ -138,6 +139,30 @@ def update_account(connection: Connection, client_as: Callable[[FixtureUser], Te
         assert role == "spending"
 
     return Case("PATCH", f"/accounts/{account}", 404, json={"role": "emergency_fund"}, after=after)
+
+
+def import_csv(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    imported = client_as(USER_A).post(
+        "/accounts/import",
+        data={"kind": "checking"},
+        files={"file": ("a.csv", b"Date,Description,Amount\n2026-10-01,A,-1.00\n", "text/csv")},
+    )
+    assert imported.status_code == 200, imported.text
+    account = imported.json()["account"]["id"]
+
+    def after(conn: Connection) -> None:
+        assert count(conn, "transactions", USER_A) == 1
+        assert count(conn, "transactions", USER_B) == 0
+        assert count(conn, "sync_items", USER_B) == 0
+
+    return Case(
+        "POST",
+        "/accounts/import",
+        404,
+        form={"account_id": account},
+        files={"file": ("b.csv", b"Date,Description,Amount\n2026-10-02,B,-2.00\n", "text/csv")},
+        after=after,
+    )
 
 
 def list_transactions(
@@ -393,7 +418,58 @@ def spending_summary(
     return Case("GET", "/spending/summary?start=2026-09-01&end=2026-09-30", 200, body=body)
 
 
+def get_cashflow(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    account = a_account(connection)
+    make_transaction(connection, USER_A.id, account, posted_at=dt.date(2026, 9, 10))
+    make_pay_stub(
+        connection,
+        USER_A.id,
+        a_document(connection, with_blob=False),
+        pay_date=dt.date(2026, 9, 15),
+    )
+
+    def body(data: Any) -> None:
+        assert data["pay_stubs"] == []
+        assert data["withholding"]["gross_cents"] == 0
+        assert data["spending"]["transaction_count"] == 0
+
+    return Case("GET", "/cashflow?start=2026-09-01&end=2026-09-30", 200, body=body)
+
+
+def list_recurring(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    make_recurring_charge(connection, USER_A.id)
+
+    def body(data: Any) -> None:
+        assert data == []
+
+    return Case("GET", "/recurring", 200, body=body)
+
+
+def update_recurring(
+    connection: Connection, client_as: Callable[[FixtureUser], TestClient]
+) -> Case:
+    charge = make_recurring_charge(connection, USER_A.id)
+
+    def after(conn: Connection) -> None:
+        row = conn.execute(
+            text("SELECT merchant_clean, user_status FROM recurring_charges WHERE id = :id"),
+            {"id": charge},
+        ).one()
+        assert tuple(row) == ("NETFLIX.COM", None)
+
+    return Case(
+        "PATCH",
+        f"/recurring/{charge}",
+        404,
+        json={"user_status": "ignored", "merchant_clean": "Mine now"},
+        after=after,
+    )
+
+
 ROUTE_CASES: dict[tuple[str, str], Builder] = {
+    ("GET", "/cashflow"): get_cashflow,
+    ("GET", "/recurring"): list_recurring,
+    ("PATCH", "/recurring/{charge_id}"): update_recurring,
     ("POST", "/decisions"): save_decision,
     ("GET", "/decisions"): list_decisions,
     ("GET", "/decisions/{decision_id}"): get_decision,
@@ -415,6 +491,7 @@ ROUTE_CASES: dict[tuple[str, str], Builder] = {
     ("POST", "/sync/items/{item_id}/sync"): sync_item,
     ("GET", "/accounts"): list_accounts,
     ("PATCH", "/accounts/{account_id}"): update_account,
+    ("POST", "/accounts/import"): import_csv,
     ("GET", "/transactions"): list_transactions,
     ("PATCH", "/transactions/{transaction_id}"): update_transaction,
     ("GET", "/jobs/{job_id}"): get_job,

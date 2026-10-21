@@ -210,10 +210,18 @@ def test_default_handlers_cover_the_m1_kinds() -> None:
     }
 
 
-def test_recurring_detect_is_a_recorded_no_op(empty_queue: Connection, user_a: FixtureUser) -> None:
+def test_recurring_detect_runs_for_a_user_with_no_charges(
+    empty_queue: Connection, user_a: FixtureUser
+) -> None:
     job_id = enqueue(empty_queue, user_a, JobKind.RECURRING_DETECT)
     worker_for(empty_queue, default_handlers()).run_once()
-    assert job(empty_queue, job_id)["result"] == {"status": "not_implemented", "detected": 0}
+    assert job(empty_queue, job_id)["result"] == {
+        "detected": 0,
+        "new": 0,
+        "changed": 0,
+        "stopped": 0,
+        "deleted": 0,
+    }
 
 
 # ---------------------------------------------------------------- real engine

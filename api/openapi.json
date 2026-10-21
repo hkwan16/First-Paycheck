@@ -138,6 +138,15 @@
         "title": "AccountRole",
         "type": "string"
       },
+      "AmountSign": {
+        "description": "How the file's ``amount`` column is signed (rule 12).",
+        "enum": [
+          "negative_is_out",
+          "positive_is_out"
+        ],
+        "title": "AmountSign",
+        "type": "string"
+      },
       "BenefitsPlanOut": {
         "properties": {
           "coinsurance_pct": {
@@ -216,6 +225,76 @@
           "plans"
         ],
         "title": "BenefitsValues",
+        "type": "object"
+      },
+      "Body_import_csv": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An earlier CSV import's account to add to",
+            "title": "Account Id"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "A CSV export of at most 10 MB",
+            "title": "File",
+            "type": "string"
+          },
+          "institution_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For a new account",
+            "title": "Institution Name"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For a new account"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For a new account",
+            "title": "Name"
+          },
+          "sign": {
+            "$ref": "#/components/schemas/AmountSign",
+            "default": "negative_is_out",
+            "description": "How the amount column is signed"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_csv",
         "type": "object"
       },
       "Body_upload_document": {
@@ -336,6 +415,42 @@
         ],
         "title": "CalendarStatus",
         "type": "string"
+      },
+      "CashFlow": {
+        "properties": {
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "pay_stubs": {
+            "items": {
+              "$ref": "#/components/schemas/PayStubFlow"
+            },
+            "title": "Pay Stubs",
+            "type": "array"
+          },
+          "spending": {
+            "$ref": "#/components/schemas/SpendingSummary"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "withholding": {
+            "$ref": "#/components/schemas/WithholdingTotal"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "pay_stubs",
+          "withholding",
+          "spending"
+        ],
+        "title": "CashFlow",
+        "type": "object"
       },
       "CategoryFix": {
         "properties": {
@@ -538,6 +653,35 @@
           "plans"
         ],
         "title": "Confirmed",
+        "type": "object"
+      },
+      "CsvImport": {
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/AccountOut"
+          },
+          "categorize_job_id": {
+            "format": "uuid",
+            "title": "Categorize Job Id",
+            "type": "string"
+          },
+          "imported": {
+            "title": "Imported",
+            "type": "integer"
+          },
+          "recurring_job_id": {
+            "format": "uuid",
+            "title": "Recurring Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account",
+          "imported",
+          "categorize_job_id",
+          "recurring_job_id"
+        ],
+        "title": "CsvImport",
         "type": "object"
       },
       "DecisionIn": {
@@ -1748,6 +1892,53 @@
         "title": "PayFrequency",
         "type": "string"
       },
+      "PayStubFlow": {
+        "properties": {
+          "deductions_cents": {
+            "title": "Deductions Cents",
+            "type": "integer"
+          },
+          "gross_cents": {
+            "title": "Gross Cents",
+            "type": "integer"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/WithholdingLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "net_cents": {
+            "title": "Net Cents",
+            "type": "integer"
+          },
+          "pay_date": {
+            "format": "date",
+            "title": "Pay Date",
+            "type": "string"
+          },
+          "pay_stub_id": {
+            "format": "uuid",
+            "title": "Pay Stub Id",
+            "type": "string"
+          },
+          "roles": {
+            "$ref": "#/components/schemas/RoleTotals"
+          }
+        },
+        "required": [
+          "gross_cents",
+          "lines",
+          "roles",
+          "deductions_cents",
+          "net_cents",
+          "pay_stub_id",
+          "pay_date"
+        ],
+        "title": "PayStubFlow",
+        "type": "object"
+      },
       "PayStubOut": {
         "properties": {
           "created_at": {
@@ -2456,6 +2647,162 @@
         "title": "QueuedJob",
         "type": "object"
       },
+      "RecurringCadence": {
+        "enum": [
+          "weekly",
+          "monthly",
+          "yearly"
+        ],
+        "title": "RecurringCadence",
+        "type": "string"
+      },
+      "RecurringChargeOut": {
+        "properties": {
+          "cadence": {
+            "$ref": "#/components/schemas/RecurringCadence"
+          },
+          "first_seen": {
+            "format": "date",
+            "title": "First Seen",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_seen": {
+            "format": "date",
+            "title": "Last Seen",
+            "type": "string"
+          },
+          "merchant_clean": {
+            "title": "Merchant Clean",
+            "type": "string"
+          },
+          "merchant_norm": {
+            "title": "Merchant Norm",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RecurringStatus"
+          },
+          "typical_amount_cents": {
+            "title": "Typical Amount Cents",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "user_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecurringUserStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "merchant_norm",
+          "merchant_clean",
+          "cadence",
+          "typical_amount_cents",
+          "first_seen",
+          "last_seen",
+          "status",
+          "user_status",
+          "updated_at"
+        ],
+        "title": "RecurringChargeOut",
+        "type": "object"
+      },
+      "RecurringPatch": {
+        "additionalProperties": false,
+        "description": "Omitted fields are unchanged; ``user_status: null`` clears it.",
+        "properties": {
+          "merchant_clean": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A new display name",
+            "title": "Merchant Clean"
+          },
+          "user_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecurringUserStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "RecurringPatch",
+        "type": "object"
+      },
+      "RecurringStatus": {
+        "description": "The detector's view of a charge (spec 009 rules 11-14).",
+        "enum": [
+          "active",
+          "new",
+          "changed",
+          "stopped"
+        ],
+        "title": "RecurringStatus",
+        "type": "string"
+      },
+      "RecurringUserStatus": {
+        "description": "What the user said about a charge (spec 009 rule 17).",
+        "enum": [
+          "confirmed",
+          "ignored",
+          "cancelled"
+        ],
+        "title": "RecurringUserStatus",
+        "type": "string"
+      },
+      "RoleTotals": {
+        "properties": {
+          "health_cents": {
+            "title": "Health Cents",
+            "type": "integer"
+          },
+          "other_cents": {
+            "title": "Other Cents",
+            "type": "integer"
+          },
+          "retirement_cents": {
+            "title": "Retirement Cents",
+            "type": "integer"
+          },
+          "tax_cents": {
+            "title": "Tax Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tax_cents",
+          "retirement_cents",
+          "health_cents",
+          "other_cents"
+        ],
+        "title": "RoleTotals",
+        "type": "object"
+      },
       "RuleOut": {
         "properties": {
           "category": {
@@ -2962,6 +3309,89 @@
         ],
         "title": "VerificationOut",
         "type": "object"
+      },
+      "WithholdingLine": {
+        "properties": {
+          "amount_cents": {
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "key": {
+            "enum": [
+              "federal_withholding",
+              "social_security",
+              "medicare",
+              "state_tax",
+              "retirement_contribution",
+              "medical_premium",
+              "other_deductions"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "tax",
+              "retirement",
+              "health",
+              "other"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "role",
+          "amount_cents"
+        ],
+        "title": "WithholdingLine",
+        "type": "object"
+      },
+      "WithholdingTotal": {
+        "properties": {
+          "deductions_cents": {
+            "title": "Deductions Cents",
+            "type": "integer"
+          },
+          "gross_cents": {
+            "title": "Gross Cents",
+            "type": "integer"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/WithholdingLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "net_cents": {
+            "title": "Net Cents",
+            "type": "integer"
+          },
+          "paycheck_count": {
+            "title": "Paycheck Count",
+            "type": "integer"
+          },
+          "roles": {
+            "$ref": "#/components/schemas/RoleTotals"
+          }
+        },
+        "required": [
+          "gross_cents",
+          "lines",
+          "roles",
+          "deductions_cents",
+          "net_cents",
+          "paycheck_count"
+        ],
+        "title": "WithholdingTotal",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -3014,6 +3444,93 @@
           }
         ],
         "summary": "List Accounts",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/accounts/import": {
+      "post": {
+        "description": "Import a bank's CSV export through the sync pipeline, then queue\ncategorization and recurring detection.",
+        "operationId": "import_csv",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_csv"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CsvImport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Import Csv",
         "tags": [
           "accounts"
         ]
@@ -3193,6 +3710,93 @@
         "summary": "List Calendar",
         "tags": [
           "calendar"
+        ]
+      }
+    },
+    "/cashflow": {
+      "get": {
+        "description": "Gross-to-net lines of each pay stub and the spending summary; the last full UTC\nmonth by default.",
+        "operationId": "get_cashflow",
+        "parameters": [
+          {
+            "description": "First day, inclusive",
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First day, inclusive",
+              "title": "Start"
+            }
+          },
+          {
+            "description": "Last day, inclusive",
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last day, inclusive",
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashFlow"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Cashflow",
+        "tags": [
+          "spending"
         ]
       }
     },
@@ -4127,6 +4731,126 @@
         "summary": "Put Profile",
         "tags": [
           "profile"
+        ]
+      }
+    },
+    "/recurring": {
+      "get": {
+        "description": "Every detected charge, ignored ones included, by name.",
+        "operationId": "list_recurring",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecurringChargeOut"
+                  },
+                  "title": "Response List Recurring",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Recurring",
+        "tags": [
+          "recurring"
+        ]
+      }
+    },
+    "/recurring/{charge_id}": {
+      "patch": {
+        "description": "Rename a charge, or mark it confirmed, not recurring (ignored) or cancelled.",
+        "operationId": "update_recurring",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "charge_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Charge Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecurringPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringChargeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Recurring",
+        "tags": [
+          "recurring"
         ]
       }
     },

@@ -11,11 +11,12 @@ root (`uv sync --all-packages`). `api/` is the import root: `app`, `calc`, `db`,
 app/        main.py (create_app), config.py (Settings), auth.py (JWT), db.py (engines,
             user_session), deps.py (UserSession, DbBind), errors.py, openapi.py, routers/
 calc/       calculators: f(Input) -> Result, Pydantic models, integer cents, Decimal rates;
-            data/<year>.json (federal constants), registry.py, pay_dates.py, spending.py
+            data/<year>.json (federal constants), registry.py, pay_dates.py, spending.py,
+            cashflow.py, recurring.py (amount arithmetic for detection)
 db/         models.py (Base), rls.py (enable_rls), enums.py, seed/ (load.py, data files)
 alembic/    env.py, versions/NNNN_name.py
 sync/       provider.py (protocol), pipeline.py, crypto.py, categorize.py, categories.py,
-            plaid/ (client, provider, webhook); CSV provider and recurring later
+            plaid/ (client, provider, webhook), csv_provider.py, recurring.py
 ingest/     store (document_blobs), chunk, proposal (API-safe); reader, ocr, redact,
             layout, pipeline (worker only)
 llm/        gateway.py (the only anthropic import), schemas.py, cost.py, prompts/<name>/vN.md
@@ -129,8 +130,9 @@ Rules:
   and `record_user_label` for `PATCH /transactions/{id}` (spec 003).
 - Migration names follow spec 001: `0006_webhook_fn` revises `0002_core`, and
   the next revision (`0003_documents`) revises `0006_webhook_fn`;
-  `0007_lock_alembic_version` revises `0003_documents`, and `0004_decisions`
-  revises `0007_lock_alembic_version`.
+  `0007_lock_alembic_version` revises `0003_documents`, `0004_decisions`
+  revises `0007_lock_alembic_version`, and `0005_checkins` revises
+  `0004_decisions`.
 - Supabase grants every new table and function in `public` to `anon` and
   `authenticated` by default. `enable_rls` revokes that per table; a function
   needs its own `REVOKE ALL ... FROM PUBLIC, anon, authenticated` plus the
@@ -255,6 +257,40 @@ explanation, `GET /calendar` shows the check it implies.
   the privileged connection; spec 002 rule 38). It stays 200 when the worker is
   stale or the read fails. Tests point `get_queue_bind` at their connection
   (the `app` fixture does) or override `worker_state`.
+
+## Recurring charges, cash flow and CSV import (from M5)
+
+Specs 009 and 010. Migration `0005_checkins` adds `recurring_charges`,
+`check_ins`, `check_in_findings` and the deferred keys `decisions.check_in_id`
+(no ON DELETE action) and `explanations.finding_id`.
+
+- **Recurring detection** (`sync/recurring.py`): `detect(charges, today)` is
+  pure: money-out transactions grouped by `merchant_norm`, the series is the
+  charges within 15% of the group median, a cadence band (weekly 6-8 d,
+  monthly 27-33 d, yearly 350-380 d) must hold three quarters of the gaps, and
+  each cadence has a minimum length (4, 3, 2). Amount arithmetic is
+  `calc/recurring.py`. `next_status` / `undetected_status` decide `status`;
+  `new` and `changed` are sticky until the check-in (M8) sets `active`.
+  `run_detection` writes under RLS and a per-user advisory lock; it never
+  overwrites `merchant_clean` (the user's rename) or `user_status`, and deletes
+  rows whose merchant has no charges left (unlink queues `recurring.detect`).
+- Job handlers read time from `Services.clock` (`jobs/context.py`), so tests
+  pass a fixed clock to the `Worker`.
+- **`GET /cashflow`** (`app/routers/cashflow.py`): stage-1 lines per pay stub
+  from the pure `calc/cashflow.py:withholding` (seven fixed lines with roles
+  tax, retirement, health, other, plus role and period totals) and the
+  spending summary through `spending.summary_for`, the same code as `GET
+  /spending/summary`, so the two never disagree.
+- **`POST /accounts/import`** (`app/routers/accounts.py`, `sync/csv_provider.py`):
+  `parse_csv` checks the whole file before any write (422 `csv_invalid` with
+  `details.errors` of `{row, column, message}`), converts to positive-is-out
+  per the `sign` field, and derives `provider_txn_id` from date, amount,
+  description and the occurrence number, so re-imports never duplicate. The
+  route runs `run_sync` with `CsvProvider` inside the request's own session (no
+  network, so one transaction); a stale cursor is 409 `import_conflict`. Its
+  10 MB limit is a second `BodySizeLimit` in `app/main.py`.
+- `tests/support/spending_month.py` holds spec 007's September month, shared by
+  the spending and cash-flow tests.
 
 ## Testing
 

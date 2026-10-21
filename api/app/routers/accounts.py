@@ -1,21 +1,41 @@
-"""The user's linked accounts with their latest balances (spec 002 rules 30-31)."""
+"""The user's accounts with their latest balances (spec 002 rules 30-31) and CSV
+imports (spec 010 part B)."""
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, File, Form, UploadFile
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import Select, select, true, update
+from sqlalchemy.orm import Session
 
-from app.deps import UserSession
-from app.errors import NotFound, error_responses
+from app.auth import CurrentUser
+from app.deps import Now, UserSession
+from app.errors import AppError, NotFound, error_responses
 from app.types import UtcDateTime
-from db.enums import AccountKind, AccountRole
+from db.enums import AccountKind, AccountRole, JobKind, SyncProvider
 from db.models import Account, BalanceSnapshot, SyncItem
+from jobs import queue
+from sync.csv_provider import (
+    PROVIDER_ACCOUNT_ID,
+    AmountSign,
+    CsvInvalid,
+    CsvProvider,
+    parse_csv,
+)
+from sync.pipeline import SyncItemSecrets, run_sync
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
+
+MAX_IMPORT_BYTES = 10 * 1024 * 1024
+# Room for the multipart boundaries and the form fields around the file.
+MULTIPART_OVERHEAD_BYTES = 64 * 1024
 
 
 class AccountOut(BaseModel):
@@ -108,3 +128,137 @@ def update_account(account_id: uuid.UUID, body: AccountPatch, session: UserSessi
     session.flush()
     row = session.execute(_accounts_query().where(Account.id == account.id)).one()
     return _out(*row)
+
+
+class CsvImport(BaseModel):
+    account: AccountOut
+    # Data rows written, new or updated.
+    imported: int
+    # The queued follow-up jobs, for the client to poll.
+    categorize_job_id: uuid.UUID
+    recurring_job_id: uuid.UUID
+
+
+def _invalid(message: str) -> AppError:
+    return AppError(message, code="validation_error", status_code=422)
+
+
+@contextmanager
+def _same_session(session: Session) -> Iterator[Session]:
+    """The request's session, for ``run_sync``: the CSV provider makes no network
+    call, so the whole import is one transaction (rule 19)."""
+    yield session
+
+
+def _target(
+    session: Session,
+    user_id: uuid.UUID,
+    account_id: uuid.UUID | None,
+    kind: AccountKind | None,
+    name: str | None,
+    institution_name: str | None,
+) -> tuple[uuid.UUID, str, AccountKind]:
+    """The CSV item to import into, with the account's name and kind (rule 17)."""
+    if account_id is not None:
+        if kind is not None or name is not None or institution_name is not None:
+            raise _invalid("kind, name and institution_name are only for a new account")
+        account = session.get(Account, account_id)
+        if account is None:
+            raise NotFound("Account not found")
+        item = session.get(SyncItem, account.sync_item_id)
+        if item is None or item.provider is not SyncProvider.CSV:
+            raise AppError(
+                "Only an account created by a CSV import can take another import",
+                code="not_csv_account",
+                status_code=422,
+            )
+        return item.id, account.name, account.kind
+    if kind is None:
+        raise _invalid("Give kind for a new account, or account_id to add to one")
+    display = " ".join((name or "").split())
+    if name is not None and not display:
+        raise _invalid("name must not be blank")
+    item = SyncItem(
+        user_id=user_id,
+        provider=SyncProvider.CSV,
+        institution_name=" ".join((institution_name or "").split()) or None,
+    )
+    session.add(item)
+    session.flush()
+    default = f"{kind.value.replace('_', ' ').capitalize()} (CSV)"
+    return item.id, display or default, kind
+
+
+@router.post("/import", responses=error_responses(401, 404, 409, 413, 422))
+def import_csv(
+    file: Annotated[UploadFile, File(description="A CSV export of at most 10 MB")],
+    user: CurrentUser,
+    session: UserSession,
+    now: Now,
+    account_id: Annotated[
+        uuid.UUID | None, Form(description="An earlier CSV import's account to add to")
+    ] = None,
+    kind: Annotated[AccountKind | None, Form(description="For a new account")] = None,
+    name: Annotated[str | None, Form(max_length=100, description="For a new account")] = None,
+    institution_name: Annotated[
+        str | None, Form(max_length=200, description="For a new account")
+    ] = None,
+    sign: Annotated[
+        AmountSign, Form(description="How the amount column is signed")
+    ] = AmountSign.NEGATIVE_IS_OUT,
+) -> CsvImport:
+    """Import a bank's CSV export through the sync pipeline, then queue
+    categorization and recurring detection."""
+    data = file.file.read(MAX_IMPORT_BYTES + 1)
+    if len(data) > MAX_IMPORT_BYTES:
+        raise AppError("The file is larger than 10 MB", code="file_too_large", status_code=413)
+    try:
+        parsed = parse_csv(data, sign)
+    except CsvInvalid as exc:
+        raise AppError(
+            str(exc),
+            code="csv_invalid",
+            status_code=422,
+            details={
+                "errors": [dataclasses.asdict(problem) for problem in exc.problems],
+                "total": exc.total,
+            },
+        ) from None
+    item_id, account_name, account_kind = _target(
+        session, user.id, account_id, kind, name, institution_name
+    )
+
+    def provider_for(_: SyncItemSecrets) -> CsvProvider:
+        return CsvProvider(parsed, name=account_name, kind=account_kind)
+
+    result = run_sync(
+        user_id=user.id,
+        item_id=item_id,
+        sessions=lambda: _same_session(session),
+        provider_for=provider_for,
+        now=now,
+    )
+    if result.outcome != "synced":
+        raise AppError(
+            "Another import into this account finished first; try again",
+            code="import_conflict",
+            status_code=409,
+        )
+    # The pipeline queued both; these return its jobs (rule 20).
+    categorize_job = queue.enqueue_unless_queued(
+        session, user_id=user.id, kind=JobKind.CATEGORIZE_RUN
+    )
+    recurring_job = queue.enqueue_unless_queued(
+        session, user_id=user.id, kind=JobKind.RECURRING_DETECT
+    )
+    row = session.execute(
+        _accounts_query().where(
+            Account.sync_item_id == item_id, Account.provider_account_id == PROVIDER_ACCOUNT_ID
+        )
+    ).one()
+    return CsvImport(
+        account=_out(*row),
+        imported=result.added,
+        categorize_job_id=categorize_job,
+        recurring_job_id=recurring_job,
+    )
