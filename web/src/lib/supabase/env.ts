@@ -21,5 +21,23 @@ export function readSupabaseEnv(
 ): SupabaseEnv | null {
   const url = env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const publishableKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
-  return url && publishableKey ? { url, publishableKey } : null;
+  if (!url || !publishableKey) return null;
+  if (!isHttpUrl(url)) {
+    // A bad value must not take every route down: the proxy and the guard run
+    // on each request, so a thrown error here is a site-wide 500.
+    console.warn(
+      `NEXT_PUBLIC_SUPABASE_URL is not a valid http(s) URL; running with auth off. Got: ${JSON.stringify(url)}`,
+    );
+    return null;
+  }
+  return { url, publishableKey };
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.hostname !== '';
+  } catch {
+    return false;
+  }
 }
