@@ -10,6 +10,7 @@ const twMerge = extendTailwindMerge({
     theme: {
       text: [
         'micro',
+        'code',
         'tiny',
         'small',
         'control',

@@ -13,6 +13,8 @@ export interface StepFooterProps {
     primary?: boolean;
     /** Not ready yet: renders a real disabled button, never a dead link. */
     disabled?: boolean;
+    /** The action is running: a spinner in place, clicks ignored. */
+    loading?: boolean;
   };
   /** Text before the next button, e.g. "3 left to confirm". */
   status?: ReactNode;
@@ -39,7 +41,12 @@ export function StepFooter({ back, next, status }: StepFooterProps) {
               {nextContent}
             </Button>
           ) : (
-            <Button variant={variant} disabled={next.disabled} onClick={next.onClick}>
+            <Button
+              variant={variant}
+              disabled={next.disabled}
+              loading={next.loading}
+              onClick={next.onClick}
+            >
               {nextContent}
             </Button>
           ))}

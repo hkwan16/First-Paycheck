@@ -1,14 +1,14 @@
 import type { Metadata } from 'next';
-import { PageTitle } from '@/components/chrome/PageTitle';
+import { ConfirmScreen } from '@/components/screens/confirm/ConfirmScreen';
 import { HydrationMarker } from '@/app/hydration-marker';
 
 export const metadata: Metadata = { title: 'Confirm pay stub' };
 
-/** Placeholder until the Confirm pay stub screen lands. */
-export default function ConfirmPage() {
+export default async function ConfirmPage({ params }: PageProps<'/setup/confirm/[documentId]'>) {
+  const { documentId } = await params;
   return (
     <>
-      <PageTitle title="Check what we read from your pay stub" lead="This screen is on its way." />
+      <ConfirmScreen documentId={documentId} />
       <HydrationMarker />
     </>
   );

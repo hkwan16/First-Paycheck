@@ -9,6 +9,7 @@ describe('cn', () => {
   it('keeps a custom font size next to a custom text color', () => {
     expect(cn('text-small text-ink-3')).toBe('text-small text-ink-3');
     expect(cn('text-tiny', 'text-blue-text')).toBe('text-tiny text-blue-text');
+    expect(cn('text-code', 'text-ink')).toBe('text-code text-ink');
   });
 
   it('lets a later token of the same group win', () => {

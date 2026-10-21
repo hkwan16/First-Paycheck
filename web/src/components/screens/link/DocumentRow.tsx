@@ -12,7 +12,7 @@ import { isReviewable, useJob } from '@/lib/api/hooks';
 import type { DocumentSummary, DocumentType } from '@/lib/api/types';
 import { formatNumber } from '@/lib/money';
 import { confirmRoute } from '@/lib/routes';
-import { documentStatusBadge, documentTypeLabel, statusReasonText } from './document-format';
+import { documentStatusBadge, documentTypeLabel, statusReasonText } from '@/lib/documents';
 
 /** The upload types the API can read today; an offer letter is stored only. */
 export const READABLE_TYPES: ReadonlySet<DocumentType> = new Set(['pay_stub', 'benefits']);

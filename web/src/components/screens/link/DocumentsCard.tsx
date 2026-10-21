@@ -12,7 +12,8 @@ import { apiErrorMessage } from '@/lib/api/errors';
 import { useDocuments, useExtractDocument, useUploadDocument } from '@/lib/api/hooks';
 import type { DocumentSummary, DocumentType } from '@/lib/api/types';
 import { DOCUMENT_ACCEPT, DocumentRow, READABLE_TYPES } from './DocumentRow';
-import { documentTypeLabel, rejectedFileMessage, uploadErrorMessage } from './document-format';
+import { documentTypeLabel } from '@/lib/documents';
+import { rejectedFileMessage, uploadErrorMessage } from './document-format';
 
 interface Upload {
   key: number;
