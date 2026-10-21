@@ -1,0 +1,95 @@
+---
+description: First Paycheck project rules, repo map and commands (mirror of CLAUDE.md)
+globs:
+alwaysApply: true
+---
+
+# First Paycheck
+
+First Paycheck guides a new salaried employee through their first-month money
+decisions (W-4, health plan, 401(k) contribution, emergency fund, what is safe to
+spend) using their own pay stub, benefits documents and linked bank accounts,
+then checks in every month to see whether those decisions took effect. All
+financial math runs in deterministic, tested code. The LLM only extracts,
+categorizes and explains, and everything it produces is a proposal until the
+user confirms it.
+
+## Non-negotiable rules
+
+1. **Money math lives only in `api/calc/`.** Pure functions over integer cents
+   (`*_cents`, `bigint` in Postgres), `Decimal` for rates, half-up rounding, no
+   I/O, no LLM. `calc/` imports only the standard library, `pydantic` and `calc`.
+2. **Only `api/llm/gateway.py` imports `anthropic`.** Calculators read confirmed
+   data only; LLM output is never written to a confirmed table without the
+   user's confirmation. Only redacted content is sent to the LLM.
+3. **Every query runs as the user under row-level security.** Routes take a
+   `UserSession`; job handlers use `user_session_for(user_id)`. The privileged
+   engine is used only by Alembic, `jobs/queue.py` and `jobs/scheduler.py`.
+   Another user's row is a 404, never a 403.
+4. **Failing test first** for every feature and bug fix; reproduce a bug end to
+   end, the way a user would hit it, before fixing it. Trivial config edits are
+   exempt.
+5. **Never use an em dash** (U+2014) in code, docs, comments or commit messages.
+   Use a plain dash. Pre-commit and CI reject it.
+6. **Fix root causes.** No suppressed lint, no `type: ignore` without a reason, no
+   skipped or retried flaky tests. Prefer quality, simplicity and long-term
+   maintainability over speed of delivery; prefer boring, well-supported
+   libraries.
+7. **Synthetic data only.** Fixtures are generated or sandbox data, never a real
+   person's pay stub or bank data. Secrets live in `.env` (git-ignored) and in
+   Render and Vercel settings, never in the repo.
+8. **The API contract is generated.** After changing a route or schema, run
+   `make types` and commit `api/openapi.json` and the web client types. Operation
+   ids are route function names; renaming one is an API change.
+
+## Repo map
+
+```
+api/        FastAPI app and worker (Python 3.12, uv). See api/CLAUDE.md.
+  app/        main, config, auth (JWT), db (RLS session), deps, errors, routers/
+  calc/       calculators: pure, integer cents, no LLM
+  db/         SQLAlchemy models, RLS helper, seeds
+  alembic/    migrations (0001_roles, ...)
+  llm/        gateway.py (the only Claude caller), schemas, prompts
+  jobs/       Postgres job queue, worker, scheduler
+  tests/      unit/, integration/ (real Postgres), support/
+web/        Next.js client (pnpm). See web/CLAUDE.md.
+evals/      eval runner, suites, fixtures, baseline.json. See evals/CLAUDE.md.
+docs/       technical spec, plan, specs/NNN-*.md, mockup/, backlog.yaml, ai-log.md
+scripts/    sync_backlog.py, check_no_em_dash.py, dev.sh, record_plaid_fixtures.py
+```
+
+## Commands
+
+```
+make setup      install Python and web deps and the pre-commit hooks
+make dev        api + worker + web via honcho (Procfile.dev), against .env
+make test       all Python tests (api, evals, scripts) and web unit tests
+make test-api   API tests only (integration tests need TEST_DATABASE_URL)
+make lint       ruff, ruff format --check, mypy, em-dash check, eslint, tsc
+make eval       deterministic eval suites (free); make eval-llm for LLM suites
+make migrate    alembic upgrade head; make revision id=0002_core msg="core tables"
+make seed       load reference data (idempotent)
+make types      export api/openapi.json and regenerate web client types
+make worker     run the background worker
+```
+
+Copy `.env.example` to `.env` first. Tests use only `TEST_DATABASE_URL`, a
+disposable local Postgres; they never read the rest of `.env`.
+
+## Specs before code
+
+Each feature starts as `docs/specs/NNN-slug.md` (Goal, Inputs, Outputs, Rules,
+Hand-worked examples, Edge cases, Status). Tests are written from the spec's
+examples, then the code. When requirements change, change the spec first, then
+the tests, then the code. Calculator examples also go into
+`evals/fixtures/calc/` so the eval runs them through the HTTP route.
+
+## Pointers
+
+- Product and architecture: `docs/technical-spec.md`; scope: `docs/proposal.md`.
+- Build plan and milestones: `docs/plan.md`; backlog: `docs/backlog.yaml`
+  (synced to GitHub with `scripts/sync_backlog.py`).
+- Visual design reference: `docs/mockup/` (Mockup B). Port the look, not its
+  client-side formulas: every number comes from the API.
+- Record notable AI-assisted work, failures and fixes in `docs/ai-log.md`.
