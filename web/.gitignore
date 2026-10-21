@@ -29,3 +29,6 @@ next-env.d.ts
 
 # written by `next dev` (agent rules live in CLAUDE.md)
 AGENTS.md
+
+# Playwright session saved by e2e/auth.setup.ts
+/e2e/.auth/
