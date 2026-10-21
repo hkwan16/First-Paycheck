@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import { HydrationMarker } from './hydration-marker';
 import { Providers } from './providers';
 import './globals.css';
 
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="en">
       <body>
         <Providers>{children}</Providers>
+        <HydrationMarker />
       </body>
     </html>
   );
