@@ -153,12 +153,23 @@ export interface ConfirmDocumentVariables {
   values: PayStubValues;
 }
 
+export interface ConfirmDocumentOptions {
+  /**
+   * Called once the API has stored the values, before the reads refresh. It
+   * belongs to the mutation, not to one `mutate` call: the refreshed document
+   * can replace the reviewing component before the refresh finishes, and
+   * TanStack drops a `mutate` call's callbacks once its component unmounts.
+   */
+  onConfirmed?: (confirmed: Confirmed) => void;
+}
+
 /**
  * `POST /docs/{id}/confirm` with the values the person checked. A 422
  * `pay_stub_unbalanced` is thrown as `PayStubUnbalanced`; anything else as
- * the API body. Success refreshes documents and pay stubs.
+ * the API body. Success calls `onConfirmed`, then refreshes documents and
+ * pay stubs.
  */
-export function useConfirmDocument() {
+export function useConfirmDocument({ onConfirmed }: ConfirmDocumentOptions = {}) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ documentId, values }: ConfirmDocumentVariables): Promise<Confirmed> => {
@@ -174,7 +185,10 @@ export function useConfirmDocument() {
       }
       return data;
     },
-    onSuccess: () => invalidateAfterConfirm(queryClient),
+    onSuccess: (confirmed) => {
+      onConfirmed?.(confirmed);
+      return invalidateAfterConfirm(queryClient);
+    },
     onError: (error) => {
       const code = apiErrorCode(error);
       if (code && STATE_CONFLICTS.has(code)) void invalidateDocuments(queryClient);
