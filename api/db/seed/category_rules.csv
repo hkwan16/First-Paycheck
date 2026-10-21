@@ -1,0 +1,260 @@
+merchant_norm,match,category
+adp,prefix,income
+adp payroll,prefix,income
+gusto pay,prefix,income
+ach electronic creditgusto pay,prefix,income
+paychex,prefix,income
+payroll,prefix,income
+direct dep,prefix,income
+direct deposit,prefix,income
+rippling,prefix,income
+intrst pymnt,exact,income
+interest payment,prefix,income
+zelle,prefix,transfer
+venmo,prefix,transfer
+cash app,prefix,transfer
+transfer,prefix,transfer
+online transfer,prefix,transfer
+ach transfer,prefix,transfer
+credit card payment,prefix,transfer
+automatic payment thank,prefix,transfer
+autopay,prefix,transfer
+payment thank you,prefix,transfer
+rent,prefix,housing
+rent payment,prefix,housing
+bilt rent,prefix,housing
+rentcafe,prefix,housing
+appfolio,prefix,housing
+buildium,prefix,housing
+yardi,prefix,housing
+apartments.com,prefix,housing
+mortgage,prefix,housing
+pg&e,prefix,utilities
+pge,prefix,utilities
+con edison,prefix,utilities
+coned,prefix,utilities
+duke energy,prefix,utilities
+sdg&e,prefix,utilities
+national grid,prefix,utilities
+xcel energy,prefix,utilities
+dominion energy,prefix,utilities
+comed,prefix,utilities
+peco,prefix,utilities
+socalgas,prefix,utilities
+southwest gas,prefix,utilities
+american water,prefix,utilities
+waste management,prefix,utilities
+republic services,prefix,utilities
+recology,prefix,utilities
+verizon,prefix,phone_internet
+verizon wireless,prefix,phone_internet
+at&t,prefix,phone_internet
+att,prefix,phone_internet
+t mobile,prefix,phone_internet
+tmobile,prefix,phone_internet
+sprint,prefix,phone_internet
+comcast,prefix,phone_internet
+xfinity,prefix,phone_internet
+spectrum,prefix,phone_internet
+charter communications,prefix,phone_internet
+cox communications,prefix,phone_internet
+frontier communications,prefix,phone_internet
+centurylink,prefix,phone_internet
+google fi,prefix,phone_internet
+mint mobile,prefix,phone_internet
+optimum,prefix,phone_internet
+whole foods,prefix,groceries
+wholefds,prefix,groceries
+trader joes,prefix,groceries
+safeway,prefix,groceries
+kroger,prefix,groceries
+aldi,prefix,groceries
+publix,prefix,groceries
+wegmans,prefix,groceries
+h e b,prefix,groceries
+heb,prefix,groceries
+albertsons,prefix,groceries
+ralphs,prefix,groceries
+vons,prefix,groceries
+food lion,prefix,groceries
+giant food,prefix,groceries
+stop & shop,prefix,groceries
+meijer,prefix,groceries
+sprouts,prefix,groceries
+hy vee,prefix,groceries
+raleys,prefix,groceries
+smart & final,prefix,groceries
+lidl,prefix,groceries
+instacart,prefix,groceries
+amazon fresh,prefix,groceries
+grocery outlet,prefix,groceries
+fred meyer,prefix,groceries
+starbucks,prefix,dining
+mcdonalds,prefix,dining
+kfc,prefix,dining
+chipotle,prefix,dining
+subway,prefix,dining
+taco bell,prefix,dining
+wendys,prefix,dining
+burger king,prefix,dining
+dunkin,prefix,dining
+panera bread,prefix,dining
+chick fil a,prefix,dining
+dominos,prefix,dining
+pizza hut,prefix,dining
+five guys,prefix,dining
+shake shack,prefix,dining
+in n out,prefix,dining
+sweetgreen,prefix,dining
+panda express,prefix,dining
+peets,prefix,dining
+blue bottle,prefix,dining
+philz coffee,prefix,dining
+doordash,prefix,dining
+dd doordash,prefix,dining
+grubhub,prefix,dining
+uber eats,prefix,dining
+cava,prefix,dining
+uber,prefix,transport
+lyft,prefix,transport
+bart,prefix,transport
+clipper,prefix,transport
+mta,prefix,transport
+ventra,prefix,transport
+wmata,prefix,transport
+septa,prefix,transport
+mbta,prefix,transport
+caltrain,prefix,transport
+nj transit,prefix,transport
+shell,prefix,transport
+chevron,prefix,transport
+exxon,prefix,transport
+exxonmobil,prefix,transport
+mobil,prefix,transport
+bp,prefix,transport
+arco,prefix,transport
+valero,prefix,transport
+costco gas,prefix,transport
+parkmobile,prefix,transport
+fastrak,prefix,transport
+e zpass,prefix,transport
+lime ride,prefix,transport
+netflix,prefix,subscriptions
+netflix.com,prefix,subscriptions
+spotify,prefix,subscriptions
+hulu,prefix,subscriptions
+disney plus,prefix,subscriptions
+disneyplus,prefix,subscriptions
+hbo max,prefix,subscriptions
+apple.com bill,prefix,subscriptions
+youtube premium,prefix,subscriptions
+youtube tv,prefix,subscriptions
+google one,prefix,subscriptions
+amazon prime,prefix,subscriptions
+audible,prefix,subscriptions
+paramount plus,prefix,subscriptions
+peacock,prefix,subscriptions
+nytimes,prefix,subscriptions
+dropbox,prefix,subscriptions
+adobe,prefix,subscriptions
+duolingo,prefix,subscriptions
+headspace,prefix,subscriptions
+geico,prefix,insurance
+progressive,prefix,insurance
+state farm,prefix,insurance
+allstate,prefix,insurance
+liberty mutual,prefix,insurance
+farmers insurance,prefix,insurance
+nationwide,prefix,insurance
+lemonade,prefix,insurance
+travelers,prefix,insurance
+metlife,prefix,insurance
+blue cross,prefix,insurance
+blue shield,prefix,insurance
+cigna,prefix,insurance
+aetna,prefix,insurance
+cvs,prefix,healthcare
+walgreens,prefix,healthcare
+rite aid,prefix,healthcare
+kaiser permanente,prefix,healthcare
+one medical,prefix,healthcare
+labcorp,prefix,healthcare
+quest diagnostics,prefix,healthcare
+goodrx,prefix,healthcare
+amazon,prefix,shopping
+amazon.com,prefix,shopping
+amzn mktp,prefix,shopping
+target,prefix,shopping
+walmart,prefix,shopping
+wal mart,prefix,shopping
+costco,prefix,shopping
+sams club,prefix,shopping
+best buy,prefix,shopping
+home depot,prefix,shopping
+lowes,prefix,shopping
+ikea,prefix,shopping
+ebay,prefix,shopping
+etsy,prefix,shopping
+macys,prefix,shopping
+nordstrom,prefix,shopping
+tj maxx,prefix,shopping
+old navy,prefix,shopping
+rei,prefix,shopping
+dollar tree,prefix,shopping
+wayfair,prefix,shopping
+chewy,prefix,shopping
+apple store,prefix,shopping
+sparkfun,prefix,shopping
+madison bicycle shop,prefix,shopping
+amc theatres,prefix,entertainment
+fandango,prefix,entertainment
+ticketmaster,prefix,entertainment
+steam purchase,prefix,entertainment
+playstation network,prefix,entertainment
+nintendo,prefix,entertainment
+touchstone climbing,prefix,entertainment
+united airlines,prefix,travel
+delta air lines,prefix,travel
+american airlines,prefix,travel
+southwest airlines,prefix,travel
+jetblue,prefix,travel
+airbnb,prefix,travel
+marriott,prefix,travel
+hilton,prefix,travel
+expedia,prefix,travel
+booking.com,prefix,travel
+hertz,prefix,travel
+amtrak,prefix,travel
+great clips,prefix,personal_care
+supercuts,prefix,personal_care
+planet fitness,prefix,personal_care
+equinox,prefix,personal_care
+la fitness,prefix,personal_care
+ulta,prefix,personal_care
+sephora,prefix,personal_care
+coursera,prefix,education
+udemy,prefix,education
+chegg,prefix,education
+gofundme,prefix,gifts_donations
+red cross,prefix,gifts_donations
+atm fee,prefix,fees
+overdraft fee,prefix,fees
+monthly service fee,prefix,fees
+foreign transaction fee,prefix,fees
+irs treas,prefix,taxes
+franchise tax bd,prefix,taxes
+turbotax,prefix,taxes
+navient,prefix,debt_payment
+nelnet,prefix,debt_payment
+mohela,prefix,debt_payment
+sallie mae,prefix,debt_payment
+aidvantage,prefix,debt_payment
+affirm,prefix,debt_payment
+vanguard,prefix,savings_investment
+fidelity,prefix,savings_investment
+schwab,prefix,savings_investment
+robinhood,prefix,savings_investment
+betterment,prefix,savings_investment
+wealthfront,prefix,savings_investment
+coinbase,prefix,savings_investment
+cd deposit initial,exact,savings_investment

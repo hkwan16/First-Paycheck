@@ -5,7 +5,8 @@
 * ``anthropic`` is imported only by ``llm/gateway.py``.
 * Routers never touch an engine: they get a ``UserSession`` from ``app.deps``.
 * The privileged engine is used only by ``app/db.py`` (its definition),
-  ``jobs/queue.py`` and ``jobs/scheduler.py``.
+  ``jobs/queue.py``, ``jobs/scheduler.py`` and the deploy-time seed loader
+  ``db/seed/load.py`` (spec 001 rule 11).
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ EXCLUDED_DIRS = {"__pycache__", ".venv", "node_modules"}
 
 CALC_ALLOWED = frozenset(sys.stdlib_module_names) | {"__future__", "pydantic", "calc"}
 ANTHROPIC_ALLOWED = "api/llm/gateway.py"
-PRIVILEGED_ALLOWED = {"app/db.py", "jobs/queue.py", "jobs/scheduler.py"}
+PRIVILEGED_ALLOWED = {"app/db.py", "jobs/queue.py", "jobs/scheduler.py", "db/seed/load.py"}
 ENGINE_NAMES = {"get_engine", "get_privileged_engine", "make_engine", "create_engine"}
 
 
@@ -199,7 +200,7 @@ def test_privileged_engine_stays_in_its_allowed_modules() -> None:
         and relative(path) not in PRIVILEGED_ALLOWED
         and (found := privileged_violations(path.read_text()))
     }
-    assert not problems, f"get_privileged_engine is for the queue and scheduler only: {problems}"
+    assert not problems, f"get_privileged_engine is for the queue, scheduler and seeds: {problems}"
 
 
 def test_the_walk_sees_the_source_tree() -> None:

@@ -5,11 +5,15 @@ description = "First Paycheck FastAPI backend and worker"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "alembic>=1.14",
+  "anthropic>=1.14.0",
+  "cryptography>=50.0.2",
   "fastapi>=0.125",
+  "plaid-python>=45.0.0",
   "psycopg[binary]>=3.2",
   "pydantic>=2.11",
   "pydantic-settings>=2.7",
   "pyjwt[crypto]>=2.10",
+  "pyyaml>=6.0.3",
   "sqlalchemy>=2.0.36",
   "uvicorn[standard]>=0.32",
 ]
@@ -31,4 +35,4 @@ build-backend = "hatchling.build"
 # top-level packages, matching `python -m app.openapi`, `python -m jobs.worker`
 # and `python -m db.seed.load`. Add each new top-level package here.
 [tool.hatch.build.targets.wheel]
-packages = ["app", "calc", "db", "jobs", "llm"]
+packages = ["app", "calc", "db", "jobs", "llm", "sync"]

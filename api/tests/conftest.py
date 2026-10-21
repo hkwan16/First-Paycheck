@@ -29,7 +29,7 @@ from sqlalchemy import Connection, Engine, make_url, text
 
 from app.config import get_settings
 from app.db import dispose_engines, make_engine
-from app.deps import get_db_bind
+from app.deps import get_db_bind, get_plaid_client
 from app.main import create_app
 from tests.support.auth_shim import ensure_auth_shim
 from tests.support.database import (
@@ -38,6 +38,7 @@ from tests.support.database import (
     sibling_database_url,
     upgrade,
 )
+from tests.support.fake_plaid import FakePlaidClient
 from tests.support.tokens import make_token
 
 # Password given to app_api in the test cluster so tests can connect as it.
@@ -106,6 +107,26 @@ def _insert_user(connection: Connection, user: FixtureUser) -> FixtureUser:
 
 
 @pytest.fixture
+def no_seed_rules(db_connection: Connection) -> Connection:
+    """Remove committed seed category rules for this test (rolled back after).
+
+    ``make seed`` may have loaded them into the test database; tests that
+    count or write seed rows start from none.
+    """
+    db_connection.execute(text("DELETE FROM category_rules WHERE user_id IS NULL"))
+    return db_connection
+
+
+@pytest.fixture
+def seeded_rules(no_seed_rules: Connection) -> Connection:
+    """Exactly the committed seed file's category rules, for this test."""
+    from db.seed.load import load_category_rules, read_seed_rules
+
+    load_category_rules(no_seed_rules, read_seed_rules())
+    return no_seed_rules
+
+
+@pytest.fixture
 def user_a(db_connection: Connection) -> FixtureUser:
     return _insert_user(db_connection, USER_A)
 
@@ -116,10 +137,17 @@ def user_b(db_connection: Connection) -> FixtureUser:
 
 
 @pytest.fixture
-def app(db_connection: Connection) -> FastAPI:
-    """The app with every request session bound to the test's transaction."""
+def fake_plaid() -> FakePlaidClient:
+    return FakePlaidClient()
+
+
+@pytest.fixture
+def app(db_connection: Connection, fake_plaid: FakePlaidClient) -> FastAPI:
+    """The app with every request session bound to the test's transaction and
+    Plaid replaced by ``fake_plaid``."""
     application = create_app()
     application.dependency_overrides[get_db_bind] = lambda: db_connection
+    application.dependency_overrides[get_plaid_client] = lambda: fake_plaid
     return application
 
 

@@ -84,6 +84,51 @@ def _claims_json(claims: Mapping[str, Any]) -> str:
 
 
 @contextmanager
+def _restore_session_state(bind: Engine | Connection) -> Iterator[None]:
+    """Put back the role and JWT claims of a caller-owned connection.
+
+    ``SET LOCAL`` lasts until the end of the enclosing transaction. On an
+    Engine that transaction is the session's own, so commit or rollback resets
+    everything. A caller-owned Connection (tests, nested sessions) keeps its
+    outer transaction open after the session's savepoint is released, so the
+    previous values are restored explicitly. On an error the savepoint
+    rollback has already undone them.
+    """
+    if not isinstance(bind, Connection):
+        yield
+        return
+    role, claims = bind.execute(
+        text(
+            "SELECT current_setting('role'),"
+            " coalesce(current_setting('request.jwt.claims', true), '')"
+        )
+    ).one()
+    yield
+    bind.execute(
+        text(
+            "SELECT set_config('role', :role, true),"
+            " set_config('request.jwt.claims', :claims, true)"
+        ),
+        {"role": role, "claims": claims},
+    )
+
+
+@contextmanager
+def _scoped_session(
+    bind: Engine | Connection | None, *setup: tuple[str, dict[str, Any]]
+) -> Iterator[Session]:
+    target = bind if bind is not None else get_engine()
+    with _restore_session_state(target):
+        session = Session(
+            bind=target, join_transaction_mode="create_savepoint", expire_on_commit=False
+        )
+        with session, session.begin():
+            for statement, params in setup:
+                session.execute(text(statement), params)
+            yield session
+
+
+@contextmanager
 def user_session(
     claims: Mapping[str, Any], *, bind: Engine | Connection | None = None
 ) -> Iterator[Session]:
@@ -96,20 +141,28 @@ def user_session(
     the pool. The block commits on success and rolls back on any exception.
 
     ``bind`` defaults to the app_api engine. Tests pass a connection that is
-    already inside a transaction; the session then joins it with a savepoint.
+    already inside a transaction; the session then joins it with a savepoint
+    and the connection's previous role and claims are restored afterwards.
     """
     claims_json = _claims_json(claims)
-    session = Session(
-        bind=bind if bind is not None else get_engine(),
-        join_transaction_mode="create_savepoint",
-        expire_on_commit=False,
-    )
-    with session, session.begin():
-        session.execute(text("SET LOCAL ROLE authenticated"))
-        session.execute(
-            text("SELECT set_config('request.jwt.claims', :claims, true)"),
-            {"claims": claims_json},
-        )
+    with _scoped_session(
+        bind,
+        ("SET LOCAL ROLE authenticated", {}),
+        ("SELECT set_config('request.jwt.claims', :claims, true)", {"claims": claims_json}),
+    ) as session:
+        yield session
+
+
+@contextmanager
+def service_session(*, bind: Engine | Connection | None = None) -> Iterator[Session]:
+    """A session with no user: ``SET LOCAL ROLE app_api``, which owns nothing.
+
+    It can only call functions granted to ``app_api``, such as the webhook's
+    ``enqueue_sync_for_plaid_item``. In production the connection already is
+    app_api, so the role switch is a no-op; under tests it drops the
+    superuser's privileges so the grants are exercised.
+    """
+    with _scoped_session(bind, ("SET LOCAL ROLE app_api", {})) as session:
         yield session
 
 
