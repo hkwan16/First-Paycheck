@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatMoney, formatNumber, formatPct, parseMoney } from './money';
+import {
+  formatMoney,
+  formatNumber,
+  formatPct,
+  formatTransactionAmount,
+  parseMoney,
+  transactionFlow,
+} from './money';
 
 describe('formatMoney', () => {
   it.each([
@@ -101,5 +108,20 @@ describe('formatNumber', () => {
     expect(formatNumber(1234)).toBe('1,234');
     expect(formatNumber(-3, { signed: true })).toBe('-3');
     expect(formatNumber(3, { signed: true })).toBe('+3');
+  });
+});
+
+describe('transaction amounts (Plaid sign: positive is money out)', () => {
+  it.each([
+    [8_412, 'out', '-$84.12'],
+    [-199_604, 'in', '+$1,996.04'],
+    [0, 'none', '$0.00'],
+  ] as const)('%i cents is %s and reads %s', (cents, flow, text) => {
+    expect(transactionFlow(cents)).toBe(flow);
+    expect(formatTransactionAmount(cents)).toBe(text);
+  });
+
+  it('rejects amounts that are not integer cents', () => {
+    expect(() => formatTransactionAmount(1.5)).toThrow(RangeError);
   });
 });
