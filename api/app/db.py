@@ -1,4 +1,4 @@
-"""Database engines.
+"""Database engines and the per-request RLS session.
 
 Two engines, two roles:
 
@@ -11,9 +11,15 @@ Two engines, two roles:
 
 from __future__ import annotations
 
+import json
+import uuid
+from collections.abc import Iterator, Mapping
+from contextlib import AbstractContextManager, contextmanager
 from functools import lru_cache
+from typing import Any
 
 from sqlalchemy import Connection, Engine, create_engine, text
+from sqlalchemy.orm import Session
 
 from app.config import get_settings
 
@@ -57,6 +63,51 @@ def get_privileged_engine() -> Engine:
     settings = get_settings()
     return make_engine(
         _require(settings.database_url_privileged, "DATABASE_URL_PRIVILEGED"), pool_size=2
+    )
+
+
+def _claims_json(claims: Mapping[str, Any]) -> str:
+    if not claims.get("sub"):
+        raise ValueError("JWT claims must carry a 'sub'")
+    return json.dumps(dict(claims), separators=(",", ":"), sort_keys=True, default=str)
+
+
+@contextmanager
+def user_session(
+    claims: Mapping[str, Any], *, bind: Engine | Connection | None = None
+) -> Iterator[Session]:
+    """A session that runs every statement as the user the claims describe.
+
+    One transaction: ``SET LOCAL ROLE authenticated`` and
+    ``set_config('request.jwt.claims', <claims>, true)`` come first, so
+    ``auth.uid()`` and every RLS policy see the user. Both settings are
+    transaction-local, so commit or rollback hands a clean connection back to
+    the pool. The block commits on success and rolls back on any exception.
+
+    ``bind`` defaults to the app_api engine. Tests pass a connection that is
+    already inside a transaction; the session then joins it with a savepoint.
+    """
+    claims_json = _claims_json(claims)
+    session = Session(
+        bind=bind if bind is not None else get_engine(),
+        join_transaction_mode="create_savepoint",
+        expire_on_commit=False,
+    )
+    with session, session.begin():
+        session.execute(text("SET LOCAL ROLE authenticated"))
+        session.execute(
+            text("SELECT set_config('request.jwt.claims', :claims, true)"),
+            {"claims": claims_json},
+        )
+        yield session
+
+
+def user_session_for(
+    user_id: uuid.UUID, *, bind: Engine | Connection | None = None
+) -> AbstractContextManager[Session]:
+    """``user_session`` for a job handler, which knows the user id but has no JWT."""
+    return user_session(
+        {"sub": str(user_id), "role": "authenticated", "aud": "authenticated"}, bind=bind
     )
 
 
