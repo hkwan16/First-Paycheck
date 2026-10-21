@@ -70,6 +70,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         message="The file is larger than 10 MB",
     )
     app.add_middleware(
+        BodySizeLimit,
+        paths=["/accounts/import"],
+        max_bytes=accounts.MAX_IMPORT_BYTES + accounts.MULTIPART_OVERHEAD_BYTES,
+        message="The file is larger than 10 MB",
+    )
+    app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_origin_regex=settings.cors_origin_regex,

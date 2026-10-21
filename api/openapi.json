@@ -138,6 +138,15 @@
         "title": "AccountRole",
         "type": "string"
       },
+      "AmountSign": {
+        "description": "How the file's ``amount`` column is signed (rule 12).",
+        "enum": [
+          "negative_is_out",
+          "positive_is_out"
+        ],
+        "title": "AmountSign",
+        "type": "string"
+      },
       "BenefitsPlanOut": {
         "properties": {
           "coinsurance_pct": {
@@ -216,6 +225,76 @@
           "plans"
         ],
         "title": "BenefitsValues",
+        "type": "object"
+      },
+      "Body_import_csv": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An earlier CSV import's account to add to",
+            "title": "Account Id"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "A CSV export of at most 10 MB",
+            "title": "File",
+            "type": "string"
+          },
+          "institution_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For a new account",
+            "title": "Institution Name"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For a new account"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For a new account",
+            "title": "Name"
+          },
+          "sign": {
+            "$ref": "#/components/schemas/AmountSign",
+            "default": "negative_is_out",
+            "description": "How the amount column is signed"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_csv",
         "type": "object"
       },
       "Body_upload_document": {
@@ -574,6 +653,35 @@
           "plans"
         ],
         "title": "Confirmed",
+        "type": "object"
+      },
+      "CsvImport": {
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/AccountOut"
+          },
+          "categorize_job_id": {
+            "format": "uuid",
+            "title": "Categorize Job Id",
+            "type": "string"
+          },
+          "imported": {
+            "title": "Imported",
+            "type": "integer"
+          },
+          "recurring_job_id": {
+            "format": "uuid",
+            "title": "Recurring Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account",
+          "imported",
+          "categorize_job_id",
+          "recurring_job_id"
+        ],
+        "title": "CsvImport",
         "type": "object"
       },
       "DecisionIn": {
@@ -3327,6 +3435,93 @@
           }
         ],
         "summary": "List Accounts",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/accounts/import": {
+      "post": {
+        "description": "Import a bank's CSV export through the sync pipeline, then queue\ncategorization and recurring detection.",
+        "operationId": "import_csv",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_csv"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CsvImport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Import Csv",
         "tags": [
           "accounts"
         ]

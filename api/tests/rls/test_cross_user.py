@@ -141,6 +141,30 @@ def update_account(connection: Connection, client_as: Callable[[FixtureUser], Te
     return Case("PATCH", f"/accounts/{account}", 404, json={"role": "emergency_fund"}, after=after)
 
 
+def import_csv(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    imported = client_as(USER_A).post(
+        "/accounts/import",
+        data={"kind": "checking"},
+        files={"file": ("a.csv", b"Date,Description,Amount\n2026-10-01,A,-1.00\n", "text/csv")},
+    )
+    assert imported.status_code == 200, imported.text
+    account = imported.json()["account"]["id"]
+
+    def after(conn: Connection) -> None:
+        assert count(conn, "transactions", USER_A) == 1
+        assert count(conn, "transactions", USER_B) == 0
+        assert count(conn, "sync_items", USER_B) == 0
+
+    return Case(
+        "POST",
+        "/accounts/import",
+        404,
+        form={"account_id": account},
+        files={"file": ("b.csv", b"Date,Description,Amount\n2026-10-02,B,-2.00\n", "text/csv")},
+        after=after,
+    )
+
+
 def list_transactions(
     connection: Connection, client_as: Callable[[FixtureUser], TestClient]
 ) -> Case:
@@ -467,6 +491,7 @@ ROUTE_CASES: dict[tuple[str, str], Builder] = {
     ("POST", "/sync/items/{item_id}/sync"): sync_item,
     ("GET", "/accounts"): list_accounts,
     ("PATCH", "/accounts/{account_id}"): update_account,
+    ("POST", "/accounts/import"): import_csv,
     ("GET", "/transactions"): list_transactions,
     ("PATCH", "/transactions/{transaction_id}"): update_transaction,
     ("GET", "/jobs/{job_id}"): get_job,
