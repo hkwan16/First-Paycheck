@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import { FormIcon, GrowthIcon, HealthIcon, UmbrellaIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { IconTile } from '@/components/ui/IconTile';
-import { CALCULATOR_KINDS, CALCULATOR_LABELS } from '@/lib/decisions';
+import { CALCULATOR_KINDS, CALCULATOR_LABELS, type DecisionSaveState } from '@/lib/decisions';
 import type { Hue } from '@/lib/design/tone';
 import type { CalculatorId } from '@/lib/features';
 
@@ -108,5 +109,29 @@ export function PlaceholderCard({ calculator, live }: PlaceholderCardProps) {
         {live ? 'Coming in a later milestone.' : 'This calculator arrives after the alpha.'}
       </p>
     </DecisionCard>
+  );
+}
+
+export interface SaveButtonProps {
+  state: DecisionSaveState;
+  /** The result on screen is the calculator's for exactly these inputs (`useCalc().isCurrent`). */
+  canSave: boolean;
+  saving?: boolean;
+  onSave: () => void;
+}
+
+/**
+ * A card's save action: "Save this decision", "Save as v3", or the pressed
+ * "Saved as v2" once what is on screen is the current version.
+ */
+export function SaveButton({ state, canSave, saving = false, onSave }: SaveButtonProps) {
+  return state.status === 'saved' ? (
+    <Button variant="confirmed" pressed onClick={onSave}>
+      {state.action}
+    </Button>
+  ) : (
+    <Button variant="primary" disabled={!canSave} loading={saving} onClick={onSave}>
+      {state.action}
+    </Button>
   );
 }

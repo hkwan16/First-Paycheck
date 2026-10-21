@@ -10,9 +10,8 @@ import { Notice } from '@/components/ui/Notice';
 import { Range } from '@/components/ui/Range';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Tile } from '@/components/ui/Tile';
-import { apiErrorCode, apiErrorMessage } from '@/lib/api/errors';
+import { apiErrorMessage } from '@/lib/api/errors';
 import {
-  ResultMismatch,
   useCalc,
   useDecisions,
   usePayStubs,
@@ -35,25 +34,14 @@ import {
 import { toneText } from '@/lib/design/tone';
 import { formatRate } from '@/lib/money';
 import { whyRoute } from '@/lib/routes';
-import { CALCULATOR_CARDS, DecisionCard } from './DecisionCard';
-import { matchHeadline, saveBadgeTone, tiersText } from './decision-format';
+import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
+import { matchHeadline, saveBadgeTone, saveErrorText, tiersText } from './decision-format';
 import { K401Notices, K401ResultRows } from './K401Result';
 import { needsPlanDetails, payFrequencyOf } from './plan-details';
 import { PlanDetailsForm } from './PlanDetailsForm';
 
 const CALC_PATH = '/calc/401k-match';
 const SLIDER_MAX = 15;
-
-/** Why a save failed, as a sentence. */
-function saveErrorText(error: unknown): string {
-  if (error instanceof ResultMismatch) {
-    return "The calculator's numbers had changed since they were shown. They are up to date now: check them and save again.";
-  }
-  if (apiErrorCode(error) === 'decision_conflict') {
-    return 'This decision was saved somewhere else since you opened it, so the latest version is loaded. Save again to replace it with these numbers.';
-  }
-  return apiErrorMessage(error, 'Could not save this decision. Try again.');
-}
 
 interface Ready {
   profile: Profile;
@@ -291,15 +279,7 @@ function Calculator({
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {state.status === 'saved' ? (
-          <Button variant="confirmed" pressed onClick={onSave}>
-            {state.action}
-          </Button>
-        ) : (
-          <Button variant="primary" disabled={!calc.isCurrent} loading={saving} onClick={onSave}>
-            {state.action}
-          </Button>
-        )}
+        <SaveButton state={state} canSave={calc.isCurrent} saving={saving} onSave={onSave} />
         <div className="flex flex-wrap items-center gap-3">
           <Button size="sm" onClick={onEditPlan}>
             Change plan details

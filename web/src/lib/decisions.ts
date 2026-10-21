@@ -2,6 +2,8 @@ import type {
   CalculatorKind,
   Decision,
   DecisionList,
+  EmergencyFundInput,
+  HealthPlansInput,
   K401MatchInput,
   K401MatchResult,
   PayFrequency,
@@ -140,6 +142,50 @@ export function asK401Inputs(inputs: Record<string, unknown>): K401MatchInput | 
     isText(inputs.filing_status) &&
     isInt(inputs.age);
   return ok ? (inputs as unknown as K401MatchInput) : null;
+}
+
+/** A saved `emergency_fund` decision's inputs, or null when they are not that shape. */
+export function asEmergencyFundInputs(inputs: Record<string, unknown>): EmergencyFundInput | null {
+  const ok = (
+    [
+      'monthly_essentials_cents',
+      'target_months',
+      'current_balance_cents',
+      'monthly_contribution_cents',
+      'pay_periods_per_year',
+    ] as const
+  ).every((key) => isInt(inputs[key]));
+  return ok ? (inputs as unknown as EmergencyFundInput) : null;
+}
+
+const PLAN_KINDS = new Set(['hdhp', 'ppo', 'hmo']);
+const USAGES = new Set(['low', 'medium', 'high']);
+
+const isPlanOption = (value: unknown) =>
+  isRecord(value) &&
+  isText(value.name) &&
+  PLAN_KINDS.has(value.kind as string) &&
+  isInt(value.premium_per_period_cents) &&
+  isInt(value.deductible_cents) &&
+  isText(value.coinsurance_pct) &&
+  isInt(value.oop_max_cents) &&
+  isInt(value.employer_hsa_cents);
+
+/** A saved `health_plans` decision's inputs, or null when they are not that shape. */
+export function asHealthPlansInputs(inputs: Record<string, unknown>): HealthPlansInput | null {
+  const ok =
+    Array.isArray(inputs.plans) &&
+    inputs.plans.length > 0 &&
+    inputs.plans.every(isPlanOption) &&
+    isInt(inputs.pay_periods_per_year) &&
+    isInt(inputs.salary_cents) &&
+    isText(inputs.filing_status) &&
+    isInt(inputs.tax_year) &&
+    isInt(inputs.employee_hsa_cents) &&
+    USAGES.has(inputs.expected_usage as string) &&
+    (inputs.selected_plan_index === null || isInt(inputs.selected_plan_index)) &&
+    (inputs.enrollment_deadline === null || isText(inputs.enrollment_deadline));
+  return ok ? (inputs as unknown as HealthPlansInput) : null;
 }
 
 const RESULT_CENTS = [

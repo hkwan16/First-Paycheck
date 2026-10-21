@@ -1,8 +1,10 @@
-import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { GrowthIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/Badge';
-import { DecisionCard, PlaceholderCard } from './DecisionCard';
+import { decisionSaveState } from '@/lib/decisions';
+import { sampleDecision, sampleK401 } from '@/test/fixtures/decisions';
+import { DecisionCard, PlaceholderCard, SaveButton } from './DecisionCard';
 
 describe('DecisionCard', () => {
   it('is a region named by its heading, with the status badge beside it', () => {
@@ -46,6 +48,50 @@ describe('PlaceholderCard', () => {
     render(<PlaceholderCard calculator="health_plan" live={false} />);
     expect(screen.getByRole('region', { name: 'Health plan' })).toHaveTextContent(
       'Which plan costs less at the care you expect.',
+    );
+  });
+});
+
+describe('SaveButton', () => {
+  const current = sampleDecision();
+
+  it('saves only when the result is current, and is pressed once saved', () => {
+    const onSave = vi.fn();
+    const { rerender } = render(
+      <SaveButton state={decisionSaveState(undefined, null)} canSave={false} onSave={onSave} />,
+    );
+    expect(screen.getByRole('button', { name: 'Save this decision' })).toBeDisabled();
+
+    rerender(
+      <SaveButton
+        state={decisionSaveState(current, sampleK401(6).inputs)}
+        canSave
+        onSave={onSave}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save as v2' }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <SaveButton
+        state={decisionSaveState(current, current.inputs)}
+        canSave={false}
+        onSave={onSave}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Saved as v1' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('is busy while saving', () => {
+    render(
+      <SaveButton state={decisionSaveState(undefined, null)} canSave saving onSave={() => {}} />,
+    );
+    expect(screen.getByRole('button', { name: 'Save this decision' })).toHaveAttribute(
+      'aria-busy',
+      'true',
     );
   });
 });
