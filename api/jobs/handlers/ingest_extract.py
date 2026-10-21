@@ -30,7 +30,7 @@ from ingest.reader import UnreadableDocument
 from jobs.context import JobContext
 from jobs.queue import MAX_ATTEMPTS
 from llm.gateway import LLMBudgetExceeded, LLMError, LLMRefused, ModelPage
-from llm.schemas import BenefitsExtraction, PayStubExtraction
+from llm.schemas import BenefitsSummaryExtraction, PayStubExtraction
 
 SKIPPED: dict[str, Any] = {"status": "skipped"}
 
@@ -44,7 +44,7 @@ class DocumentExtractor(Protocol):
 
     def extract_benefits(
         self, user_id: uuid.UUID, pages: Sequence[ModelPage], *, job_id: uuid.UUID | None = None
-    ) -> BenefitsExtraction: ...
+    ) -> BenefitsSummaryExtraction: ...
 
 
 @dataclass(frozen=True)

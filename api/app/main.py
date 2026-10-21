@@ -17,6 +17,7 @@ from app.logs import ensure_logging
 from app.request_log import REQUEST_ID_HEADER, RequestLogging
 from app.routers import (
     accounts,
+    benefits,
     calc,
     calendar,
     cashflow,
@@ -106,6 +107,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(jobs.router)
     app.include_router(docs.router)
     app.include_router(pay_stubs.router)
+    app.include_router(benefits.router)
     app.include_router(profile.router)
     app.include_router(calc.router)
     app.include_router(decisions.router)

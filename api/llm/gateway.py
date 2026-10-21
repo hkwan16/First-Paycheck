@@ -49,7 +49,7 @@ from db.models import LlmCall
 from llm.cost import cost_microcents, price_for
 from llm.prompts import Prompt, load_prompt
 from llm.schemas import (
-    BenefitsExtraction,
+    BenefitsSummaryExtraction,
     CategoryAssignment,
     CategoryBatch,
     ExplainContext,
@@ -62,7 +62,7 @@ log = logging.getLogger(__name__)
 
 CATEGORIZE_PROMPT = ("categorize", "v1")
 EXTRACT_PAY_STUB_PROMPT = ("extract_pay_stub", "v1")
-EXTRACT_BENEFITS_PROMPT = ("extract_benefits", "v1")
+EXTRACT_BENEFITS_PROMPT = ("extract_benefits", "v2")
 EXPLAIN_PROMPT = ("explain", "v1")
 REQUEST_TIMEOUT_SECONDS = 120.0
 MICROCENTS_PER_CENT = 1_000_000
@@ -376,12 +376,13 @@ class Gateway(ABC):
         pages: Sequence[ModelPage],
         *,
         job_id: uuid.UUID | None = None,
-    ) -> BenefitsExtraction:
-        """Read the plan options of a benefits summary from redacted pages (spec 005)."""
+    ) -> BenefitsSummaryExtraction:
+        """Read the plans, the 401(k) match and vesting of a benefits summary from
+        redacted pages (specs 005 and 013)."""
         prompt = load_prompt(*EXTRACT_BENEFITS_PROMPT)
         return self._call(
             prompt,
-            BenefitsExtraction,
+            BenefitsSummaryExtraction,
             user_id=user_id,
             job_id=job_id,
             content=self._pages(pages),
@@ -604,7 +605,7 @@ class FakeGateway(Gateway):
             text = self._categorize(content)
         elif prompt.schema is PayStubExtraction:
             text = self._fixture_text("extract_pay_stub.json")
-        elif prompt.schema is BenefitsExtraction:
+        elif prompt.schema is BenefitsSummaryExtraction:
             text = self._fixture_text("extract_benefits.json")
         elif prompt.schema is ExplanationDraft and isinstance(content, str):
             text = self._explain(content)

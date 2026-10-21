@@ -566,13 +566,23 @@ class BenefitsPlan(Base):
         CheckConstraint("deductible_cents <= oop_max_cents", name="deductible_within_oop_max"),
         CheckConstraint("coinsurance_pct BETWEEN 0 AND 100", name="coinsurance_range"),
         CheckConstraint("employer_hsa_cents >= 0", name="employer_hsa_non_negative"),
+        CheckConstraint("position >= 0", name="position_non_negative"),
         Index("ix_benefits_plans_user_id", "user_id"),
+        Index(
+            "uq_benefits_plans_document_position",
+            "document_id",
+            "position",
+            unique=True,
+            postgresql_where=text("document_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = _id()
     user_id: Mapped[uuid.UUID] = _owner()
     # Null when the plan was entered by hand.
     document_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    # The plan's place in its summary's list, from 0 (spec 013 rule 14).
+    position: Mapped[int] = mapped_column(SmallInteger, server_default=text("0"))
     name: Mapped[str] = mapped_column(Text)
     kind: Mapped[PlanKind] = mapped_column(pg_enum(PlanKind, "plan_kind"))
     premium_per_period_cents: Mapped[int] = mapped_column(BigInteger)

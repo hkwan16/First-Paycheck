@@ -153,9 +153,26 @@
             "title": "Coinsurance Pct",
             "type": "string"
           },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
           "deductible_cents": {
             "title": "Deductible Cents",
             "type": "integer"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
           },
           "employer_hsa_cents": {
             "title": "Employer Hsa Cents",
@@ -196,6 +213,7 @@
         },
         "required": [
           "id",
+          "document_id",
           "name",
           "kind",
           "premium_per_period_cents",
@@ -203,7 +221,8 @@
           "oop_max_cents",
           "coinsurance_pct",
           "employer_hsa_cents",
-          "enrollment_deadline"
+          "enrollment_deadline",
+          "created_at"
         ],
         "title": "BenefitsPlanOut",
         "type": "object"
@@ -216,9 +235,18 @@
               "$ref": "#/components/schemas/PlanValues"
             },
             "maxItems": 20,
-            "minItems": 1,
             "title": "Plans",
             "type": "array"
+          },
+          "retirement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RetirementValues"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -647,12 +675,17 @@
             },
             "title": "Plans",
             "type": "array"
+          },
+          "profile_updated": {
+            "title": "Profile Updated",
+            "type": "boolean"
           }
         },
         "required": [
           "document",
           "pay_stub",
-          "plans"
+          "plans",
+          "profile_updated"
         ],
         "title": "Confirmed",
         "type": "object"
@@ -3265,7 +3298,7 @@
       },
       "Proposal": {
         "additionalProperties": false,
-        "description": "``documents.proposal`` (spec 005 outputs).",
+        "description": "``documents.proposal`` (spec 005 outputs, spec 013 rules 7-9).",
         "properties": {
           "fields": {
             "items": {
@@ -3274,11 +3307,26 @@
             "title": "Fields",
             "type": "array"
           },
+          "kind": {
+            "enum": [
+              "pay_stub",
+              "benefits"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
           "line_items": {
             "items": {
               "$ref": "#/components/schemas/LineItem"
             },
             "title": "Line Items",
+            "type": "array"
+          },
+          "match_tiers": {
+            "items": {
+              "$ref": "#/components/schemas/TierProposal"
+            },
+            "title": "Match Tiers",
             "type": "array"
           },
           "notes": {
@@ -3306,6 +3354,16 @@
             "title": "Source Lines",
             "type": "array"
           },
+          "vesting_years": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedField"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "withheld_pages": {
             "items": {
               "type": "integer"
@@ -3314,6 +3372,9 @@
             "type": "array"
           }
         },
+        "required": [
+          "kind"
+        ],
         "title": "Proposal",
         "type": "object"
       },
@@ -3340,7 +3401,8 @@
               "money",
               "date",
               "text",
-              "percent"
+              "percent",
+              "number"
             ],
             "title": "Kind",
             "type": "string"
@@ -3538,6 +3600,38 @@
         ],
         "title": "RecurringUserStatus",
         "type": "string"
+      },
+      "RetirementValues": {
+        "additionalProperties": false,
+        "description": "The confirmed 401(k) formula and vesting (spec 013 rule 10).",
+        "properties": {
+          "match_tiers": {
+            "items": {
+              "$ref": "#/components/schemas/MatchTier-Input"
+            },
+            "maxItems": 5,
+            "title": "Match Tiers",
+            "type": "array"
+          },
+          "vesting_years": {
+            "anyOf": [
+              {
+                "maximum": 10.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vesting Years"
+          }
+        },
+        "required": [
+          "match_tiers"
+        ],
+        "title": "RetirementValues",
+        "type": "object"
       },
       "RoleTotals": {
         "properties": {
@@ -3849,6 +3943,24 @@
         ],
         "title": "SyncStatus",
         "type": "string"
+      },
+      "TierProposal": {
+        "additionalProperties": false,
+        "description": "One 401(k) match tier: ``employee_pct_upto`` (computed) and ``employer_pct``.",
+        "properties": {
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedField"
+            },
+            "title": "Fields",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "title": "TierProposal",
+        "type": "object"
       },
       "TransactionOut": {
         "properties": {
@@ -4376,6 +4488,47 @@
         "summary": "Update Account",
         "tags": [
           "accounts"
+        ]
+      }
+    },
+    "/benefits-plans": {
+      "get": {
+        "description": "The user's confirmed plans: the most recently confirmed summary first, each\nsummary's plans in the order it lists them.",
+        "operationId": "list_benefits_plans",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BenefitsPlanOut"
+                  },
+                  "title": "Response List Benefits Plans",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Benefits Plans",
+        "tags": [
+          "benefits"
         ]
       }
     },

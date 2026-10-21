@@ -14,15 +14,15 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Annotated, Literal, Protocol, Self
+from typing import Annotated, Any, Literal, Protocol, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from calc.k401 import MAX_TIERS, MatchTier, cumulative_bounds, tiers_ascending
 from calc.pay_stub import PayStubAmounts, total_cents
 from calc.types import Cents, Percent, PositiveCents
 from llm.schemas import (
-    BenefitsExtraction,
-    ExtractedField,
+    BenefitsSummaryExtraction,
     LineItem,
     PayFrequencyValue,
     PayStubExtraction,
@@ -36,7 +36,8 @@ NO_OTHER_DEDUCTIONS = "No other deductions listed"
 OTHER_DEDUCTIONS = "other_deductions_cents"
 DEDUCTION_KINDS = frozenset({"tax", "pre_tax_deduction", "post_tax_deduction"})
 
-FieldKind = Literal["money", "date", "text", "percent"]
+FieldKind = Literal["money", "date", "text", "percent", "number"]
+ProposalKind = Literal["pay_stub", "benefits"]
 FieldRole = Literal["gross", "deduction", "net", "info"]
 FieldValue = int | str | None
 
@@ -50,9 +51,12 @@ __all__ = [
     "PlanProposal",
     "PlanValues",
     "Proposal",
+    "ProposalKind",
     "ProposedField",
+    "RetirementValues",
     "SourceLine",
     "SourcePage",
+    "TierProposal",
     "benefits_proposal",
     "benefits_text",
     "manual_entry_proposal",
@@ -96,6 +100,10 @@ PLAN_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("employer_hsa_cents", "Employer HSA contribution", "money"),
     FieldSpec("enrollment_deadline", "Enrollment deadline", "date"),
 )
+TIER_BOUND = FieldSpec("employee_pct_upto", "Matched up to (% of pay)", "percent")
+TIER_SHARE = FieldSpec("employer_pct", "Employer match", "percent")
+VESTING = FieldSpec("vesting_years", "Years to full vesting", "number")
+_HUNDREDTH = Decimal("0.01")
 
 
 # ---------------------------------------------------------------- proposal
@@ -129,15 +137,30 @@ class PlanProposal(_Model):
     fields: list[ProposedField]
 
 
-class Proposal(_Model):
-    """``documents.proposal`` (spec 005 outputs)."""
+class TierProposal(_Model):
+    """One 401(k) match tier: ``employee_pct_upto`` (computed) and ``employer_pct``."""
 
+    fields: list[ProposedField]
+
+
+class Proposal(_Model):
+    """``documents.proposal`` (spec 005 outputs, spec 013 rules 7-9)."""
+
+    kind: ProposalKind
     fields: list[ProposedField] = Field(default_factory=list)
     line_items: list[LineItem] = Field(default_factory=list)
     plans: list[PlanProposal] = Field(default_factory=list)
+    match_tiers: list[TierProposal] = Field(default_factory=list)
+    vesting_years: ProposedField | None = None
     source_lines: list[SourceLine] = Field(default_factory=list)
     withheld_pages: list[int] = Field(default_factory=list)
     notes: str | None = None
+
+    @classmethod
+    def stored(cls, data: dict[str, Any], document_type: str) -> Proposal:
+        """A stored proposal; one saved before M6 has no ``kind``, so the
+        document's type fills it."""
+        return cls.model_validate({"kind": document_type, **data})
 
 
 class PageLines(Protocol):
@@ -148,6 +171,19 @@ class PageLines(Protocol):
 
     @property
     def lines(self) -> Sequence[str]: ...
+
+
+class Reading(Protocol):
+    """One value the model read; every ``llm.schemas.ExtractedField`` is one."""
+
+    @property
+    def value(self) -> object: ...
+
+    @property
+    def confidence(self) -> float: ...
+
+    @property
+    def source_text(self) -> str | None: ...
 
 
 @dataclass(frozen=True)
@@ -165,10 +201,11 @@ def pay_stub_proposal(
         if spec.key == OTHER_DEDUCTIONS:
             fields.append(_other_deductions(spec, extraction.line_items))
             continue
-        extracted: ExtractedField[object] = getattr(extraction, spec.key)
+        extracted: Reading = getattr(extraction, spec.key)
         fields.append(_proposed(spec, extracted))
         sources[spec.key] = extracted.source_text
     return Proposal(
+        kind="pay_stub",
         fields=fields,
         line_items=extraction.line_items,
         source_lines=_link(_source_lines(pages), fields, sources),
@@ -178,10 +215,15 @@ def pay_stub_proposal(
 
 
 def benefits_proposal(
-    extraction: BenefitsExtraction, pages: Sequence[PageLines], withheld_pages: Sequence[int]
+    extraction: BenefitsSummaryExtraction,
+    pages: Sequence[PageLines],
+    withheld_pages: Sequence[int],
 ) -> Proposal:
     return Proposal(
+        kind="benefits",
         plans=[_plan(plan) for plan in extraction.plans],
+        match_tiers=_tiers(extraction),
+        vesting_years=_proposed(VESTING, extraction.vesting_years),
         source_lines=_source_lines(pages),
         withheld_pages=list(withheld_pages),
         notes=extraction.notes,
@@ -193,14 +235,20 @@ def manual_entry_proposal(
 ) -> Proposal:
     """Rule 12: the redacted lines to type from, and nothing filled in."""
     if document_type == "pay_stub":
-        fields = [_empty(spec) for spec in PAY_STUB_FIELDS]
-    elif document_type == "benefits":
-        fields = []
-    else:
-        raise ValueError(f"no proposal for document type {document_type!r}")
-    return Proposal(
-        fields=fields, source_lines=_source_lines(pages), withheld_pages=list(withheld_pages)
-    )
+        return Proposal(
+            kind="pay_stub",
+            fields=[_empty(spec) for spec in PAY_STUB_FIELDS],
+            source_lines=_source_lines(pages),
+            withheld_pages=list(withheld_pages),
+        )
+    if document_type == "benefits":
+        return Proposal(
+            kind="benefits",
+            vesting_years=_empty(VESTING),
+            source_lines=_source_lines(pages),
+            withheld_pages=list(withheld_pages),
+        )
+    raise ValueError(f"no proposal for document type {document_type!r}")
 
 
 def benefits_text(proposal: Proposal) -> str:
@@ -208,7 +256,7 @@ def benefits_text(proposal: Proposal) -> str:
     return "\n".join(line.text for line in proposal.source_lines)
 
 
-def _proposed(spec: FieldSpec, extracted: ExtractedField[object]) -> ProposedField:
+def _proposed(spec: FieldSpec, extracted: Reading) -> ProposedField:
     value = _field_value(spec.kind, extracted.value)
     return ProposedField(
         key=spec.key,
@@ -238,8 +286,8 @@ def _field_value(kind: FieldKind, value: object) -> FieldValue:
         return None
     if isinstance(value, dt.date):
         return value.isoformat()
-    if kind == "percent" and isinstance(value, int | float):
-        return str(Decimal(str(value)).quantize(Decimal("0.01")))
+    if kind == "percent" and isinstance(value, int | float | Decimal):
+        return str(Decimal(str(value)).quantize(_HUNDREDTH))
     if isinstance(value, int | str):
         return value
     raise TypeError(f"unexpected {kind} value {value!r}")
@@ -268,6 +316,36 @@ def _other_deductions(spec: FieldSpec, line_items: Sequence[LineItem]) -> Propos
 
 def _plan(plan: PlanExtraction) -> PlanProposal:
     return PlanProposal(fields=[_proposed(spec, getattr(plan, spec.key)) for spec in PLAN_FIELDS])
+
+
+def _tiers(extraction: BenefitsSummaryExtraction) -> list[TierProposal]:
+    """Spec 013 rule 8: the printed bands become cumulative bounds, in code."""
+    tiers: list[TierProposal] = []
+    bands: list[Decimal] = []
+    confidence = 1.0
+    complete = True
+    for index, tier in enumerate(extraction.match_tiers):
+        band = tier.band_pct.value
+        if band is None or band <= 0:
+            complete = False
+        if complete and band is not None:
+            band_pct = Decimal(str(band)).quantize(_HUNDREDTH)
+            bands.append(band_pct)
+            confidence = min(confidence, tier.band_pct.confidence)
+            upto = cumulative_bounds(bands)[-1]
+            bound = ProposedField(
+                key=TIER_BOUND.key,
+                label=TIER_BOUND.label,
+                value=_field_value("percent", upto),
+                confidence=confidence,
+                note=f"Cumulative: {band_pct}% added to the tiers before it" if index else None,
+                kind=TIER_BOUND.kind,
+                role=TIER_BOUND.role,
+            )
+        else:
+            bound = _empty(TIER_BOUND).model_copy(update={"note": NOT_FOUND})
+        tiers.append(TierProposal(fields=[bound, _proposed(TIER_SHARE, tier.employer_pct)]))
+    return tiers
 
 
 def _source_lines(pages: Sequence[PageLines]) -> list[SourceLine]:
@@ -367,13 +445,37 @@ class PlanValues(BaseModel):
     enrollment_deadline: dt.date | None
 
     @model_validator(mode="after")
-    def _deductible_within_oop_max(self) -> Self:
+    def _consistent(self) -> Self:
         if self.deductible_cents > self.oop_max_cents:
             raise ValueError("deductible_cents must not exceed oop_max_cents")
+        if self.employer_hsa_cents > 0 and self.kind != "hdhp":
+            # The health plan calculator's rule (spec 012 rule 12, spec 013 rule 11).
+            raise ValueError("employer_hsa_cents must be 0 unless kind is hdhp")
+        return self
+
+
+class RetirementValues(BaseModel):
+    """The confirmed 401(k) formula and vesting (spec 013 rule 10)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    match_tiers: list[MatchTier] = Field(max_length=MAX_TIERS)
+    vesting_years: int | None = Field(default=None, ge=0, le=10, strict=True)
+
+    @model_validator(mode="after")
+    def _tiers_ascending(self) -> Self:
+        tiers_ascending(self.match_tiers)
         return self
 
 
 class BenefitsValues(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    plans: list[PlanValues] = Field(min_length=1, max_length=20)
+    plans: list[PlanValues] = Field(max_length=20)
+    retirement: RetirementValues | None = None
+
+    @model_validator(mode="after")
+    def _something_to_store(self) -> Self:
+        if not self.plans and self.retirement is None:
+            raise ValueError("give at least one plan or the retirement part")
+        return self

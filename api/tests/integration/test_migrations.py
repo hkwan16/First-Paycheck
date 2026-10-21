@@ -132,3 +132,37 @@ def test_current_user_id_reads_the_jwt_claims(scratch_database: tuple[str, Engin
             {"claims": f'{{"sub": "{user_id}"}}'},
         )
         assert str(connection.execute(text("SELECT public.current_user_id()")).scalar()) == user_id
+
+
+def test_0008_numbers_existing_plans_in_list_order(scratch_database: tuple[str, Engine]) -> None:
+    url, engine = scratch_database
+    upgrade(url, "0005_checkins")
+    user = "00000000-0000-4000-8000-0000000000c1"
+    document = "00000000-0000-4000-8000-0000000000d1"
+    plan = text(
+        "INSERT INTO benefits_plans (user_id, document_id, name, kind,"
+        " premium_per_period_cents, deductible_cents, oop_max_cents, coinsurance_pct,"
+        " created_at) VALUES (:u, :d, :name, 'ppo', 0, 0, 0, 10, :at)"
+    )
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO auth.users (id) VALUES (:u)"), {"u": user})
+        connection.execute(
+            text(
+                "INSERT INTO documents (id, user_id, type, content_type, size_bytes)"
+                " VALUES (:d, :u, 'benefits', 'application/pdf', 1)"
+            ),
+            {"d": document, "u": user},
+        )
+        for name, at, owner in [
+            ("Second", "2026-10-02", document),
+            ("First", "2026-10-01", document),
+            ("By hand", "2026-10-03", None),
+        ]:
+            connection.execute(plan, {"u": user, "d": owner, "name": name, "at": at})
+
+    upgrade(url, "head")
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text("SELECT name, position FROM benefits_plans ORDER BY name")
+        ).all()
+    assert [tuple(row) for row in rows] == [("By hand", 0), ("First", 0), ("Second", 1)]

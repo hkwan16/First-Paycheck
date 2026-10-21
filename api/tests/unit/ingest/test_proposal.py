@@ -15,6 +15,7 @@ from ingest.proposal import (
     BenefitsValues,
     PayStubValues,
     PlanValues,
+    Proposal,
     SourcePage,
     benefits_proposal,
     benefits_text,
@@ -22,11 +23,11 @@ from ingest.proposal import (
     pay_stub_proposal,
 )
 from llm.gateway import FAKE_FIXTURES
-from llm.schemas import BenefitsExtraction, LineItem, PayStubExtraction, PlanExtraction
+from llm.schemas import BenefitsSummaryExtraction, LineItem, PayStubExtraction, PlanExtraction
 from tests.support.documents import ACME_STUB_LINES
 
 STUB = PayStubExtraction.model_validate_json((FAKE_FIXTURES / "extract_pay_stub.json").read_text())
-BENEFITS = BenefitsExtraction.model_validate_json(
+BENEFITS = BenefitsSummaryExtraction.model_validate_json(
     (FAKE_FIXTURES / "extract_benefits.json").read_text()
 )
 REDACTED_LINES = [
@@ -217,6 +218,58 @@ def test_benefits_proposal_has_one_entry_per_plan() -> None:
     assert {f.role for plan in proposal.plans for f in plan.fields} == {"info"}
 
 
+def test_every_proposal_names_its_kind() -> None:
+    """Spec 013 rule 7, including proposals stored before M6."""
+    assert pay_stub_proposal(STUB, PAGES, withheld_pages=[]).kind == "pay_stub"
+    assert benefits_proposal(BENEFITS, PAGES, withheld_pages=[]).kind == "benefits"
+    assert manual_entry_proposal("benefits", [], withheld_pages=[]).kind == "benefits"
+    legacy = benefits_proposal(BENEFITS, PAGES, withheld_pages=[]).model_dump(mode="json")
+    del legacy["kind"], legacy["match_tiers"], legacy["vesting_years"]
+    restored = Proposal.stored(legacy, "benefits")
+    assert (restored.kind, restored.match_tiers, restored.vesting_years) == ("benefits", [], None)
+    stored = benefits_proposal(BENEFITS, PAGES, withheld_pages=[]).model_dump(mode="json")
+    assert Proposal.stored(stored, "pay_stub").kind == "benefits"
+
+
+def test_benefits_proposal_computes_cumulative_tiers() -> None:
+    proposal = benefits_proposal(BENEFITS, PAGES, withheld_pages=[])
+    first, second = (by_key(tier.fields) for tier in proposal.match_tiers)
+    assert (first["employee_pct_upto"].value, first["employee_pct_upto"].confidence) == (
+        "3.00",
+        0.9,
+    )
+    assert first["employee_pct_upto"].note is None
+    assert (second["employee_pct_upto"].value, second["employee_pct_upto"].confidence) == (
+        "5.00",
+        0.8,
+    )
+    assert second["employee_pct_upto"].note == "Cumulative: 2.00% added to the tiers before it"
+    assert (first["employer_pct"].value, second["employer_pct"].value) == ("100.00", "50.00")
+    assert {f.kind for tier in proposal.match_tiers for f in tier.fields} == {"percent"}
+    assert proposal.vesting_years is not None
+    assert (proposal.vesting_years.value, proposal.vesting_years.kind) == (3, "number")
+
+
+def test_benefits_proposal_with_a_missing_band() -> None:
+    missing = BENEFITS.match_tiers[1].model_copy(
+        update={"band_pct": BENEFITS.match_tiers[1].band_pct.model_copy(update={"value": None})}
+    )
+    extraction = BENEFITS.model_copy(
+        update={"match_tiers": [BENEFITS.match_tiers[0], missing, BENEFITS.match_tiers[0]]}
+    )
+    tiers = [by_key(t.fields) for t in benefits_proposal(extraction, PAGES, []).match_tiers]
+    assert [t["employee_pct_upto"].value for t in tiers] == ["3.00", None, None]
+    assert tiers[1]["employee_pct_upto"].note == "Not found on the document"
+    assert tiers[2]["employee_pct_upto"].note == "Not found on the document"
+
+
+def test_manual_entry_benefits_proposal_has_an_empty_retirement_part() -> None:
+    proposal = manual_entry_proposal("benefits", PAGES, withheld_pages=[])
+    assert (proposal.plans, proposal.match_tiers) == ([], [])
+    assert proposal.vesting_years is not None
+    assert proposal.vesting_years.value is None
+
+
 def test_benefits_text_joins_the_redacted_lines() -> None:
     proposal = benefits_proposal(BENEFITS, [SourcePage(1, ["Plan A", "SSN [REDACTED]"])], [])
     assert benefits_text(proposal) == "Plan A\nSSN [REDACTED]"
@@ -297,5 +350,34 @@ def test_plan_values() -> None:
         PlanValues.model_validate({**PLAN, "deductible_cents": 400_000})
     with pytest.raises(ValidationError):
         PlanValues.model_validate({**PLAN, "coinsurance_pct": "100.5"})
-    with pytest.raises(ValidationError):
-        BenefitsValues.model_validate({"plans": []})
+    with pytest.raises(ValidationError, match="employer_hsa_cents"):
+        PlanValues.model_validate({**PLAN, "employer_hsa_cents": 50_000})
+    hdhp = PlanValues.model_validate({**PLAN, "kind": "hdhp", "employer_hsa_cents": 50_000})
+    assert hdhp.employer_hsa_cents == 50_000
+
+
+def test_benefits_values() -> None:
+    """Spec 013 rule 10: plans, a retirement part, or both."""
+    tiers = [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"},
+    ]
+    both = BenefitsValues.model_validate(
+        {"plans": [PLAN], "retirement": {"match_tiers": tiers, "vesting_years": 3}}
+    )
+    assert both.retirement is not None
+    assert both.retirement.vesting_years == 3
+    alone = BenefitsValues.model_validate({"plans": [], "retirement": {"match_tiers": tiers}})
+    assert alone.retirement is not None
+    assert alone.retirement.vesting_years is None
+    assert BenefitsValues.model_validate({"plans": [PLAN]}).retirement is None
+    bad: dict[str, Any]
+    for bad in (
+        {"plans": []},
+        {"plans": [], "retirement": None},
+        {"plans": [], "retirement": {"match_tiers": tiers[::-1]}},
+        {"plans": [], "retirement": {"match_tiers": tiers, "vesting_years": 11}},
+        {"plans": [PLAN] * 21},
+    ):
+        with pytest.raises(ValidationError):
+            BenefitsValues.model_validate(bad)

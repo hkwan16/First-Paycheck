@@ -298,6 +298,25 @@ def confirm_document(
     return Case("POST", f"/docs/{document}/confirm", 404, json={"pay_stub": values}, after=after)
 
 
+def list_benefits_plans(
+    connection: Connection, client_as: Callable[[FixtureUser], TestClient]
+) -> Case:
+    document = a_document(connection, type="benefits", with_blob=False)
+    connection.execute(
+        text(
+            "INSERT INTO benefits_plans (user_id, document_id, name, kind,"
+            " premium_per_period_cents, deductible_cents, oop_max_cents, coinsurance_pct)"
+            " VALUES (:u, :d, 'Gold PPO', 'ppo', 6250, 50000, 300000, 10)"
+        ),
+        {"u": USER_A.id, "d": document},
+    )
+
+    def body(data: Any) -> None:
+        assert data == []
+
+    return Case("GET", "/benefits-plans", 200, body=body)
+
+
 def list_pay_stubs(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
     make_pay_stub(connection, USER_A.id, a_document(connection, with_blob=False))
 
@@ -563,6 +582,7 @@ ROUTE_CASES: dict[tuple[str, str], Builder] = {
     ("POST", "/docs/{document_id}/extract"): extract_document,
     ("POST", "/docs/{document_id}/confirm"): confirm_document,
     ("GET", "/pay-stubs"): list_pay_stubs,
+    ("GET", "/benefits-plans"): list_benefits_plans,
     ("GET", "/profile"): get_profile,
     ("PUT", "/profile"): put_profile,
     ("POST", "/sync/link-token"): link_token,

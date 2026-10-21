@@ -39,7 +39,7 @@ from llm.gateway import (
     get_gateway,
 )
 from llm.schemas import (
-    BenefitsExtraction,
+    BenefitsSummaryExtraction,
     CategoryBatch,
     ExplainCitation,
     ExplainContext,
@@ -433,9 +433,10 @@ def test_extract_benefits_uses_its_own_prompt(
     answer = json.loads((FAKE_FIXTURES / "extract_benefits.json").read_text())
     api = Api(ok(answer))
     benefits = gateway(db_connection, api).extract_benefits(user_a.id, [PAGES[1]])
-    assert benefits == BenefitsExtraction.model_validate(answer)
-    assert "plans" in api.requests[0]["output_config"]["format"]["schema"]["properties"]
-    assert ledger(db_connection, user_a)[0]["prompt_version"] == "extract_benefits/v1"
+    assert benefits == BenefitsSummaryExtraction.model_validate(answer)
+    properties = api.requests[0]["output_config"]["format"]["schema"]["properties"]
+    assert {"plans", "match_tiers", "vesting_years"} <= set(properties)
+    assert ledger(db_connection, user_a)[0]["prompt_version"] == "extract_benefits/v2"
 
 
 def test_extract_with_no_pages_sends_and_records_nothing(
@@ -460,9 +461,11 @@ def test_fake_extracts_from_fixtures(db_connection: Connection, user_a: FixtureU
     assert stub.net_cents.value == 199_604
     benefits = fake(db_connection).extract_benefits(user_a.id, PAGES)
     assert [plan.kind.value for plan in benefits.plans] == ["hdhp", "ppo"]
+    assert [tier.band_pct.value for tier in benefits.match_tiers] == [3, 2]
+    assert benefits.vesting_years.value == 3
     # Both rows carry the same frozen timestamp, so compare without order.
     assert sorted(row["prompt_version"] for row in ledger(db_connection, user_a)) == [
-        "extract_benefits/v1",
+        "extract_benefits/v2",
         "extract_pay_stub/v1",
     ]
 

@@ -8,11 +8,14 @@
 * ``calendar_kind`` gains ``goal_contribution`` and ``goal_review``. Postgres
   cannot drop an enum value, so the downgrade deletes those events and
   rebuilds the type with its 0004 labels.
+* ``benefits_plans.position`` keeps a summary's plans in the order it lists
+  them (spec 013 rule 14); existing rows are numbered by ``created_at, id``.
 * ``profiles.birth_year`` settles spec 006 open question 2. The lower bound is
   a CHECK; the upper bound (the current year) is the route's, because a CHECK
   cannot read the clock.
 
-No new table or function: ``goals``, ``calendar_events`` and ``profiles`` keep
+No new table or function: ``goals``, ``calendar_events``, ``benefits_plans`` and
+``profiles`` keep
 the owner policies and grants their own migrations gave them.
 
 Revision ID: 0008_goals_and_birth_year
@@ -73,9 +76,35 @@ def upgrade() -> None:
     op.create_check_constraint(
         op.f("ck_profiles_birth_year_after_1900"), "profiles", "birth_year >= 1900"
     )
+    op.add_column(
+        "benefits_plans",
+        sa.Column("position", sa.SmallInteger(), server_default=sa.text("0"), nullable=False),
+    )
+    op.execute(
+        "UPDATE benefits_plans AS plan SET position = numbered.position"
+        " FROM (SELECT id, row_number() OVER"
+        " (PARTITION BY document_id ORDER BY created_at, id) - 1 AS position"
+        " FROM benefits_plans WHERE document_id IS NOT NULL) AS numbered"
+        " WHERE plan.id = numbered.id"
+    )
+    op.create_check_constraint(
+        op.f("ck_benefits_plans_position_non_negative"), "benefits_plans", "position >= 0"
+    )
+    op.create_index(
+        "uq_benefits_plans_document_position",
+        "benefits_plans",
+        ["document_id", "position"],
+        unique=True,
+        postgresql_where=sa.text("document_id IS NOT NULL"),
+    )
 
 
 def downgrade() -> None:
+    op.drop_index("uq_benefits_plans_document_position", table_name="benefits_plans")
+    op.drop_constraint(
+        op.f("ck_benefits_plans_position_non_negative"), "benefits_plans", type_="check"
+    )
+    op.drop_column("benefits_plans", "position")
     op.drop_constraint(op.f("ck_profiles_birth_year_after_1900"), "profiles", type_="check")
     op.drop_column("profiles", "birth_year")
     op.execute(

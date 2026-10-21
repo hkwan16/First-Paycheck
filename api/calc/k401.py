@@ -37,9 +37,11 @@ __all__ = [
     "K401MatchResult",
     "MatchTier",
     "PayPeriods",
+    "cumulative_bounds",
     "deferral_limit_cents",
     "k401_match",
     "tiers_ascending",
+    "tiers_from_bands",
 ]
 
 MAX_TIERS = 5
@@ -73,6 +75,30 @@ def tiers_ascending(tiers: Sequence[MatchTier]) -> None:
     uptos = [tier.employee_pct_upto for tier in tiers]
     if any(later <= earlier for earlier, later in pairwise(uptos)):
         raise ValueError("match_tiers must have strictly ascending employee_pct_upto")
+
+
+def cumulative_bounds(bands: Sequence[Decimal]) -> list[Decimal]:
+    """Each tier's upper bound: its band plus every band before it (spec 013 rule 8).
+    Exact ``Decimal`` sums; a band must be positive."""
+    bounds: list[Decimal] = []
+    upto = _ZERO
+    for band in bands:
+        if band <= 0:
+            raise ValueError(f"a match band must be positive, not {band}")
+        upto += band
+        bounds.append(upto)
+    return bounds
+
+
+def tiers_from_bands(bands: Sequence[tuple[Decimal, Decimal]]) -> list[MatchTier]:
+    """``(band, share)`` pairs as a summary prints them ("100% of the first 3%,
+    50% of the next 2%") become cumulative tiers (3@100, 5@50). Raises
+    ``ValueError`` when the result is not a valid formula."""
+    bounds = cumulative_bounds([band for band, _ in bands])
+    return [
+        MatchTier(employee_pct_upto=upto, employer_pct=share)
+        for upto, (_, share) in zip(bounds, bands, strict=True)
+    ]
 
 
 class K401MatchInput(BaseModel):
