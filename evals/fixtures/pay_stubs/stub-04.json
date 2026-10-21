@@ -1,0 +1,25 @@
+{
+  "account_number": "845570883634",
+  "content_type": "image/png",
+  "fields": {
+    "employer_name": "Cedar Health Partners",
+    "federal_withholding_cents": 73376,
+    "gross_cents": 562500,
+    "medical_premium_cents": null,
+    "medicare_cents": 8156,
+    "net_cents": 372968,
+    "other_deductions_cents": 0,
+    "pay_date": "2026-06-30",
+    "pay_frequency": "monthly",
+    "period_end": "2026-06-30",
+    "period_start": "2026-06-01",
+    "retirement_contribution_cents": 45000,
+    "social_security_cents": 34875,
+    "state_tax_cents": 28125
+  },
+  "file": "stub-04.png",
+  "id": "stub-04",
+  "layout": "summary",
+  "output": "png",
+  "ssn": "915-49-2489"
+}

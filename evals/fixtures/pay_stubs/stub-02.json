@@ -1,0 +1,25 @@
+{
+  "account_number": "492567378397",
+  "content_type": "application/pdf",
+  "fields": {
+    "employer_name": "Northwind Analytics LLC",
+    "federal_withholding_cents": 24091,
+    "gross_cents": 247115,
+    "medical_premium_cents": null,
+    "medicare_cents": 3583,
+    "net_cents": 188113,
+    "other_deductions_cents": 1180,
+    "pay_date": "2026-02-06",
+    "pay_frequency": "weekly",
+    "period_end": "2026-02-06",
+    "period_start": "2026-01-31",
+    "retirement_contribution_cents": 14827,
+    "social_security_cents": 15321,
+    "state_tax_cents": null
+  },
+  "file": "stub-02.pdf",
+  "id": "stub-02",
+  "layout": "summary",
+  "output": "text_pdf",
+  "ssn": null
+}

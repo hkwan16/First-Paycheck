@@ -7,7 +7,8 @@
 ``llm`` (suites that call Claude) or ``all``. It can be repeated.
 
 Exit codes: 0 every metric meets its baseline; 1 a regression or a suite with
-no baseline; 2 the cost cap was hit or the arguments are wrong.
+no baseline; 2 the cost cap was hit, a suite cannot run here (no API key) or the
+arguments are wrong.
 
 Deterministic suites must match their baseline exactly; LLM suites may drop up
 to 2 points. ``--update-baseline`` rewrites the baseline from this run; commit
@@ -23,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from evals.suites import SUITES
-from evals.suites.base import Budget, CostCapExceeded, Suite, SuiteResult
+from evals.suites.base import Budget, CostCapExceeded, Suite, SuiteResult, SuiteUnavailable
 
 DEFAULT_BASELINE = Path(__file__).resolve().parent / "baseline.json"
 DETERMINISTIC_TOLERANCE = 0.0
@@ -107,6 +108,9 @@ def main(argv: Sequence[str] | None = None, *, registry: Mapping[str, Suite] = S
             result = suite.run(budget)
         except CostCapExceeded as exc:
             print(f"{suite.name}: stopped, {exc}")
+            return 2
+        except SuiteUnavailable as exc:
+            print(f"{suite.name}: unavailable, {exc}")
             return 2
         tolerance = LLM_TOLERANCE if suite.llm else DETERMINISTIC_TOLERANCE
         if args.update_baseline:

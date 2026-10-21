@@ -73,7 +73,7 @@ Take a document the user uploads (a pay stub, an offer letter or a benefits summ
 ### Retention
 
 20. Confirming a document deletes its blob and sets `deleted_at` in the confirm transaction (spec 005).
-21. Every scheduler tick (spec 002 rule 36) runs `store.expire_unconfirmed(now)` on the privileged connection: every document not `confirmed`, not yet deleted, and created more than 7 days before `now` loses its blob and becomes `failed` with `status_reason = 'expired'` and `deleted_at = now`. The tick reports the count as `expired`. The same tick deletes `rate_limit_counters` rows whose window ended more than a day earlier.
+21. Every scheduler tick (spec 002 rule 36) runs `store.expire_unconfirmed(now)` on the privileged connection: every document not `confirmed`, not yet deleted, and created more than 7 days before `now` loses its blob and becomes `failed` with `status_reason = 'expired'` and `deleted_at = now`. The tick reports the count as `expired`. The same tick deletes `rate_limit_counters` rows whose window started more than a day before `now` (`app/ratelimit.py:prune_counters`).
 
 ### Documents table and statuses
 

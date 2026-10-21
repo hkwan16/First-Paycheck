@@ -1,0 +1,25 @@
+{
+  "account_number": null,
+  "content_type": "image/png",
+  "fields": {
+    "employer_name": "Bluebird Robotics Inc",
+    "federal_withholding_cents": 32913,
+    "gross_cents": 283333,
+    "medical_premium_cents": 6250,
+    "medicare_cents": 4108,
+    "net_cents": 210222,
+    "other_deductions_cents": 940,
+    "pay_date": "2026-09-30",
+    "pay_frequency": "semimonthly",
+    "period_end": "2026-09-30",
+    "period_start": "2026-09-16",
+    "retirement_contribution_cents": 11333,
+    "social_security_cents": 17567,
+    "state_tax_cents": null
+  },
+  "file": "stub-03.png",
+  "id": "stub-03",
+  "layout": "ledger",
+  "output": "png",
+  "ssn": "953-51-1398"
+}
