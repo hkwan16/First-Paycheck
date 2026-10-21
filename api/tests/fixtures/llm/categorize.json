@@ -1,0 +1,12 @@
+{
+  "blue bottle coffee": {"category": "dining", "confidence": 0.94},
+  "netflix.com": {"category": "subscriptions", "confidence": 0.97},
+  "amzn mktp us": {"category": "shopping", "confidence": 0.88},
+  "joes diner": {"category": "dining", "confidence": 0.9},
+  "uber sf pool": {"category": "transport", "confidence": 0.92},
+  "touchstone climbing": {"category": "personal_care", "confidence": 0.71},
+  "acme corp payroll": {"category": "income", "confidence": 0.95},
+  "city of springfield utilities": {"category": "utilities", "confidence": 0.89},
+  "corner bodega": {"category": "groceries", "confidence": 0.62},
+  "venmo payment": {"category": "transfer", "confidence": 0.58}
+}
