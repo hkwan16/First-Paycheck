@@ -14,7 +14,11 @@ from calc.k401 import K401MatchInput, K401MatchResult
 from llm.schemas import ExplanationDraft, NumberClaim
 from verify.format import dollars, percent
 
-__all__ = ["fallback_draft"]
+__all__ = ["FALLBACK_VERSION", "fallback_draft"]
+
+# Stored as a fallback row's prompt_version: the text comes from this module,
+# not a prompt, so a change to it is a new version here.
+FALLBACK_VERSION = "fallback/v1"
 
 K401_CONCEPT = "Your employer's 401(k) match and what it costs you to earn all of it."
 

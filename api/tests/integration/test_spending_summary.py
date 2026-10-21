@@ -1,0 +1,231 @@
+"""GET /spending/summary on a hand-built month (spec 007 part B)."""
+
+from __future__ import annotations
+
+import datetime as dt
+import uuid
+from collections.abc import Callable
+from typing import Any
+
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy import Connection
+
+from app.db import user_session_for
+from app.deps import get_now
+from db.enums import CategorySource
+from db.models import Account
+from sync.categories import CATEGORIES, CATEGORY_BUCKETS
+from tests.conftest import FixtureUser
+from tests.support.factories import (
+    make_account,
+    make_document,
+    make_item,
+    make_pay_stub,
+    make_transaction,
+)
+
+Client = Callable[[FixtureUser], TestClient]
+NOW = dt.datetime(2026, 10, 21, 15, 0, tzinfo=dt.UTC)
+SEPTEMBER = {"start": "2026-09-01", "end": "2026-09-30"}
+
+
+@pytest.fixture
+def frozen(app: FastAPI) -> FastAPI:
+    app.dependency_overrides[get_now] = lambda: NOW
+    return app
+
+
+@pytest.fixture
+def account(db_connection: Connection, user_a: FixtureUser) -> uuid.UUID:
+    return make_account(db_connection, user_a.id, make_item(db_connection, user_a.id))
+
+
+def spend(
+    connection: Connection,
+    user: FixtureUser,
+    account: uuid.UUID,
+    amount_cents: int,
+    category: str | None,
+    day: dt.date = dt.date(2026, 9, 10),
+    **fields: Any,
+) -> None:
+    make_transaction(
+        connection,
+        user.id,
+        account,
+        amount_cents=amount_cents,
+        posted_at=day,
+        category=category,
+        category_source=CategorySource.USER if category else None,
+        **fields,
+    )
+
+
+def september(connection: Connection, user: FixtureUser, account: uuid.UUID) -> None:
+    """The spec's month: every row of spec 007's spending example."""
+    spend(connection, user, account, -199_604, "income", dt.date(2026, 9, 15))
+    spend(connection, user, account, -199_604, "income", dt.date(2026, 9, 30))
+    spend(connection, user, account, 150_000, "housing", dt.date(2026, 9, 1))
+    spend(connection, user, account, 32_000, "groceries")
+    spend(connection, user, account, -2_000, "groceries")
+    spend(connection, user, account, 8_500, "dining")
+    spend(connection, user, account, 40_000, "savings_investment")
+    spend(connection, user, account, 25_000, "transfer")
+    spend(connection, user, account, 3_900, "fees")
+    spend(connection, user, account, 1_200, None)
+    spend(connection, user, account, 9_999, "dining", pending=True)
+    spend(connection, user, account, 5_000, "dining", dt.date(2026, 8, 31))
+    for pay_date in (dt.date(2026, 9, 15), dt.date(2026, 9, 30), dt.date(2026, 10, 15)):
+        document = make_document(connection, user.id, with_blob=False)
+        make_pay_stub(connection, user.id, document, pay_date=pay_date)
+
+
+def test_the_spec_month(
+    frozen: FastAPI,
+    client_as: Client,
+    user_a: FixtureUser,
+    account: uuid.UUID,
+    db_connection: Connection,
+) -> None:
+    september(db_connection, user_a, account)
+    response = client_as(user_a).get("/spending/summary", params=SEPTEMBER)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert {key: value for key, value in body.items() if key != "category_buckets"} == {
+        "start": "2026-09-01",
+        "end": "2026-09-30",
+        "income_cents": 399_208,
+        "essentials_cents": 180_000,
+        "flexible_cents": 8_500,
+        "savings_cents": 40_000,
+        "other_cents": 3_900,
+        "transfers_ignored_cents": 25_000,
+        "uncategorized_cents": 1_200,
+        "left_over_cents": 166_808,
+        "essentials_pct": "45.1",
+        "flexible_pct": "2.1",
+        "savings_rate_pct": "10.0",
+        "transaction_count": 10,
+        "uncategorized_count": 1,
+        "paycheck_count": 2,
+        "categories": [
+            {"category": "income", "bucket": "income", "total_cents": 399_208, "count": 2},
+            {"category": "transfer", "bucket": "transfer", "total_cents": 25_000, "count": 1},
+            {"category": "housing", "bucket": "essentials", "total_cents": 150_000, "count": 1},
+            {"category": "groceries", "bucket": "essentials", "total_cents": 30_000, "count": 2},
+            {"category": "dining", "bucket": "flexible", "total_cents": 8_500, "count": 1},
+            {"category": "fees", "bucket": "other", "total_cents": 3_900, "count": 1},
+            {
+                "category": "savings_investment",
+                "bucket": "savings",
+                "total_cents": 40_000,
+                "count": 1,
+            },
+        ],
+    }
+    assert body["category_buckets"] == dict(CATEGORY_BUCKETS)
+    assert list(body["category_buckets"]) == list(CATEGORIES)
+
+
+def test_defaults_to_the_last_complete_month(
+    frozen: FastAPI,
+    client_as: Client,
+    user_a: FixtureUser,
+    account: uuid.UUID,
+    db_connection: Connection,
+) -> None:
+    september(db_connection, user_a, account)
+    body = client_as(user_a).get("/spending/summary").json()
+    assert (body["start"], body["end"]) == ("2026-09-01", "2026-09-30")
+    assert body["income_cents"] == 399_208
+
+
+def test_january_defaults_to_last_december(
+    app: FastAPI, client_as: Client, user_a: FixtureUser
+) -> None:
+    app.dependency_overrides[get_now] = lambda: dt.datetime(2027, 1, 1, 0, 0, tzinfo=dt.UTC)
+    body = client_as(user_a).get("/spending/summary").json()
+    assert (body["start"], body["end"]) == ("2026-12-01", "2026-12-31")
+
+
+def test_inactive_accounts_are_left_out(
+    frozen: FastAPI,
+    client_as: Client,
+    user_a: FixtureUser,
+    account: uuid.UUID,
+    db_connection: Connection,
+) -> None:
+    spend(db_connection, user_a, account, 8_500, "dining")
+    with user_session_for(user_a.id, bind=db_connection) as session:
+        session.get_one(Account, account).is_active = False
+    body = client_as(user_a).get("/spending/summary", params=SEPTEMBER).json()
+    assert (body["flexible_cents"], body["transaction_count"]) == (0, 0)
+
+
+def test_an_empty_period(frozen: FastAPI, client_as: Client, user_a: FixtureUser) -> None:
+    body = client_as(user_a).get("/spending/summary", params=SEPTEMBER).json()
+    assert body["categories"] == []
+    assert body["income_cents"] == body["left_over_cents"] == body["transaction_count"] == 0
+    assert body["essentials_pct"] is None
+    assert body["savings_rate_pct"] is None
+    assert len(body["category_buckets"]) == len(CATEGORIES)
+
+
+def test_no_income_gives_null_percentages(
+    frozen: FastAPI,
+    client_as: Client,
+    user_a: FixtureUser,
+    account: uuid.UUID,
+    db_connection: Connection,
+) -> None:
+    spend(db_connection, user_a, account, 8_500, "dining")
+    body = client_as(user_a).get("/spending/summary", params=SEPTEMBER).json()
+    assert body["left_over_cents"] == -8_500
+    assert (body["essentials_pct"], body["flexible_pct"], body["savings_rate_pct"]) == (
+        None,
+        None,
+        None,
+    )
+
+
+def test_another_users_transactions_are_invisible(
+    frozen: FastAPI,
+    client_as: Client,
+    user_a: FixtureUser,
+    user_b: FixtureUser,
+    account: uuid.UUID,
+    db_connection: Connection,
+) -> None:
+    september(db_connection, user_a, account)
+    body = client_as(user_b).get("/spending/summary", params=SEPTEMBER).json()
+    assert (body["transaction_count"], body["paycheck_count"]) == (0, 0)
+
+
+@pytest.mark.parametrize(
+    ("params", "message"),
+    [
+        ({"start": "2026-09-01"}, "both"),
+        ({"end": "2026-09-30"}, "both"),
+        ({"start": "2026-09-30", "end": "2026-09-01"}, "after"),
+        ({"start": "2025-01-01", "end": "2026-01-02"}, "366"),
+        ({"start": "september", "end": "2026-09-30"}, "start"),
+    ],
+)
+def test_bad_periods_are_422(
+    frozen: FastAPI, client_as: Client, user_a: FixtureUser, params: dict[str, str], message: str
+) -> None:
+    response = client_as(user_a).get("/spending/summary", params=params)
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+    assert message in response.json()["error"]["message"]
+
+
+def test_a_full_leap_year_is_allowed(
+    frozen: FastAPI, client_as: Client, user_a: FixtureUser
+) -> None:
+    response = client_as(user_a).get(
+        "/spending/summary", params={"start": "2028-01-01", "end": "2028-12-31"}
+    )
+    assert response.status_code == 200

@@ -237,6 +237,106 @@
         "title": "Body_upload_document",
         "type": "object"
       },
+      "CalculatorDecisions": {
+        "properties": {
+          "calculator": {
+            "$ref": "#/components/schemas/CalculatorKind"
+          },
+          "current": {
+            "$ref": "#/components/schemas/DecisionOut"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionVersion"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "calculator",
+          "current",
+          "versions"
+        ],
+        "title": "CalculatorDecisions",
+        "type": "object"
+      },
+      "CalculatorKind": {
+        "enum": [
+          "emergency_fund",
+          "k401_match",
+          "health_plans",
+          "w4"
+        ],
+        "title": "CalculatorKind",
+        "type": "string"
+      },
+      "CalendarEventOut": {
+        "properties": {
+          "decision_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id"
+          },
+          "due_at": {
+            "format": "date",
+            "title": "Due At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CalendarKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalendarStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "due_at",
+          "decision_id",
+          "status"
+        ],
+        "title": "CalendarEventOut",
+        "type": "object"
+      },
+      "CalendarKind": {
+        "enum": [
+          "enrollment_deadline",
+          "tax_season",
+          "open_enrollment",
+          "goal_target",
+          "election_check"
+        ],
+        "title": "CalendarKind",
+        "type": "string"
+      },
+      "CalendarStatus": {
+        "enum": [
+          "upcoming",
+          "done",
+          "dismissed"
+        ],
+        "title": "CalendarStatus",
+        "type": "string"
+      },
       "CategoryFix": {
         "properties": {
           "relabeled": {
@@ -312,6 +412,75 @@
         "title": "CategorySource",
         "type": "string"
       },
+      "CategoryTotal": {
+        "properties": {
+          "bucket": {
+            "enum": [
+              "income",
+              "essentials",
+              "flexible",
+              "savings",
+              "other",
+              "transfer"
+            ],
+            "title": "Bucket",
+            "type": "string"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "total_cents": {
+            "title": "Total Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "category",
+          "bucket",
+          "total_cents",
+          "count"
+        ],
+        "title": "CategoryTotal",
+        "type": "object"
+      },
+      "CitationOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "passage": {
+            "title": "Passage",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "url",
+          "passage",
+          "source"
+        ],
+        "title": "CitationOut",
+        "type": "object"
+      },
       "ConfirmIn": {
         "additionalProperties": false,
         "description": "Exactly one of ``pay_stub`` or ``benefits``, matching the document's type.",
@@ -369,6 +538,237 @@
           "plans"
         ],
         "title": "Confirmed",
+        "type": "object"
+      },
+      "DecisionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "calculator": {
+            "$ref": "#/components/schemas/CalculatorKind"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "title": "Inputs",
+            "type": "object"
+          },
+          "result": {
+            "additionalProperties": true,
+            "title": "Result",
+            "type": "object"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          }
+        },
+        "required": [
+          "calculator",
+          "inputs",
+          "result"
+        ],
+        "title": "DecisionIn",
+        "type": "object"
+      },
+      "DecisionList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CalculatorDecisions"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "DecisionList",
+        "type": "object"
+      },
+      "DecisionOut": {
+        "properties": {
+          "calculator": {
+            "$ref": "#/components/schemas/CalculatorKind"
+          },
+          "check_in_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check In Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "title": "Inputs",
+            "type": "object"
+          },
+          "is_current": {
+            "title": "Is Current",
+            "type": "boolean"
+          },
+          "result": {
+            "additionalProperties": true,
+            "title": "Result",
+            "type": "object"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "supersedes_id",
+          "created_at",
+          "calculator",
+          "check_in_id",
+          "inputs",
+          "result",
+          "is_current"
+        ],
+        "title": "DecisionOut",
+        "type": "object"
+      },
+      "DecisionSaved": {
+        "properties": {
+          "calculator": {
+            "$ref": "#/components/schemas/CalculatorKind"
+          },
+          "calendar_event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calendar Event Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decision_id": {
+            "format": "uuid",
+            "title": "Decision Id",
+            "type": "string"
+          },
+          "goal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Id"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "decision_id",
+          "calculator",
+          "version",
+          "supersedes_id",
+          "created_at",
+          "calendar_event_id",
+          "goal_id"
+        ],
+        "title": "DecisionSaved",
+        "type": "object"
+      },
+      "DecisionVersion": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "supersedes_id",
+          "created_at"
+        ],
+        "title": "DecisionVersion",
         "type": "object"
       },
       "DocumentCreated": {
@@ -634,6 +1034,115 @@
           "error"
         ],
         "title": "ErrorResponse",
+        "type": "object"
+      },
+      "ExplainIn": {
+        "additionalProperties": false,
+        "properties": {
+          "decision_id": {
+            "format": "uuid",
+            "title": "Decision Id",
+            "type": "string"
+          },
+          "force": {
+            "default": false,
+            "title": "Force",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "decision_id"
+        ],
+        "title": "ExplainIn",
+        "type": "object"
+      },
+      "ExplanationOut": {
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/CitationOut"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "concept": {
+            "title": "Concept",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decision_id": {
+            "format": "uuid",
+            "title": "Decision Id",
+            "type": "string"
+          },
+          "fallback": {
+            "title": "Fallback",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "numbers": {
+            "items": {
+              "$ref": "#/components/schemas/NumberClaim"
+            },
+            "title": "Numbers",
+            "type": "array"
+          },
+          "prompt_version": {
+            "title": "Prompt Version",
+            "type": "string"
+          },
+          "retries": {
+            "title": "Retries",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/VerificationOut"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          },
+          "what_ifs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "What Ifs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "decision_id",
+          "concept",
+          "text",
+          "numbers",
+          "what_ifs",
+          "citations",
+          "verified",
+          "fallback",
+          "attempt",
+          "retries",
+          "prompt_version",
+          "verification",
+          "created_at"
+        ],
+        "title": "ExplanationOut",
         "type": "object"
       },
       "ExtractionQueued": {
@@ -1179,6 +1688,28 @@
           "employer_pct"
         ],
         "title": "MatchTier",
+        "type": "object"
+      },
+      "NumberClaim": {
+        "additionalProperties": false,
+        "description": "A figure the explanation states, for the UI to show beside the text.",
+        "properties": {
+          "label": {
+            "description": "What the number is, in a few words",
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "description": "The number exactly as written in the text, e.g. $2,400.00",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "NumberClaim",
         "type": "object"
       },
       "OtherJob": {
@@ -1994,6 +2525,141 @@
         "title": "SourceLine",
         "type": "object"
       },
+      "SpendingSummary": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryTotal"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "category_buckets": {
+            "additionalProperties": {
+              "enum": [
+                "income",
+                "essentials",
+                "flexible",
+                "savings",
+                "other",
+                "transfer"
+              ],
+              "type": "string"
+            },
+            "title": "Category Buckets",
+            "type": "object"
+          },
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "essentials_cents": {
+            "title": "Essentials Cents",
+            "type": "integer"
+          },
+          "essentials_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Essentials Pct"
+          },
+          "flexible_cents": {
+            "title": "Flexible Cents",
+            "type": "integer"
+          },
+          "flexible_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flexible Pct"
+          },
+          "income_cents": {
+            "title": "Income Cents",
+            "type": "integer"
+          },
+          "left_over_cents": {
+            "title": "Left Over Cents",
+            "type": "integer"
+          },
+          "other_cents": {
+            "title": "Other Cents",
+            "type": "integer"
+          },
+          "paycheck_count": {
+            "title": "Paycheck Count",
+            "type": "integer"
+          },
+          "savings_cents": {
+            "title": "Savings Cents",
+            "type": "integer"
+          },
+          "savings_rate_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Savings Rate Pct"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "transaction_count": {
+            "title": "Transaction Count",
+            "type": "integer"
+          },
+          "transfers_ignored_cents": {
+            "title": "Transfers Ignored Cents",
+            "type": "integer"
+          },
+          "uncategorized_cents": {
+            "title": "Uncategorized Cents",
+            "type": "integer"
+          },
+          "uncategorized_count": {
+            "title": "Uncategorized Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "income_cents",
+          "essentials_cents",
+          "flexible_cents",
+          "savings_cents",
+          "other_cents",
+          "transfers_ignored_cents",
+          "uncategorized_cents",
+          "left_over_cents",
+          "essentials_pct",
+          "flexible_pct",
+          "savings_rate_pct",
+          "transaction_count",
+          "uncategorized_count",
+          "paycheck_count",
+          "categories",
+          "category_buckets"
+        ],
+        "title": "SpendingSummary",
+        "type": "object"
+      },
       "SyncItemOut": {
         "properties": {
           "created_at": {
@@ -2248,6 +2914,45 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "VerificationOut": {
+        "properties": {
+          "citations_checked": {
+            "title": "Citations Checked",
+            "type": "integer"
+          },
+          "citations_unknown": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Citations Unknown",
+            "type": "array"
+          },
+          "has_citation": {
+            "title": "Has Citation",
+            "type": "boolean"
+          },
+          "numbers_checked": {
+            "title": "Numbers Checked",
+            "type": "integer"
+          },
+          "numbers_unmatched": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Numbers Unmatched",
+            "type": "array"
+          }
+        },
+        "required": [
+          "numbers_checked",
+          "numbers_unmatched",
+          "citations_checked",
+          "citations_unknown",
+          "has_citation"
+        ],
+        "title": "VerificationOut",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -2438,6 +3143,297 @@
         "summary": "Calc 401K Match",
         "tags": [
           "calc"
+        ]
+      }
+    },
+    "/calendar": {
+      "get": {
+        "description": "Upcoming events, soonest first; done and dismissed ones stay for the plan export.",
+        "operationId": "list_calendar",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalendarEventOut"
+                  },
+                  "title": "Response List Calendar",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Calendar",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/decisions": {
+      "get": {
+        "description": "The current decision and the version history of every calculator.",
+        "operationId": "list_decisions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Decisions",
+        "tags": [
+          "decisions"
+        ]
+      },
+      "post": {
+        "description": "Save the result the user picked as a new decision version.",
+        "operationId": "save_decision",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionSaved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Save Decision",
+        "tags": [
+          "decisions"
+        ]
+      }
+    },
+    "/decisions/{decision_id}": {
+      "get": {
+        "description": "One decision version; another user's id is 404.",
+        "operationId": "get_decision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Decision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Decision",
+        "tags": [
+          "decisions"
+        ]
+      }
+    },
+    "/decisions/{decision_id}/explanation": {
+      "get": {
+        "description": "The decision's latest explanation; 404 when it has none.",
+        "operationId": "get_explanation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Decision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplanationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Explanation",
+        "tags": [
+          "explain"
         ]
       }
     },
@@ -2804,6 +3800,83 @@
         ]
       }
     },
+    "/explain": {
+      "post": {
+        "description": "Explain a decision; returns the existing verified explanation unless ``force``.",
+        "operationId": "explain",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplanationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Explain",
+        "tags": [
+          "explain"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "description": "The running commit and the database's migration revision. No auth.",
@@ -3035,6 +4108,93 @@
         "summary": "Put Profile",
         "tags": [
           "profile"
+        ]
+      }
+    },
+    "/spending/summary": {
+      "get": {
+        "description": "Income, spending by bucket and what is left over; the last full UTC month by default.",
+        "operationId": "spending_summary",
+        "parameters": [
+          {
+            "description": "First day, inclusive",
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First day, inclusive",
+              "title": "Start"
+            }
+          },
+          {
+            "description": "Last day, inclusive",
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last day, inclusive",
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpendingSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Spending Summary",
+        "tags": [
+          "spending"
         ]
       }
     },

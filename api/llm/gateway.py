@@ -78,6 +78,7 @@ Clock = Callable[[], dt.datetime]
 Content = str | list[ContentBlockParam]
 
 __all__ = [
+    "REFUSAL_REPLY",
     "CategorizeItem",
     "DbLedger",
     "FakeGateway",
@@ -94,9 +95,13 @@ __all__ = [
     "LedgerEntry",
     "MemoryLedger",
     "ModelPage",
+    "Reply",
+    "ScriptStep",
+    "ScriptedGateway",
     "TextPage",
     "Usage",
     "get_gateway",
+    "reply_with",
 ]
 
 
@@ -648,6 +653,41 @@ class FakeGateway(Gateway):
             log.warning("FakeGateway: %s is missing; every merchant is 'other'", path)
             return {}
         return data
+
+
+ScriptStep = Reply | LLMError | None
+REFUSAL_REPLY = Reply(stop_reason="refusal", text=None, usage=Usage())
+
+
+def reply_with(answer: BaseModel) -> Reply:
+    """A model reply whose text is ``answer`` as JSON."""
+    return Reply(stop_reason="end_turn", text=answer.model_dump_json(), usage=Usage())
+
+
+class ScriptedGateway(FakeGateway):
+    """A ``FakeGateway`` that answers each call with the next step of a script.
+
+    A ``Reply`` is returned as the model's reply (so refusals and bad JSON go
+    through the real branches), an ``LLMError`` is raised as the API's failure,
+    and ``None`` gives ``FakeGateway``'s own answer. For flow tests and the
+    ``explain-smoke`` eval; ``contents`` keeps what each call sent.
+    """
+
+    def __init__(self, settings: Settings, *, script: Sequence[ScriptStep], **kwargs: Any) -> None:
+        super().__init__(settings, **kwargs)
+        self._script = list(script)
+        self.contents: list[Content] = []
+
+    def _send(self, prompt: Prompt, model: str, content: Content) -> Reply:
+        self.contents.append(content)
+        if not self._script:
+            raise LLMError(f"ScriptedGateway: the script is exhausted at {prompt.version}")
+        step = self._script.pop(0)
+        if isinstance(step, LLMError):
+            raise step
+        if step is None:
+            return super()._send(prompt, model, content)
+        return step
 
 
 def _fake_default() -> dict[str, Any]:

@@ -291,7 +291,116 @@ def put_profile(connection: Connection, client_as: Callable[[FixtureUser], TestC
     return Case("PUT", "/profile", 200, json={"salary_cents": 1}, after=a_profile_unchanged)
 
 
+K401_INPUTS: dict[str, Any] = {
+    "salary_cents": 6_000_000,
+    "pay_periods_per_year": 26,
+    "match_tiers": [{"employee_pct_upto": "3", "employer_pct": "100"}],
+    "contribution_pct": "3",
+    "tax_year": 2026,
+    "filing_status": "single",
+    "age": 30,
+}
+
+
+def a_decision(client_as: Callable[[FixtureUser], TestClient], *, explained: bool = False) -> str:
+    """A's saved 401(k) decision (with its calendar event), saved through the API."""
+    client = client_as(USER_A)
+    result = client.post("/calc/401k-match", json=K401_INPUTS).json()
+    saved = client.post(
+        "/decisions",
+        json={"calculator": "k401_match", "inputs": K401_INPUTS, "result": result},
+    )
+    assert saved.status_code == 201, saved.text
+    decision_id: str = saved.json()["decision_id"]
+    if explained:
+        assert client.post("/explain", json={"decision_id": decision_id}).status_code == 200
+    return decision_id
+
+
+def a_decisions_unchanged(conn: Connection) -> None:
+    assert count(conn, "decisions", USER_A) == 1
+    assert count(conn, "decisions", USER_B) == 0
+    assert count(conn, "calendar_events", USER_B) == 0
+
+
+def save_decision(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    decision = a_decision(client_as)
+    inputs = {**K401_INPUTS, "contribution_pct": "4"}
+    result = client_as(USER_B).post("/calc/401k-match", json=inputs).json()
+    body = {
+        "calculator": "k401_match",
+        "inputs": inputs,
+        "result": result,
+        "supersedes_id": decision,
+    }
+    return Case("POST", "/decisions", 404, json=body, after=a_decisions_unchanged)
+
+
+def list_decisions(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    a_decision(client_as)
+
+    def body(data: Any) -> None:
+        assert data == {"items": []}
+
+    return Case("GET", "/decisions", 200, body=body)
+
+
+def get_decision(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    return Case("GET", f"/decisions/{a_decision(client_as)}", 404)
+
+
+def get_explanation(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    decision = a_decision(client_as, explained=True)
+    return Case("GET", f"/decisions/{decision}/explanation", 404)
+
+
+def explain(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    decision = a_decision(client_as, explained=True)
+    before = count(connection, "explanations", USER_A)
+
+    def after(conn: Connection) -> None:
+        assert count(conn, "explanations", USER_A) == before
+        assert count(conn, "explanations", USER_B) == 0
+        assert count(conn, "llm_calls", USER_B) == 0
+
+    return Case("POST", "/explain", 404, json={"decision_id": decision, "force": True}, after=after)
+
+
+def list_calendar(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    a_decision(client_as)
+
+    def body(data: Any) -> None:
+        assert data == []
+
+    return Case("GET", "/calendar", 200, body=body)
+
+
+def spending_summary(
+    connection: Connection, client_as: Callable[[FixtureUser], TestClient]
+) -> Case:
+    account = a_account(connection)
+    make_transaction(connection, USER_A.id, account, posted_at=dt.date(2026, 9, 10))
+    make_pay_stub(
+        connection,
+        USER_A.id,
+        a_document(connection, with_blob=False),
+        pay_date=dt.date(2026, 9, 15),
+    )
+
+    def body(data: Any) -> None:
+        assert (data["transaction_count"], data["paycheck_count"]) == (0, 0)
+
+    return Case("GET", "/spending/summary?start=2026-09-01&end=2026-09-30", 200, body=body)
+
+
 ROUTE_CASES: dict[tuple[str, str], Builder] = {
+    ("POST", "/decisions"): save_decision,
+    ("GET", "/decisions"): list_decisions,
+    ("GET", "/decisions/{decision_id}"): get_decision,
+    ("GET", "/decisions/{decision_id}/explanation"): get_explanation,
+    ("POST", "/explain"): explain,
+    ("GET", "/calendar"): list_calendar,
+    ("GET", "/spending/summary"): spending_summary,
     ("POST", "/docs"): upload_document,
     ("GET", "/docs"): list_documents,
     ("GET", "/docs/{document_id}"): get_document,

@@ -6,7 +6,8 @@ import datetime as dt
 import logging
 import threading
 import weakref
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager
 from functools import lru_cache
 from typing import Annotated
 
@@ -25,6 +26,7 @@ from app.db import (
     user_session,
 )
 from app.errors import AppError
+from llm.gateway import Gateway, LLMNotConfigured, get_gateway
 from sync.crypto import TokenCipher, TokenCipherNotConfigured, cipher_from_settings
 from sync.plaid.client import PlaidClient, PlaidLinking, PlaidNotConfigured
 from sync.plaid.webhook import WebhookKeyCache
@@ -59,6 +61,61 @@ def get_user_session(user: CurrentUser, bind: DbBind) -> Iterator[Session]:
 # scope="function": the transaction commits before the response is sent, so a
 # failed commit becomes an error response instead of a lost write.
 UserSession = Annotated[Session, Depends(get_user_session, scope="function")]
+
+
+UserSessionFactory = Callable[[], AbstractContextManager[Session]]
+
+
+def get_user_session_factory(user: CurrentUser, bind: DbBind) -> UserSessionFactory:
+    """Opens a fresh, committed-on-exit user session on each call.
+
+    For routes that must not hold a transaction across a slow call (the model
+    in ``POST /explain``, spec 008 rule 21): read in one session, call with
+    none open, write in another.
+    """
+    claims = dict(user.claims)
+    return lambda: user_session(claims, bind=bind)
+
+
+UserSessions = Annotated[UserSessionFactory, Depends(get_user_session_factory)]
+
+
+@lru_cache(maxsize=1)
+def _process_gateway() -> Gateway:
+    # One client per process: the SDK keeps a connection pool.
+    return get_gateway(get_settings())
+
+
+GatewayFactory = Callable[[], Gateway]
+
+
+def get_llm_gateway(settings: SettingsDep, bind: DbBind) -> GatewayFactory:
+    """Builds the model gateway when called; 503 ``llm_unavailable`` when it is
+    not configured.
+
+    Lazy, so a route answers what needs no model (a 404, a stored result) even
+    when the model is not configured. Production binds the process engine and
+    shares one gateway; tests bind their transaction's connection, so their
+    gateway writes its ledger there.
+    """
+
+    def build() -> Gateway:
+        try:
+            if isinstance(bind, Engine):
+                return _process_gateway()
+            return get_gateway(settings, bind=bind)
+        except LLMNotConfigured as exc:
+            logger.error("the LLM gateway is not configured: %s", exc)
+            raise AppError(
+                "Explanations are not available right now",
+                code="llm_unavailable",
+                status_code=503,
+            ) from exc
+
+    return build
+
+
+LlmGateway = Annotated[GatewayFactory, Depends(get_llm_gateway)]
 
 
 def get_now() -> dt.datetime:

@@ -140,6 +140,16 @@ def seeded_rules(no_seed_rules: Connection) -> Connection:
 
 
 @pytest.fixture
+def seeded_citations(db_connection: Connection) -> Connection:
+    """Exactly the committed seed file's IRS citations, for this test."""
+    from db.seed.load import load_irs_citations, read_seed_citations
+
+    db_connection.execute(text("DELETE FROM irs_citations"))
+    load_irs_citations(db_connection, read_seed_citations())
+    return db_connection
+
+
+@pytest.fixture
 def user_a(db_connection: Connection) -> FixtureUser:
     return _insert_user(db_connection, USER_A)
 
