@@ -8,6 +8,16 @@
     "source": "IRS Notice 2025-67: 402(g)(1) elective deferral limit $24,500; 414(v)(2)(B)(i) catch-up, age 50 and over, $8,000; 414(v)(2)(E)(i) catch-up, ages 60-63, $11,250; 401(a)(17) annual compensation limit $360,000",
     "url": "https://www.irs.gov/pub/irs-drop/n-25-67.pdf"
   },
+  "hsa": {
+    "self_only_limit_cents": 440000,
+    "family_limit_cents": 875000,
+    "hdhp_min_deductible_self_cents": 170000,
+    "hdhp_min_deductible_family_cents": 340000,
+    "hdhp_max_oop_self_cents": 850000,
+    "hdhp_max_oop_family_cents": 1700000,
+    "source": "Rev. Proc. 2025-19, section 2.01: 223(b)(2) HSA contribution limit $4,400 self-only, $8,750 family; 223(c)(2)(A) high deductible health plan minimum deductible $1,700 self-only, $3,400 family, maximum out-of-pocket $8,500 self-only, $17,000 family",
+    "url": "https://www.irs.gov/pub/irs-drop/rp-25-19.pdf"
+  },
   "standard_deduction": {
     "cents": {
       "single": 1610000,

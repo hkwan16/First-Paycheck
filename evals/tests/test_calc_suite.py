@@ -71,6 +71,16 @@ def test_nested_expectations_compare_as_subsets() -> None:
     assert calc.mismatches({"a": [1, 2]}, {"a": [1, 2]}) == []
 
 
+def test_lists_compare_item_by_item_with_object_items_as_subsets() -> None:
+    actual = {"plans": [{"x": 1, "y": 2}, {"x": 3, "y": 4}]}
+    assert calc.mismatches({"plans": [{"x": 1}, {"y": 4}]}, actual) == []
+    assert calc.mismatches({"plans": [{"x": 1}, {"x": 5}]}, actual) == [
+        "plans[1].x expected 5, got 3"
+    ]
+    assert calc.mismatches({"plans": [{"x": 1}]}, actual) == ["plans expected 1 items, got 2"]
+    assert calc.mismatches({"a": [1]}, {"a": 1}) == ["a expected a list, got 1"]
+
+
 def test_no_cases_is_a_vacuous_pass() -> None:
     result = calc.run(Budget(0), cases=[])
     assert result.metrics == {"pass_rate": 1.0}
@@ -135,7 +145,9 @@ def test_every_spec_006_example_is_a_case() -> None:
 SPECS = Path(__file__).resolve().parents[2] / "docs" / "specs"
 
 
-@pytest.mark.parametrize(("spec", "rows"), [("011-emergency-fund.md", 8)])
+@pytest.mark.parametrize(
+    ("spec", "rows"), [("011-emergency-fund.md", 8), ("012-health-plans.md", 8)]
+)
 def test_every_new_calculator_example_is_a_case(spec: str, rows: int) -> None:
     """Spec 011 and 012 example tables, by test name (`spec-NNN-x-y`)."""
     number = spec[:3]

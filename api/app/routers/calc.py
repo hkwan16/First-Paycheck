@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from app.auth import CurrentUser
 from app.errors import error_responses
 from calc.emergency_fund import EmergencyFundInput, EmergencyFundResult, emergency_fund
+from calc.health_plans import HealthPlansInput, HealthPlansResult, health_plans
 from calc.k401 import K401MatchInput, K401MatchResult, k401_match
 
 router = APIRouter(prefix="/calc", tags=["calc"])
@@ -29,3 +30,13 @@ def calc_emergency_fund(body: EmergencyFundInput, user: CurrentUser) -> Emergenc
     contribution and that contribution per paycheck."""
     del user  # signed-in users only; the calculator reads nothing of theirs
     return emergency_fund(body)
+
+
+@router.post("/health-plans", responses=error_responses(401, 422))
+def calc_health_plans(body: HealthPlansInput, user: CurrentUser) -> HealthPlansResult:
+    """The health plan comparison (spec 012): each plan's expected annual net
+    cost at low, medium and high usage, the HSA tax effect, the break-even
+    spending between each pair of plans and the cheapest plan at the user's
+    expected usage."""
+    del user  # signed-in users only; the calculator reads nothing of theirs
+    return health_plans(body)

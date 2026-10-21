@@ -41,6 +41,7 @@ EXEMPT = {
     ("POST", "/sync/webhook"),
     ("POST", "/calc/401k-match"),
     ("POST", "/calc/emergency-fund"),
+    ("POST", "/calc/health-plans"),
 }
 
 

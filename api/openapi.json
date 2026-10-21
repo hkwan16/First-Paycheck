@@ -1138,6 +1138,136 @@
         "title": "DocumentType",
         "type": "string"
       },
+      "EmergencyFundInput": {
+        "additionalProperties": false,
+        "description": "The calculator's inputs, exactly as spec 011 lists them.",
+        "properties": {
+          "current_balance_cents": {
+            "description": "What the fund holds today",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Current Balance Cents",
+            "type": "integer"
+          },
+          "monthly_contribution_cents": {
+            "description": "What the user adds each month",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Monthly Contribution Cents",
+            "type": "integer"
+          },
+          "monthly_essentials_cents": {
+            "description": "Essential spending per month, as the user confirmed it",
+            "exclusiveMinimum": 0.0,
+            "maximum": 100000000000.0,
+            "title": "Monthly Essentials Cents",
+            "type": "integer"
+          },
+          "pay_periods_per_year": {
+            "enum": [
+              12,
+              24,
+              26,
+              52
+            ],
+            "title": "Pay Periods Per Year",
+            "type": "integer"
+          },
+          "target_months": {
+            "description": "Months of essentials the fund should hold; 3 to 6 is suggested",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "Target Months",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "monthly_essentials_cents",
+          "target_months",
+          "current_balance_cents",
+          "monthly_contribution_cents",
+          "pay_periods_per_year"
+        ],
+        "title": "EmergencyFundInput",
+        "type": "object"
+      },
+      "EmergencyFundResult": {
+        "properties": {
+          "funded": {
+            "title": "Funded",
+            "type": "boolean"
+          },
+          "funded_pct": {
+            "description": "The balance as a share of the target, in percent, at most 100",
+            "title": "Funded Pct",
+            "type": "string"
+          },
+          "horizon_months": {
+            "title": "Horizon Months",
+            "type": "integer"
+          },
+          "months_to_target": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Monthly contributions that close the shortfall; 0 when funded; null when it takes more than horizon_months or never happens",
+            "title": "Months To Target"
+          },
+          "per_paycheck_contribution_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Per Paycheck Contribution Cents",
+            "type": "integer"
+          },
+          "reachable": {
+            "title": "Reachable",
+            "type": "boolean"
+          },
+          "shortfall_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Shortfall Cents",
+            "type": "integer"
+          },
+          "six_month_target_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Six Month Target Cents",
+            "type": "integer"
+          },
+          "target_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Target Cents",
+            "type": "integer"
+          },
+          "three_month_target_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Three Month Target Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "target_cents",
+          "three_month_target_cents",
+          "six_month_target_cents",
+          "shortfall_cents",
+          "funded",
+          "funded_pct",
+          "months_to_target",
+          "reachable",
+          "per_paycheck_contribution_cents",
+          "horizon_months"
+        ],
+        "title": "EmergencyFundResult",
+        "type": "object"
+      },
       "ErrorDetail": {
         "properties": {
           "code": {
@@ -1363,6 +1493,291 @@
           "worker"
         ],
         "title": "Health",
+        "type": "object"
+      },
+      "HealthPlanOption": {
+        "additionalProperties": false,
+        "description": "One plan the employer offers, employee-only coverage, in network.",
+        "properties": {
+          "coinsurance_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "The member's share after the deductible",
+            "title": "Coinsurance Pct"
+          },
+          "deductible_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Deductible Cents",
+            "type": "integer"
+          },
+          "employer_hsa_cents": {
+            "description": "The employer's annual HSA contribution",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Employer Hsa Cents",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "hdhp",
+              "ppo",
+              "hmo"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "oop_max_cents": {
+            "description": "The out-of-pocket maximum",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Oop Max Cents",
+            "type": "integer"
+          },
+          "premium_per_period_cents": {
+            "description": "The employee's premium per paycheck",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Premium Per Period Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "premium_per_period_cents",
+          "deductible_cents",
+          "coinsurance_pct",
+          "oop_max_cents",
+          "employer_hsa_cents"
+        ],
+        "title": "HealthPlanOption",
+        "type": "object"
+      },
+      "HealthPlansInput": {
+        "additionalProperties": false,
+        "description": "The calculator's inputs, exactly as spec 012 lists them.",
+        "properties": {
+          "employee_hsa_cents": {
+            "description": "What the user plans to put into an HSA in the year themselves",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Employee Hsa Cents",
+            "type": "integer"
+          },
+          "enrollment_deadline": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last day to enroll; used only when the decision is saved",
+            "title": "Enrollment Deadline"
+          },
+          "expected_usage": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Expected Usage",
+            "type": "string"
+          },
+          "filing_status": {
+            "enum": [
+              "single",
+              "married_filing_jointly",
+              "head_of_household"
+            ],
+            "title": "Filing Status",
+            "type": "string"
+          },
+          "pay_periods_per_year": {
+            "enum": [
+              12,
+              24,
+              26,
+              52
+            ],
+            "title": "Pay Periods Per Year",
+            "type": "integer"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/HealthPlanOption"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Plans",
+            "type": "array"
+          },
+          "salary_cents": {
+            "description": "Annual salary, for the marginal rate",
+            "exclusiveMinimum": 0.0,
+            "maximum": 100000000000.0,
+            "title": "Salary Cents",
+            "type": "integer"
+          },
+          "selected_plan_index": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The plan the user picks",
+            "title": "Selected Plan Index"
+          },
+          "tax_year": {
+            "description": "The pay stub's tax year",
+            "title": "Tax Year",
+            "type": "integer"
+          },
+          "usage_high_cents": {
+            "default": 1000000,
+            "description": "Annual medical spending, high",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Usage High Cents",
+            "type": "integer"
+          },
+          "usage_low_cents": {
+            "default": 50000,
+            "description": "Annual medical spending, low",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Usage Low Cents",
+            "type": "integer"
+          },
+          "usage_medium_cents": {
+            "default": 300000,
+            "description": "Annual medical spending, medium",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Usage Medium Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "plans",
+          "pay_periods_per_year",
+          "salary_cents",
+          "filing_status",
+          "tax_year",
+          "employee_hsa_cents",
+          "expected_usage"
+        ],
+        "title": "HealthPlansInput",
+        "type": "object"
+      },
+      "HealthPlansResult": {
+        "properties": {
+          "citation_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Citation Keys",
+            "type": "array"
+          },
+          "hdhp_max_oop_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Hdhp Max Oop Cents",
+            "type": "integer"
+          },
+          "hdhp_min_deductible_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Hdhp Min Deductible Cents",
+            "type": "integer"
+          },
+          "hsa_limit_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Hsa Limit Cents",
+            "type": "integer"
+          },
+          "marginal_rate_used": {
+            "title": "Marginal Rate Used",
+            "type": "string"
+          },
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/PlanPair"
+            },
+            "title": "Pairs",
+            "type": "array"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/PlanCost"
+            },
+            "title": "Plans",
+            "type": "array"
+          },
+          "recommended_index": {
+            "title": "Recommended Index",
+            "type": "integer"
+          },
+          "scan_end_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Scan End Cents",
+            "type": "integer"
+          },
+          "scan_step_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Scan Step Cents",
+            "type": "integer"
+          },
+          "selected_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Index"
+          }
+        },
+        "required": [
+          "marginal_rate_used",
+          "hsa_limit_cents",
+          "hdhp_min_deductible_cents",
+          "hdhp_max_oop_cents",
+          "plans",
+          "pairs",
+          "recommended_index",
+          "selected_index",
+          "scan_step_cents",
+          "scan_end_cents",
+          "citation_keys"
+        ],
+        "title": "HealthPlansResult",
         "type": "object"
       },
       "HealthcareUsage": {
@@ -2179,6 +2594,95 @@
         "title": "PayStubValues",
         "type": "object"
       },
+      "PlanCost": {
+        "properties": {
+          "annual_premium_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Annual Premium Cents",
+            "type": "integer"
+          },
+          "employee_hsa_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Employee Hsa Cents",
+            "type": "integer"
+          },
+          "employer_hsa_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Employer Hsa Cents",
+            "type": "integer"
+          },
+          "high_cost_cents": {
+            "maximum": 100000000000.0,
+            "minimum": -100000000000.0,
+            "title": "High Cost Cents",
+            "type": "integer"
+          },
+          "hsa_capped": {
+            "title": "Hsa Capped",
+            "type": "boolean"
+          },
+          "hsa_eligible": {
+            "title": "Hsa Eligible",
+            "type": "boolean"
+          },
+          "hsa_tax_savings_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Hsa Tax Savings Cents",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "hdhp",
+              "ppo",
+              "hmo"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "low_cost_cents": {
+            "maximum": 100000000000.0,
+            "minimum": -100000000000.0,
+            "title": "Low Cost Cents",
+            "type": "integer"
+          },
+          "medium_cost_cents": {
+            "maximum": 100000000000.0,
+            "minimum": -100000000000.0,
+            "title": "Medium Cost Cents",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "worst_case_cents": {
+            "maximum": 100000000000.0,
+            "minimum": -100000000000.0,
+            "title": "Worst Case Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "annual_premium_cents",
+          "hsa_eligible",
+          "employer_hsa_cents",
+          "employee_hsa_cents",
+          "hsa_capped",
+          "hsa_tax_savings_cents",
+          "low_cost_cents",
+          "medium_cost_cents",
+          "high_cost_cents",
+          "worst_case_cents"
+        ],
+        "title": "PlanCost",
+        "type": "object"
+      },
       "PlanKind": {
         "enum": [
           "hdhp",
@@ -2187,6 +2691,59 @@
         ],
         "title": "PlanKind",
         "type": "string"
+      },
+      "PlanPair": {
+        "properties": {
+          "break_even_spends_cents": {
+            "description": "Every scanned annual spend at which the cheaper plan changes",
+            "items": {
+              "maximum": 100000000000.0,
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "title": "Break Even Spends Cents",
+            "type": "array"
+          },
+          "cheaper_at_end_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cheaper At End Index"
+          },
+          "cheaper_at_zero_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cheaper At Zero Index"
+          },
+          "plan_a_index": {
+            "title": "Plan A Index",
+            "type": "integer"
+          },
+          "plan_b_index": {
+            "title": "Plan B Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "plan_a_index",
+          "plan_b_index",
+          "cheaper_at_zero_index",
+          "break_even_spends_cents",
+          "cheaper_at_end_index"
+        ],
+        "title": "PlanPair",
+        "type": "object"
       },
       "PlanProposal": {
         "additionalProperties": false,
@@ -3667,6 +4224,120 @@
           }
         ],
         "summary": "Calc 401K Match",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/calc/emergency-fund": {
+      "post": {
+        "description": "The emergency fund calculator (spec 011): the target from monthly\nessentials, the shortfall, months to the target at the monthly\ncontribution and that contribution per paycheck.",
+        "operationId": "calc_emergency_fund",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmergencyFundInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmergencyFundResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Calc Emergency Fund",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/calc/health-plans": {
+      "post": {
+        "description": "The health plan comparison (spec 012): each plan's expected annual net\ncost at low, medium and high usage, the HSA tax effect, the break-even\nspending between each pair of plans and the cheapest plan at the user's\nexpected usage.",
+        "operationId": "calc_health_plans",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HealthPlansInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthPlansResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Calc Health Plans",
         "tags": [
           "calc"
         ]

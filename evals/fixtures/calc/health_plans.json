@@ -1,0 +1,545 @@
+[
+  {
+    "id": "spec-012-hdhp-versus-ppo",
+    "route": "/calc/health-plans",
+    "request": {
+      "plans": [
+        {
+          "name": "Bronze HSA",
+          "kind": "hdhp",
+          "premium_per_period_cents": 2500,
+          "deductible_cents": 170000,
+          "coinsurance_pct": "20",
+          "oop_max_cents": 400000,
+          "employer_hsa_cents": 75000
+        },
+        {
+          "name": "Gold PPO",
+          "kind": "ppo",
+          "premium_per_period_cents": 6250,
+          "deductible_cents": 50000,
+          "coinsurance_pct": "10",
+          "oop_max_cents": 300000,
+          "employer_hsa_cents": 0
+        }
+      ],
+      "pay_periods_per_year": 26,
+      "salary_cents": 6500000,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "employee_hsa_cents": 100000,
+      "expected_usage": "medium"
+    },
+    "expected": {
+      "marginal_rate_used": "12.00",
+      "plans": [
+        {
+          "hsa_eligible": true,
+          "employee_hsa_cents": 100000,
+          "hsa_capped": false,
+          "hsa_tax_savings_cents": 12000,
+          "low_cost_cents": 28000,
+          "medium_cost_cents": 174000,
+          "high_cost_cents": 314000,
+          "worst_case_cents": 378000
+        },
+        {
+          "hsa_eligible": false,
+          "employee_hsa_cents": 0,
+          "hsa_capped": false,
+          "hsa_tax_savings_cents": 0,
+          "low_cost_cents": 212500,
+          "medium_cost_cents": 237500,
+          "high_cost_cents": 307500,
+          "worst_case_cents": 462500
+        }
+      ],
+      "pairs": [
+        {
+          "plan_a_index": 0,
+          "plan_b_index": 1,
+          "cheaper_at_zero_index": 0,
+          "break_even_spends_cents": [
+            940000,
+            1710000
+          ],
+          "cheaper_at_end_index": 0
+        }
+      ],
+      "recommended_index": 0,
+      "scan_end_cents": 2550000,
+      "citation_keys": [
+        "health.hdhp_definition",
+        "health.hsa_limit",
+        "health.federal_brackets"
+      ]
+    }
+  },
+  {
+    "id": "spec-012-three-plans-pairwise",
+    "route": "/calc/health-plans",
+    "request": {
+      "plans": [
+        {
+          "name": "Bronze HSA",
+          "kind": "hdhp",
+          "premium_per_period_cents": 2500,
+          "deductible_cents": 170000,
+          "coinsurance_pct": "20",
+          "oop_max_cents": 400000,
+          "employer_hsa_cents": 75000
+        },
+        {
+          "name": "Gold PPO",
+          "kind": "ppo",
+          "premium_per_period_cents": 6250,
+          "deductible_cents": 50000,
+          "coinsurance_pct": "10",
+          "oop_max_cents": 300000,
+          "employer_hsa_cents": 0
+        },
+        {
+          "name": "Silver HMO",
+          "kind": "hmo",
+          "premium_per_period_cents": 4000,
+          "deductible_cents": 100000,
+          "coinsurance_pct": "0",
+          "oop_max_cents": 250000,
+          "employer_hsa_cents": 0
+        }
+      ],
+      "pay_periods_per_year": 26,
+      "salary_cents": 6500000,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "employee_hsa_cents": 100000,
+      "expected_usage": "medium"
+    },
+    "expected": {
+      "plans": [
+        {
+          "hsa_eligible": true,
+          "employee_hsa_cents": 100000,
+          "hsa_capped": false,
+          "hsa_tax_savings_cents": 12000,
+          "low_cost_cents": 28000,
+          "medium_cost_cents": 174000,
+          "high_cost_cents": 314000,
+          "worst_case_cents": 378000
+        },
+        {
+          "hsa_eligible": false,
+          "employee_hsa_cents": 0,
+          "hsa_capped": false,
+          "hsa_tax_savings_cents": 0,
+          "low_cost_cents": 212500,
+          "medium_cost_cents": 237500,
+          "high_cost_cents": 307500,
+          "worst_case_cents": 462500
+        },
+        {
+          "hsa_eligible": false,
+          "employee_hsa_cents": 0,
+          "hsa_capped": false,
+          "hsa_tax_savings_cents": 0,
+          "low_cost_cents": 154000,
+          "medium_cost_cents": 204000,
+          "high_cost_cents": 204000,
+          "worst_case_cents": 354000
+        }
+      ],
+      "pairs": [
+        {
+          "plan_a_index": 0,
+          "plan_b_index": 1,
+          "cheaper_at_zero_index": 0,
+          "break_even_spends_cents": [
+            940000,
+            1710000
+          ],
+          "cheaper_at_end_index": 0
+        },
+        {
+          "plan_a_index": 0,
+          "plan_b_index": 2,
+          "cheaper_at_zero_index": 0,
+          "break_even_spends_cents": [
+            450000,
+            460000
+          ],
+          "cheaper_at_end_index": 2
+        },
+        {
+          "plan_a_index": 1,
+          "plan_b_index": 2,
+          "cheaper_at_zero_index": 2,
+          "break_even_spends_cents": [],
+          "cheaper_at_end_index": 2
+        }
+      ],
+      "recommended_index": 0
+    }
+  },
+  {
+    "id": "spec-012-hsa-contribution-capped-at-limit",
+    "route": "/calc/health-plans",
+    "request": {
+      "plans": [
+        {
+          "name": "Bronze HSA",
+          "kind": "hdhp",
+          "premium_per_period_cents": 2500,
+          "deductible_cents": 170000,
+          "coinsurance_pct": "20",
+          "oop_max_cents": 400000,
+          "employer_hsa_cents": 75000
+        },
+        {
+          "name": "Gold PPO",
+          "kind": "ppo",
+          "premium_per_period_cents": 6250,
+          "deductible_cents": 50000,
+          "coinsurance_pct": "10",
+          "oop_max_cents": 300000,
+          "employer_hsa_cents": 0
+        }
+      ],
+      "pay_periods_per_year": 26,
+      "salary_cents": 9000000,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "employee_hsa_cents": 500000,
+      "expected_usage": "medium"
+    },
+    "expected": {
+      "marginal_rate_used": "22.00",
+      "plans": [
+        {
+          "hsa_eligible": true,
+          "employee_hsa_cents": 365000,
+          "hsa_capped": true,
+          "hsa_tax_savings_cents": 80300,
+          "low_cost_cents": -40300,
+          "medium_cost_cents": 105700,
+          "high_cost_cents": 245700,
+          "worst_case_cents": 309700
+        },
+        {
+          "hsa_eligible": false,
+          "employee_hsa_cents": 0,
+          "hsa_capped": false,
+          "hsa_tax_savings_cents": 0,
+          "low_cost_cents": 212500,
+          "medium_cost_cents": 237500,
+          "high_cost_cents": 307500,
+          "worst_case_cents": 462500
+        }
+      ],
+      "pairs": [
+        {
+          "plan_a_index": 0,
+          "plan_b_index": 1,
+          "cheaper_at_zero_index": 0,
+          "break_even_spends_cents": [],
+          "cheaper_at_end_index": 0
+        }
+      ],
+      "recommended_index": 0
+    }
+  },
+  {
+    "id": "spec-012-hdhp-below-minimum-deductible",
+    "route": "/calc/health-plans",
+    "request": {
+      "plans": [
+        {
+          "name": "Bronze HSA",
+          "kind": "hdhp",
+          "premium_per_period_cents": 2500,
+          "deductible_cents": 150000,
+          "coinsurance_pct": "20",
+          "oop_max_cents": 400000,
+          "employer_hsa_cents": 75000
+        },
+        {
+          "name": "Gold PPO",
+          "kind": "ppo",
+          "premium_per_period_cents": 6250,
+          "deductible_cents": 50000,
+          "coinsurance_pct": "10",
+          "oop_max_cents": 300000,
+          "employer_hsa_cents": 0
+        }
+      ],
+      "pay_periods_per_year": 26,
+      "salary_cents": 6500000,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "employee_hsa_cents": 100000,
+      "expected_usage": "medium"
+    },
+    "expected": {
+      "plans": [
+        {
+          "hsa_eligible": false,
+          "employee_hsa_cents": 0,
+          "hsa_capped": false,
+          "hsa_tax_savings_cents": 0,
+          "low_cost_cents": 40000,
+          "medium_cost_cents": 170000,
+          "high_cost_cents": 310000,
+          "worst_case_cents": 390000
+        },
+        {
+          "hsa_eligible": false,
+          "employee_hsa_cents": 0,
+          "hsa_capped": false,
+          "hsa_tax_savings_cents": 0,
+          "low_cost_cents": 212500,
+          "medium_cost_cents": 237500,
+          "high_cost_cents": 307500,
+          "worst_case_cents": 462500
+        }
+      ],
+      "pairs": [
+        {
+          "plan_a_index": 0,
+          "plan_b_index": 1,
+          "cheaper_at_zero_index": 0,
+          "break_even_spends_cents": [
+            980000,
+            1830000
+          ],
+          "cheaper_at_end_index": 0
+        }
+      ],
+      "recommended_index": 0
+    }
+  },
+  {
+    "id": "spec-012-ten-percent-bracket-rounds-half-up",
+    "route": "/calc/health-plans",
+    "request": {
+      "plans": [
+        {
+          "name": "Bronze HSA",
+          "kind": "hdhp",
+          "premium_per_period_cents": 2500,
+          "deductible_cents": 170000,
+          "coinsurance_pct": "20",
+          "oop_max_cents": 400000,
+          "employer_hsa_cents": 75000
+        }
+      ],
+      "pay_periods_per_year": 26,
+      "salary_cents": 2500000,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "employee_hsa_cents": 12345,
+      "expected_usage": "medium"
+    },
+    "expected": {
+      "marginal_rate_used": "10.00",
+      "plans": [
+        {
+          "hsa_eligible": true,
+          "employee_hsa_cents": 12345,
+          "hsa_capped": false,
+          "hsa_tax_savings_cents": 1235,
+          "low_cost_cents": 38766,
+          "medium_cost_cents": 184766,
+          "high_cost_cents": 324766,
+          "worst_case_cents": 388766
+        }
+      ],
+      "pairs": [],
+      "recommended_index": 0,
+      "scan_end_cents": 1320000
+    }
+  },
+  {
+    "id": "spec-012-zero-marginal-rate",
+    "route": "/calc/health-plans",
+    "request": {
+      "plans": [
+        {
+          "name": "Bronze HSA",
+          "kind": "hdhp",
+          "premium_per_period_cents": 2500,
+          "deductible_cents": 170000,
+          "coinsurance_pct": "20",
+          "oop_max_cents": 400000,
+          "employer_hsa_cents": 75000
+        },
+        {
+          "name": "Gold PPO",
+          "kind": "ppo",
+          "premium_per_period_cents": 6250,
+          "deductible_cents": 50000,
+          "coinsurance_pct": "10",
+          "oop_max_cents": 300000,
+          "employer_hsa_cents": 0
+        }
+      ],
+      "pay_periods_per_year": 26,
+      "salary_cents": 1500000,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "employee_hsa_cents": 100000,
+      "expected_usage": "medium"
+    },
+    "expected": {
+      "marginal_rate_used": "0.00",
+      "plans": [
+        {
+          "hsa_eligible": true,
+          "employee_hsa_cents": 100000,
+          "hsa_capped": false,
+          "hsa_tax_savings_cents": 0,
+          "low_cost_cents": 40000,
+          "medium_cost_cents": 186000,
+          "high_cost_cents": 326000,
+          "worst_case_cents": 390000
+        },
+        {
+          "hsa_eligible": false,
+          "employee_hsa_cents": 0,
+          "hsa_capped": false,
+          "hsa_tax_savings_cents": 0,
+          "low_cost_cents": 212500,
+          "medium_cost_cents": 237500,
+          "high_cost_cents": 307500,
+          "worst_case_cents": 462500
+        }
+      ],
+      "pairs": [
+        {
+          "plan_a_index": 0,
+          "plan_b_index": 1,
+          "cheaper_at_zero_index": 0,
+          "break_even_spends_cents": [
+            820000,
+            1830000
+          ],
+          "cheaper_at_end_index": 0
+        }
+      ]
+    }
+  },
+  {
+    "id": "spec-012-identical-plans-tie",
+    "route": "/calc/health-plans",
+    "request": {
+      "plans": [
+        {
+          "name": "Gold PPO",
+          "kind": "ppo",
+          "premium_per_period_cents": 6250,
+          "deductible_cents": 50000,
+          "coinsurance_pct": "10",
+          "oop_max_cents": 300000,
+          "employer_hsa_cents": 0
+        },
+        {
+          "name": "Gold PPO 2",
+          "kind": "ppo",
+          "premium_per_period_cents": 6250,
+          "deductible_cents": 50000,
+          "coinsurance_pct": "10",
+          "oop_max_cents": 300000,
+          "employer_hsa_cents": 0
+        }
+      ],
+      "pay_periods_per_year": 26,
+      "salary_cents": 6500000,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "employee_hsa_cents": 100000,
+      "expected_usage": "medium"
+    },
+    "expected": {
+      "plans": [
+        {
+          "hsa_eligible": false,
+          "employee_hsa_cents": 0,
+          "hsa_capped": false,
+          "hsa_tax_savings_cents": 0,
+          "low_cost_cents": 212500,
+          "medium_cost_cents": 237500,
+          "high_cost_cents": 307500,
+          "worst_case_cents": 462500
+        },
+        {
+          "hsa_eligible": false,
+          "employee_hsa_cents": 0,
+          "hsa_capped": false,
+          "hsa_tax_savings_cents": 0,
+          "low_cost_cents": 212500,
+          "medium_cost_cents": 237500,
+          "high_cost_cents": 307500,
+          "worst_case_cents": 462500
+        }
+      ],
+      "pairs": [
+        {
+          "plan_a_index": 0,
+          "plan_b_index": 1,
+          "cheaper_at_zero_index": null,
+          "break_even_spends_cents": [],
+          "cheaper_at_end_index": null
+        }
+      ],
+      "recommended_index": 0,
+      "citation_keys": [
+        "health.federal_brackets"
+      ]
+    }
+  },
+  {
+    "id": "spec-012-high-usage-recommends-ppo",
+    "route": "/calc/health-plans",
+    "request": {
+      "plans": [
+        {
+          "name": "Bronze HSA",
+          "kind": "hdhp",
+          "premium_per_period_cents": 2500,
+          "deductible_cents": 170000,
+          "coinsurance_pct": "20",
+          "oop_max_cents": 400000,
+          "employer_hsa_cents": 75000
+        },
+        {
+          "name": "Gold PPO",
+          "kind": "ppo",
+          "premium_per_period_cents": 6250,
+          "deductible_cents": 50000,
+          "coinsurance_pct": "10",
+          "oop_max_cents": 300000,
+          "employer_hsa_cents": 0
+        }
+      ],
+      "pay_periods_per_year": 26,
+      "salary_cents": 6500000,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "employee_hsa_cents": 100000,
+      "expected_usage": "high"
+    },
+    "expected": {
+      "pairs": [
+        {
+          "plan_a_index": 0,
+          "plan_b_index": 1,
+          "cheaper_at_zero_index": 0,
+          "break_even_spends_cents": [
+            940000,
+            1710000
+          ],
+          "cheaper_at_end_index": 0
+        }
+      ],
+      "recommended_index": 1
+    }
+  }
+]

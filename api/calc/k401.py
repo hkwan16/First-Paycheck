@@ -16,7 +16,8 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from calc.data import FilingStatus, K401Limits, TaxYearData, UnknownTaxYear, tax_year
+from calc.brackets import marginal_rate
+from calc.data import FilingStatus, K401Limits, UnknownTaxYear, tax_year
 from calc.money import CONTEXT, pct_of, per_period, round_half_up
 from calc.types import (
     Cents,
@@ -152,16 +153,6 @@ def _match(tiers: Sequence[MatchTier], match_base: Decimal, deferral: Decimal) -
     return total
 
 
-def _marginal_rate(data: TaxYearData, status: FilingStatus, taxable: Decimal) -> Decimal:
-    """Rule 9: the rate of the bracket holding ``taxable``; a bound is "not over"."""
-    if taxable <= 0:
-        return _ZERO
-    for bracket in data.brackets.by_status[status]:
-        if bracket.up_to_cents is None or taxable <= bracket.up_to_cents:
-            return bracket.rate_pct
-    raise AssertionError("the top bracket is open-ended")  # pragma: no cover
-
-
 def k401_match(data: K401MatchInput) -> K401MatchResult:
     year = tax_year(data.tax_year)
     with localcontext(CONTEXT):
@@ -182,7 +173,7 @@ def k401_match(data: K401MatchInput) -> K401MatchResult:
 
         delta = max(_ZERO, full - current)
         taxable = salary - current - year.standard_deduction.cents[data.filing_status]
-        rate = _marginal_rate(year, data.filing_status, taxable)
+        rate = marginal_rate(year, data.filing_status, taxable)
         periods = data.pay_periods_per_year
         after_tax = per_period(delta * (1 - rate / _HUNDRED), periods)
 
