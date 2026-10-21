@@ -17,12 +17,15 @@ fires (see .github/workflows/deploy.yml), not here.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import signal
 import subprocess
 import sys
 import time
 from collections.abc import Callable, Mapping
+
+log = logging.getLogger(__name__)
 
 POLL_SECONDS = 0.2
 GRACE_SECONDS = 25.0  # Render sends SIGKILL about 30 s after SIGTERM.
@@ -36,7 +39,7 @@ def default_commands() -> dict[str, list[str]]:
             "uvicorn",
             "app.main:app",
             "--host",
-            "0.0.0.0",
+            "0.0.0.0",  # noqa: S104 (the container must listen on all interfaces)
             "--port",
             port,
             "--workers",
@@ -68,8 +71,9 @@ class Supervisor:
 
     def start(self) -> None:
         for name, argv in self.commands.items():
-            self.processes[name] = subprocess.Popen(argv)
-            print(f"serve: started {name} pid={self.processes[name].pid}", flush=True)
+            # argv comes from this module or the operator (SERVE_COMMANDS_JSON), never from users.
+            self.processes[name] = subprocess.Popen(argv)  # noqa: S603
+            log.info("serve: started %s pid=%s", name, self.processes[name].pid)
 
     def _signal_all(self, signum: int) -> None:
         for name, proc in self.processes.items():
@@ -77,7 +81,7 @@ class Supervisor:
                 try:
                     proc.send_signal(signum)
                 except ProcessLookupError:
-                    print(f"serve: {name} already gone", flush=True)
+                    log.info("serve: %s already gone", name)
 
     def _wait_all(self, timeout: float) -> None:
         deadline = time.monotonic() + timeout
@@ -94,14 +98,14 @@ class Supervisor:
         self.start()
         while True:
             if stop_requested is not None and stop_requested(time.monotonic()):
-                print("serve: stop requested, terminating children", flush=True)
+                log.info("serve: stop requested, terminating children")
                 self._signal_all(signal.SIGTERM)
                 self._wait_all(GRACE_SECONDS)
                 return 0
             for name, proc in self.processes.items():
                 code = proc.poll()
                 if code is not None:
-                    print(f"serve: {name} exited with {code}, stopping the rest", flush=True)
+                    log.error("serve: %s exited with %s, stopping the rest", name, code)
                     self._signal_all(signal.SIGTERM)
                     self._wait_all(GRACE_SECONDS)
                     return 1
@@ -109,6 +113,7 @@ class Supervisor:
 
 
 def main() -> int:
+    logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"), format="%(message)s")
     stop = {"requested": False}
 
     def request_stop(*_: object) -> None:

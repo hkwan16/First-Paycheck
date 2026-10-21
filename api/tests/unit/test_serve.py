@@ -71,10 +71,14 @@ def test_main_forwards_sigterm_end_to_end(tmp_path: Path) -> None:
         "signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))\n"
         "time.sleep(30)\n"
     )
-    env = {**os.environ, "SERVE_COMMANDS_JSON": serve.commands_json(
-        {"api": [sys.executable, str(script)], "worker": [sys.executable, str(script)]}
-    )}
-    proc = subprocess.Popen([sys.executable, "-m", "app.serve"], env=env, cwd=Path(serve.__file__).parents[1])
+    env = {
+        **os.environ,
+        "SERVE_COMMANDS_JSON": serve.commands_json(
+            {"api": [sys.executable, str(script)], "worker": [sys.executable, str(script)]}
+        ),
+    }
+    api_dir = Path(serve.__file__).parents[1]
+    proc = subprocess.Popen([sys.executable, "-m", "app.serve"], env=env, cwd=api_dir)
     time.sleep(1.0)
     proc.send_signal(signal.SIGTERM)
     assert proc.wait(timeout=10) == 0
