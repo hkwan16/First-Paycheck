@@ -14,13 +14,22 @@ import math
 import uuid
 from dataclasses import dataclass
 
+from sqlalchemy import Connection, delete
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.errors import AppError
 from db.models import RateLimitCounter
 
-__all__ = ["UPLOADS", "Limit", "RateLimited", "consume", "window_start"]
+__all__ = [
+    "COUNTER_RETENTION",
+    "UPLOADS",
+    "Limit",
+    "RateLimited",
+    "consume",
+    "prune_counters",
+    "window_start",
+]
 
 
 @dataclass(frozen=True)
@@ -32,6 +41,8 @@ class Limit:
 
 
 UPLOADS = Limit(bucket="docs.upload", limit=10, window=dt.timedelta(hours=1))
+# Counters are only read for the current window; older ones are pruned.
+COUNTER_RETENTION = dt.timedelta(days=1)
 
 
 class RateLimited(AppError):
@@ -48,6 +59,19 @@ class RateLimited(AppError):
 def window_start(now: dt.datetime, window: dt.timedelta) -> dt.datetime:
     epoch = dt.datetime(1970, 1, 1, tzinfo=dt.UTC)
     return epoch + ((now.astimezone(dt.UTC) - epoch) // window) * window
+
+
+def prune_counters(connection: Connection, *, now: dt.datetime) -> int:
+    """Delete counters whose window started more than a day before ``now``.
+
+    Runs from the scheduler tick on the privileged connection, across users.
+    """
+    deleted = connection.execute(
+        delete(RateLimitCounter)
+        .where(RateLimitCounter.window_start < now - COUNTER_RETENTION)
+        .returning(RateLimitCounter.user_id)
+    ).all()
+    return len(deleted)
 
 
 def consume(session: Session, user_id: uuid.UUID, limit: Limit, *, now: dt.datetime) -> None:

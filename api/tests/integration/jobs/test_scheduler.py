@@ -46,7 +46,7 @@ def test_tick_requeues_stale_running_jobs(empty_queue: Connection, user_a: Fixtu
 
     result = scheduler.tick(bind=empty_queue)
 
-    assert result == {"requeued": 1, "dead": 1, "pruned": 0, "skipped": False}
+    assert result == {"requeued": 1, "dead": 1, "pruned": 0, "expired": 0, "skipped": False}
     assert status(empty_queue, stale) == ("queued", "StaleJob: no heartbeat for 10 minutes")
     assert status(empty_queue, fresh) == ("running", None)
     assert status(empty_queue, exhausted)[0] == "dead"
@@ -91,5 +91,6 @@ def test_tick_skips_when_another_scheduler_holds_the_lock(
             "requeued": 0,
             "dead": 0,
             "pruned": 0,
+            "expired": 0,
             "skipped": True,
         }
