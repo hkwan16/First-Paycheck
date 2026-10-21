@@ -12,7 +12,8 @@ export interface SegProps<T extends string> {
   /** Accessible name of the group, e.g. "Filing status". */
   label: string;
   options: readonly SegOption<T>[];
-  value: T;
+  /** The chosen option; null before one is chosen (none pressed, the first is the tab stop). */
+  value: T | null;
   onChange: (value: T) => void;
   className?: string;
 }
