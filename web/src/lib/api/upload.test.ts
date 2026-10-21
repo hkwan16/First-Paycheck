@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installFakeXhr } from '@/test/fake-xhr';
 import { API_BASE_URL } from './base-url';
 import { apiErrorMessage } from './errors';
-import { parseRetryAfter, UploadError, uploadDocument } from './upload';
+import { csvProblems, importCsv, parseRetryAfter, UploadError, uploadDocument } from './upload';
 
 const mocks = vi.hoisted(() => {
   const auth = { getSession: vi.fn(), refreshSession: vi.fn(), signOut: vi.fn() };
@@ -166,5 +166,104 @@ describe('parseRetryAfter', () => {
     expect(parseRetryAfter(null, now)).toBeNull();
     expect(parseRetryAfter('soon', now)).toBeNull();
     expect(parseRetryAfter('-5', now)).toBeNull();
+  });
+});
+
+const csv = () => new File(['Date,Description,Amount\n'], 'export.csv', { type: 'text/csv' });
+
+describe('importCsv', () => {
+  it('posts the file, the new account and the sign convention to /accounts/import', async () => {
+    const done = importCsv({
+      file: csv(),
+      account: { kind: 'checking', name: 'Credit union' },
+      sign: 'positive_is_out',
+    });
+    await flush();
+    const request = xhr.last();
+    expect(request.method).toBe('POST');
+    expect(request.url).toBe(`${API_BASE_URL}/accounts/import`);
+    expect((request.field('file') as File).name).toBe('export.csv');
+    expect(request.field('kind')).toBe('checking');
+    expect(request.field('name')).toBe('Credit union');
+    expect(request.field('sign')).toBe('positive_is_out');
+    expect(request.field('account_id')).toBeNull();
+
+    const body = {
+      account: { id: 'a1' },
+      imported: 3,
+      categorize_job_id: 'j1',
+      recurring_job_id: 'j2',
+    };
+    request.respond(200, body);
+    await expect(done).resolves.toEqual(body);
+  });
+
+  it('adds to an earlier CSV account by id, without kind or name', async () => {
+    const done = importCsv({ file: csv(), account: { id: 'acct-1' }, sign: 'negative_is_out' });
+    await flush();
+    const request = xhr.last();
+    expect(request.field('account_id')).toBe('acct-1');
+    expect(request.field('kind')).toBeNull();
+    expect(request.field('name')).toBeNull();
+    request.respond(200, {});
+    await done;
+  });
+
+  it('leaves an empty name out, so the API names the account', async () => {
+    const done = importCsv({
+      file: csv(),
+      account: { kind: 'savings', name: '  ' },
+      sign: 'negative_is_out',
+    });
+    await flush();
+    expect(xhr.last().field('name')).toBeNull();
+    xhr.last().respond(200, {});
+    await done;
+  });
+
+  it("fails with the API's csv_invalid body, its row errors readable by csvProblems", async () => {
+    const done = importCsv({ file: csv(), account: { kind: 'checking' }, sign: 'negative_is_out' });
+    await flush();
+    xhr.last().respond(422, {
+      error: {
+        code: 'csv_invalid',
+        message: 'The CSV has 2 problems',
+        details: {
+          errors: [
+            { row: 3, column: 'date', message: 'Not a date; use YYYY-MM-DD or MM/DD/YYYY' },
+            { row: null, column: null, message: 'The file has no transactions' },
+          ],
+          total: 2,
+        },
+      },
+    });
+    const error = await done.catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(UploadError);
+    expect((error as UploadError).code).toBe('csv_invalid');
+    expect(csvProblems(error)).toEqual({
+      errors: [
+        { row: 3, column: 'date', message: 'Not a date; use YYYY-MM-DD or MM/DD/YYYY' },
+        { row: null, column: null, message: 'The file has no transactions' },
+      ],
+      total: 2,
+    });
+  });
+});
+
+describe('csvProblems', () => {
+  it('is null for anything but a well-formed csv_invalid error', () => {
+    expect(
+      csvProblems(new UploadError(409, { error: { code: 'import_conflict', message: 'x' } }, null)),
+    ).toBeNull();
+    expect(
+      csvProblems(
+        new UploadError(
+          422,
+          { error: { code: 'csv_invalid', message: 'x', details: { errors: 'no' } } },
+          null,
+        ),
+      ),
+    ).toBeNull();
+    expect(csvProblems(new Error('boom'))).toBeNull();
   });
 });
