@@ -1,10 +1,15 @@
-# Render Blueprint: the API web service and the background worker, built from
-# one Docker image (api/Dockerfile). Deploys are triggered only by
-# .github/workflows/deploy.yml after CI passes on main (autoDeploy: false).
+# Render Blueprint: one free web service that runs the API and the job worker
+# together (api/Dockerfile, `python -m app.serve`).
 #
-# Secrets are `sync: false`: Render asks for them when the Blueprint is first
-# applied and never reads them from this file. Pre-deploy commands need a paid
-# instance type, hence `plan: starter`.
+# Why one service: Render's free tier has no background workers and no
+# pre-deploy command. app.serve supervises uvicorn and `python -m jobs.worker`
+# in one container; migrations and seeds run from CI (deploy.yml) before the
+# deploy hook fires. A free instance spins down after 15 idle minutes, so
+# .github/workflows/keepalive.yml pings /health every 10 minutes.
+#
+# Deploys are triggered only by deploy.yml after CI passes on main
+# (autoDeploy: false). Secrets are `sync: false`: Render asks for them when the
+# Blueprint is first applied and never reads them from this file.
 
 envVarGroups:
   - name: first-paycheck
@@ -13,11 +18,14 @@ envVarGroups:
         value: production
       - key: LOG_LEVEL
         value: INFO
+      # One uvicorn worker: the container also runs the job worker in 512 MB.
+      - key: WEB_CONCURRENCY
+        value: "1"
       # Supavisor pooler URLs only (Render has no IPv6 egress).
       # app_api role, transaction mode, port 6543.
       - key: DATABASE_URL
         sync: false
-      # postgres role, session mode, port 5432 (Alembic, queue, scheduler).
+      # postgres role, session mode, port 5432 (queue, scheduler).
       - key: DATABASE_URL_PRIVILEGED
         sync: false
       - key: SUPABASE_URL
@@ -53,25 +61,12 @@ services:
   - type: web
     name: first-paycheck-api
     runtime: docker
-    plan: starter
+    plan: free
     region: oregon
     dockerfilePath: ./api/Dockerfile
     dockerContext: .
-    # Image CMD: uvicorn with 2 workers on $PORT.
-    preDeployCommand: sh -c "alembic upgrade head && python -m db.seed.load"
+    dockerCommand: python -m app.serve
     healthCheckPath: /health
-    autoDeploy: false
-    envVars:
-      - fromGroup: first-paycheck
-
-  - type: worker
-    name: first-paycheck-worker
-    runtime: docker
-    plan: starter
-    region: oregon
-    dockerfilePath: ./api/Dockerfile
-    dockerContext: .
-    dockerCommand: python -m jobs.worker
     autoDeploy: false
     envVars:
       - fromGroup: first-paycheck

@@ -1,7 +1,9 @@
 name: Deploy
 
-# Render services have autoDeploy off; this workflow deploys them after CI
-# passes on main, pinned to the commit CI tested.
+# The Render service has autoDeploy off; this workflow deploys it after CI
+# passes on main, pinned to the commit CI tested. Render Free has no pre-deploy
+# command, so migrations and seeds run here first, against the Supabase
+# session pooler, and the deploy hook fires only if they succeed.
 on:
   workflow_run:
     workflows: [CI]
@@ -16,7 +18,7 @@ permissions:
   contents: read
 
 jobs:
-  render:
+  migrate:
     if: >-
       github.event.workflow_run.conclusion == 'success'
       && github.event.workflow_run.event == 'push'
@@ -24,15 +26,32 @@ jobs:
     env:
       SHA: ${{ github.event.workflow_run.head_sha }}
     steps:
-      - name: deploy the API
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SHA }}
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+      - name: install the api package
+        run: uv sync --frozen --package first-paycheck-api
+      - name: migrate and seed the production database
+        env:
+          APP_ENV: development
+          DATABASE_URL_PRIVILEGED: ${{ secrets.DATABASE_URL_PRIVILEGED }}
+        run: |
+          test -n "$DATABASE_URL_PRIVILEGED" || { echo "::error::DATABASE_URL_PRIVILEGED is not set"; exit 1; }
+          uv run --project api alembic -c api/alembic.ini upgrade head
+          uv run --project api python -m db.seed.load
+
+  render:
+    needs: migrate
+    runs-on: ubuntu-24.04
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: deploy the API and worker service
         env:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
         run: |
           test -n "$HOOK" || { echo "::error::RENDER_DEPLOY_HOOK_API is not set"; exit 1; }
-          curl --fail-with-body --silent --show-error --retry 3 -X POST "${HOOK}&ref=${SHA}"
-      - name: deploy the worker
-        env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER }}
-        run: |
-          test -n "$HOOK" || { echo "::error::RENDER_DEPLOY_HOOK_WORKER is not set"; exit 1; }
           curl --fail-with-body --silent --show-error --retry 3 -X POST "${HOOK}&ref=${SHA}"

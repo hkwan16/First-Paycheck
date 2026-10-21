@@ -240,7 +240,7 @@ Categorization runs as a background job queued by every sync. Rules and user cor
 - **Parsing, LLM, retrieval:** pdfplumber, pandas, Tesseract OCR (pytesseract); Anthropic SDK (Sonnet 5.5, Haiku 5.5; Sonnet 5.5 vision for redacted images) behind one gateway with a per-call cost ledger; curated IRS citation tables; Postgres full-text search over chunked benefits text.
 - **Data, auth, storage:** Supabase (PostgreSQL with row-level security, Auth) reached through the Supavisor pooler; raw uploads in a `document_blobs` table under row-level security; SQLAlchemy + Alembic, Postgres-backed job queue with a separate worker and scheduler, application-level encryption for provider tokens. PDF export: WeasyPrint.
 - **Testing:** pytest, Hypothesis, Vitest, Playwright, custom eval runner, Plaid sandbox fixtures.
-- **CI/CD, hosting:** GitHub Actions (lint, tests, evals, OpenAPI type drift; merges blocked on regressions), Vercel, Render (API and worker).
+- **CI/CD, hosting:** GitHub Actions (lint, tests, evals, OpenAPI type drift; merges blocked on regressions), Vercel, Render Free (the API and the job worker supervised in one container by `python -m app.serve`; migrations and seeds run from the deploy workflow; a scheduled health ping prevents spin-down).
 
 ## 5. Business Context Summary
 

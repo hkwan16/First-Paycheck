@@ -161,6 +161,7 @@ Rules:
 ```
 cd api && uv run uvicorn app.main:app --reload     # or `make dev` from the root
 cd api && uv run python -m jobs.worker              # or `make worker`
+cd api && uv run python -m app.serve                # API plus worker in one process tree (Render Free)
 cd api && uv run alembic upgrade head               # or `make migrate`
 docker build -f api/Dockerfile -t first-paycheck-api .   # from the repo root
 ```

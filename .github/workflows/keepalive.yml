@@ -1,0 +1,21 @@
+name: Keep alive
+
+# Render Free spins the service down after 15 idle minutes and takes about a
+# minute to come back, which breaks Plaid webhooks and demos. A health ping
+# every 10 minutes keeps it warm; one always-on free instance fits in Render's
+# 750 free instance hours per month.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: ping /health
+        run: |
+          curl --silent --show-error --max-time 90 --retry 2 \
+            https://first-paycheck-api.onrender.com/health || echo "::warning::health ping failed"
