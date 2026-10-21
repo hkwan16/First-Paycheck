@@ -6,14 +6,21 @@ import { Badge } from '@/components/ui/Badge';
 import { Num } from '@/components/ui/Money';
 import { useDecisions } from '@/lib/api/hooks';
 import { CALCULATORS, features, type CalculatorId } from '@/lib/features';
+import type { ComponentType } from 'react';
 import { PlaceholderCard } from './DecisionCard';
+import { EmergencyFundCard } from './EmergencyFundCard';
+import { HealthPlanCard } from './HealthPlanCard';
 import { Match401kCard } from './Match401kCard';
 
 /** The mockup's card order: emergency fund, 401(k), health plan, W-4. */
 const ORDER: readonly CalculatorId[] = ['emergency_fund', '401k_match', 'health_plan', 'w4'];
 
-/** Calculators with a card built so far; the rest render as placeholders. */
-const BUILT: ReadonlySet<CalculatorId> = new Set(['401k_match']);
+/** The card of each calculator built so far; the rest render as placeholders. */
+const CARDS: Partial<Record<CalculatorId, ComponentType>> = {
+  emergency_fund: EmergencyFundCard,
+  '401k_match': Match401kCard,
+  health_plan: HealthPlanCard,
+};
 
 export interface DecisionsScreenProps {
   /** Live calculators (`features.calculators`); the rest show as After alpha. */
@@ -43,13 +50,14 @@ export function DecisionsScreen({ calculators = features.calculators }: Decision
         }
       />
       <div className="grid grid-cols-2 items-start gap-6 max-wide:grid-cols-1">
-        {ORDER.map((calculator) =>
-          live.has(calculator) && BUILT.has(calculator) ? (
-            <Match401kCard key={calculator} />
+        {ORDER.map((calculator) => {
+          const Card = live.has(calculator) ? CARDS[calculator] : undefined;
+          return Card ? (
+            <Card key={calculator} />
           ) : (
             <PlaceholderCard key={calculator} calculator={calculator} live={live.has(calculator)} />
-          ),
-        )}
+          );
+        })}
       </div>
       <StepFooter
         back={{ href: '/setup/spending' }}
