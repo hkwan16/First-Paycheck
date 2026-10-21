@@ -10,6 +10,7 @@ status in step with its findings, for the engine and ``PATCH``.
 
 from __future__ import annotations
 
+import calendar
 import datetime as dt
 import uuid
 from collections.abc import Collection, Sequence
@@ -38,6 +39,7 @@ __all__ = [
     "CheckInRun",
     "Existing",
     "Trigger",
+    "month_end",
     "queue_refresh",
     "reconcile",
     "run_check_in",
@@ -117,6 +119,11 @@ class CheckInRun:
             "dropped": self.dropped,
             "marked_active": self.marked_active,
         }
+
+
+def month_end(period: dt.date) -> dt.date:
+    """The last day of ``period``'s month."""
+    return period.replace(day=calendar.monthrange(period.year, period.month)[1])
 
 
 def _lock(session: Session, key: str) -> None:

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import calendar
 import datetime as dt
 from typing import Any
 
-from checkin.engine import Trigger, run_check_in
+from checkin.engine import Trigger, month_end, run_check_in
 from jobs.context import JobContext
 
 TRIGGERS: tuple[Trigger, ...] = ("schedule", "sync")
@@ -27,15 +26,11 @@ def parse_payload(payload: dict[str, Any]) -> tuple[dt.date, Trigger]:
     raise ValueError(f"trigger must be one of {TRIGGERS}, not {trigger!r}")
 
 
-def last_day(period: dt.date) -> dt.date:
-    return period.replace(day=calendar.monthrange(period.year, period.month)[1])
-
-
 def run(ctx: JobContext) -> dict[str, Any]:
     period, trigger = parse_payload(ctx.job.payload)
     now = ctx.services.clock()
     # Rule 16: a job that runs after its month judges the month's last day.
-    today = min(now.date(), last_day(period))
+    today = min(now.date(), month_end(period))
     with ctx.user_session() as session:
         result = run_check_in(session, ctx.user_id, period, today=today, now=now, trigger=trigger)
     return result.as_job_result()
