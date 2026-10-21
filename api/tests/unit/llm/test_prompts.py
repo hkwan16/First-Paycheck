@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import get_args
 
 import pytest
+from pydantic import BaseModel
 
 from db.enums import LlmPurpose
 from llm import schemas
@@ -46,6 +48,34 @@ def test_categorize_v1() -> None:
     # The prompt names every category the schema accepts.
     for category in schemas.CATEGORIES:
         assert f"`{category}`" in prompt.system
+
+
+@pytest.mark.parametrize(
+    ("name", "schema", "nested"),
+    [
+        ("extract_pay_stub", schemas.PayStubExtraction, schemas.LineItem),
+        ("extract_benefits", schemas.BenefitsExtraction, schemas.PlanExtraction),
+    ],
+)
+def test_extraction_prompts_v1(name: str, schema: type[BaseModel], nested: type[BaseModel]) -> None:
+    prompt = load_prompt(name, "v1")
+    assert prompt.version == f"{name}/v1"
+    assert prompt.purpose is LlmPurpose.EXTRACT
+    assert prompt.effort == "low"
+    assert prompt.schema is schema
+    # The prompt explains every field the schema asks for, and the redaction marker.
+    for field in [*schema.model_fields, *nested.model_fields]:
+        assert f"`{field}`" in prompt.system, field
+    assert "[REDACTED]" in prompt.system
+    assert "YYYY-MM-DD" in prompt.system
+
+
+def test_pay_stub_prompt_names_every_line_kind_and_field() -> None:
+    prompt = load_prompt("extract_pay_stub", "v1")
+    for kind in get_args(schemas.LineItemKind):
+        assert f"`{kind}`" in prompt.system
+    for frequency in get_args(schemas.PayFrequencyValue):
+        assert f"`{frequency}`" in prompt.system
 
 
 def test_parse_valid_prompt() -> None:

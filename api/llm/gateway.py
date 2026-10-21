@@ -1,4 +1,4 @@
-"""The only door to Claude (spec 003 rules 19-27).
+"""The only door to Claude (spec 003 rules 19-27, spec 005 rules 6-8).
 
 Every call: check the user's daily budget, send one structured-output request
 with a cached system prompt, branch on ``stop_reason == "refusal"`` before
@@ -12,12 +12,18 @@ the call's usage is lost. The gateway therefore calls ``messages.create`` with
 ``output_config.format`` built by ``anthropic.transform_schema`` (the same
 schema ``parse`` would send) and validates the text itself.
 
+Extraction requests carry already-redacted pages only: page images as base64
+PNG ``image`` blocks first, then one ``text`` block with the text pages.
+
 ``FakeGateway`` (``LLM_FAKE=true``) shares the budget check, validation and
-ledger; it replaces only the HTTP call with fixture answers.
+ledger; it replaces only the HTTP call with fixture answers. The ledger is the
+``llm_calls`` table (``DbLedger``) everywhere except the eval runner, which
+has no database and passes a ``MemoryLedger``.
 """
 
 from __future__ import annotations
 
+import base64
 import datetime as dt
 import json
 import logging
@@ -25,13 +31,14 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, Protocol, TypeVar
 
 import anthropic
 import httpx2
+from anthropic.types import ContentBlockParam
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import Connection, Engine, func, select
 
@@ -41,12 +48,14 @@ from db.enums import LlmPurpose, LlmStatus
 from db.models import LlmCall
 from llm.cost import cost_microcents, price_for
 from llm.prompts import Prompt, load_prompt
-from llm.schemas import CategoryAssignment, CategoryBatch
+from llm.schemas import BenefitsExtraction, CategoryAssignment, CategoryBatch, PayStubExtraction
 
 log = logging.getLogger(__name__)
 
 CATEGORIZE_PROMPT = ("categorize", "v1")
-REQUEST_TIMEOUT_SECONDS = 60.0
+EXTRACT_PAY_STUB_PROMPT = ("extract_pay_stub", "v1")
+EXTRACT_BENEFITS_PROMPT = ("extract_benefits", "v1")
+REQUEST_TIMEOUT_SECONDS = 120.0
 MICROCENTS_PER_CENT = 1_000_000
 FAKE_MODEL = "fake"
 FAKE_FIXTURES = REPO_ROOT / "api" / "tests" / "fixtures" / "llm"
@@ -54,11 +63,15 @@ FAKE_DEFAULT = ("other", 0.5)
 
 Schema = TypeVar("Schema", bound=BaseModel)
 Clock = Callable[[], dt.datetime]
+# A user message's content: plain text, or a list of content blocks.
+Content = str | list[ContentBlockParam]
 
 __all__ = [
     "CategorizeItem",
+    "DbLedger",
     "FakeGateway",
     "Gateway",
+    "ImagePage",
     "LLMBudgetExceeded",
     "LLMError",
     "LLMGateway",
@@ -66,6 +79,11 @@ __all__ = [
     "LLMRefused",
     "LLMSchemaError",
     "LLMUnavailable",
+    "Ledger",
+    "LedgerEntry",
+    "MemoryLedger",
+    "ModelPage",
+    "TextPage",
     "Usage",
     "get_gateway",
 ]
@@ -162,6 +180,133 @@ def _utc_now() -> dt.datetime:
     return dt.datetime.now(dt.UTC)
 
 
+def _day_start(moment: dt.datetime) -> dt.datetime:
+    return dt.datetime.combine(moment.astimezone(dt.UTC).date(), dt.time.min, tzinfo=dt.UTC)
+
+
+def page_content(pages: Sequence[ModelPage]) -> list[ContentBlockParam]:
+    """Image blocks in page order, then one text block naming the image pages
+    and holding every text page under its number (spec 005 rule 6)."""
+    images = [page for page in pages if isinstance(page, ImagePage)]
+    texts = [page for page in pages if isinstance(page, TextPage)]
+    blocks: list[ContentBlockParam] = [
+        {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": "image/png",
+                "data": base64.b64encode(page.png).decode("ascii"),
+            },
+        }
+        for page in images
+    ]
+    parts: list[str] = []
+    if images:
+        numbers = ", ".join(str(page.number) for page in images)
+        parts.append(f"Images above: pages {numbers} (redacted page images, in order).")
+    parts.extend(f"Page {page.number} (text layer):\n{page.text}" for page in texts)
+    parts.append("Read the document described in your instructions.")
+    blocks.append({"type": "text", "text": "\n\n".join(parts)})
+    return blocks
+
+
+# ---------------------------------------------------------------- the ledger
+
+
+@dataclass(frozen=True)
+class LedgerEntry:
+    """One call's accounting: counts, cost and status, never text."""
+
+    user_id: uuid.UUID
+    job_id: uuid.UUID | None
+    purpose: LlmPurpose
+    model: str
+    prompt_version: str
+    status: LlmStatus
+    input_tokens: int
+    output_tokens: int
+    cache_read_tokens: int
+    cost_microcents: int
+    latency_ms: int
+    created_at: dt.datetime
+
+
+class Ledger(Protocol):
+    def spent_today(self, user_id: uuid.UUID) -> int:
+        """Microcents the user has spent since the current UTC midnight."""
+        ...
+
+    def record(self, entry: LedgerEntry) -> None: ...
+
+
+class DbLedger:
+    """The ``llm_calls`` table, written as the user (spec 003 rule 25)."""
+
+    def __init__(self, *, bind: Engine | Connection | None = None, clock: Clock = _utc_now) -> None:
+        self._bind = bind
+        self._clock = clock
+
+    def spent_today(self, user_id: uuid.UUID) -> int:
+        start = _day_start(self._clock())
+        with user_session_for(user_id, bind=self._bind) as session:
+            spent = session.scalar(
+                select(func.coalesce(func.sum(LlmCall.cost_microcents), 0)).where(
+                    LlmCall.user_id == user_id, LlmCall.created_at >= start
+                )
+            )
+        return int(spent or 0)
+
+    def record(self, entry: LedgerEntry) -> None:
+        # Its own short session, committed at once: a later failure in the
+        # caller cannot erase the charge.
+        with user_session_for(entry.user_id, bind=self._bind) as session:
+            session.add(
+                LlmCall(
+                    user_id=entry.user_id,
+                    purpose=entry.purpose,
+                    model=entry.model,
+                    prompt_version=entry.prompt_version,
+                    input_tokens=entry.input_tokens,
+                    output_tokens=entry.output_tokens,
+                    cache_read_tokens=entry.cache_read_tokens,
+                    cost_microcents=entry.cost_microcents,
+                    latency_ms=entry.latency_ms,
+                    status=entry.status,
+                    job_id=entry.job_id,
+                    created_at=entry.created_at,
+                )
+            )
+
+
+@dataclass
+class MemoryLedger:
+    """An in-process ledger for runs with no database (the eval runner).
+
+    ``on_record`` sees each entry as it is written, before the caller reads the
+    result; the eval runner charges its cost cap there.
+    """
+
+    clock: Clock = _utc_now
+    on_record: Callable[[LedgerEntry], None] | None = None
+    entries: list[LedgerEntry] = field(default_factory=list)
+
+    def spent_today(self, user_id: uuid.UUID) -> int:
+        start = _day_start(self.clock())
+        return sum(
+            entry.cost_microcents
+            for entry in self.entries
+            if entry.user_id == user_id and entry.created_at >= start
+        )
+
+    def record(self, entry: LedgerEntry) -> None:
+        self.entries.append(entry)
+        if self.on_record is not None:
+            self.on_record(entry)
+
+
+# ---------------------------------------------------------------- the gateway
+
+
 class Gateway(ABC):
     """Budget, validation and ledger; subclasses supply the model call."""
 
@@ -171,10 +316,11 @@ class Gateway(ABC):
         *,
         bind: Engine | Connection | None = None,
         clock: Clock = _utc_now,
+        ledger: Ledger | None = None,
     ) -> None:
         self._settings = settings
-        self._bind = bind
         self._clock = clock
+        self._ledger: Ledger = ledger if ledger is not None else DbLedger(bind=bind, clock=clock)
 
     # Public methods, one per prompt ------------------------------------------
 
@@ -191,6 +337,46 @@ class Gateway(ABC):
         prompt = load_prompt(*CATEGORIZE_PROMPT)
         return self._call(prompt, CategoryBatch, user_id=user_id, job_id=job_id, content=content)
 
+    def extract_pay_stub(
+        self,
+        user_id: uuid.UUID,
+        pages: Sequence[ModelPage],
+        *,
+        job_id: uuid.UUID | None = None,
+    ) -> PayStubExtraction:
+        """Read a pay stub from redacted pages (spec 005)."""
+        prompt = load_prompt(*EXTRACT_PAY_STUB_PROMPT)
+        return self._call(
+            prompt,
+            PayStubExtraction,
+            user_id=user_id,
+            job_id=job_id,
+            content=self._pages(pages),
+        )
+
+    def extract_benefits(
+        self,
+        user_id: uuid.UUID,
+        pages: Sequence[ModelPage],
+        *,
+        job_id: uuid.UUID | None = None,
+    ) -> BenefitsExtraction:
+        """Read the plan options of a benefits summary from redacted pages (spec 005)."""
+        prompt = load_prompt(*EXTRACT_BENEFITS_PROMPT)
+        return self._call(
+            prompt,
+            BenefitsExtraction,
+            user_id=user_id,
+            job_id=job_id,
+            content=self._pages(pages),
+        )
+
+    @staticmethod
+    def _pages(pages: Sequence[ModelPage]) -> list[ContentBlockParam]:
+        if not pages:
+            raise ValueError("extraction needs at least one page; no pages were given")
+        return page_content(pages)
+
     # The call ----------------------------------------------------------------
 
     def _call(
@@ -200,7 +386,7 @@ class Gateway(ABC):
         *,
         user_id: uuid.UUID,
         job_id: uuid.UUID | None,
-        content: str,
+        content: Content,
     ) -> Schema:
         if prompt.schema is not schema:
             raise TypeError(f"{prompt.version} declares {prompt.schema.__name__}, not {schema}")
@@ -209,18 +395,32 @@ class Gateway(ABC):
 
         def record(status: LlmStatus, usage: Usage, started: float | None) -> None:
             latency = 0 if started is None else round((time.monotonic() - started) * 1000)
-            self._record(
-                user_id=user_id,
-                job_id=job_id,
-                prompt=prompt,
-                model=model,
-                status=status,
-                usage=usage,
-                latency_ms=latency,
+            self._ledger.record(
+                LedgerEntry(
+                    user_id=user_id,
+                    job_id=job_id,
+                    purpose=prompt.purpose,
+                    model=model,
+                    prompt_version=prompt.version,
+                    status=status,
+                    input_tokens=usage.input_tokens + usage.cache_write_tokens,
+                    output_tokens=usage.output_tokens,
+                    cache_read_tokens=usage.cache_read_tokens,
+                    cost_microcents=self._cost(model, usage),
+                    latency_ms=latency,
+                    created_at=self._clock(),
+                )
+            )
+            log.info(
+                "llm call %s %s status=%s latency_ms=%d",
+                prompt.version,
+                model,
+                status.value,
+                latency,
             )
 
         if (
-            self._spent_today(user_id)
+            self._ledger.spent_today(user_id)
             >= self._settings.llm_daily_budget_cents * MICROCENTS_PER_CENT
         ):
             record(LlmStatus.BUDGET_BLOCKED, Usage(), None)
@@ -266,59 +466,8 @@ class Gateway(ABC):
         )
 
     @abstractmethod
-    def _send(self, prompt: Prompt, model: str, content: str) -> Reply:
+    def _send(self, prompt: Prompt, model: str, content: Content) -> Reply:
         """Make the model call. Raise ``LLMUnavailable`` or ``LLMError`` on failure."""
-
-    # Ledger ------------------------------------------------------------------
-
-    def _spent_today(self, user_id: uuid.UUID) -> int:
-        today = self._clock().astimezone(dt.UTC).date()
-        start = dt.datetime.combine(today, dt.time.min, tzinfo=dt.UTC)
-        with user_session_for(user_id, bind=self._bind) as session:
-            spent = session.scalar(
-                select(func.coalesce(func.sum(LlmCall.cost_microcents), 0)).where(
-                    LlmCall.user_id == user_id, LlmCall.created_at >= start
-                )
-            )
-        return int(spent or 0)
-
-    def _record(
-        self,
-        *,
-        user_id: uuid.UUID,
-        job_id: uuid.UUID | None,
-        prompt: Prompt,
-        model: str,
-        status: LlmStatus,
-        usage: Usage,
-        latency_ms: int,
-    ) -> None:
-        # Its own short session, committed at once: a later failure in the
-        # caller cannot erase the charge.
-        with user_session_for(user_id, bind=self._bind) as session:
-            session.add(
-                LlmCall(
-                    user_id=user_id,
-                    purpose=prompt.purpose,
-                    model=model,
-                    prompt_version=prompt.version,
-                    input_tokens=usage.input_tokens + usage.cache_write_tokens,
-                    output_tokens=usage.output_tokens,
-                    cache_read_tokens=usage.cache_read_tokens,
-                    cost_microcents=self._cost(model, usage),
-                    latency_ms=latency_ms,
-                    status=status,
-                    job_id=job_id,
-                    created_at=self._clock(),
-                )
-            )
-        log.info(
-            "llm call %s %s status=%s latency_ms=%d",
-            prompt.version,
-            model,
-            status.value,
-            latency_ms,
-        )
 
 
 class LLMGateway(Gateway):
@@ -330,10 +479,11 @@ class LLMGateway(Gateway):
         *,
         bind: Engine | Connection | None = None,
         clock: Clock = _utc_now,
+        ledger: Ledger | None = None,
         http_client: httpx2.Client | None = None,
         max_retries: int = 2,
     ) -> None:
-        super().__init__(settings, bind=bind, clock=clock)
+        super().__init__(settings, bind=bind, clock=clock, ledger=ledger)
         if settings.anthropic_api_key is None:
             raise LLMNotConfigured("ANTHROPIC_API_KEY must be set unless LLM_FAKE=true")
         self._client = anthropic.Anthropic(
@@ -343,7 +493,7 @@ class LLMGateway(Gateway):
             http_client=http_client,
         )
 
-    def _send(self, prompt: Prompt, model: str, content: str) -> Reply:
+    def _send(self, prompt: Prompt, model: str, content: Content) -> Reply:
         try:
             response = self._client.messages.create(
                 model=model,
@@ -398,9 +548,10 @@ class FakeGateway(Gateway):
         *,
         bind: Engine | Connection | None = None,
         clock: Clock = _utc_now,
+        ledger: Ledger | None = None,
         fixtures: Path = FAKE_FIXTURES,
     ) -> None:
-        super().__init__(settings, bind=bind, clock=clock)
+        super().__init__(settings, bind=bind, clock=clock, ledger=ledger)
         self._fixtures = fixtures
 
     def _model_for(self, purpose: LlmPurpose) -> str:
@@ -412,9 +563,18 @@ class FakeGateway(Gateway):
     def _cost(self, model: str, usage: Usage) -> int:
         return 0
 
-    def _send(self, prompt: Prompt, model: str, content: str) -> Reply:
-        if prompt.schema is not CategoryBatch:
+    def _send(self, prompt: Prompt, model: str, content: Content) -> Reply:
+        if prompt.schema is CategoryBatch and isinstance(content, str):
+            text = self._categorize(content)
+        elif prompt.schema is PayStubExtraction:
+            text = self._fixture_text("extract_pay_stub.json")
+        elif prompt.schema is BenefitsExtraction:
+            text = self._fixture_text("extract_benefits.json")
+        else:
             raise LLMError(f"FakeGateway has no answers for {prompt.version}")
+        return Reply(stop_reason="end_turn", text=text, usage=Usage())
+
+    def _categorize(self, content: str) -> str:
         items = json.loads(content)["items"]
         answers = [
             CategoryAssignment.model_validate(
@@ -422,11 +582,14 @@ class FakeGateway(Gateway):
             )
             for item in items
         ]
-        return Reply(
-            stop_reason="end_turn",
-            text=CategoryBatch(items=answers).model_dump_json(),
-            usage=Usage(),
-        )
+        return CategoryBatch(items=answers).model_dump_json()
+
+    def _fixture_text(self, name: str) -> str:
+        path = self._fixtures / name
+        try:
+            return path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            raise LLMError(f"FakeGateway: {path} is missing") from None
 
     @cached_property
     def _categories(self) -> Mapping[str, Mapping[str, Any]]:
