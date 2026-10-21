@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spending map</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+:root{--ink:#16181D;--ink-2:#3F4650;--ink-3:#5B6370;--ground:#F3F4F6;--surface:#FFFFFF;--blue:#1D4ED8;--blue-deep:#1E40AF;--blue-text:#1E40AF;--blue-tint:#E8EEFC;--coral:#EA580C;--coral-text:#9A3412;--coral-tint:#FFEDE3;--teal:#14B8A6;--teal-text:#115E59;--teal-tint:#D5F3EE;--plum:#7C3AED;--plum-text:#5B21B6;--plum-tint:#EDE9FE;--green:#0F7A4B;--green-text:#0F6B42;--green-tint:#E6F5EE;--amber:#D97706;--amber-text:#8A5A00;--amber-tint:#FFF1D6;--red:#DC2626;--red-text:#B42318;--red-tint:#FEE4E2}
+.badge-coral{background:var(--coral-tint);color:var(--coral-text)}.badge-teal{background:var(--teal-tint);color:var(--teal-text)}.badge-plum{background:var(--plum-tint);color:var(--plum-text)}
+.catlabel{display:flex;align-items:center;gap:8px}
+.flowhost{position:relative}
+.colhead{position:absolute;top:0;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap}
+.node{position:absolute;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:0 10px;background:#fff;border:1px solid rgba(22,24,29,.14);border-radius:6px;font-size:12.5px;line-height:1.3;color:var(--ink)}
+.node .sw{flex:none;width:12px;height:12px;border-radius:3px}
+.node-text{display:flex;flex-direction:column;min-width:0}
+.node-name{color:var(--ink-2);white-space:nowrap}
+.node-amt{font-weight:700;white-space:nowrap}
+button.node{font:inherit;text-align:left;cursor:default;transition:box-shadow 120ms ease-out}
+.node:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.band{transition:fill-opacity 120ms ease-out;cursor:default}
+.pop{position:absolute;z-index:3;box-sizing:border-box;background:rgba(255,255,255,.94);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border-radius:10px;box-shadow:0 1px 2px rgba(22,24,29,.08),0 10px 28px rgba(22,24,29,.18),0 0 0 1px rgba(22,24,29,.08);padding:12px 14px;display:flex;flex-direction:column;gap:8px;animation:pop-in 120ms ease-out both;color:var(--ink)}
+@keyframes pop-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+@keyframes pop-fade{from{opacity:0}to{opacity:1}}
+.pop-head{display:flex;flex-direction:column;gap:2px}
+.pop-title{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px}
+.pop-amt{font-size:20px;font-weight:700;letter-spacing:-.015em;line-height:1.2}
+.pop-lines{display:flex;flex-direction:column}
+.pop-line{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px 10px;align-items:center;font-size:12.5px;padding:6px 0;border-top:1px solid rgba(22,24,29,.08)}
+.pop-line:first-child{border-top:0;padding-top:0}
+.pop-merchant{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+@media (prefers-reduced-motion:reduce){.pop{animation:pop-fade 120ms ease-out both}.band,button.node{transition:none}}
+@media (prefers-reduced-transparency:reduce){.pop{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+*,*::before,*::after{box-sizing:border-box}
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 24px;background:rgba(243,244,246,.72);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(22,24,29,.08)}
+.wordmark{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:15px;letter-spacing:-0.01em;color:#16181D;text-decoration:none}
+.chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(22,24,29,.06);font-size:12px;font-weight:500;letter-spacing:.01em;color:#3F4650;white-space:nowrap}
+.shell{display:flex;flex-wrap:wrap;gap:24px;padding:24px;max-width:1280px;margin:0 auto;width:100%}
+.nav{flex:1 1 200px;max-width:240px}
+.nav-list{display:flex;flex-direction:column;gap:2px;list-style:none;margin:0;padding:0}
+.nav a{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 12px;border-radius:10px;color:#3F4650;text-decoration:none;font-weight:500;font-size:14px;letter-spacing:0}
+.nav a:hover{background:rgba(22,24,29,.05);color:#16181D}
+.nav a[aria-current=page]{background:#fff;color:#16181D;box-shadow:0 1px 2px rgba(22,24,29,.08),0 0 0 1px rgba(22,24,29,.05)}
+.nav-step{flex:none;width:22px;height:22px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;background:rgba(22,24,29,.07);color:#3F4650}
+.nav-step.done{background:#E6F5EE;color:#0F6B42}
+.nav-head{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#5B6370;margin:16px 12px 6px}
+.nav-head:first-child{margin-top:4px}
+.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:24px}
+h1{font-size:28px;line-height:1.15;letter-spacing:-0.02em;font-weight:700;margin:0}
+h2{font-size:17px;line-height:1.3;letter-spacing:-0.012em;font-weight:600;margin:0}
+.lead{font-size:15px;color:#5B6370;margin:6px 0 0}
+.card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 1px 2px rgba(22,24,29,.06),0 0 0 1px rgba(22,24,29,.06)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:10px;border:0;font:inherit;font-weight:600;font-size:14px;cursor:pointer;text-decoration:none;transition:transform 100ms ease-out,background-color 120ms ease-out;background:rgba(22,24,29,.06);color:#16181D;white-space:nowrap}
+.btn:hover{background:rgba(22,24,29,.1);color:#16181D}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:#1D4ED8;color:#fff}.btn-primary:hover{background:#1E40AF;color:#fff}
+.btn-sm{min-height:36px;padding:0 12px;font-size:13px}
+.input{width:100%;min-height:40px;padding:8px 10px;border-radius:10px;border:1px solid rgba(22,24,29,.18);font:inherit;font-size:14px;background:#fff;color:#16181D}
+.input:focus{outline:2px solid #1D4ED8;outline-offset:1px}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:#5B6370}
+.small{font-size:13px;line-height:1.45;letter-spacing:.004em}
+.tiny{font-size:12px;line-height:1.4;letter-spacing:.01em}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.01em;white-space:nowrap}
+.badge-ok{background:#E6F5EE;color:#0F6B42}
+.badge-warn{background:#FFF1D6;color:#8A5A00}
+.badge-info{background:#E8EEFC;color:#1E40AF}
+.badge-neutral{background:rgba(22,24,29,.06);color:#3F4650}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.tile{padding:14px 16px;border-radius:12px;background:#F7F8FA}
+.tile .k{font-size:12px;font-weight:600;letter-spacing:.02em;color:#5B6370;text-transform:uppercase}
+.tile .v{font-size:22px;font-weight:700;letter-spacing:-0.015em;line-height:1.2;margin-top:4px}
+.legend{display:flex;gap:16px;flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#3F4650}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+.scroll{overflow-x:auto}
+.trow{display:grid;grid-template-columns:64px minmax(180px,1fr) 110px 190px 96px;gap:12px;align-items:center;padding:10px 0;border-top:1px solid rgba(22,24,29,.08);min-width:640px}
+.trow.head{border-top:0;padding:0 0 6px;font-size:12px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:#5B6370}
+@media (max-width:900px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:780px){.nav{max-width:none}.nav-list{flex-direction:row;flex-wrap:wrap}.nav-head{width:100%}}
+@media (prefers-reduced-motion:reduce){.btn,.btn:active{transition:none;transform:none}}
+@media (prefers-reduced-transparency:reduce){.top{background:#F3F4F6;backdrop-filter:none;-webkit-backdrop-filter:none}}
+</style>
+</helmet>
+<div style="min-height: 100vh" onPointerDown="{{closeAll}}">
+  <header class="top">
+    <a class="wordmark" href="Main.dc.html" aria-label="First Paycheck home">
+      <svg width="22" height="22" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="1" y="1" width="18" height="18" rx="5.5" fill="#EA580C"/><path d="M6 10.5l2.6 2.6L14 7.8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      First Paycheck
+    </a>
+    <div class="chips">
+      <span class="chip">Acme Corp · Semi-monthly</span>
+      <span class="chip">J. Rivera</span>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="nav" aria-label="Setup steps">
+      <div class="nav-head">Setup</div>
+      <ul class="nav-list">
+        <li><a href="Link.dc.html"><span class="nav-step done"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.5l2.3 2.3L9.5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Accounts and documents</a></li>
+        <li><a href="Confirm.dc.html"><span class="nav-step done"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.5l2.3 2.3L9.5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Confirm pay stub</a></li>
+        <li><a href="Spending.dc.html" aria-current="page"><span class="nav-step">3</span>Spending map</a></li>
+        <li><a href="Decisions.dc.html"><span class="nav-step">4</span>Decisions</a></li>
+      </ul>
+      <div class="nav-head">Your plan</div>
+      <ul class="nav-list">
+        <li><a href="Why.dc.html"><span class="nav-step"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 8.5v-.3c0-.7.4-1 1-1.4.6-.4 1-.8 1-1.5A2 2 0 004 5.3M6 10.3h.01" stroke="#3F4650" stroke-width="1.4" stroke-linecap="round"/></svg></span>Why this decision</a></li>
+        <li><a href="Plan.dc.html"><span class="nav-step"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><rect x="2" y="2.5" width="8" height="7.5" rx="1.5" stroke="#3F4650" stroke-width="1.4"/><path d="M2 5h8" stroke="#3F4650" stroke-width="1.4"/></svg></span>Plan and calendar</a></li>
+        <li><a href="CheckIn.dc.html"><span class="nav-step"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 9.5l3-3 2 2 3-4" stroke="#3F4650" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Monthly check-in</a></li>
+      </ul>
+    </nav>
+
+    <main class="main">
+      <div>
+        <h1>Where October's money went</h1>
+        <p class="lead">Known merchants are labeled by rules. Only unknown ones went to the AI, with a confidence score. Fix any label and it becomes a rule for next time.</p>
+      </div>
+
+      <section class="card" aria-labelledby="summary-title" style="display: flex; flex-direction: column; gap: 16px">
+        <div class="row" style="justify-content: space-between">
+          <h2 id="summary-title">October 1 to 17 · two paychecks</h2>
+          <span class="small muted">Chase ··4821 and ··7730</span>
+        </div>
+        <div class="tiles">
+          <div class="tile" style="background: #EDE9FE"><div class="k" style="color: #5B21B6">Income</div><div class="v num" style="color: #5B21B6">{{incomeText}}</div><div class="tiny muted">2 × $1,996.04 net</div></div>
+          <div class="tile" style="background: #E8EEFC"><div class="k" style="color: #1E40AF">Essentials</div><div class="v num" style="color: #1E40AF">{{essText}}</div><div class="tiny muted"><span class="num">{{essPct}}</span> of income</div></div>
+          <div class="tile" style="background: #FFEDE3"><div class="k" style="color: #9A3412">Flexible</div><div class="v num" style="color: #9A3412">{{flexText}}</div><div class="tiny muted"><span class="num">{{flexPct}}</span> of income</div></div>
+          <div class="tile" style="background: #D5F3EE"><div class="k" style="color: #115E59">Savings</div><div class="v num" style="color: #115E59">{{saveText}}</div><div class="tiny muted">Savings rate <span class="num">{{savePct}}</span></div></div>
+        </div>
+        <p class="small muted" style="margin: 0">Not yet spent: <strong class="num" style="color: #16181D">{{leftText}}</strong> is still in Chase Checking ··4821. The flow below shows where every dollar of October's gross pay went.</p>
+      </section>
+
+      <section class="card" aria-labelledby="flow-title" style="display: flex; flex-direction: column; gap: 12px">
+        <div class="row" style="justify-content: space-between; align-items: flex-start">
+          <div>
+            <h2 id="flow-title">Where each dollar of October pay went</h2>
+            <div class="small muted">Gross pay to take-home, take-home to buckets, buckets to categories and accounts. Band thickness is proportional to dollars; the category labels update as you fix transactions below.</div>
+          </div>
+          <span class="badge badge-neutral">Scale: 1 px is about $13</span>
+        </div>
+        <div class="scroll" ref="{{scrollRef}}">
+          <div class="flowhost" style="{{hostStyle}}">
+            <svg width="{{hostW}}" height="{{hostH}}" viewBox="0 0 {{hostW}} {{hostH}}" style="position: absolute; left: 0; top: 0; width: {{hostW}}px; height: {{hostH}}px; overflow: visible" role="img" aria-label="Cash flow bands between the labeled nodes; every amount is written in the node labels">
+              <sc-for list="{{links}}" as="l" hint-placeholder-count="6">
+                <path class="band" d="{{l.d}}" fill="{{l.fill}}" fill-opacity="{{l.op}}" stroke="none" onPointerEnter="{{l.enter}}" onPointerLeave="{{l.leave}}" onPointerDown="{{l.down}}"><title>{{l.tip}}</title></path>
+              </sc-for>
+            </svg>
+            <div class="colhead" style="{{colHead0}}">Pay stubs, October</div>
+            <div class="colhead" style="{{colHead1}}">Withheld and deducted</div>
+            <div class="colhead" style="{{colHead2}}">Take-home buckets</div>
+            <div class="colhead" style="{{colHead3}}">Categories and accounts</div>
+            <sc-for list="{{nodes}}" as="n" hint-placeholder-count="8">
+              <button type="button" class="node" style="{{n.style}}" aria-expanded="{{n.expanded}}" aria-describedby="{{n.descId}}" onPointerEnter="{{n.enter}}" onPointerLeave="{{n.leave}}" onPointerDown="{{n.down}}" onFocus="{{n.focus}}" onBlur="{{n.blur}}" onKeyDown="{{n.key}}"><i class="sw" style="{{n.swStyle}}"></i><span class="node-text"><span class="node-name">{{n.name}}</span><span class="node-amt num">{{n.amt}}</span></span></button>
+            </sc-for>
+            <sc-if value="{{popOpen}}" hint-placeholder-val="{{false}}">
+              <div class="pop" id="flow-pop" role="tooltip" style="{{popStyle}}" onPointerEnter="{{popEnter}}" onPointerLeave="{{popLeave}}" onPointerDown="{{popDown}}">
+                <div class="pop-head">
+                  <div class="pop-title"><i class="sw" style="{{popSwStyle}}"></i><span>{{popTitle}}</span></div>
+                  <div class="pop-amt num">{{popAmt}}</div>
+                  <div class="tiny muted">{{popShare}}</div>
+                </div>
+                <sc-if value="{{popHasLines}}" hint-placeholder-val="{{false}}">
+                  <div class="pop-lines">
+                    <sc-for list="{{popLines}}" as="p" hint-placeholder-count="3">
+                      <div class="pop-line">
+                        <span class="pop-merchant">{{p.merchant}}</span>
+                        <span class="badge {{p.srcCls}}">{{p.srcText}}</span>
+                        <span class="num" style="font-weight: 600; text-align: right">{{p.amountText}}</span>
+                        <span class="tiny muted num" style="grid-column: 1 / -1; margin-top: -2px">{{p.date}}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{popHasNote}}" hint-placeholder-val="{{false}}">
+                  <div class="small muted">{{popNote}}</div>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+        <div class="legend" aria-label="Legend">
+          <span><i class="sw" style="background: #7C3AED"></i>Gross pay and 401(k)</span>
+          <span><i class="sw" style="background: #8A919C"></i>Taxes withheld</span>
+          <span><i class="sw" style="background: #EA580C"></i>Health premiums and flexible spending</span>
+          <span><i class="sw" style="background: #3F4650"></i>Take-home</span>
+          <span><i class="sw" style="background: #1D4ED8"></i>Essentials</span>
+          <span><i class="sw" style="background: #14B8A6"></i>Savings</span>
+          <span><i class="sw" style="background: #B8BEC7"></i>Not yet spent</span>
+        </div>
+        <p class="tiny muted" style="margin: 0">Stage 3 categories are lighter shades of their bucket's color. Withholding comes from the two confirmed pay stubs; buckets and categories come from the transactions below. Every value is also in the stat tiles and the table.</p>
+      </section>
+
+      <section class="card" aria-labelledby="txn-title" style="display: flex; flex-direction: column; gap: 12px">
+        <div class="row" style="justify-content: space-between">
+          <h2 id="txn-title">Transactions</h2>
+          <div class="row">
+            <span class="badge badge-neutral"><span class="num">{{ruleCount}}</span> by rule</span>
+            <span class="badge badge-info"><span class="num">{{aiCount}}</span> by AI</span>
+            <span class="badge badge-ok"><span class="num">{{userCount}}</span> fixed by you</span>
+          </div>
+        </div>
+        <sc-if value="{{anyFixed}}" hint-placeholder-val="{{false}}">
+          <div class="row small" style="padding: 10px 14px; border-radius: 10px; background: #E6F5EE; color: #0F6B42">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 8.5l3 3L12.5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Saved as a rule. These merchants will never go back to the AI for you.</span>
+          </div>
+        </sc-if>
+        <div class="scroll">
+          <div class="trow head" aria-hidden="true">
+            <span>Date</span><span>Merchant</span><span>Labeled by</span><span>Category</span><span style="text-align: right">Amount</span>
+          </div>
+          <sc-for list="{{txns}}" as="item" hint-placeholder-count="8">
+            <div class="trow">
+              <span class="small muted num">{{item.date}}</span>
+              <span style="min-width: 0">
+                <span style="font-weight: 600; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{item.merchant}}</span>
+                <span class="tiny muted">{{item.account}}</span>
+              </span>
+              <span><span class="badge {{item.srcCls}}">{{item.srcText}}</span></span>
+              <label class="catlabel">
+                <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Category for {{item.merchant}}</span>
+                <i class="sw" style="{{item.dotStyle}}"></i>
+                <select class="input" value="{{item.category}}" onChange="{{item.change}}">
+                  <sc-for list="{{categories}}" as="c" hint-placeholder-count="4">
+                    <option value="{{c.id}}">{{c.label}}</option>
+                  </sc-for>
+                </select>
+              </label>
+              <span class="num" style="text-align: right; font-weight: 600; {{item.amtStyle}}">{{item.amountText}}</span>
+            </div>
+          </sc-for>
+        </div>
+        <p class="tiny muted" style="margin: 0">Category groups: essentials are rent, groceries, utilities, phone, transit and insurance. Flexible is dining, shopping, subscriptions and entertainment. Savings is any transfer into your emergency-fund account.</p>
+      </section>
+
+      <div class="row" style="justify-content: space-between">
+        <a href="Confirm.dc.html" class="btn">Back</a>
+        <a href="Decisions.dc.html" class="btn btn-primary">
+          Use these numbers in decisions
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":2820}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const t = [
+      ['Oct 1', 'Acme Corp Payroll', '··4821', 1996.04, 'income', 'rule', 1],
+      ['Oct 1', 'Parkline Apartments', '··4821', -1450.00, 'rent', 'rule', 1],
+      ['Oct 2', 'Trader Joe\'s', '··4821', -84.12, 'groceries', 'rule', 1],
+      ['Oct 3', 'PG&E', '··4821', -61.40, 'utilities', 'rule', 1],
+      ['Oct 4', 'Clipper Card Reload', '··4821', -48.00, 'transit', 'rule', 1],
+      ['Oct 5', 'Spotify', '··4821', -11.99, 'subscriptions', 'rule', 1],
+      ['Oct 6', 'Transfer to Chase Savings ··7730', '··4821', -300.00, 'savings', 'rule', 1],
+      ['Oct 8', 'Sweetgreen', '··4821', -14.75, 'dining', 'ai', 0.91],
+      ['Oct 9', 'Amazon', '··4821', -62.30, 'shopping', 'ai', 0.78],
+      ['Oct 11', 'Blue Bottle Coffee', '··4821', -6.25, 'dining', 'ai', 0.94],
+      ['Oct 12', 'Verizon Wireless', '··4821', -70.00, 'phone', 'rule', 1],
+      ['Oct 13', 'Costco Wholesale', '··4821', -142.60, 'shopping', 'ai', 0.62],
+      ['Oct 14', 'Lemonade Renters', '··4821', -12.00, 'subscriptions', 'ai', 0.71],
+      ['Oct 15', 'Acme Corp Payroll', '··4821', 1996.04, 'income', 'rule', 1],
+      ['Oct 16', 'Uber', '··4821', -18.40, 'transit', 'rule', 1],
+      ['Oct 17', 'Trader Joe\'s', '··4821', -91.33, 'groceries', 'rule', 1]
+    ];
+    this.state = {
+      txns: t.map(([date, merchant, account, amount, category, source, conf], i) => ({ id: i, date, merchant, account, amount, category, source, conf })),
+      open: null,
+      pinned: false,
+      hostW: 928
+    };
+    this.closeTimer = null;
+    this.scrollEl = null;
+    this.resizeObs = null;
+  }
+
+  measure() {
+    if (!this.scrollEl) return;
+    const w = Math.floor(this.scrollEl.clientWidth);
+    if (w > 0 && w !== this.state.hostW) this.setState({ hostW: w });
+  }
+
+  componentDidMount() {
+    if (typeof ResizeObserver !== 'undefined' && this.scrollEl) {
+      this.resizeObs = new ResizeObserver(() => this.measure());
+      this.resizeObs.observe(this.scrollEl);
+    }
+    this.measure();
+  }
+
+  openNode(id, pin) {
+    if (this.closeTimer) { clearTimeout(this.closeTimer); this.closeTimer = null; }
+    this.setState((st) => {
+      if (pin) return st.pinned && st.open === id ? { open: null, pinned: false } : { open: id, pinned: true };
+      return st.pinned ? null : { open: id, pinned: false };
+    });
+  }
+
+  closeNode(id, delay) {
+    const run = () => this.setState((st) => (!st.pinned && (id === null || st.open === id) ? { open: null } : null));
+    if (this.closeTimer) { clearTimeout(this.closeTimer); this.closeTimer = null; }
+    if (delay) this.closeTimer = setTimeout(run, 80); else run();
+  }
+
+  closeAll() {
+    if (this.closeTimer) { clearTimeout(this.closeTimer); this.closeTimer = null; }
+    this.setState({ open: null, pinned: false });
+  }
+
+  componentWillUnmount() {
+    if (this.closeTimer) clearTimeout(this.closeTimer);
+    if (this.resizeObs) this.resizeObs.disconnect();
+  }
+
+  categories() {
+    return [
+      { id: 'income', label: 'Income', bucket: 'income' },
+      { id: 'rent', label: 'Rent', bucket: 'ess' },
+      { id: 'groceries', label: 'Groceries', bucket: 'ess' },
+      { id: 'utilities', label: 'Utilities', bucket: 'ess' },
+      { id: 'phone', label: 'Phone', bucket: 'ess' },
+      { id: 'transit', label: 'Transit', bucket: 'ess' },
+      { id: 'insurance', label: 'Insurance', bucket: 'ess' },
+      { id: 'dining', label: 'Dining', bucket: 'flex' },
+      { id: 'shopping', label: 'Shopping', bucket: 'flex' },
+      { id: 'subscriptions', label: 'Subscriptions', bucket: 'flex' },
+      { id: 'entertainment', label: 'Entertainment', bucket: 'flex' },
+      { id: 'savings', label: 'Savings transfer', bucket: 'save' }
+    ];
+  }
+
+  money(n) {
+    return '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  flow(ess, flex, save, left, byCat, cats, containerW) {
+    const k = 0.075, minH = 36, gap = 8, topY = 28, W = 176, edge = 4;
+    const minHostW = 4 * W + 3 * 56 + 2 * edge;
+    const hostW = Math.max(minHostW, Math.floor(containerW || 0));
+    const step = (hostW - 2 * edge - W) / 3;
+    const colX = [0, 1, 2, 3].map((i) => Math.round(edge + i * step));
+    const C = { plum: '#7C3AED', grey: '#8A919C', coral: '#EA580C', ink: '#3F4650', blue: '#1D4ED8', teal: '#14B8A6', lgrey: '#B8BEC7', blueT: '#6B93EE', coralT: '#F2925F' };
+    const quiet = [C.grey, C.lgrey, C.ink];
+    const nodes = [], links = [];
+    const r = (v) => Math.round(v * 10) / 10;
+    const mk = (col, id, name, value, color, kind, zeroName) => {
+      const vh = value * k;
+      const h = Math.max(vh, minH);
+      const n = { col, id, kind, name: value > 0 || !zeroName ? name : zeroName, value, color, vh, h, out: (h - vh) / 2, zero: value <= 0, y: 0, x: colX[col] };
+      nodes.push(n);
+      return n;
+    };
+    const stack = (list, y0) => { let y = y0; list.forEach((n) => { n.y = y; y += n.h + gap; }); };
+    const link = (a, b) => {
+      if (b.value <= 0) return;
+      const t = Math.max(b.vh, 1.5);
+      const x1 = colX[a.col] + W, x2 = colX[b.col], xm = (x1 + x2) / 2;
+      const ya = a.y + a.out, yb = b.y + (b.h - t) / 2;
+      a.out += b.vh;
+      links.push({
+        from: a.id,
+        to: b.id,
+        d: 'M ' + x1 + ' ' + r(ya) + ' C ' + xm + ' ' + r(ya) + ', ' + xm + ' ' + r(yb) + ', ' + x2 + ' ' + r(yb) + ' L ' + x2 + ' ' + r(yb + t) + ' C ' + xm + ' ' + r(yb + t) + ', ' + xm + ' ' + r(ya + t) + ', ' + x1 + ' ' + r(ya + t) + ' Z',
+        fill: b.color,
+        baseOp: quiet.indexOf(b.color) >= 0 ? 0.3 : 0.45,
+        tip: a.name + ' to ' + b.name + ': ' + this.money(b.value)
+      });
+    };
+
+    const gross = mk(0, 'gross', 'Gross pay, 2 stubs', 5416.66, C.plum, 'gross');
+    const fed = mk(1, 'fed', 'Federal tax', 595.52, C.grey, 'ded');
+    const ss = mk(1, 'ss', 'Social Security', 335.84, C.grey, 'ded');
+    const medicare = mk(1, 'medicare', 'Medicare', 78.54, C.grey, 'ded');
+    const state = mk(1, 'state', 'State tax + SDI (CA)', 261.28, C.grey, 'ded');
+    const k401 = mk(1, 'k401', '401(k)', 0, C.plum, 'ded', '401(k), not elected');
+    const health = mk(1, 'health', 'Health premiums', 153.40, C.coral, 'ded');
+    const takeHome = mk(1, 'take', 'Take-home', 3992.08, C.ink, 'take');
+    stack([gross], topY);
+    stack([fed, ss, medicare, state, k401, health, takeHome], topY);
+    [fed, ss, medicare, state, k401, health, takeHome].forEach((n) => link(gross, n));
+
+    const essN = mk(2, 'ess', 'Essentials', ess, C.blue, 'bucket');
+    const flexN = mk(2, 'flex', 'Flexible', flex, C.coral, 'bucket');
+    const saveN = mk(2, 'save', 'Savings', save, C.teal, 'bucket');
+    const leftN = mk(2, 'left', 'Not yet spent', left, C.lgrey, 'bucket');
+    stack([essN, flexN, saveN, leftN], takeHome.y);
+    [essN, flexN, saveN, leftN].forEach((n) => link(takeHome, n));
+
+    const col3 = [];
+    const catNodes = (bucket, color) => cats.filter((c) => c.bucket === bucket && (byCat[c.id] || 0) > 0).map((c) => mk(3, 'cat:' + c.id, c.label, byCat[c.id], color, 'cat'));
+    const essCats = catNodes('ess', C.blueT);
+    const flexCats = catNodes('flex', C.coralT);
+    const saveAcct = save > 0 ? [mk(3, 'acct:save', 'Chase Savings ··7730', save, C.teal, 'acct')] : [];
+    const checking = left > 0 ? [mk(3, 'acct:left', 'Chase Checking ··4821', left, C.lgrey, 'acct')] : [];
+    col3.push.apply(col3, essCats.concat(flexCats, saveAcct, checking));
+    stack(col3, essN.y);
+    essCats.forEach((n) => link(essN, n));
+    flexCats.forEach((n) => link(flexN, n));
+    saveAcct.forEach((n) => link(saveN, n));
+    checking.forEach((n) => link(leftN, n));
+
+    const hostH = Math.ceil(Math.max.apply(null, nodes.map((n) => n.y + n.h))) + 12;
+    return { geo: nodes, links, hostH, W, hostW, colX, r };
+  }
+
+  popover(n, flow, s, srcOf) {
+    const takeHome = 3992.08, gross = 5416.66;
+    const share = (v, base, label) => (base > 0 ? Math.round((v / base) * 1000) / 10 : 0) + '% of ' + label;
+    const out = { popTitle: n.name, popAmt: this.money(n.value), popSwStyle: n.zero ? 'background: transparent; border: 1.5px dashed #8A919C' : 'background: ' + n.color, popShare: '', popLines: [], popHasLines: false, popNote: '', popHasNote: false };
+    let lines = 0;
+    if (n.kind === 'gross') out.popShare = 'Two semi-monthly stubs, Oct 1 and Oct 15';
+    else if (n.kind === 'ded') out.popShare = n.zero ? 'Elect 4% in Decisions to see $216.66 here' : share(n.value, gross, 'gross pay');
+    else if (n.kind === 'take') out.popShare = share(n.value, gross, 'gross pay');
+    else if (n.kind === 'bucket') out.popShare = share(n.value, takeHome, 'take-home');
+    else if (n.kind === 'acct') {
+      out.popShare = share(n.value, takeHome, 'take-home');
+      out.popNote = n.id === 'acct:save' ? 'Transferred into Chase Savings ··7730, the account your emergency fund is tracked against.' : 'Stays in Chase Checking ··4821 until it is spent or moved.';
+      out.popHasNote = true;
+    } else if (n.kind === 'cat') {
+      out.popShare = share(n.value, takeHome, 'take-home');
+      const catId = n.id.slice(4);
+      const list = s.txns.filter((t) => t.category === catId && t.amount < 0).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+      const shown = list.slice(0, 8);
+      out.popLines = shown.map((t) => Object.assign({ merchant: t.merchant, date: t.date + ' · ' + t.account, amountText: '-' + this.money(t.amount) }, srcOf(t)));
+      out.popHasLines = out.popLines.length > 0;
+      lines = out.popLines.length;
+      if (list.length > shown.length) { out.popNote = '+' + (list.length - shown.length) + ' more in the table below'; out.popHasNote = true; }
+    }
+    const popW = 300;
+    const popH = 84 + lines * 44 + (out.popHasNote ? 44 : 0);
+    let left = n.x + flow.W + 10, origin = 'left top';
+    if (left + popW > flow.hostW) { left = n.x - 10 - popW; origin = 'right top'; }
+    let top = n.y;
+    if (top + popH > flow.hostH - 4) top = Math.max(4, flow.hostH - 4 - popH);
+    out.popStyle = 'left: ' + left + 'px; top: ' + flow.r(top) + 'px; width: ' + popW + 'px; transform-origin: ' + origin;
+    return out;
+  }
+
+  renderVals() {
+    const cats = this.categories();
+    const bucketOf = (id) => (cats.find((c) => c.id === id) || {}).bucket;
+    const s = this.state;
+    let income = 0, ess = 0, flex = 0, save = 0;
+    const byCat = {};
+    s.txns.forEach((t) => {
+      const b = bucketOf(t.category);
+      if (b === 'income') income += t.amount;
+      else if (b === 'ess') ess += -t.amount;
+      else if (b === 'flex') flex += -t.amount;
+      else if (b === 'save') save += -t.amount;
+      if (b !== 'income') byCat[t.category] = (byCat[t.category] || 0) + -t.amount;
+    });
+    const left = income - ess - flex - save;
+    const flow = this.flow(ess, flex, save, left, byCat, cats, s.hostW);
+    const pct = (n) => (income > 0 ? (n / income) * 100 : 0);
+    const pctText = (n) => Math.round(pct(n)) + '%';
+    const bucketColor = { income: '#7C3AED', ess: '#1D4ED8', flex: '#EA580C', save: '#14B8A6' };
+    const srcOf = (t) => ({
+      srcCls: t.source === 'user' ? 'badge-ok' : t.source === 'ai' ? (t.conf < 0.7 ? 'badge-warn' : 'badge-info') : 'badge-neutral',
+      srcText: t.source === 'user' ? 'You' : t.source === 'ai' ? 'AI · ' + Math.round(t.conf * 100) + '%' : 'Rule'
+    });
+
+    const open = s.open;
+    const openNode = open ? flow.geo.find((n) => n.id === open) : null;
+    const isMouse = (e) => !e || !e.pointerType || e.pointerType === 'mouse';
+    const nodes = flow.geo.map((n) => {
+      const isOpen = n.id === open;
+      return {
+        name: n.name,
+        amt: this.money(n.value),
+        style: 'left: ' + n.x + 'px; top: ' + flow.r(n.y) + 'px; width: ' + flow.W + 'px; height: ' + flow.r(n.h) + 'px' + (n.zero ? '; border-style: dashed; color: #5B6370' : '') + (isOpen ? '; box-shadow: 0 0 0 2px ' + (n.zero ? '#8A919C' : n.color) + '; z-index: 2' : ''),
+        swStyle: n.zero ? 'background: transparent; border: 1.5px dashed #8A919C' : 'background: ' + n.color,
+        expanded: isOpen,
+        descId: isOpen ? 'flow-pop' : undefined,
+        enter: (e) => { if (isMouse(e)) this.openNode(n.id, false); },
+        leave: (e) => { if (isMouse(e)) this.closeNode(n.id, true); },
+        down: (e) => { e.stopPropagation(); this.openNode(n.id, true); },
+        focus: () => this.openNode(n.id, false),
+        blur: () => this.closeNode(n.id, false),
+        key: (e) => { if (e.key === 'Escape') { e.stopPropagation(); this.closeAll(); } }
+      };
+    });
+    const links = flow.links.map((l) => {
+      const related = open && (l.from === open || l.to === open);
+      return Object.assign({}, l, {
+        op: open ? (related ? Math.min(0.85, l.baseOp + 0.35) : l.baseOp * 0.65) : l.baseOp,
+        enter: (e) => { if (isMouse(e)) this.openNode(l.to, false); },
+        leave: (e) => { if (isMouse(e)) this.closeNode(l.to, true); },
+        down: (e) => { e.stopPropagation(); this.openNode(l.to, true); }
+      });
+    });
+    const pop = openNode ? this.popover(openNode, flow, s, srcOf) : { popStyle: '', popTitle: '', popAmt: '', popShare: '', popSwStyle: '', popLines: [], popHasLines: false, popNote: '', popHasNote: false };
+
+    const txns = s.txns.map((t) => {
+      const src = srcOf(t);
+      const srcCls = src.srcCls;
+      const srcText = src.srcText;
+      return Object.assign({}, t, {
+        srcCls,
+        srcText,
+        dotStyle: 'background: ' + (bucketColor[bucketOf(t.category)] || '#5B6370') + '; flex: none',
+        amountText: (t.amount < 0 ? '-' : '+') + this.money(t.amount),
+        amtStyle: t.amount > 0 ? 'color: #5B21B6' : 'color: #16181D',
+        change: (e) => {
+          const v = e.target.value;
+          this.setState((st) => ({ txns: st.txns.map((x) => (x.id === t.id ? Object.assign({}, x, { category: v, source: 'user', conf: 1 }) : x)) }));
+        }
+      });
+    });
+    return {
+      txns,
+      categories: cats,
+      nodes,
+      links,
+      hostH: flow.hostH,
+      hostW: flow.hostW,
+      hostStyle: 'width: ' + flow.hostW + 'px; height: ' + flow.hostH + 'px',
+      colHead0: 'left: ' + flow.colX[0] + 'px',
+      colHead1: 'left: ' + flow.colX[1] + 'px',
+      colHead2: 'left: ' + flow.colX[2] + 'px',
+      colHead3: 'left: ' + flow.colX[3] + 'px',
+      scrollRef: (el) => { this.scrollEl = el; },
+      popOpen: !!openNode,
+      popStyle: pop.popStyle,
+      popTitle: pop.popTitle,
+      popAmt: pop.popAmt,
+      popShare: pop.popShare,
+      popSwStyle: pop.popSwStyle,
+      popLines: pop.popLines,
+      popHasLines: pop.popHasLines,
+      popNote: pop.popNote,
+      popHasNote: pop.popHasNote,
+      popEnter: () => { if (this.closeTimer) { clearTimeout(this.closeTimer); this.closeTimer = null; } },
+      popLeave: () => this.closeNode(null, true),
+      popDown: (e) => e.stopPropagation(),
+      closeAll: () => this.closeAll(),
+      incomeText: this.money(income),
+      essText: this.money(ess),
+      flexText: this.money(flex),
+      saveText: this.money(save),
+      leftText: this.money(left),
+      essPct: pctText(ess),
+      flexPct: pctText(flex),
+      savePct: pctText(save),
+      ruleCount: s.txns.filter((t) => t.source === 'rule').length,
+      aiCount: s.txns.filter((t) => t.source === 'ai').length,
+      userCount: s.txns.filter((t) => t.source === 'user').length,
+      anyFixed: s.txns.some((t) => t.source === 'user')
+    };
+  }
+}
+</script>
+</body>
+</html>

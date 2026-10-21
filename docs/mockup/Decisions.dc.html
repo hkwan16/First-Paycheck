@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Decisions</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+:root{--ink:#16181D;--ink-2:#3F4650;--ink-3:#5B6370;--ground:#F3F4F6;--surface:#FFFFFF;--blue:#1D4ED8;--blue-deep:#1E40AF;--blue-text:#1E40AF;--blue-tint:#E8EEFC;--coral:#EA580C;--coral-text:#9A3412;--coral-tint:#FFEDE3;--teal:#14B8A6;--teal-text:#115E59;--teal-tint:#D5F3EE;--plum:#7C3AED;--plum-text:#5B21B6;--plum-tint:#EDE9FE;--green:#0F7A4B;--green-text:#0F6B42;--green-tint:#E6F5EE;--amber:#D97706;--amber-text:#8A5A00;--amber-tint:#FFF1D6;--red:#DC2626;--red-text:#B42318;--red-tint:#FEE4E2}
+.badge-coral{background:var(--coral-tint);color:var(--coral-text)}.badge-teal{background:var(--teal-tint);color:var(--teal-text)}.badge-plum{background:var(--plum-tint);color:var(--plum-text)}
+.ico{flex:none;width:36px;height:36px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center}
+.ico-blue{background:var(--blue-tint);color:var(--blue-text)}.ico-coral{background:var(--coral-tint);color:var(--coral-text)}.ico-teal{background:var(--teal-tint);color:var(--teal-text)}.ico-plum{background:var(--plum-tint);color:var(--plum-text)}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+*,*::before,*::after{box-sizing:border-box}
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 24px;background:rgba(243,244,246,.72);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(22,24,29,.08)}
+.wordmark{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:15px;letter-spacing:-0.01em;color:#16181D;text-decoration:none}
+.chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(22,24,29,.06);font-size:12px;font-weight:500;letter-spacing:.01em;color:#3F4650;white-space:nowrap}
+.shell{display:flex;flex-wrap:wrap;gap:24px;padding:24px;max-width:1280px;margin:0 auto;width:100%}
+.nav{flex:1 1 200px;max-width:240px}
+.nav-list{display:flex;flex-direction:column;gap:2px;list-style:none;margin:0;padding:0}
+.nav a{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 12px;border-radius:10px;color:#3F4650;text-decoration:none;font-weight:500;font-size:14px;letter-spacing:0}
+.nav a:hover{background:rgba(22,24,29,.05);color:#16181D}
+.nav a[aria-current=page]{background:#fff;color:#16181D;box-shadow:0 1px 2px rgba(22,24,29,.08),0 0 0 1px rgba(22,24,29,.05)}
+.nav-step{flex:none;width:22px;height:22px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;background:rgba(22,24,29,.07);color:#3F4650}
+.nav-step.done{background:#E6F5EE;color:#0F6B42}
+.nav-head{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#5B6370;margin:16px 12px 6px}
+.nav-head:first-child{margin-top:4px}
+.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:24px}
+h1{font-size:28px;line-height:1.15;letter-spacing:-0.02em;font-weight:700;margin:0}
+h2{font-size:17px;line-height:1.3;letter-spacing:-0.012em;font-weight:600;margin:0}
+.lead{font-size:15px;color:#5B6370;margin:6px 0 0}
+.card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 1px 2px rgba(22,24,29,.06),0 0 0 1px rgba(22,24,29,.06);display:flex;flex-direction:column;gap:16px;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:10px;border:0;font:inherit;font-weight:600;font-size:14px;cursor:pointer;text-decoration:none;transition:transform 100ms ease-out,background-color 120ms ease-out;background:rgba(22,24,29,.06);color:#16181D;white-space:nowrap}
+.btn:hover{background:rgba(22,24,29,.1);color:#16181D}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:#1D4ED8;color:#fff}.btn-primary:hover{background:#1E40AF;color:#fff}
+.btn-confirmed{background:#E6F5EE;color:#0F6B42}.btn-confirmed:hover{background:#D5EEE1;color:#0F6B42}
+.btn-sm{min-height:36px;padding:0 12px;font-size:13px}
+.label{font-size:13px;font-weight:600;color:#3F4650;display:flex;justify-content:space-between;gap:8px;margin-bottom:6px}
+.input{width:100%;min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid rgba(22,24,29,.18);font:inherit;font-size:15px;background:#fff;color:#16181D}
+.input:focus{outline:2px solid #1D4ED8;outline-offset:1px}
+.range{width:100%;accent-color:#1D4ED8;height:44px;margin:0}
+.seg{display:inline-flex;background:rgba(22,24,29,.06);border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{min-height:38px;padding:0 14px;border:0;border-radius:8px;background:transparent;font:inherit;font-size:13px;font-weight:500;color:#3F4650;cursor:pointer;transition:transform 100ms ease-out}
+.seg button:active{transform:scale(.97)}
+.seg button[aria-pressed=true]{background:#fff;color:#16181D;box-shadow:0 1px 2px rgba(22,24,29,.12);font-weight:600}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:#5B6370}
+.small{font-size:13px;line-height:1.45;letter-spacing:.004em}
+.tiny{font-size:12px;line-height:1.4;letter-spacing:.01em}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.01em;white-space:nowrap}
+.badge-ok{background:#E6F5EE;color:#0F6B42}
+.badge-warn{background:#FFF1D6;color:#8A5A00}
+.badge-info{background:#E8EEFC;color:#1E40AF}
+.badge-neutral{background:rgba(22,24,29,.06);color:#3F4650}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.result{background:#F7F8FA;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.headline{font-size:20px;font-weight:700;letter-spacing:-0.015em;line-height:1.25}
+.kv{display:flex;justify-content:space-between;gap:12px;font-size:14px;padding:6px 0;border-top:1px solid rgba(22,24,29,.08)}
+.kv:first-of-type{border-top:0}
+.bar{height:8px;border-radius:999px;background:rgba(22,24,29,.08);overflow:hidden}
+.bar > div{height:100%;background:#0F7A4B;border-radius:999px;transition:width 160ms ease-out}
+.plan{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);gap:8px 12px;font-size:14px;align-items:center}
+.plan .h{font-weight:600;font-size:13px}
+.plan .c{padding:6px 0;border-top:1px solid rgba(22,24,29,.08)}
+.check{display:flex;align-items:center;gap:10px;min-height:44px;font-size:14px;font-weight:500}
+.check input{width:20px;height:20px;accent-color:#1D4ED8;margin:0}
+@media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:780px){.nav{max-width:none}.nav-list{flex-direction:row;flex-wrap:wrap}.nav-head{width:100%}}
+@media (prefers-reduced-motion:reduce){.btn,.btn:active,.seg button,.bar > div{transition:none;transform:none}}
+@media (prefers-reduced-transparency:reduce){.top{background:#F3F4F6;backdrop-filter:none;-webkit-backdrop-filter:none}}
+</style>
+</helmet>
+<div style="min-height: 100vh">
+  <header class="top">
+    <a class="wordmark" href="Main.dc.html" aria-label="First Paycheck home">
+      <svg width="22" height="22" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="1" y="1" width="18" height="18" rx="5.5" fill="#EA580C"/><path d="M6 10.5l2.6 2.6L14 7.8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      First Paycheck
+    </a>
+    <div class="chips">
+      <span class="chip">Acme Corp · Semi-monthly</span>
+      <span class="chip">J. Rivera</span>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="nav" aria-label="Setup steps">
+      <div class="nav-head">Setup</div>
+      <ul class="nav-list">
+        <li><a href="Link.dc.html"><span class="nav-step done"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.5l2.3 2.3L9.5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Accounts and documents</a></li>
+        <li><a href="Confirm.dc.html"><span class="nav-step done"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.5l2.3 2.3L9.5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Confirm pay stub</a></li>
+        <li><a href="Spending.dc.html"><span class="nav-step done"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.5l2.3 2.3L9.5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Spending map</a></li>
+        <li><a href="Decisions.dc.html" aria-current="page"><span class="nav-step">4</span>Decisions</a></li>
+      </ul>
+      <div class="nav-head">Your plan</div>
+      <ul class="nav-list">
+        <li><a href="Why.dc.html"><span class="nav-step"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 8.5v-.3c0-.7.4-1 1-1.4.6-.4 1-.8 1-1.5A2 2 0 004 5.3M6 10.3h.01" stroke="#3F4650" stroke-width="1.4" stroke-linecap="round"/></svg></span>Why this decision</a></li>
+        <li><a href="Plan.dc.html"><span class="nav-step"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><rect x="2" y="2.5" width="8" height="7.5" rx="1.5" stroke="#3F4650" stroke-width="1.4"/><path d="M2 5h8" stroke="#3F4650" stroke-width="1.4"/></svg></span>Plan and calendar</a></li>
+        <li><a href="CheckIn.dc.html"><span class="nav-step"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 9.5l3-3 2 2 3-4" stroke="#3F4650" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Monthly check-in</a></li>
+      </ul>
+    </nav>
+
+    <main class="main">
+      <div class="row" style="justify-content: space-between; align-items: flex-end">
+        <div>
+          <h1>Four decisions for your first month</h1>
+          <p class="lead">Move the controls to try what-ifs. Every number comes from the calculator, not the AI. Saving keeps a versioned record and adds it to your plan.</p>
+        </div>
+        <span class="badge badge-neutral"><span class="num">{{savedCount}}</span> of 4 saved</span>
+      </div>
+
+      <div class="grid2">
+        <section class="card" aria-labelledby="ef-title">
+          <div class="row" style="justify-content: space-between">
+            <div class="row" style="gap: 10px"><span class="ico ico-teal"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 11a7 7 0 0114 0H3zM10 11v4.5a1.5 1.5 0 003 0M10 2.5V4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><h2 id="ef-title">Emergency fund</h2></div>
+            <span class="badge {{efBadgeCls}}">{{efBadgeText}}</span>
+          </div>
+          <p class="small muted" style="margin: 0">Your spending map puts essentials at <strong class="num">$1,823</strong> a month. Chase Savings ··7730 holds <strong class="num">$2,140</strong> today.</p>
+          <div>
+            <label class="label" for="ef-months"><span>Months of essentials to hold</span><span class="num">{{efMonths}} months</span></label>
+            <input class="range" id="ef-months" type="range" min="3" max="6" step="1" value="{{efMonths}}" onChange="{{setEfMonths}}">
+          </div>
+          <div>
+            <label class="label" for="ef-contrib"><span>Monthly transfer to savings</span><span class="num">{{efContribText}}</span></label>
+            <input class="range" id="ef-contrib" type="range" min="100" max="1000" step="50" value="{{efContrib}}" onChange="{{setEfContrib}}">
+          </div>
+          <div class="result" style="background: #EDF8F6">
+            <div class="headline" style="color: #115E59">Target <span class="num">{{efTargetText}}</span>, reached around {{efDate}}</div>
+            <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{efPct}}" aria-label="Emergency fund progress"><div style="{{efBarStyle}}"></div></div>
+            <div class="kv"><span>Saved so far</span><span class="num">$2,140.00 · {{efPct}}%</span></div>
+            <div class="kv"><span>Still to save</span><span class="num">{{efGapText}}</span></div>
+            <div class="kv"><span>At {{efContribText}} a month</span><span class="num">{{efMonthsToGoal}} months</span></div>
+          </div>
+          <div class="row" style="justify-content: space-between">
+            <button class="btn {{efSaveCls}}" type="button" onClick="{{saveEf}}">{{efSaveText}}</button>
+            <sc-if value="{{efSaved}}" hint-placeholder-val="{{false}}"><a href="Why.dc.html" class="small">Why this decision</a></sc-if>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="k-title">
+          <div class="row" style="justify-content: space-between">
+            <div class="row" style="gap: 10px"><span class="ico ico-plum"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 15l5-5 3 3 6-7M12 6h5v5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><h2 id="k-title">401(k) match</h2></div>
+            <span class="badge {{kBadgeCls}}">{{kBadgeText}}</span>
+          </div>
+          <p class="small muted" style="margin: 0">Acme matches <strong>100% of the first 4%</strong> of your $65,000 salary. Your Oct 15 pay stub shows no contribution yet.</p>
+          <div>
+            <label class="label" for="k-pct"><span>Your contribution</span><span class="num">{{kPct}}% of salary</span></label>
+            <input class="range" id="k-pct" type="range" min="0" max="15" step="1" value="{{kPct}}" onChange="{{setKPct}}">
+          </div>
+          <div class="result" style="background: #F4F1FD">
+            <div class="headline" style="color: #5B21B6">{{kHeadline}}</div>
+            <div class="kv"><span>You put in per year</span><span class="num">{{kYoursText}}</span></div>
+            <div class="kv"><span>Acme adds per year</span><span class="num" style="color: #5B21B6; font-weight: 600">{{kMatchText}}</span></div>
+            <div class="kv"><span>Per paycheck, before tax</span><span class="num">{{kPerText}}</span></div>
+            <div class="kv"><span>Per paycheck, after tax at {{marginalText}} marginal</span><span class="num">{{kPerAfterText}}</span></div>
+          </div>
+          <div class="row" style="justify-content: space-between">
+            <button class="btn {{kSaveCls}}" type="button" onClick="{{saveK}}">{{kSaveText}}</button>
+            <sc-if value="{{kSaved}}" hint-placeholder-val="{{false}}"><a href="Why.dc.html" class="small">Why this decision</a></sc-if>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="hp-title">
+          <div class="row" style="justify-content: space-between">
+            <div class="row" style="gap: 10px"><span class="ico ico-coral"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.7"/><path d="M10 6.5v7M6.5 10h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><h2 id="hp-title">Health plan</h2></div>
+            <span class="badge {{hpBadgeCls}}">{{hpBadgeText}}</span>
+          </div>
+          <p class="small muted" style="margin: 0">Two plans from your Acme benefits summary. Enrollment closes <strong>Nov 14, 2026</strong>. Your pay stub shows the PPO premium ($62.50) today.</p>
+          <div>
+            <div class="label"><span>How much care do you expect in 2027?</span></div>
+            <div class="seg" role="group" aria-label="Expected healthcare use">
+              <button type="button" aria-pressed="{{hpIsLow}}" onClick="{{hpLow}}">Low · about $400</button>
+              <button type="button" aria-pressed="{{hpIsMed}}" onClick="{{hpMed}}">Medium · about $1,800</button>
+              <button type="button" aria-pressed="{{hpIsHigh}}" onClick="{{hpHigh}}">High · about $6,000</button>
+            </div>
+          </div>
+          <div class="plan">
+            <span class="h"></span><span class="h">HDHP + HSA</span><span class="h">PPO</span>
+            <span class="c muted">Premium per year</span><span class="c num">$750</span><span class="c num">$1,500</span>
+            <span class="c muted">Deductible</span><span class="c num">$1,800</span><span class="c num">$250</span>
+            <span class="c muted">Out-of-pocket max</span><span class="c num">$3,500</span><span class="c num">$3,000</span>
+            <span class="c muted">Acme pays into HSA</span><span class="c num">$600</span><span class="c num">none</span>
+            <span class="c" style="font-weight: 600">Your expected cost</span><span class="c num" style="{{hpHdhpStyle}}">{{hpHdhpText}}</span><span class="c num" style="{{hpPpoStyle}}">{{hpPpoText}}</span>
+          </div>
+          <div class="result" style="background: #FFF4EE">
+            <div class="headline" style="color: #9A3412">{{hpHeadline}}</div>
+            <div class="small muted">Break-even is around <span class="num">{{hpBreakEven}}</span> of care a year: below it the HDHP wins, above it the PPO does. Premiums, deductibles and coinsurance are from your plan documents.</div>
+          </div>
+          <div class="row" style="justify-content: space-between">
+            <button class="btn {{hpSaveCls}}" type="button" onClick="{{saveHp}}">{{hpSaveText}}</button>
+            <sc-if value="{{hpSaved}}" hint-placeholder-val="{{false}}"><a href="Why.dc.html" class="small">Why this decision</a></sc-if>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="w4-title">
+          <div class="row" style="justify-content: space-between">
+            <div class="row" style="gap: 10px"><span class="ico ico-blue"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="5" y="3" width="10" height="14" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 8h4M8 11h4M8 14h2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><h2 id="w4-title">W-4, federal only</h2></div>
+            <span class="badge {{w4BadgeCls}}">{{w4BadgeText}}</span>
+          </div>
+          <p class="small muted" style="margin: 0">Your pay stub withholds <strong class="num">$297.76</strong> per check. State tax is shown on your stub but not computed here.</p>
+          <div>
+            <div class="label"><span>Step 1(c): filing status</span></div>
+            <div class="seg" role="group" aria-label="Filing status">
+              <button type="button" aria-pressed="{{w4IsSingle}}" onClick="{{w4Single}}">Single</button>
+              <button type="button" aria-pressed="{{w4IsMfj}}" onClick="{{w4Mfj}}">Married filing jointly</button>
+              <button type="button" aria-pressed="{{w4IsHoh}}" onClick="{{w4Hoh}}">Head of household</button>
+            </div>
+          </div>
+          <label class="check">
+            <input type="checkbox" checked="{{twoJobs}}" onChange="{{toggleTwoJobs}}">
+            Step 2(c): I have a second job, or my spouse works
+          </label>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+            <div>
+              <label class="label" for="w4-dep"><span>Step 3: children under 17</span></label>
+              <input class="input num" id="w4-dep" type="number" min="0" max="5" step="1" value="{{dependents}}" onChange="{{setDependents}}">
+            </div>
+            <div>
+              <label class="label" for="w4-extra"><span>Step 4(c): extra per check</span><span class="num">{{extraText}}</span></label>
+              <input class="range" id="w4-extra" type="range" min="0" max="200" step="10" value="{{extra}}" onChange="{{setExtra}}">
+            </div>
+          </div>
+          <div class="result" style="background: #F0F4FD">
+            <div class="headline" style="{{w4HeadStyle}}">{{w4Headline}}</div>
+            <div class="kv"><span>Projected 2026 federal tax</span><span class="num">{{w4TaxText}}</span></div>
+            <div class="kv"><span>Withheld with this W-4</span><span class="num">{{w4WithheldText}}</span></div>
+            <div class="kv"><span>If you keep today's W-4 instead</span><span class="num">{{w4CurrentText}}</span></div>
+            <div class="tiny muted">Uses 2026 brackets and the {{w4StdText}} standard deduction, your 401(k) choice above, and pre-tax premiums from your stub.</div>
+          </div>
+          <div class="row" style="justify-content: space-between">
+            <button class="btn {{w4SaveCls}}" type="button" onClick="{{saveW4}}">{{w4SaveText}}</button>
+            <sc-if value="{{w4Saved}}" hint-placeholder-val="{{false}}"><a href="Why.dc.html" class="small">Why this decision</a></sc-if>
+          </div>
+        </section>
+      </div>
+
+      <div class="row" style="justify-content: space-between">
+        <a href="Spending.dc.html" class="btn">Back</a>
+        <a href="Plan.dc.html" class="btn btn-primary">
+          See your plan
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1640}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      efMonths: 3, efContrib: 300,
+      kPct: 4,
+      hpUsage: 'low',
+      w4Status: 'single', twoJobs: false, dependents: 0, extra: 0,
+      saved: { ef: null, k: null, hp: null, w4: null },
+      versions: { ef: 0, k: 0, hp: 0, w4: 0 }
+    };
+  }
+
+  d0(n) { return (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US'); }
+  d2(n) { return (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  tax(taxable, status) {
+    const b = {
+      single: [[12400, 0.10], [50400, 0.12], [105700, 0.22], [201775, 0.24], [256225, 0.32], [640600, 0.35], [Infinity, 0.37]],
+      mfj: [[24800, 0.10], [100800, 0.12], [211400, 0.22], [403550, 0.24], [512450, 0.32], [768700, 0.35], [Infinity, 0.37]],
+      hoh: [[17700, 0.10], [67450, 0.12], [105700, 0.22], [201750, 0.24], [256200, 0.32], [640600, 0.35], [Infinity, 0.37]]
+    }[status];
+    let t = 0, prev = 0, marginal = 0.10;
+    for (const [cap, rate] of b) {
+      if (taxable <= prev) break;
+      const slice = Math.min(taxable, cap) - prev;
+      t += slice * rate;
+      marginal = rate;
+      prev = cap;
+    }
+    return { tax: Math.max(0, t), marginal };
+  }
+
+  planCost(p, spend) {
+    const oop = Math.min(p.oop, Math.min(spend, p.ded) + Math.max(0, spend - p.ded) * p.coins);
+    return p.premium + oop - p.hsa;
+  }
+
+  snapshot(key) {
+    const s = this.state;
+    if (key === 'ef') return JSON.stringify([s.efMonths, s.efContrib]);
+    if (key === 'k') return JSON.stringify([s.kPct]);
+    if (key === 'hp') return JSON.stringify([s.hpUsage]);
+    return JSON.stringify([s.w4Status, s.twoJobs, s.dependents, s.extra]);
+  }
+
+  saveState(key) {
+    const snap = this.snapshot(key);
+    const saved = this.state.saved[key];
+    const dirty = saved !== null && saved !== snap;
+    const v = this.state.versions[key];
+    return {
+      saved: saved !== null,
+      cls: saved === null ? 'btn-primary' : dirty ? 'btn-primary' : 'btn-confirmed',
+      text: saved === null ? 'Save this decision' : dirty ? 'Save as v' + (v + 1) : 'Saved as v' + v,
+      badgeCls: saved === null ? 'badge-neutral' : dirty ? 'badge-warn' : 'badge-ok',
+      badgeText: saved === null ? 'Not saved' : dirty ? 'Changed since v' + v : 'Saved v' + v + ' · Oct 20',
+      save: () => this.setState((st) => {
+        const snapNow = this.snapshot(key);
+        if (st.saved[key] === snapNow) return null;
+        return {
+          saved: Object.assign({}, st.saved, { [key]: snapNow }),
+          versions: Object.assign({}, st.versions, { [key]: st.versions[key] + 1 })
+        };
+      })
+    };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const salary = 65000, periods = 24, grossPer = 2708.33, ess = 1823.25, current = 2140;
+
+    const efTarget = s.efMonths * ess;
+    const efGap = Math.max(0, efTarget - current);
+    const efMonthsToGoal = Math.ceil(efGap / s.efContrib);
+    const efPct = Math.min(100, Math.round((current / efTarget) * 100));
+    const d = new Date(2026, 9, 1);
+    d.setMonth(d.getMonth() + efMonthsToGoal);
+    const efDate = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+
+    const kYours = (s.kPct / 100) * salary;
+    const kMatch = (Math.min(s.kPct, 4) / 100) * salary;
+    const kMissed = (Math.max(0, 4 - s.kPct) / 100) * salary;
+    const kPer = (s.kPct / 100) * grossPer;
+
+    const pretax = kYours + 62.5 * periods + 14.2 * periods;
+    const wages = salary - pretax;
+    const std = { single: 16100, mfj: 32200, hoh: 24150 }[s.w4Status];
+    const other = s.twoJobs ? 18000 : 0;
+    const credit = 2000 * s.dependents;
+    const actual = this.tax(Math.max(0, wages + other - std), s.w4Status);
+    const actualTax = Math.max(0, actual.tax - credit);
+    const stdThisJob = s.twoJobs ? std / 2 : std;
+    const thisJobWithheld = Math.max(0, this.tax(Math.max(0, wages - stdThisJob), s.w4Status).tax - credit);
+    const otherWithheld = s.twoJobs ? this.tax(Math.max(0, other - std / 2), s.w4Status).tax : 0;
+    const withheld = thisJobWithheld + otherWithheld + s.extra * periods;
+    const refund = withheld - actualTax;
+    const currentWithheld = 297.76 * periods + otherWithheld;
+    const currentRefund = currentWithheld - actualTax;
+    const marginal = actual.marginal;
+    const kPerAfter = kPer * (1 - marginal);
+
+    const hdhp = { premium: 750, ded: 1800, oop: 3500, coins: 0.30, hsa: 600 };
+    const ppo = { premium: 1500, ded: 250, oop: 3000, coins: 0.10, hsa: 0 };
+    const spend = { low: 400, medium: 1800, high: 6000 }[s.hpUsage];
+    const cH = this.planCost(hdhp, spend);
+    const cP = this.planCost(ppo, spend);
+    const hdhpWins = cH <= cP;
+    let be = 0;
+    for (let x = 0; x <= 20000; x += 50) { if (this.planCost(ppo, x) <= this.planCost(hdhp, x)) { be = x; break; } }
+    const usageLabel = { low: 'low', medium: 'medium', high: 'high' }[s.hpUsage];
+
+    const ef = this.saveState('ef'), k = this.saveState('k'), hp = this.saveState('hp'), w4 = this.saveState('w4');
+    const savedCount = [ef, k, hp, w4].filter((x) => x.saved).length;
+    const setNum = (key) => (e) => this.setState({ [key]: Number(e.target.value) });
+
+    return {
+      savedCount,
+      efMonths: s.efMonths, efContrib: s.efContrib, efContribText: this.d0(s.efContrib),
+      setEfMonths: setNum('efMonths'), setEfContrib: setNum('efContrib'),
+      efTargetText: this.d0(efTarget), efGapText: this.d2(efGap), efMonthsToGoal, efDate, efPct,
+      efBarStyle: 'width: ' + efPct + '%; background: #14B8A6',
+      efSaveCls: ef.cls, efSaveText: ef.text, efBadgeCls: ef.badgeCls, efBadgeText: ef.badgeText, efSaved: ef.saved, saveEf: ef.save,
+
+      kPct: s.kPct, setKPct: setNum('kPct'),
+      kHeadline: s.kPct >= 4 ? 'You capture the full ' + this.d0(kMatch) + ' match' : s.kPct === 0 ? 'You leave the whole ' + this.d0(kMissed) + ' match behind' : 'You leave ' + this.d0(kMissed) + ' of match behind',
+      kYoursText: this.d0(kYours), kMatchText: this.d0(kMatch), kPerText: this.d2(kPer), kPerAfterText: this.d2(kPerAfter),
+      marginalText: Math.round(marginal * 100) + '%',
+      kSaveCls: k.cls, kSaveText: k.text, kBadgeCls: k.badgeCls, kBadgeText: k.badgeText, kSaved: k.saved, saveK: k.save,
+
+      hpIsLow: s.hpUsage === 'low', hpIsMed: s.hpUsage === 'medium', hpIsHigh: s.hpUsage === 'high',
+      hpLow: () => this.setState({ hpUsage: 'low' }), hpMed: () => this.setState({ hpUsage: 'medium' }), hpHigh: () => this.setState({ hpUsage: 'high' }),
+      hpHdhpText: this.d0(cH), hpPpoText: this.d0(cP),
+      hpHdhpStyle: hdhpWins ? 'font-weight: 700; color: #9A3412' : 'font-weight: 500',
+      hpPpoStyle: hdhpWins ? 'font-weight: 500' : 'font-weight: 700; color: #9A3412',
+      hpHeadline: (hdhpWins ? 'HDHP + HSA' : 'PPO') + ' costs about ' + this.d0(Math.abs(cH - cP)) + ' less at ' + usageLabel + ' use',
+      hpBreakEven: this.d0(be),
+      hpSaveCls: hp.cls, hpSaveText: hp.text, hpBadgeCls: hp.badgeCls, hpBadgeText: hp.badgeText, hpSaved: hp.saved, saveHp: hp.save,
+
+      w4IsSingle: s.w4Status === 'single', w4IsMfj: s.w4Status === 'mfj', w4IsHoh: s.w4Status === 'hoh',
+      w4Single: () => this.setState({ w4Status: 'single' }), w4Mfj: () => this.setState({ w4Status: 'mfj' }), w4Hoh: () => this.setState({ w4Status: 'hoh' }),
+      twoJobs: s.twoJobs, toggleTwoJobs: () => this.setState({ twoJobs: !s.twoJobs }),
+      dependents: s.dependents, setDependents: (e) => this.setState({ dependents: Math.max(0, Math.min(5, Number(e.target.value) || 0)) }),
+      extra: s.extra, setExtra: setNum('extra'), extraText: this.d0(s.extra),
+      w4Headline: Math.abs(refund) < 50 ? 'About even at tax time: ' + this.d0(Math.abs(refund)) + (refund >= 0 ? ' refund' : ' due') : refund >= 0 ? 'Projected refund ' + this.d0(refund) : 'Projected balance due ' + this.d0(-refund),
+      w4HeadStyle: refund < -50 ? 'color: #8A5A00' : 'color: #1E40AF',
+      w4TaxText: this.d0(actualTax), w4WithheldText: this.d0(withheld),
+      w4CurrentText: (currentRefund >= 0 ? this.d0(currentRefund) + ' refund' : this.d0(-currentRefund) + ' due'),
+      w4StdText: this.d0(std),
+      w4SaveCls: w4.cls, w4SaveText: w4.text, w4BadgeCls: w4.badgeCls, w4BadgeText: w4.badgeText, w4Saved: w4.saved, saveW4: w4.save
+    };
+  }
+}
+</script>
+</body>
+</html>

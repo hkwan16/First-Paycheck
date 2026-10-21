@@ -1,0 +1,48 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-20T18:00:00Z"},
+  "title": "First Paycheck Mockup B",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1280, "h": 820, "title": "0 Sign in", "expand": "fill", "radius": 12},
+    "Link.dc.html": {"x": 1360, "y": 0, "w": 1280, "h": 1180, "title": "1 Link accounts and upload documents", "expand": "fill", "radius": 12},
+    "Confirm.dc.html": {"x": 2720, "y": 0, "w": 1280, "h": 1360, "title": "2 Confirm pay stub fields", "expand": "fill", "is_interactive": true, "radius": 12},
+    "Spending.dc.html": {"x": 4080, "y": 0, "w": 1280, "h": 2820, "title": "3 Spending map", "expand": "fill", "is_interactive": true, "radius": 12},
+    "Decisions.dc.html": {"x": 0, "y": 3220, "w": 1280, "h": 1640, "title": "4 Decisions", "expand": "fill", "is_interactive": true, "radius": 12},
+    "Why.dc.html": {"x": 1360, "y": 3220, "w": 1280, "h": 1300, "title": "5 Why", "expand": "fill", "is_interactive": true, "radius": 12},
+    "Plan.dc.html": {"x": 2720, "y": 3220, "w": 1280, "h": 1360, "title": "6 Plan and calendar", "expand": "fill", "radius": 12},
+    "CheckIn.dc.html": {"x": 4080, "y": 3220, "w": 1280, "h": 1640, "title": "7 Monthly check-in", "expand": "fill", "is_interactive": true, "radius": 12}
+  },
+  "order": [
+    "Main.dc.html",
+    "Link.dc.html",
+    "Confirm.dc.html",
+    "Spending.dc.html",
+    "Decisions.dc.html",
+    "Why.dc.html",
+    "Plan.dc.html",
+    "CheckIn.dc.html"
+  ],
+  "notes": {
+    "sample": {
+      "x": 0,
+      "y": -660,
+      "w": 720,
+      "maxH": 300,
+      "fill": "blue",
+      "text": "Sample data, not real. Acme Corp, $65,000 salary, semi-monthly pay: gross $2,708.33 and net $1,996.04 per paycheck. Employer matches 100% of the first 4% of salary. Two Chase accounts linked (checking ..4821, savings ..7730) plus a Fidelity 401(k) through Plaid Investments. Health plans are invented: HDHP+HSA $750/yr premium, $1,800 deductible, $3,500 out-of-pocket max, 30% coinsurance, $600 employer HSA deposit; PPO $1,500/yr premium, $250 deductible, $3,000 out-of-pocket max, 10% coinsurance. W-4 projection uses 2026 federal brackets and standard deduction; the optional second job is assumed at $18,000. Look: Ledger. System font, paper-grey ground, white cards, tinted accents (see the palette note); green is reserved for confirmed, verified, saved and on-plan states."
+    },
+    "palette": {
+      "x": 800,
+      "y": -660,
+      "w": 640,
+      "maxH": 300,
+      "fill": "orange",
+      "text": "Palette, defined as CSS custom properties in every artboard. Ink #16181D on ground #F3F4F6, white surfaces. Blue #1D4ED8: primary actions, links, AI-labeled items, W-4, essentials. Coral #EA580C: brand mark, hero highlight, health plan, flexible spending, redaction counts, citations. Teal #14B8A6: savings and the emergency fund. Plum #7C3AED: income, 401(k), pay or deduction changes. Green #0F7A4B: only confirmed, verified, saved and on-plan. Amber #D97706: warnings and the explanation fallback. Red #DC2626: not applied or off plan. Text on tints uses the darker pairs (#1E40AF, #9A3412, #115E59, #5B21B6, #0F6B42, #8A5A00, #B42318), all at 4.5:1 or better; the solid colors differ in lightness as well as hue."
+    },
+    "row1": {"x": 0, "y": -300, "kind": "title1", "maxW": 5360, "text": "Setup: sign in, link, confirm, map spending"},
+    "row2": {"x": 0, "y": 2930, "kind": "title1", "maxW": 5360, "text": "Decide, explain, plan, then come back monthly"}
+  },
+  "designSystems": []
+}
