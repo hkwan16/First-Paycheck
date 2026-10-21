@@ -13,6 +13,7 @@ from llm.schemas import (
     CategoryBatch,
     ExplanationDraft,
     ExtractedField,
+    NumberClaim,
     PayStubExtraction,
 )
 
@@ -146,14 +147,21 @@ def test_benefits_extraction_lists_plans() -> None:
 
 
 def test_explanation_draft_shape() -> None:
-    draft = ExplanationDraft(
-        concept="Employer match",
-        body="Contributing 4% earns the full match.",
-        numbers=["4%"],
-        citation_keys=["401k_deferral_limit"],
-        what_ifs=[],
+    draft = ExplanationDraft.model_validate(
+        {
+            "concept": "Employer match",
+            "text": "Contributing 5% earns the full match of $2,400.00.",
+            "numbers": [{"value": "$2,400.00", "label": "Full match"}],
+            "what_ifs": ["At 4% you would get $2,100.00."],
+            "citation_keys": ["k401.employer_match"],
+        }
     )
-    assert draft.citation_keys == ["401k_deferral_limit"]
+    assert draft.numbers == [NumberClaim(value="$2,400.00", label="Full match")]
+    assert draft.citation_keys == ["k401.employer_match"]
+    with pytest.raises(ValidationError):
+        ExplanationDraft.model_validate({**draft.model_dump(), "body": "old field"})
+    with pytest.raises(ValidationError, match="what_ifs"):
+        ExplanationDraft.model_validate({**draft.model_dump(), "what_ifs": ["a", "b", "c", "d"]})
 
 
 def test_registry_names_every_schema() -> None:
