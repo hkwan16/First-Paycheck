@@ -313,3 +313,11 @@ the read, confirms every field and continues to Spending. Never use a real docum
   `text-ink-3` would collide.
 - jsdom is pinned to 29 because jsdom 30 needs Node 22.22+; bump it with the Node floor.
 - `next dev` writes `AGENTS.md` here; it is gitignored and this file is the agent guide.
+- `pnpm e2e` should leave the `next dev` log empty. Dev prerenders each route to validate its
+  instant UI, so nothing may read the clock while rendering (no `Date.now()`, no `new Date()`
+  outside an effect; the sample QueryClient uses `staleTime: 'static'` and stamps its data) and
+  nothing may `redirect()` from inside a layout's Suspense (redirect in the proxy instead). Do
+  not use `page.route` in the smoke spec: it turns off Chromium's cache, every request then says
+  `Cache-Control: no-cache`, and dev skips that validation (and logs that it did).
+- Plaid Link's script loads through `lib/plaid-script.ts`, once per page, and `usePlaidLink` is
+  mounted only after it has run. Letting react-plaid-link add it runs it twice under Strict Mode.
