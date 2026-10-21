@@ -4,7 +4,7 @@ Status: Implemented, M3. Part B (`GET /spending/summary`) is pulled forward from
 
 ## Goal
 
-Save the calculator result a user picks as an immutable, versioned `decisions` row that the server has recomputed itself, show the current decision per calculator with its history, and turn a decision into the dated checkpoint it implies (`calendar_events`). Code: migration `api/alembic/versions/0004_decisions.py`, `api/app/routers/decisions.py`, `api/app/routers/calendar.py`, `api/calc/registry.py`, `api/calc/pay_dates.py`, `api/decisions/` (save and side effects). Part B adds `GET /spending/summary` (`api/app/routers/spending.py`, `api/calc/spending.py`), a read-only total of the user's transactions by spending bucket.
+Save the calculator result a user picks as an immutable, versioned `decisions` row that the server has recomputed itself, show the current decision per calculator with its history, and turn a decision into the dated checkpoint it implies (`calendar_events`). Code: migration `api/alembic/versions/0004_decisions.py`, `api/app/routers/decisions.py`, `api/app/routers/calendar.py`, `api/calc/registry.py`, `api/calc/pay_dates.py`; the save and its side effects live in the decisions router. Part B adds `GET /spending/summary` (`api/app/routers/spending.py`, `api/calc/spending.py`), a read-only total of the user's transactions by spending bucket.
 
 ## Inputs
 
