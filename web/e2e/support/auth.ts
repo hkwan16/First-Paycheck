@@ -32,6 +32,19 @@ export function e2eUser(): E2EUser | null {
   return supabaseConfigured() && email && password ? { email, password } : null;
 }
 
+export const NO_ALPHA_USER =
+  'Skipped: set E2E_ALPHA_USER_EMAIL and E2E_ALPHA_USER_PASSWORD (a new, confirmed user with no data; scripts/e2e_stack.py makes one per run) to run the alpha path.';
+
+/**
+ * The account alpha.spec.ts walks through the whole alpha with: it must be new
+ * (no bank, no pay stub, no decisions), so it is not the shared e2e user.
+ */
+export function alphaUser(): E2EUser | null {
+  const email = process.env.E2E_ALPHA_USER_EMAIL?.trim();
+  const password = process.env.E2E_ALPHA_USER_PASSWORD;
+  return supabaseConfigured() && email && password ? { email, password } : null;
+}
+
 /** Wait for React to hydrate before interacting, so no event lands on dead HTML. */
 export async function waitForHydration(page: Page) {
   await page.locator('html[data-hydrated="true"]').waitFor();

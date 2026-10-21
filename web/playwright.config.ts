@@ -94,6 +94,8 @@ export default defineConfig({
           },
         ]
       : []),
+    // The whole alpha path as a new user signing in through the form (E2E_ALPHA_USER_*).
+    { name: 'alpha', testMatch: 'alpha.spec.ts', use: desktop },
   ],
   webServer: {
     command: `next dev --port ${PORT}`,
