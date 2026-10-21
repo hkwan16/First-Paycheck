@@ -1,0 +1,214 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.12.3"
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  PYTEST_MARKS: "not plaid_sandbox and not llm_live"
+
+# Steps that need web/ are guarded with hashFiles('web/package.json') so the
+# workflow stays green before the frontend exists.
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --locked
+      - name: ruff check
+        run: uv run ruff check --output-format=github .
+      - name: ruff format
+        run: uv run ruff format --check .
+      - name: mypy
+        run: uv run mypy
+      - name: no em dash
+        run: uv run python scripts/check_no_em_dash.py
+      - if: hashFiles('web/package.json') != ''
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+      - if: hashFiles('web/package.json') != ''
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - if: hashFiles('web/package.json') != ''
+        run: pnpm --dir web install --frozen-lockfile
+      - name: eslint
+        if: hashFiles('web/package.json') != ''
+        run: pnpm --dir web lint
+      - name: tsc
+        if: hashFiles('web/package.json') != ''
+        run: pnpm --dir web typecheck
+
+  migrations:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: first_paycheck_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/first_paycheck_test
+      DATABASE_URL_PRIVILEGED: postgresql://postgres:postgres@localhost:5432/first_paycheck_test
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --locked
+      # Supabase provides the auth schema; plain Postgres gets the test shim.
+      - name: auth schema shim
+        run: uv run python -m tests.support.auth_shim
+      - name: upgrade
+        run: uv run alembic upgrade head
+      - name: downgrade to base
+        run: uv run alembic downgrade base
+      - name: upgrade again
+        run: uv run alembic upgrade head
+      - name: models match the schema
+        run: uv run alembic check
+
+  api-test:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: first_paycheck_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/first_paycheck_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --locked
+      - name: pytest with coverage
+        run: >-
+          uv run pytest -m "${{ env.PYTEST_MARKS }}"
+          --cov=api --cov-report=term --cov-fail-under=85
+
+  ingest-in-docker:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: build runtime image
+        run: docker buildx build --load -f api/Dockerfile --target runtime -t first-paycheck-api:ci .
+      - name: runtime image starts and has tesseract
+        run: |
+          docker run --rm first-paycheck-api:ci tesseract --version
+          docker run --rm first-paycheck-api:ci python -c "import app.main"
+      - name: build test image
+        run: docker buildx build --load -f api/Dockerfile --target test -t first-paycheck-api-test:ci .
+      - name: ingest tests inside the image
+        run: docker run --rm first-paycheck-api-test:ci
+
+  types-drift:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --locked
+      - if: hashFiles('web/package.json') != ''
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+      - if: hashFiles('web/package.json') != ''
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - if: hashFiles('web/package.json') != ''
+        run: pnpm --dir web install --frozen-lockfile
+      - name: regenerate OpenAPI and client types
+        run: make types
+      - name: committed files match
+        run: |
+          if ! git diff --exit-code; then
+            echo "::error::api/openapi.json or the web client types are stale; run 'make types' and commit"
+            exit 1
+          fi
+
+  evals-free:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --locked
+      - name: deterministic eval suites
+        run: make eval
+
+  web-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: hashFiles('web/package.json') == ''
+        run: echo "web/ not found, nothing to test"
+      - if: hashFiles('web/package.json') != ''
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+      - if: hashFiles('web/package.json') != ''
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - if: hashFiles('web/package.json') != ''
+        run: pnpm --dir web install --frozen-lockfile
+      - name: unit tests
+        if: hashFiles('web/package.json') != ''
+        run: pnpm --dir web test
+      - name: build
+        if: hashFiles('web/package.json') != ''
+        run: pnpm --dir web build

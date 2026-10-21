@@ -1,0 +1,13 @@
+# Build-context allowlist for api/Dockerfile (BuildKit reads <Dockerfile>.dockerignore).
+# Everything is excluded except what the image needs, so .env and other local
+# files never reach the build context.
+**
+!pyproject.toml
+!uv.lock
+!evals/pyproject.toml
+!api/
+api/**/__pycache__
+api/**/*.pyc
+api/.pytest_cache
+api/.mypy_cache
+api/openapi.json.tmp
