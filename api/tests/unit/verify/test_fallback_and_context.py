@@ -184,11 +184,9 @@ def test_fallback_when_nothing_is_missed() -> None:
     assert draft.citation_keys == []
 
 
-def test_fallback_and_context_need_a_registered_calculator() -> None:
-    with pytest.raises(ValueError, match="w4"):
-        fallback_draft("w4", {}, {}, set())
-    with pytest.raises(ValueError, match="w4"):
-        explain_context("w4", {}, {}, [], [])
+def test_fallback_and_context_need_an_explainable_calculator() -> None:
+    with pytest.raises(ValueError, match="emergency_fund"):
+        fallback_draft("emergency_fund", {}, {}, set())
     with pytest.raises(ValueError, match="emergency_fund"):
         explain_context("emergency_fund", {}, {}, [], [])
 

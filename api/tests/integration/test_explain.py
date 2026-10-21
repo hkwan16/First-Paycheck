@@ -447,3 +447,56 @@ def test_emergency_fund_decision_is_not_explained_yet(
     assert script.sent == []
     assert rows(db_connection, decision_id) == []
     assert client.get(f"/decisions/{decision_id}/explanation").status_code == 404
+
+
+# Spec 014 example 5: a second job and no Step 2, so a balance due.
+W4_EXAMPLE_5: dict[str, Any] = {
+    "salary_cents": 5_000_000,
+    "pay_periods_per_year": 26,
+    "filing_status": "single",
+    "tax_year": 2026,
+    "other_jobs_wages_cents": 2_000_000,
+    "other_jobs_withholding_cents": 39_000,
+}
+
+
+def test_w4_decision_is_explained_with_its_citations(
+    script: Script, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    """Spec 014 rule 19: W-4 facts, notes and the seeded w4 passages."""
+    client = client_as(user_a)
+    decision_id = save_other(client, "w4", "/calc/w4", W4_EXAMPLE_5)
+    script(GOOD)
+    out = explain(client, decision_id)
+    assert (out["verified"], out["fallback"]) == (True, False)
+    assert out["citations"][0]["key"] == "w4.percentage_method"
+    assert out["citations"][0]["url"] == "https://www.irs.gov/publications/p15t"
+    context = script.sent[0]["context"]
+    assert context["calculator"] == "w4"
+    assert [c["key"] for c in context["citations"]][:5] == [
+        "w4.percentage_method",
+        "w4.form_adjustments",
+        "w4.standard_deduction",
+        "w4.federal_brackets",
+        "w4.multiple_jobs",
+    ]
+    facts = {fact["label"]: fact["value"] for fact in context["facts"]}
+    assert facts["Projected balance due"] == "$2,360.08"
+    assert rows(db_connection, decision_id) == [(1, 0, True, False, "explain/v1")]
+
+
+def test_w4_fallback_is_cited(script: Script, client_as: Client, user_a: FixtureUser) -> None:
+    client = client_as(user_a)
+    decision_id = save_other(client, "w4", "/calc/w4", W4_EXAMPLE_5)
+    script(BAD, BAD)
+    out = explain(client, decision_id)
+    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v1")
+    assert out["verification"]["numbers_unmatched"] == []
+    assert [c["key"] for c in out["citations"]] == [
+        "w4.percentage_method",
+        "w4.form_adjustments",
+        "w4.standard_deduction",
+        "w4.federal_brackets",
+        "w4.multiple_jobs",
+    ]
+    assert "owe about $2,360.08" in out["text"]

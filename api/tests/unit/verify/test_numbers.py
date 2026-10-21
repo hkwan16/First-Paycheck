@@ -29,6 +29,8 @@ def values(text: str) -> list[tuple[Decimal, str]]:
         ("A 12 % rate", [(Decimal(12), "percent")]),
         ("Code 414(v) and 401(a)(17) apply", []),
         ("See Form 1040 and the k401 key, 3rd paycheck", []),
+        ("Check Step 2, fill in Steps 3 and Step 4(c) of your W-4", []),
+        ("Step 3 lowers it by $2,200.", [(Decimal(2200), "money")]),
         ("$60,000 salary, $2,400 match.", [(Decimal(60000), "money"), (Decimal(2400), "money")]),
         ("$46.15.", [(Decimal("46.15"), "money")]),
         ("No numbers here.", []),

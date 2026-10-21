@@ -1,0 +1,115 @@
+# IRS passages the W-4 calculator may cite (spec 014 rule 15).
+#
+# Every passage is quoted exactly from the page at `url`, fetched on
+# `verified_on`; "..." marks omitted words, and each part between them appears
+# verbatim in the page text (curly quotes included). Passages stay under 80
+# words. The standard deduction, bracket and pre-tax deferral passages are the
+# ones k401.yaml and health_plans.yaml quote, checked again against the live
+# pages under the w4 calculator. `make seed` upserts these rows on
+# (calculator, key, tax_year).
+
+- key: w4.percentage_method
+  calculator: w4
+  tax_year: 2026
+  title: How employers figure withholding from Form W-4
+  source: IRS Publication 15-T (2026), section 1
+  url: https://www.irs.gov/publications/p15t
+  passage: >-
+    If you’re an employer with an automated payroll system, use Worksheet 1A
+    and the Percentage Method tables in this section to figure federal income
+    tax withholding. This method works for Forms W-4 for all prior, current,
+    and future years. This method also works for any amount of wages.
+  verified: true
+  verified_on: 2026-10-21
+
+- key: w4.form_adjustments
+  calculator: w4
+  tax_year: 2026
+  title: What Steps 3 and 4 of Form W-4 change
+  source: IRS Publication 15-T (2026), Form W-4
+  url: https://www.irs.gov/publications/p15t
+  passage: >-
+    Employers use the amount on this line as an annual reduction in the amount
+    of withholding. ... Employers increase the annual amount of wages subject
+    to income tax withholding by the annual amount shown in Step 4(a) and
+    reduce the annual amount of wages subject to income tax withholding by the
+    annual amount shown in Step 4(b). Step 4(c). Employers will increase
+    withholding by the per pay period tax amount in Step 4(c).
+  verified: true
+  verified_on: 2026-10-21
+
+- key: w4.multiple_jobs
+  calculator: w4
+  tax_year: 2026
+  title: Form W-4 Step 2 for two jobs
+  source: 2026 Form W-4, Specific Instructions
+  url: https://www.irs.gov/pub/irs-pdf/fw4.pdf
+  passage: >-
+    Instead, if you (and your spouse) have a total of only two jobs, you may
+    check the box in option (c). The box must also be checked on the Form W-4
+    for the other job. If the box is checked, the standard deduction and tax
+    brackets will be cut in half for each job to calculate withholding. This
+    option is accurate for jobs with similar pay; otherwise, more tax than
+    necessary may be withheld ...
+  verified: true
+  verified_on: 2026-10-21
+
+- key: w4.dependents_credit
+  calculator: w4
+  tax_year: 2026
+  title: Form W-4 Step 3 for dependents
+  source: 2026 Form W-4, Specific Instructions
+  url: https://www.irs.gov/pub/irs-pdf/fw4.pdf
+  passage: >-
+    Step 3. This step provides instructions for determining the amount of the
+    child tax credit and the credit for other dependents that you may be able
+    to claim when you file your tax return. ... Including these credits will
+    increase your paycheck and reduce the amount of any refund you may receive
+    when you file your tax return.
+  verified: true
+  verified_on: 2026-10-21
+
+- key: w4.standard_deduction
+  calculator: w4
+  tax_year: 2026
+  title: 2026 standard deduction
+  source: IRS News Release IR-2025-103
+  url: https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2026-including-amendments-from-the-one-big-beautiful-bill
+  passage: >-
+    For tax year 2026, the standard deduction increases to $32,200 for married
+    couples filing jointly. For single taxpayers and married individuals filing
+    separately, the standard deduction rises to $16,100 for tax year 2026, and
+    for heads of households, the standard deduction will be $24,150.
+  verified: true
+  verified_on: 2026-10-21
+
+- key: w4.federal_brackets
+  calculator: w4
+  tax_year: 2026
+  title: 2026 federal income tax rates
+  source: IRS News Release IR-2025-103
+  url: https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2026-including-amendments-from-the-one-big-beautiful-bill
+  passage: >-
+    For tax year 2026, the top tax rate remains 37% for individual single
+    taxpayers with incomes greater than $640,600 ($768,700 for married couples
+    filing jointly). ... 24% for incomes over $105,700 ($211,400 for married
+    couples filing jointly); 22% for incomes over $50,400 ($100,800 for married
+    couples filing jointly); 12% for incomes over $12,400 ($24,800 for married
+    couples filing jointly).
+  verified: true
+  verified_on: 2026-10-21
+
+- key: w4.pretax_deferral
+  calculator: w4
+  tax_year: 2026
+  title: How 401(k) elective deferrals are taxed
+  source: IRS 401(k) Resource Guide, Plan Participants
+  url: https://www.irs.gov/retirement-plans/plan-participant-employee/401k-resource-guide-plan-participants-401k-plan-overview
+  passage: >-
+    These deferred wages (elective deferrals) are generally not subject to
+    federal income tax withholding at the time of deferral ... Although
+    elective deferrals are not treated as current income for federal income tax
+    purposes, they are included as wages subject to Social Security (FICA),
+    Medicare, and federal unemployment taxes (FUTA).
+  verified: true
+  verified_on: 2026-10-21

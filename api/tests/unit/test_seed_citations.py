@@ -9,6 +9,10 @@ import pytest
 from calc.health_plans import BASE_CITATION_KEYS as HEALTH_BASE_KEYS
 from calc.health_plans import HDHP_CITATION_KEYS
 from calc.k401 import BASE_CITATION_KEYS, CATCH_UP_KEY, COMPENSATION_LIMIT_KEY
+from calc.w4 import BASE_CITATION_KEYS as W4_BASE_KEYS
+from calc.w4 import DEPENDENTS_CREDIT_KEY as W4_DEPENDENTS_CREDIT_KEY
+from calc.w4 import MULTIPLE_JOBS_KEY as W4_MULTIPLE_JOBS_KEY
+from calc.w4 import PRETAX_DEFERRAL_KEY as W4_PRETAX_DEFERRAL_KEY
 from db.seed.load import SeedError, read_seed_citations
 
 
@@ -33,6 +37,17 @@ def test_health_seed_covers_every_key_the_calculator_emits() -> None:
     """Spec 012 rule 11."""
     keys = {c.key for c in read_seed_citations() if c.calculator == "health_plans"}
     assert keys == {*HDHP_CITATION_KEYS, *HEALTH_BASE_KEYS}
+
+
+def test_w4_seed_covers_every_key_the_calculator_emits() -> None:
+    """Spec 014 rule 15."""
+    keys = {c.key for c in read_seed_citations() if c.calculator == "w4"}
+    assert keys == {
+        *W4_BASE_KEYS,
+        W4_MULTIPLE_JOBS_KEY,
+        W4_DEPENDENTS_CREDIT_KEY,
+        W4_PRETAX_DEFERRAL_KEY,
+    }
 
 
 def write(directory: Path, body: str) -> Path:
