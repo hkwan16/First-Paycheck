@@ -12,11 +12,6 @@ export function institutionInitials(name: string | null): string {
   return letters.toUpperCase();
 }
 
-/** "··4821", the mockup's way of showing an account's last digits. */
-export function maskLabel(mask: string | null): string | null {
-  return mask ? `··${mask}` : null;
-}
-
 /** The role select's value: a role, '' for none chosen yet, or 'unused'. */
 export type RoleValue = AccountRole | '' | 'unused';
 

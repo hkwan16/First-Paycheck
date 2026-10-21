@@ -9,10 +9,10 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useAccountTransactionCount, useUpdateAccount } from '@/lib/api/hooks';
 import { apiErrorMessage } from '@/lib/api/errors';
 import type { Account } from '@/lib/api/types';
+import { maskLabel } from '@/lib/accounts';
 import { formatRelative } from '@/lib/dates';
 import {
   institutionInitials,
-  maskLabel,
   patchForRole,
   ROLE_OPTIONS,
   roleValue,

@@ -3,7 +3,6 @@ import { sampleAccounts } from '@/test/fixtures/sample';
 import {
   groupByInstitution,
   institutionInitials,
-  maskLabel,
   patchForRole,
   roleValue,
   transactionCountText,
@@ -23,13 +22,6 @@ describe('institutionInitials', () => {
     ['', '?'],
   ])('%j reads %s', (name, initials) => {
     expect(institutionInitials(name)).toBe(initials);
-  });
-});
-
-describe('maskLabel', () => {
-  it('prefixes the last digits with two middle dots, as the mockup does', () => {
-    expect(maskLabel('4821')).toBe('··4821');
-    expect(maskLabel(null)).toBeNull();
   });
 });
 
