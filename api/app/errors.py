@@ -17,6 +17,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.request_log import REQUEST_ID_HEADER, request_id_of
+
 logger = logging.getLogger(__name__)
 
 
@@ -127,8 +129,21 @@ async def _validation_error(_: Request, error: Exception) -> JSONResponse:
 
 
 async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("unhandled error on %s %s", request.method, request.url.path, exc_info=exc)
-    return JSONResponse(error_body("internal_error", "Internal server error"), status_code=500)
+    # Starlette runs this outside every middleware, so the request id comes
+    # from the request's state (app.request_log) rather than the log context.
+    request_id = request_id_of(request.scope)
+    logger.exception(
+        "unhandled error on %s %s",
+        request.method,
+        request.url.path,
+        exc_info=exc,
+        extra={"request_id": request_id} if request_id else None,
+    )
+    return JSONResponse(
+        error_body("internal_error", "Internal server error"),
+        status_code=500,
+        headers={REQUEST_ID_HEADER: request_id} if request_id else None,
+    )
 
 
 def install_error_handlers(app: FastAPI) -> None:

@@ -13,6 +13,8 @@ from app.body_limit import BodySizeLimit
 from app.config import Settings, get_settings
 from app.db import dispose_engines
 from app.errors import install_error_handlers
+from app.logs import ensure_logging
+from app.request_log import REQUEST_ID_HEADER, RequestLogging
 from app.routers import (
     accounts,
     calc,
@@ -44,6 +46,9 @@ def operation_id(route: APIRoute) -> str:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    # ``python -m app.serve api`` hands uvicorn the logging config; a bare
+    # ``uvicorn app.main:app`` (make dev) leaves the root logger to us.
+    ensure_logging()
     yield
     # Return pooled connections to Postgres on shutdown instead of dropping them.
     dispose_engines()
@@ -75,10 +80,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
-        # The upload UI tells the user how long to wait after a 429.
-        expose_headers=["Retry-After"],
+        # The upload UI tells the user how long to wait after a 429; the
+        # request id lets a bug report point at the server's log line.
+        expose_headers=["Retry-After", REQUEST_ID_HEADER],
         max_age=600,
     )
+    # Outermost, so its line and X-Request-Id cover CORS and the size limit too.
+    app.add_middleware(RequestLogging)
     install_error_handlers(app)
     app.include_router(health.router)
     app.include_router(sync.router)

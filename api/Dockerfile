@@ -79,5 +79,6 @@ RUN uv sync --frozen --no-dev --package first-paycheck-api \
 WORKDIR /app/api
 USER app
 EXPOSE 8000
-# Render sets PORT. The worker service overrides this with `python -m jobs.worker`.
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port \"${PORT:-8000}\" --workers 2 --proxy-headers --forwarded-allow-ips '*'"]
+# What Render runs (render.yaml): the API on $PORT and the job worker, supervised
+# by app.serve. `python -m app.serve api` runs the API alone.
+CMD ["python", "-m", "app.serve"]

@@ -228,6 +228,23 @@ explanation, `GET /calendar` shows the check it implies.
   the pure `calc/spending.py:summarize`; buckets are
   `sync/categories.py:CATEGORY_BUCKETS`.
 
+## Logging and operations (from M4)
+
+- `app/logs.py` is the one logging setup: JSON lines on stderr (`ts`, `level`,
+  `logger`, `message`, then fields), plain text only when `APP_ENV=development`
+  on a TTY. `configure_logging()` for CLIs and the worker; `app.serve api`
+  hands `logging_config()` to uvicorn, whose own lines then share the format;
+  a bare `uvicorn app.main:app` gets it from `ensure_logging()` in the lifespan.
+- Log fields with `extra={...}` or bind them with `log_context(...)`; ids,
+  counts and durations only. Never tokens, headers, request bodies, document
+  bytes, extracted values or secrets.
+- `app/request_log.py` writes one `app.request` line per request (`method`,
+  `path` without the query, `status`, `duration_ms`, `request_id`, `user_id`
+  once the token verified) and returns `X-Request-Id` (kept from the request
+  when it is a plain token, else generated), also on unhandled 500s. The worker
+  logs each run (`job_id`, `kind`, `user_id`, `attempt`, `outcome`,
+  `duration_ms`) and binds them for the handler's own lines.
+
 ## Testing
 
 - `make test-api`. Unit tests need nothing; integration tests need
@@ -271,6 +288,7 @@ explanation, `GET /calendar` shows the check it implies.
 cd api && uv run uvicorn app.main:app --reload     # or `make dev` from the root
 cd api && uv run python -m jobs.worker              # or `make worker`
 cd api && uv run python -m app.serve                # API plus worker in one process tree (Render Free)
+cd api && uv run python -m app.serve api            # the API alone, as Render runs it (JSON logs)
 cd api && uv run alembic upgrade head               # or `make migrate`
 docker build -f api/Dockerfile -t first-paycheck-api .   # from the repo root
 ```
