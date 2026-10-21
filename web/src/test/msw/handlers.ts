@@ -518,7 +518,7 @@ export const handlers = [
       confirmed_at: SAMPLE_NOW,
       deleted_at: SAMPLE_NOW,
     });
-    const confirmed: Confirmed = { document, pay_stub: stub, plans: [] };
+    const confirmed: Confirmed = { document, pay_stub: stub, plans: [], profile_updated: false };
     return HttpResponse.json(confirmed);
   }),
 

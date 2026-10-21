@@ -128,6 +128,11 @@ export function parseDraft(f: Pick<ReviewField, 'kind' | 'choices'>, text: strin
       return /^\d{1,3}(\.\d{1,2})?$/.test(trimmed)
         ? { ok: true, value: trimmed }
         : { ok: false, error: 'Enter a percentage, like 20 or 12.5' };
+    case 'number':
+      // A plain count the API stores as a number (vesting years on a benefits summary).
+      return /^\d+(\.\d+)?$/.test(trimmed)
+        ? { ok: true, value: Number(trimmed) }
+        : { ok: false, error: 'Enter a number, like 3' };
     case 'text':
       if (trimmed === '') return { ok: true, value: null };
       if (f.choices && !f.choices.some((c) => c.value === trimmed)) {

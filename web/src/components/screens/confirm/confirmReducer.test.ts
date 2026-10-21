@@ -5,6 +5,7 @@ import {
   confirmReducer,
   initConfirmState,
   mathGate,
+  parseDraft,
   payStubValues,
   summarize,
   type ConfirmAction,
@@ -347,5 +348,19 @@ describe('mathGate', () => {
 describe('payStubValues', () => {
   it('sends each field under its key with its confirmed value', () => {
     expect(payStubValues(run(proposed(), { type: 'confirmAll' }).fields)).toEqual(sampleValues);
+  });
+});
+
+describe('parseDraft for a number field', () => {
+  // Benefits summaries propose plain numbers (vesting years); the API stores them as numbers.
+  it('accepts a whole or decimal number and sends it as a number', () => {
+    expect(parseDraft({ kind: 'number' }, ' 3 ')).toEqual({ ok: true, value: 3 });
+    expect(parseDraft({ kind: 'number' }, '2.5')).toEqual({ ok: true, value: 2.5 });
+  });
+
+  it('refuses text, negatives and an empty draft', () => {
+    for (const text of ['three', '-1', '', '1,000']) {
+      expect(parseDraft({ kind: 'number' }, text).ok).toBe(false);
+    }
   });
 });

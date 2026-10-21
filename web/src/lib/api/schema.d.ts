@@ -66,6 +66,27 @@ export interface paths {
     patch: operations['update_account'];
     trace?: never;
   };
+  '/benefits-plans': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Benefits Plans
+     * @description The user's confirmed plans: the most recently confirmed summary first, each
+     *     summary's plans in the order it lists them.
+     */
+    get: operations['list_benefits_plans'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/calc/401k-match': {
     parameters: {
       query?: never;
@@ -82,6 +103,51 @@ export interface paths {
      *     per-paycheck cost before and after federal income tax.
      */
     post: operations['calc_401k_match'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/calc/emergency-fund': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Calc Emergency Fund
+     * @description The emergency fund calculator (spec 011): the target from monthly
+     *     essentials, the shortfall, months to the target at the monthly
+     *     contribution and that contribution per paycheck.
+     */
+    post: operations['calc_emergency_fund'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/calc/health-plans': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Calc Health Plans
+     * @description The health plan comparison (spec 012): each plan's expected annual net
+     *     cost at low, medium and high usage, the HSA tax effect, the break-even
+     *     spending between each pair of plans and the cheapest plan at the user's
+     *     expected usage.
+     */
+    post: operations['calc_health_plans'];
     delete?: never;
     options?: never;
     head?: never;
@@ -295,6 +361,46 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  '/goals': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Goals
+     * @description The user's goals, oldest first, with progress from the linked account.
+     */
+    get: operations['list_goals'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/goals/{goal_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update Goal
+     * @description Pause, resume or mark a goal reached, change its contribution or its account.
+     */
+    patch: operations['update_goal'];
     trace?: never;
   };
   '/health': {
@@ -630,8 +736,15 @@ export interface components {
     BenefitsPlanOut: {
       /** Coinsurance Pct */
       coinsurance_pct: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
       /** Deductible Cents */
       deductible_cents: number;
+      /** Document Id */
+      document_id: string | null;
       /** Employer Hsa Cents */
       employer_hsa_cents: number;
       /** Enrollment Deadline */
@@ -653,6 +766,7 @@ export interface components {
     BenefitsValues: {
       /** Plans */
       plans: components['schemas']['PlanValues'][];
+      retirement?: components['schemas']['RetirementValues'] | null;
     };
     /** Body_import_csv */
     Body_import_csv: {
@@ -729,7 +843,13 @@ export interface components {
      * @enum {string}
      */
     CalendarKind:
-      'enrollment_deadline' | 'tax_season' | 'open_enrollment' | 'goal_target' | 'election_check';
+      | 'enrollment_deadline'
+      | 'tax_season'
+      | 'open_enrollment'
+      | 'goal_target'
+      | 'election_check'
+      | 'goal_contribution'
+      | 'goal_review';
     /**
      * CalendarStatus
      * @enum {string}
@@ -835,6 +955,8 @@ export interface components {
       pay_stub: components['schemas']['PayStubOut'] | null;
       /** Plans */
       plans: components['schemas']['BenefitsPlanOut'][];
+      /** Profile Updated */
+      profile_updated: boolean;
     };
     /** CsvImport */
     CsvImport: {
@@ -1020,6 +1142,66 @@ export interface components {
      * @enum {string}
      */
     DocumentType: 'pay_stub' | 'offer_letter' | 'benefits';
+    /**
+     * EmergencyFundInput
+     * @description The calculator's inputs, exactly as spec 011 lists them.
+     */
+    EmergencyFundInput: {
+      /**
+       * Current Balance Cents
+       * @description What the fund holds today
+       */
+      current_balance_cents: number;
+      /**
+       * Monthly Contribution Cents
+       * @description What the user adds each month
+       */
+      monthly_contribution_cents: number;
+      /**
+       * Monthly Essentials Cents
+       * @description Essential spending per month, as the user confirmed it
+       */
+      monthly_essentials_cents: number;
+      /**
+       * Pay Periods Per Year
+       * @enum {integer}
+       */
+      pay_periods_per_year: 12 | 24 | 26 | 52;
+      /**
+       * Target Months
+       * @description Months of essentials the fund should hold; 3 to 6 is suggested
+       */
+      target_months: number;
+    };
+    /** EmergencyFundResult */
+    EmergencyFundResult: {
+      /** Funded */
+      funded: boolean;
+      /**
+       * Funded Pct
+       * @description The balance as a share of the target, in percent, at most 100
+       */
+      funded_pct: string;
+      /** Horizon Months */
+      horizon_months: number;
+      /**
+       * Months To Target
+       * @description Monthly contributions that close the shortfall; 0 when funded; null when it takes more than horizon_months or never happens
+       */
+      months_to_target: number | null;
+      /** Per Paycheck Contribution Cents */
+      per_paycheck_contribution_cents: number;
+      /** Reachable */
+      reachable: boolean;
+      /** Shortfall Cents */
+      shortfall_cents: number;
+      /** Six Month Target Cents */
+      six_month_target_cents: number;
+      /** Target Cents */
+      target_cents: number;
+      /** Three Month Target Cents */
+      three_month_target_cents: number;
+    };
     /** ErrorDetail */
     ErrorDetail: {
       /** Code */
@@ -1100,6 +1282,64 @@ export interface components {
      * @enum {string}
      */
     FilingStatus: 'single' | 'married_filing_jointly' | 'head_of_household';
+    /**
+     * GoalKind
+     * @enum {string}
+     */
+    GoalKind: 'emergency_fund' | 'custom';
+    /** GoalOut */
+    GoalOut: {
+      /** Account Id */
+      account_id: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Current Balance Cents */
+      current_balance_cents: number | null;
+      /** Decision Id */
+      decision_id: string | null;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      kind: components['schemas']['GoalKind'];
+      /** Monthly Contribution Cents */
+      monthly_contribution_cents: number;
+      /** Progress Pct */
+      progress_pct: string | null;
+      /** Reached At */
+      reached_at: string | null;
+      status: components['schemas']['GoalStatus'];
+      /** Target Amount Cents */
+      target_amount_cents: number;
+      /** Target Date */
+      target_date: string | null;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
+    /**
+     * GoalPatch
+     * @description Any of the fields; one left out is unchanged.
+     */
+    GoalPatch: {
+      /** Account Id */
+      account_id?: string | null;
+      /** Monthly Contribution Cents */
+      monthly_contribution_cents?: number | null;
+      status?: components['schemas']['GoalStatus'] | null;
+    };
+    /**
+     * GoalStatus
+     * @description Where a goal stands (spec 011 rule 15).
+     * @enum {string}
+     */
+    GoalStatus: 'active' | 'paused' | 'reached';
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -1121,6 +1361,132 @@ export interface components {
        * @enum {string}
        */
       worker: 'ok' | 'stale';
+    };
+    /**
+     * HealthPlanOption
+     * @description One plan the employer offers, employee-only coverage, in network.
+     */
+    HealthPlanOption: {
+      /**
+       * Coinsurance Pct
+       * @description The member's share after the deductible
+       */
+      coinsurance_pct: number | string;
+      /** Deductible Cents */
+      deductible_cents: number;
+      /**
+       * Employer Hsa Cents
+       * @description The employer's annual HSA contribution
+       */
+      employer_hsa_cents: number;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'hdhp' | 'ppo' | 'hmo';
+      /** Name */
+      name: string;
+      /**
+       * Oop Max Cents
+       * @description The out-of-pocket maximum
+       */
+      oop_max_cents: number;
+      /**
+       * Premium Per Period Cents
+       * @description The employee's premium per paycheck
+       */
+      premium_per_period_cents: number;
+    };
+    /**
+     * HealthPlansInput
+     * @description The calculator's inputs, exactly as spec 012 lists them.
+     */
+    HealthPlansInput: {
+      /**
+       * Employee Hsa Cents
+       * @description What the user plans to put into an HSA in the year themselves
+       */
+      employee_hsa_cents: number;
+      /**
+       * Enrollment Deadline
+       * @description The last day to enroll; used only when the decision is saved
+       */
+      enrollment_deadline?: string | null;
+      /**
+       * Expected Usage
+       * @enum {string}
+       */
+      expected_usage: 'low' | 'medium' | 'high';
+      /**
+       * Filing Status
+       * @enum {string}
+       */
+      filing_status: 'single' | 'married_filing_jointly' | 'head_of_household';
+      /**
+       * Pay Periods Per Year
+       * @enum {integer}
+       */
+      pay_periods_per_year: 12 | 24 | 26 | 52;
+      /** Plans */
+      plans: components['schemas']['HealthPlanOption'][];
+      /**
+       * Salary Cents
+       * @description Annual salary, for the marginal rate
+       */
+      salary_cents: number;
+      /**
+       * Selected Plan Index
+       * @description The plan the user picks
+       */
+      selected_plan_index?: number | null;
+      /**
+       * Tax Year
+       * @description The pay stub's tax year
+       */
+      tax_year: number;
+      /**
+       * Usage High Cents
+       * @description Annual medical spending, high
+       * @default 1000000
+       */
+      usage_high_cents: number;
+      /**
+       * Usage Low Cents
+       * @description Annual medical spending, low
+       * @default 50000
+       */
+      usage_low_cents: number;
+      /**
+       * Usage Medium Cents
+       * @description Annual medical spending, medium
+       * @default 300000
+       */
+      usage_medium_cents: number;
+    };
+    /** HealthPlansResult */
+    HealthPlansResult: {
+      /** Citation Keys */
+      citation_keys: string[];
+      /** Hdhp Max Oop Cents */
+      hdhp_max_oop_cents: number;
+      /** Hdhp Min Deductible Cents */
+      hdhp_min_deductible_cents: number;
+      /** Hsa Limit Cents */
+      hsa_limit_cents: number;
+      /** Marginal Rate Used */
+      marginal_rate_used: string;
+      /** Pairs */
+      pairs: components['schemas']['PlanPair'][];
+      /** Plans */
+      plans: components['schemas']['PlanCost'][];
+      /** Recommended Index */
+      recommended_index: number;
+      /** Scan End Cents */
+      scan_end_cents: number;
+      /** Scan Step Cents */
+      scan_step_cents: number;
+      /** Selected Index */
+      selected_index: number | null;
     };
     /**
      * HealthcareUsage
@@ -1486,11 +1852,57 @@ export interface components {
       /** State Tax Cents */
       state_tax_cents: number;
     };
+    /** PlanCost */
+    PlanCost: {
+      /** Annual Premium Cents */
+      annual_premium_cents: number;
+      /** Employee Hsa Cents */
+      employee_hsa_cents: number;
+      /** Employer Hsa Cents */
+      employer_hsa_cents: number;
+      /** High Cost Cents */
+      high_cost_cents: number;
+      /** Hsa Capped */
+      hsa_capped: boolean;
+      /** Hsa Eligible */
+      hsa_eligible: boolean;
+      /** Hsa Tax Savings Cents */
+      hsa_tax_savings_cents: number;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'hdhp' | 'ppo' | 'hmo';
+      /** Low Cost Cents */
+      low_cost_cents: number;
+      /** Medium Cost Cents */
+      medium_cost_cents: number;
+      /** Name */
+      name: string;
+      /** Worst Case Cents */
+      worst_case_cents: number;
+    };
     /**
      * PlanKind
      * @enum {string}
      */
     PlanKind: 'hdhp' | 'ppo' | 'hmo';
+    /** PlanPair */
+    PlanPair: {
+      /**
+       * Break Even Spends Cents
+       * @description Every scanned annual spend at which the cheaper plan changes
+       */
+      break_even_spends_cents: number[];
+      /** Cheaper At End Index */
+      cheaper_at_end_index: number | null;
+      /** Cheaper At Zero Index */
+      cheaper_at_zero_index: number | null;
+      /** Plan A Index */
+      plan_a_index: number;
+      /** Plan B Index */
+      plan_b_index: number;
+    };
     /** PlanProposal */
     PlanProposal: {
       /** Fields */
@@ -1526,6 +1938,8 @@ export interface components {
      * @description The whole profile; a field left out is reset to its default.
      */
     ProfileIn: {
+      /** Birth Year */
+      birth_year?: number | null;
       /**
        * Dependents
        * @default 0
@@ -1547,6 +1961,8 @@ export interface components {
     };
     /** ProfileOut */
     ProfileOut: {
+      /** Birth Year */
+      birth_year?: number | null;
       /**
        * Dependents
        * @default 0
@@ -1570,19 +1986,27 @@ export interface components {
     };
     /**
      * Proposal
-     * @description ``documents.proposal`` (spec 005 outputs).
+     * @description ``documents.proposal`` (spec 005 outputs, spec 013 rules 7-9).
      */
     Proposal: {
       /** Fields */
       fields?: components['schemas']['ProposedField'][];
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'pay_stub' | 'benefits';
       /** Line Items */
       line_items?: components['schemas']['LineItem'][];
+      /** Match Tiers */
+      match_tiers?: components['schemas']['TierProposal'][];
       /** Notes */
       notes?: string | null;
       /** Plans */
       plans?: components['schemas']['PlanProposal'][];
       /** Source Lines */
       source_lines?: components['schemas']['SourceLine'][];
+      vesting_years?: components['schemas']['ProposedField'] | null;
       /** Withheld Pages */
       withheld_pages?: number[];
     };
@@ -1596,7 +2020,7 @@ export interface components {
        * Kind
        * @enum {string}
        */
-      kind: 'money' | 'date' | 'text' | 'percent';
+      kind: 'money' | 'date' | 'text' | 'percent' | 'number';
       /** Label */
       label: string;
       /** Note */
@@ -1678,6 +2102,16 @@ export interface components {
      * @enum {string}
      */
     RecurringUserStatus: 'confirmed' | 'ignored' | 'cancelled';
+    /**
+     * RetirementValues
+     * @description The confirmed 401(k) formula and vesting (spec 013 rule 10).
+     */
+    RetirementValues: {
+      /** Match Tiers */
+      match_tiers: components['schemas']['MatchTier-Input'][];
+      /** Vesting Years */
+      vesting_years?: number | null;
+    };
     /** RoleTotals */
     RoleTotals: {
       /** Health Cents */
@@ -1808,6 +2242,14 @@ export interface components {
      * @enum {string}
      */
     SyncStatus: 'active' | 'login_required' | 'error';
+    /**
+     * TierProposal
+     * @description One 401(k) match tier: ``employee_pct_upto`` (computed) and ``employer_pct``.
+     */
+    TierProposal: {
+      /** Fields */
+      fields: components['schemas']['ProposedField'][];
+    };
     /** TransactionOut */
     TransactionOut: {
       /**
@@ -2097,6 +2539,35 @@ export interface operations {
       };
     };
   };
+  list_benefits_plans: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BenefitsPlanOut'][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
   calc_401k_match: {
     parameters: {
       query?: never;
@@ -2117,6 +2588,90 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['K401MatchResult'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  calc_emergency_fund: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EmergencyFundInput'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EmergencyFundResult'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  calc_health_plans: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['HealthPlansInput'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HealthPlansResult'];
         };
       };
       /** @description Unauthorized */
@@ -2705,13 +3260,13 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Validation Error */
+      /** @description Unprocessable Entity */
       422: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['HTTPValidationError'];
+          'application/json': components['schemas']['ErrorResponse'];
         };
       };
       /** @description Too Many Requests */
@@ -2725,6 +3280,88 @@ export interface operations {
       };
       /** @description Service Unavailable */
       503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  list_goals: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GoalOut'][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  update_goal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        goal_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GoalPatch'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GoalOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
         headers: {
           [name: string]: unknown;
         };

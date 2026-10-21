@@ -101,6 +101,7 @@ export const sampleSourceLines: readonly SourceLine[] = [
 ];
 
 export const sampleProposal: Proposal = {
+  kind: 'pay_stub',
   fields: [...sampleFields],
   line_items: [
     { label: 'GROSS PAY', amount_cents: 270_833, kind: 'earning', field: 'gross_cents' },
@@ -127,6 +128,7 @@ export const sampleProposal: Proposal = {
 
 /** What `manual_entry_proposal` returns: every field empty, the redacted lines to type from. */
 export const manualEntryProposal: Proposal = {
+  kind: 'pay_stub',
   fields: sampleFields.map((f) => ({ ...f, value: null, confidence: null, note: null })),
   line_items: [],
   plans: [],
