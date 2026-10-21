@@ -30,6 +30,7 @@ from tests.support.factories import (
     make_item,
     make_job,
     make_pay_stub,
+    make_recurring_charge,
     make_transaction,
 )
 
@@ -393,7 +394,39 @@ def spending_summary(
     return Case("GET", "/spending/summary?start=2026-09-01&end=2026-09-30", 200, body=body)
 
 
+def list_recurring(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    make_recurring_charge(connection, USER_A.id)
+
+    def body(data: Any) -> None:
+        assert data == []
+
+    return Case("GET", "/recurring", 200, body=body)
+
+
+def update_recurring(
+    connection: Connection, client_as: Callable[[FixtureUser], TestClient]
+) -> Case:
+    charge = make_recurring_charge(connection, USER_A.id)
+
+    def after(conn: Connection) -> None:
+        row = conn.execute(
+            text("SELECT merchant_clean, user_status FROM recurring_charges WHERE id = :id"),
+            {"id": charge},
+        ).one()
+        assert tuple(row) == ("NETFLIX.COM", None)
+
+    return Case(
+        "PATCH",
+        f"/recurring/{charge}",
+        404,
+        json={"user_status": "ignored", "merchant_clean": "Mine now"},
+        after=after,
+    )
+
+
 ROUTE_CASES: dict[tuple[str, str], Builder] = {
+    ("GET", "/recurring"): list_recurring,
+    ("PATCH", "/recurring/{charge_id}"): update_recurring,
     ("POST", "/decisions"): save_decision,
     ("GET", "/decisions"): list_decisions,
     ("GET", "/decisions/{decision_id}"): get_decision,

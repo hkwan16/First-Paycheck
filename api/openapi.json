@@ -2447,6 +2447,134 @@
         "title": "QueuedJob",
         "type": "object"
       },
+      "RecurringCadence": {
+        "enum": [
+          "weekly",
+          "monthly",
+          "yearly"
+        ],
+        "title": "RecurringCadence",
+        "type": "string"
+      },
+      "RecurringChargeOut": {
+        "properties": {
+          "cadence": {
+            "$ref": "#/components/schemas/RecurringCadence"
+          },
+          "first_seen": {
+            "format": "date",
+            "title": "First Seen",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_seen": {
+            "format": "date",
+            "title": "Last Seen",
+            "type": "string"
+          },
+          "merchant_clean": {
+            "title": "Merchant Clean",
+            "type": "string"
+          },
+          "merchant_norm": {
+            "title": "Merchant Norm",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RecurringStatus"
+          },
+          "typical_amount_cents": {
+            "title": "Typical Amount Cents",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "user_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecurringUserStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "merchant_norm",
+          "merchant_clean",
+          "cadence",
+          "typical_amount_cents",
+          "first_seen",
+          "last_seen",
+          "status",
+          "user_status",
+          "updated_at"
+        ],
+        "title": "RecurringChargeOut",
+        "type": "object"
+      },
+      "RecurringPatch": {
+        "additionalProperties": false,
+        "description": "Omitted fields are unchanged; ``user_status: null`` clears it.",
+        "properties": {
+          "merchant_clean": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A new display name",
+            "title": "Merchant Clean"
+          },
+          "user_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecurringUserStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "RecurringPatch",
+        "type": "object"
+      },
+      "RecurringStatus": {
+        "description": "The detector's view of a charge (spec 009 rules 11-14).",
+        "enum": [
+          "active",
+          "new",
+          "changed",
+          "stopped"
+        ],
+        "title": "RecurringStatus",
+        "type": "string"
+      },
+      "RecurringUserStatus": {
+        "description": "What the user said about a charge (spec 009 rule 17).",
+        "enum": [
+          "confirmed",
+          "ignored",
+          "cancelled"
+        ],
+        "title": "RecurringUserStatus",
+        "type": "string"
+      },
       "RuleOut": {
         "properties": {
           "category": {
@@ -4108,6 +4236,126 @@
         "summary": "Put Profile",
         "tags": [
           "profile"
+        ]
+      }
+    },
+    "/recurring": {
+      "get": {
+        "description": "Every detected charge, ignored ones included, by name.",
+        "operationId": "list_recurring",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecurringChargeOut"
+                  },
+                  "title": "Response List Recurring",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Recurring",
+        "tags": [
+          "recurring"
+        ]
+      }
+    },
+    "/recurring/{charge_id}": {
+      "patch": {
+        "description": "Rename a charge, or mark it confirmed, not recurring (ignored) or cancelled.",
+        "operationId": "update_recurring",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "charge_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Charge Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecurringPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringChargeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Recurring",
+        "tags": [
+          "recurring"
         ]
       }
     },

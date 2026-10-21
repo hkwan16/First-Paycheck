@@ -24,6 +24,7 @@ from app.routers import (
     jobs,
     pay_stubs,
     profile,
+    recurring,
     spending,
     sync,
     transactions,
@@ -93,6 +94,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(explain.router)
     app.include_router(calendar.router)
     app.include_router(spending.router)
+    app.include_router(recurring.router)
     return app
 
 

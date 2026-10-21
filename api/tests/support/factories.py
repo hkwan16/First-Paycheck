@@ -12,7 +12,15 @@ from typing import Any
 from sqlalchemy import Connection
 
 from app.db import user_session_for
-from db.enums import AccountKind, CategorySource, DocumentType, JobKind, PayFrequency, SyncProvider
+from db.enums import (
+    AccountKind,
+    CategorySource,
+    DocumentType,
+    JobKind,
+    PayFrequency,
+    RecurringCadence,
+    SyncProvider,
+)
 from db.models import (
     Account,
     BalanceSnapshot,
@@ -20,6 +28,7 @@ from db.models import (
     Holding,
     Job,
     PayStub,
+    RecurringCharge,
     SyncItem,
     Transaction,
 )
@@ -224,3 +233,31 @@ def make_job(
         session.add(job)
         session.flush()
         return job.id
+
+
+def make_recurring_charge(
+    connection: Connection,
+    user_id: uuid.UUID,
+    *,
+    merchant_norm: str = "netflix.com",
+    merchant_clean: str = "NETFLIX.COM",
+    cadence: RecurringCadence = RecurringCadence.MONTHLY,
+    typical_amount_cents: int = 1549,
+    first_seen: dt.date = dt.date(2026, 7, 3),
+    last_seen: dt.date = dt.date(2026, 10, 3),
+    **fields: Any,
+) -> uuid.UUID:
+    with user_session_for(user_id, bind=connection) as session:
+        charge = RecurringCharge(
+            user_id=user_id,
+            merchant_norm=merchant_norm,
+            merchant_clean=merchant_clean,
+            cadence=cadence,
+            typical_amount_cents=typical_amount_cents,
+            first_seen=first_seen,
+            last_seen=last_seen,
+            **fields,
+        )
+        session.add(charge)
+        session.flush()
+        return charge.id
