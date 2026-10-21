@@ -49,7 +49,12 @@ export function Notice({
     >
       {glyph !== null && <span className="mt-0.5 flex flex-none">{glyph}</span>}
       <div className="min-w-0">
-        {title !== undefined && <strong>{title}</strong>} {children}
+        {title !== undefined && (
+          <>
+            <strong>{title}</strong>{' '}
+          </>
+        )}
+        {children}
       </div>
     </div>
   );

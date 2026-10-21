@@ -24,6 +24,26 @@ describe('Notice', () => {
     expect(screen.getByText('The math checks out.').tagName).toBe('STRONG');
   });
 
+  it('starts its text with the body when there is no title', () => {
+    // A stray leading space made the status read " Linked First Platypus
+    // Bank." and broke text matches anchored at the start.
+    render(
+      <Notice tone="confirmed" role="status" icon={null}>
+        Linked First Platypus Bank.
+      </Notice>,
+    );
+    expect(screen.getByRole('status').textContent).toBe('Linked First Platypus Bank.');
+  });
+
+  it('separates the title from the body with one space', () => {
+    render(
+      <Notice title="Saved." icon={null} role="status">
+        It is a rule now.
+      </Notice>,
+    );
+    expect(screen.getByRole('status').textContent).toBe('Saved. It is a rule now.');
+  });
+
   it('accepts a custom icon or none', () => {
     const { container, rerender } = render(<Notice icon={<svg data-testid="custom" />}>x</Notice>);
     expect(screen.getByTestId('custom')).toBeInTheDocument();
