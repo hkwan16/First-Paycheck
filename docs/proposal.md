@@ -29,9 +29,9 @@ One guided flow in which each step feeds the next. Financial math runs in determ
 ### MVP (must-have)
 
 1. **Bank sync and spending map:** link accounts through Plaid (sandbox for the class project) or import a CSV; both feed one pipeline. Transactions are auto-categorized (rules first, AI only for unknown merchants, user-correctable), and monthly essentials, flexible spending and savings rate are computed.
-2. **Paycheck decoder:** extract and explain each line of a pay stub or offer letter (PDF or image). Federal lines are computed and explained; state tax lines are labeled but not computed.
+2. **Paycheck decoder:** extract and explain each line of a pay stub or offer letter (PDF or image). Extraction runs as a background job after redaction, and the user confirms each field; a pay stub is saved only when gross minus deductions equals net. Federal lines are computed and explained; state tax lines are labeled but not computed.
 3. **Emergency fund goal:** size a 3–6 month target from essentials and current savings, show time-to-goal at different savings rates, and track progress against the linked savings account.
-4. **401(k) match optimizer:** show the contribution that captures the full match and the dollars gained or lost.
+4. **401(k) match optimizer:** show the contribution that captures the full match, the dollars gained or lost, and what the change costs per paycheck before and after federal income tax.
 5. **Health plan comparison:** HSA-eligible high-deductible plan vs. PPO, with expected cost and break-even point, based on the user's expected healthcare usage.
 6. **W-4 walkthrough:** guided form completion with a projected federal refund or balance due.
 7. **"Why" explanations:** the concept, the user's numbers, and what would change the answer, grounded in IRS and plan sources.
