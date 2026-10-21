@@ -46,10 +46,15 @@ from db.enums import (
     CalendarKind,
     CalendarStatus,
     CategorySource,
+    CheckinStatus,
+    CheckinTrigger,
     DocumentStatus,
     DocumentStatusReason,
     DocumentType,
     FilingStatus,
+    FindingAction,
+    FindingKind,
+    FindingSeverity,
     GoalKind,
     HealthcareUsage,
     JobKind,
@@ -58,6 +63,9 @@ from db.enums import (
     LlmStatus,
     PayFrequency,
     PlanKind,
+    RecurringCadence,
+    RecurringStatus,
+    RecurringUserStatus,
     RuleMatch,
     RuleSource,
     SyncProvider,
@@ -642,6 +650,9 @@ class Decision(Base):
         ),
         CheckConstraint("jsonb_typeof(inputs) = 'object'", name="inputs_object"),
         CheckConstraint("jsonb_typeof(result) = 'object'", name="result_object"),
+        # No ON DELETE action: a check-in a decision points at is never deleted
+        # alone, and account deletion removes both in one statement.
+        ForeignKeyConstraint(["check_in_id", "user_id"], ["check_ins.id", "check_ins.user_id"]),
         Index(
             "uq_decisions_supersedes_id",
             "supersedes_id",
@@ -658,7 +669,7 @@ class Decision(Base):
     result: Mapped[dict[str, Any]] = mapped_column(JSONB)
     version: Mapped[int] = mapped_column(Integer)
     supersedes_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
-    # Set when a check-in finding led to this version; foreign key in 0005.
+    # Set when a check-in finding led to this version.
     check_in_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     created_at: Mapped[dt.datetime] = _created_at()
 
@@ -746,13 +757,19 @@ class Explanation(Base):
         CheckConstraint("jsonb_typeof(what_ifs) = 'array'", name="what_ifs_array"),
         CheckConstraint("jsonb_typeof(citations) = 'array'", name="citations_array"),
         CheckConstraint("jsonb_typeof(verification) = 'object'", name="verification_object"),
+        ForeignKeyConstraint(
+            ["finding_id", "user_id"],
+            ["check_in_findings.id", "check_in_findings.user_id"],
+            ondelete="CASCADE",
+        ),
         Index("ix_explanations_decision_created", "decision_id", "created_at"),
+        Index("ix_explanations_finding_created", "finding_id", "created_at"),
     )
 
     id: Mapped[uuid.UUID] = _id()
     user_id: Mapped[uuid.UUID] = _owner()
     decision_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
-    # A check-in finding; foreign key in 0005.
+    # A check-in finding.
     finding_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     attempt: Mapped[int] = mapped_column(SmallInteger)
     retries: Mapped[int] = mapped_column(SmallInteger)
@@ -795,5 +812,110 @@ class IrsCitation(Base):
     source: Mapped[str] = mapped_column(Text)
     tax_year: Mapped[int] = mapped_column(SmallInteger)
     verified_on: Mapped[dt.date] = mapped_column(Date)
+    created_at: Mapped[dt.datetime] = _created_at()
+    updated_at: Mapped[dt.datetime] = _updated_at()
+
+
+# ---------------------------------------------------------------- check-ins (0005)
+
+
+class RecurringCharge(Base):
+    """A detected subscription or bill (spec 009). ``status`` belongs to the
+    detector, ``user_status`` and renames of ``merchant_clean`` to the user."""
+
+    __tablename__ = "recurring_charges"
+    __table_args__ = (
+        UniqueConstraint("user_id", "merchant_norm", "cadence"),
+        CheckConstraint("typical_amount_cents > 0", name="typical_positive"),
+        CheckConstraint("first_seen <= last_seen", name="seen_in_order"),
+        CheckConstraint("merchant_norm <> ''", name="merchant_norm_not_empty"),
+        CheckConstraint("merchant_clean <> ''", name="merchant_clean_not_empty"),
+    )
+
+    id: Mapped[uuid.UUID] = _id()
+    user_id: Mapped[uuid.UUID] = _owner()
+    merchant_norm: Mapped[str] = mapped_column(Text)
+    # Display name: set on detection, then changed only by the user.
+    merchant_clean: Mapped[str] = mapped_column(Text)
+    cadence: Mapped[RecurringCadence] = mapped_column(
+        pg_enum(RecurringCadence, "recurring_cadence")
+    )
+    # Money out, so always positive.
+    typical_amount_cents: Mapped[int] = mapped_column(BigInteger)
+    first_seen: Mapped[dt.date] = mapped_column(Date)
+    last_seen: Mapped[dt.date] = mapped_column(Date)
+    status: Mapped[RecurringStatus] = mapped_column(
+        pg_enum(RecurringStatus, "recurring_status"), server_default=text("'new'")
+    )
+    user_status: Mapped[RecurringUserStatus | None] = mapped_column(
+        pg_enum(RecurringUserStatus, "recurring_user_status")
+    )
+    created_at: Mapped[dt.datetime] = _created_at()
+    updated_at: Mapped[dt.datetime] = _updated_at()
+
+
+class CheckIn(Base):
+    """One monthly or data-triggered review (M8)."""
+
+    __tablename__ = "check_ins"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id"),
+        CheckConstraint("EXTRACT(day FROM period) = 1", name="period_first_of_month"),
+        CheckConstraint(
+            "(status = 'completed') = (completed_at IS NOT NULL)", name="completed_when_done"
+        ),
+        # The monthly enqueue is idempotent: one scheduled check-in per month.
+        Index(
+            "uq_check_ins_scheduled_period",
+            "user_id",
+            "period",
+            unique=True,
+            postgresql_where=text("triggered_by = 'schedule'"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = _id()
+    user_id: Mapped[uuid.UUID] = _owner()
+    # First day of the reviewed month.
+    period: Mapped[dt.date] = mapped_column(Date)
+    triggered_by: Mapped[CheckinTrigger] = mapped_column(pg_enum(CheckinTrigger, "checkin_trigger"))
+    status: Mapped[CheckinStatus] = mapped_column(
+        pg_enum(CheckinStatus, "checkin_status"), server_default=text("'open'")
+    )
+    completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[dt.datetime] = _created_at()
+    updated_at: Mapped[dt.datetime] = _updated_at()
+
+
+class CheckInFinding(Base):
+    """A typed finding of one check-in; its payload shape is set in M8."""
+
+    __tablename__ = "check_in_findings"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id"),
+        ForeignKeyConstraint(
+            ["check_in_id", "user_id"],
+            ["check_ins.id", "check_ins.user_id"],
+            ondelete="CASCADE",
+        ),
+        _decision_fk(),
+        CheckConstraint("jsonb_typeof(payload) = 'object'", name="payload_object"),
+        CheckConstraint("(user_action IS NULL) = (user_action_at IS NULL)", name="action_has_time"),
+        Index("ix_check_in_findings_check_in_id", "check_in_id"),
+        Index("ix_check_in_findings_decision_id", "decision_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _id()
+    user_id: Mapped[uuid.UUID] = _owner()
+    check_in_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    kind: Mapped[FindingKind] = mapped_column(pg_enum(FindingKind, "finding_kind"))
+    severity: Mapped[FindingSeverity] = mapped_column(pg_enum(FindingSeverity, "finding_severity"))
+    decision_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    # Null undoes the user's action (spec amendment 14).
+    user_action: Mapped[FindingAction | None] = mapped_column(
+        pg_enum(FindingAction, "finding_action")
+    )
+    user_action_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[dt.datetime] = _created_at()
     updated_at: Mapped[dt.datetime] = _updated_at()
