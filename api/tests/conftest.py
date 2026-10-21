@@ -29,7 +29,7 @@ from sqlalchemy import Connection, Engine, make_url, text
 
 from app.config import get_settings
 from app.db import dispose_engines, make_engine
-from app.deps import get_db_bind
+from app.deps import get_db_bind, get_plaid_client
 from app.main import create_app
 from tests.support.auth_shim import ensure_auth_shim
 from tests.support.database import (
@@ -38,6 +38,7 @@ from tests.support.database import (
     sibling_database_url,
     upgrade,
 )
+from tests.support.fake_plaid import FakePlaidClient
 from tests.support.tokens import make_token
 
 # Password given to app_api in the test cluster so tests can connect as it.
@@ -136,10 +137,17 @@ def user_b(db_connection: Connection) -> FixtureUser:
 
 
 @pytest.fixture
-def app(db_connection: Connection) -> FastAPI:
-    """The app with every request session bound to the test's transaction."""
+def fake_plaid() -> FakePlaidClient:
+    return FakePlaidClient()
+
+
+@pytest.fixture
+def app(db_connection: Connection, fake_plaid: FakePlaidClient) -> FastAPI:
+    """The app with every request session bound to the test's transaction and
+    Plaid replaced by ``fake_plaid``."""
     application = create_app()
     application.dependency_overrides[get_db_bind] = lambda: db_connection
+    application.dependency_overrides[get_plaid_client] = lambda: fake_plaid
     return application
 
 

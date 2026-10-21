@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 import plaid
 import urllib3
@@ -49,7 +49,25 @@ TIMEOUT = (5.0, 60.0)
 SYNC_PAGE_SIZE = 500
 HISTORY_DAYS = 730
 
-__all__ = ["PlaidClient", "PlaidError", "PlaidNotConfigured"]
+__all__ = ["PlaidClient", "PlaidError", "PlaidLinking", "PlaidNotConfigured"]
+
+
+class PlaidLinking(Protocol):
+    """The part of PlaidClient the API routes use (linking, unlinking, webhooks)."""
+
+    def link_token_create(self, *, user_id: str, webhook: str | None) -> dict[str, str]: ...
+
+    def item_public_token_exchange(self, public_token: str) -> tuple[SecretStr, str]: ...
+
+    def sandbox_public_token_create(
+        self, institution_id: str, *, webhook: str | None = None
+    ) -> str: ...
+
+    def institution_name(self, institution_id: str) -> str: ...
+
+    def item_remove(self, access_token: SecretStr) -> None: ...
+
+    def webhook_verification_key_get(self, key_id: str) -> dict[str, Any]: ...
 
 
 class PlaidNotConfigured(RuntimeError):

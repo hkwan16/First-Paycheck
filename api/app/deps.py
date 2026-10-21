@@ -3,18 +3,30 @@
 from __future__ import annotations
 
 import logging
+import threading
+import weakref
 from collections.abc import Iterator
+from functools import lru_cache
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from sqlalchemy import Connection, Engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth import CurrentUser
 from app.config import Settings, get_settings
-from app.db import DatabaseNotConfigured, current_alembic_revision, get_engine, user_session
+from app.db import (
+    DatabaseNotConfigured,
+    current_alembic_revision,
+    get_engine,
+    service_session,
+    user_session,
+)
 from app.errors import AppError
+from sync.crypto import TokenCipher, TokenCipherNotConfigured, cipher_from_settings
+from sync.plaid.client import PlaidClient, PlaidLinking, PlaidNotConfigured
+from sync.plaid.webhook import WebhookKeyCache
 
 logger = logging.getLogger(__name__)
 
@@ -58,3 +70,79 @@ def alembic_revision(bind: DbBind) -> str | None:
     except SQLAlchemyError as exc:
         logger.warning("health check could not read the alembic revision: %s", exc)
         raise _unavailable() from exc
+
+
+def get_service_session(bind: DbBind) -> Iterator[Session]:
+    """A session as ``app_api`` with no user: only granted functions work."""
+    with service_session(bind=bind) as session:
+        yield session
+
+
+ServiceSession = Annotated[Session, Depends(get_service_session, scope="function")]
+
+
+# ---------------------------------------------------------------- Plaid
+
+
+def _plaid_unavailable(message: str) -> AppError:
+    return AppError(message, code="plaid_unavailable", status_code=503)
+
+
+@lru_cache(maxsize=1)
+def _plaid_client() -> PlaidClient:
+    return PlaidClient.from_settings(get_settings())
+
+
+def get_plaid_client() -> PlaidLinking:
+    """The process-wide Plaid client; 503 when Plaid is not configured."""
+    try:
+        return _plaid_client()
+    except PlaidNotConfigured as exc:
+        logger.error("plaid is not configured: %s", exc)
+        raise _plaid_unavailable("Bank linking is not configured") from exc
+
+
+PlaidDep = Annotated[PlaidLinking, Depends(get_plaid_client)]
+
+
+def get_token_cipher(settings: SettingsDep) -> TokenCipher:
+    try:
+        return cipher_from_settings(settings)
+    except TokenCipherNotConfigured as exc:
+        logger.error("token encryption is not configured: %s", exc)
+        raise _plaid_unavailable("Bank linking is not configured") from exc
+
+
+CipherDep = Annotated[TokenCipher, Depends(get_token_cipher)]
+
+# One verification-key cache per Plaid client, so keys survive across requests.
+_key_caches: weakref.WeakKeyDictionary[PlaidLinking, WebhookKeyCache] = weakref.WeakKeyDictionary()
+_key_caches_lock = threading.Lock()
+
+
+def get_webhook_keys(plaid: PlaidDep) -> WebhookKeyCache:
+    with _key_caches_lock:
+        cache = _key_caches.get(plaid)
+        if cache is None:
+            cache = WebhookKeyCache(plaid.webhook_verification_key_get)
+            _key_caches[plaid] = cache
+        return cache
+
+
+WebhookKeys = Annotated[WebhookKeyCache, Depends(get_webhook_keys)]
+
+
+def sandbox_linking_allowed(settings: SettingsDep) -> bool:
+    """``POST /sync/items`` accepts ``sandbox_institution_id`` outside production."""
+    return settings.app_env != "production"
+
+
+SandboxAllowed = Annotated[bool, Depends(sandbox_linking_allowed)]
+
+
+async def get_raw_body(request: Request) -> bytes:
+    """The exact request bytes (the webhook signature covers them)."""
+    return await request.body()
+
+
+RawBody = Annotated[bytes, Depends(get_raw_body)]

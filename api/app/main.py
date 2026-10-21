@@ -12,7 +12,7 @@ from fastapi.routing import APIRoute
 from app.config import Settings, get_settings
 from app.db import dispose_engines
 from app.errors import install_error_handlers
-from app.routers import health
+from app.routers import accounts, health, jobs, sync, transactions
 from app.version import resolve_git_sha
 
 API_VERSION = "0.1.0"
@@ -55,6 +55,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     install_error_handlers(app)
     app.include_router(health.router)
+    app.include_router(sync.router)
+    app.include_router(accounts.router)
+    app.include_router(transactions.router)
+    app.include_router(jobs.router)
     return app
 
 

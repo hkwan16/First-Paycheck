@@ -1,6 +1,218 @@
 {
   "components": {
     "schemas": {
+      "AccountKind": {
+        "enum": [
+          "checking",
+          "savings",
+          "credit",
+          "investment",
+          "retirement"
+        ],
+        "title": "AccountKind",
+        "type": "string"
+      },
+      "AccountOut": {
+        "properties": {
+          "balance_as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Balance As Of"
+          },
+          "balance_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Balance Cents"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "institution_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institution Name"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AccountKind"
+          },
+          "mask": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mask"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sync_item_id": {
+            "format": "uuid",
+            "title": "Sync Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sync_item_id",
+          "institution_name",
+          "name",
+          "kind",
+          "mask",
+          "role",
+          "is_active",
+          "balance_cents",
+          "balance_as_of"
+        ],
+        "title": "AccountOut",
+        "type": "object"
+      },
+      "AccountPatch": {
+        "additionalProperties": false,
+        "description": "Omitted fields are unchanged; ``role: null`` clears the role.",
+        "properties": {
+          "is_active": {
+            "default": true,
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "AccountPatch",
+        "type": "object"
+      },
+      "AccountRole": {
+        "enum": [
+          "spending",
+          "emergency_fund",
+          "retirement"
+        ],
+        "title": "AccountRole",
+        "type": "string"
+      },
+      "CategoryFix": {
+        "properties": {
+          "relabeled": {
+            "title": "Relabeled",
+            "type": "integer"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transaction": {
+            "$ref": "#/components/schemas/TransactionOut"
+          }
+        },
+        "required": [
+          "transaction",
+          "rule",
+          "relabeled"
+        ],
+        "title": "CategoryFix",
+        "type": "object"
+      },
+      "CategoryPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "income",
+              "transfer",
+              "housing",
+              "utilities",
+              "phone_internet",
+              "groceries",
+              "dining",
+              "transport",
+              "subscriptions",
+              "insurance",
+              "healthcare",
+              "shopping",
+              "entertainment",
+              "travel",
+              "personal_care",
+              "education",
+              "gifts_donations",
+              "fees",
+              "taxes",
+              "debt_payment",
+              "savings_investment",
+              "other"
+            ],
+            "title": "Category",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category"
+        ],
+        "title": "CategoryPatch",
+        "type": "object"
+      },
+      "CategorySource": {
+        "enum": [
+          "rule",
+          "user",
+          "llm"
+        ],
+        "title": "CategorySource",
+        "type": "string"
+      },
       "ErrorDetail": {
         "properties": {
           "code": {
@@ -29,6 +241,19 @@
           "error"
         ],
         "title": "ErrorResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
         "type": "object"
       },
       "Health": {
@@ -61,6 +286,504 @@
         ],
         "title": "Health",
         "type": "object"
+      },
+      "JobKind": {
+        "enum": [
+          "sync.initial",
+          "sync.incremental",
+          "categorize.run",
+          "ingest.extract",
+          "recurring.detect",
+          "checkin.monthly",
+          "schedule.tick"
+        ],
+        "title": "JobKind",
+        "type": "string"
+      },
+      "JobOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/JobKind"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "progress": {
+            "title": "Progress",
+            "type": "integer"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "progress",
+          "result",
+          "last_error",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "JobOut",
+        "type": "object"
+      },
+      "JobStatus": {
+        "enum": [
+          "queued",
+          "running",
+          "succeeded",
+          "dead"
+        ],
+        "title": "JobStatus",
+        "type": "string"
+      },
+      "LinkItemRequest": {
+        "additionalProperties": false,
+        "description": "Exactly one of ``public_token`` (from Plaid Link) or ``sandbox_institution_id``.",
+        "properties": {
+          "institution_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institution Name"
+          },
+          "public_token": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Token"
+          },
+          "sandbox_institution_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "ins_109508"
+            ],
+            "title": "Sandbox Institution Id"
+          }
+        },
+        "title": "LinkItemRequest",
+        "type": "object"
+      },
+      "LinkToken": {
+        "properties": {
+          "expiration": {
+            "title": "Expiration",
+            "type": "string"
+          },
+          "link_token": {
+            "title": "Link Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "link_token",
+          "expiration"
+        ],
+        "title": "LinkToken",
+        "type": "object"
+      },
+      "LinkedItem": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/SyncItemOut"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item",
+          "job_id"
+        ],
+        "title": "LinkedItem",
+        "type": "object"
+      },
+      "QueuedJob": {
+        "properties": {
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "QueuedJob",
+        "type": "object"
+      },
+      "RuleOut": {
+        "properties": {
+          "category": {
+            "enum": [
+              "income",
+              "transfer",
+              "housing",
+              "utilities",
+              "phone_internet",
+              "groceries",
+              "dining",
+              "transport",
+              "subscriptions",
+              "insurance",
+              "healthcare",
+              "shopping",
+              "entertainment",
+              "travel",
+              "personal_care",
+              "education",
+              "gifts_donations",
+              "fees",
+              "taxes",
+              "debt_payment",
+              "savings_investment",
+              "other"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "merchant_norm": {
+            "title": "Merchant Norm",
+            "type": "string"
+          }
+        },
+        "required": [
+          "merchant_norm",
+          "category"
+        ],
+        "title": "RuleOut",
+        "type": "object"
+      },
+      "SyncItemOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "institution_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institution Name"
+          },
+          "last_synced_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Synced At"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/SyncProvider"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SyncStatus"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "institution_name",
+          "status",
+          "last_synced_at",
+          "created_at"
+        ],
+        "title": "SyncItemOut",
+        "type": "object"
+      },
+      "SyncProvider": {
+        "enum": [
+          "plaid",
+          "csv"
+        ],
+        "title": "SyncProvider",
+        "type": "string"
+      },
+      "SyncStatus": {
+        "enum": [
+          "active",
+          "login_required",
+          "error"
+        ],
+        "title": "SyncStatus",
+        "type": "string"
+      },
+      "TransactionOut": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "amount_cents": {
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "income",
+                  "transfer",
+                  "housing",
+                  "utilities",
+                  "phone_internet",
+                  "groceries",
+                  "dining",
+                  "transport",
+                  "subscriptions",
+                  "insurance",
+                  "healthcare",
+                  "shopping",
+                  "entertainment",
+                  "travel",
+                  "personal_care",
+                  "education",
+                  "gifts_donations",
+                  "fees",
+                  "taxes",
+                  "debt_payment",
+                  "savings_investment",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "category_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CategorySource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "merchant_clean": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Clean"
+          },
+          "merchant_norm": {
+            "title": "Merchant Norm",
+            "type": "string"
+          },
+          "merchant_raw": {
+            "title": "Merchant Raw",
+            "type": "string"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "boolean"
+          },
+          "posted_at": {
+            "format": "date",
+            "title": "Posted At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "account_id",
+          "posted_at",
+          "amount_cents",
+          "merchant_raw",
+          "merchant_clean",
+          "merchant_norm",
+          "category",
+          "category_source",
+          "confidence",
+          "pending"
+        ],
+        "title": "TransactionOut",
+        "type": "object"
+      },
+      "TransactionPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TransactionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "TransactionPage",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "description": "Supabase access token",
+        "scheme": "bearer",
+        "type": "http"
       }
     }
   },
@@ -70,6 +793,126 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/accounts": {
+      "get": {
+        "description": "Every linked account, by institution then name, with its latest balance.",
+        "operationId": "list_accounts",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AccountOut"
+                  },
+                  "title": "Response List Accounts",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Accounts",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/accounts/{account_id}": {
+      "patch": {
+        "description": "Set an account's role or active flag. Making an account the emergency\nfund takes the role from the user's previous one.",
+        "operationId": "update_account",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Account",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "description": "The running commit and the database's migration revision. No auth.",
@@ -99,6 +942,632 @@
         "summary": "Health",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/jobs/{job_id}": {
+      "get": {
+        "description": "One of the user's jobs.",
+        "operationId": "get_job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/sync/items": {
+      "post": {
+        "description": "Exchange a Link public token (or, outside production, create one for a\nsandbox institution), store the encrypted access token and queue the\ninitial sync.",
+        "operationId": "link_item",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkedItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Link Item",
+        "tags": [
+          "sync"
+        ]
+      }
+    },
+    "/sync/items/{item_id}": {
+      "delete": {
+        "description": "Unlink an institution: remove it at Plaid (best effort) and delete it with\nits accounts, transactions, balances and holdings.",
+        "operationId": "delete_item",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Item",
+        "tags": [
+          "sync"
+        ]
+      }
+    },
+    "/sync/items/{item_id}/sync": {
+      "post": {
+        "description": "Queue an incremental sync, or return the one already waiting.",
+        "operationId": "sync_item",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueuedJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Sync Item",
+        "tags": [
+          "sync"
+        ]
+      }
+    },
+    "/sync/link-token": {
+      "post": {
+        "description": "A Plaid Link token for the signed-in user.",
+        "operationId": "create_link_token",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkToken"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Link Token",
+        "tags": [
+          "sync"
+        ]
+      }
+    },
+    "/transactions": {
+      "get": {
+        "description": "The user's transactions, newest first (posted_at, then id, descending).",
+        "operationId": "list_transactions",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "Earliest posted_at, inclusive",
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Earliest posted_at, inclusive",
+              "title": "Start"
+            }
+          },
+          {
+            "description": "Latest posted_at, inclusive",
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Latest posted_at, inclusive",
+              "title": "End"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "income",
+                    "transfer",
+                    "housing",
+                    "utilities",
+                    "phone_internet",
+                    "groceries",
+                    "dining",
+                    "transport",
+                    "subscriptions",
+                    "insurance",
+                    "healthcare",
+                    "shopping",
+                    "entertainment",
+                    "travel",
+                    "personal_care",
+                    "education",
+                    "gifts_donations",
+                    "fees",
+                    "taxes",
+                    "debt_payment",
+                    "savings_investment",
+                    "other"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "description": "Rule and user labels count as 1; uncategorized excluded",
+            "in": "query",
+            "name": "min_confidence",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Rule and user labels count as 1; uncategorized excluded",
+              "title": "Min Confidence"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Transactions",
+        "tags": [
+          "transactions"
+        ]
+      }
+    },
+    "/transactions/{transaction_id}": {
+      "patch": {
+        "description": "Correct a transaction's category. The fix becomes the user's rule for\nthat merchant and relabels the merchant's other transactions, except\nones the user labeled individually.",
+        "operationId": "update_transaction_category",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Transaction Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryFix"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Transaction Category",
+        "tags": [
+          "transactions"
         ]
       }
     }
