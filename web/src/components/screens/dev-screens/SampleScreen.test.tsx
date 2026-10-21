@@ -117,6 +117,22 @@ describe('SampleScreen after Confirm', () => {
     expect(requests).toEqual([]);
   });
 
+  it('renders the index of saved decisions, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="why-index" />);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Why each decision' }),
+    ).toBeInTheDocument();
+    const list = screen.getByRole('list', { name: 'Saved decisions' });
+    expect(within(list).getByRole('link', { name: '401(k) match' })).toBeInTheDocument();
+    expect(list).toHaveTextContent('v1 · Saved Oct 17');
+    expect(screen.getByRole('link', { name: 'Why this decision' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(requests).toEqual([]);
+  });
+
   it('renders the fallback, with no requests', async () => {
     const requests = countRequests();
     render(<SampleScreen screen="why-fallback" />);
@@ -131,7 +147,7 @@ describe('SampleScreen after Confirm', () => {
 describe('seededClient', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it.each(['link', 'decisions', 'why', 'why-fallback'] as const)(
+  it.each(['link', 'decisions', 'why', 'why-fallback', 'why-index'] as const)(
     'seeds every %s query at the sample time without reading the clock',
     (name) => {
       // It runs while the page renders: next dev prerenders the route to

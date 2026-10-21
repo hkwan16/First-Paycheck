@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { JOB_POLL_MS } from '@/lib/api/hooks';
+import { JOB_POLL_MS, usePayStubs } from '@/lib/api/hooks';
 import {
   BENEFITS_DOC_ID,
   manualEntryProposal,
@@ -101,6 +101,47 @@ describe('ConfirmScreen review', () => {
     await user.click(within(row('Period end')).getByRole('button', { name: /^Period end/ }));
     expect(highlighted()).toHaveLength(0);
     expect(pane).toHaveTextContent('Period end has no line of its own in the source.');
+  });
+
+  it('still goes to Spending when the confirmed document renders before the other reads return', async () => {
+    // In the app the side nav also reads /docs and /pay-stubs, so confirming
+    // refetches them too, and the document's own refetch can land first: the
+    // screen switches to its "confirmed" view and unmounts the review while
+    // /pay-stubs is still loading. The move to Spending must not depend on
+    // the review staying on screen (found by the e2e specs against the API).
+    let releasePayStubs: () => void = () => {};
+    const payStubsHeld = new Promise<void>((resolve) => {
+      releasePayStubs = resolve;
+    });
+    let confirmed = false;
+    server.use(
+      http.post(apiUrl('/docs/:id/confirm'), () => {
+        confirmed = true;
+        return undefined;
+      }),
+      http.get(apiUrl('/pay-stubs'), async () => {
+        if (confirmed) await payStubsHeld;
+        return undefined;
+      }),
+    );
+    function PayStubsReader() {
+      usePayStubs();
+      return null;
+    }
+    const { user } = renderWithProviders(
+      <>
+        <ConfirmScreen documentId={PAY_STUB_DOC_ID} />
+        <PayStubsReader />
+      </>,
+      { advanceTimers: vi.advanceTimersByTime },
+    );
+    await screen.findByRole('region', { name: FIELDS });
+    await user.click(screen.getByRole('button', { name: 'Confirm all remaining' }));
+    await user.click(continueButton());
+
+    await screen.findByText('This pay stub is confirmed.');
+    releasePayStubs();
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/setup/spending'));
   });
 
   it('confirms one field at a time with a pressed toggle and moves the progress bar', async () => {

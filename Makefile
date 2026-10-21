@@ -16,7 +16,7 @@ endef
 
 .PHONY: help
 help: ## List targets
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
+	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
 
 .PHONY: setup
 setup: ## Install Python and web dependencies and the git hooks
@@ -45,6 +45,10 @@ lint: ## ruff, ruff format, mypy, the em-dash check, eslint and tsc
 	uv run python scripts/check_no_em_dash.py
 	@$(call in_web,pnpm --dir web lint)
 	@$(call in_web,pnpm --dir web typecheck)
+
+.PHONY: e2e-full
+e2e-full: ## Playwright against a local API, worker, auth and Postgres (scripts/e2e_stack.py)
+	uv run python -m scripts.e2e_stack run
 
 .PHONY: eval
 eval: ## Free (deterministic) eval suites

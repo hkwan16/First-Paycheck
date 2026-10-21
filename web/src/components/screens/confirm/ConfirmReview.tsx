@@ -44,7 +44,7 @@ export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
     initConfirmState(proposal.fields ?? [], { manual, choices: FIELD_CHOICES }),
   );
   const summary = summarize(state);
-  const confirm = useConfirmDocument();
+  const confirm = useConfirmDocument({ onConfirmed: () => router.push('/setup/spending') });
 
   const dispatch: Dispatch<ConfirmAction> = (action) => {
     // An answer from the server describes the values it was sent; any change makes it stale.
@@ -53,11 +53,11 @@ export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
   };
 
   const submit = () =>
-    confirm.mutate(
-      // The fields are the API's own keys for this document type; the server validates them.
-      { documentId: document.id, values: payStubValues(state.fields) as unknown as PayStubValues },
-      { onSuccess: () => router.push('/setup/spending') },
-    );
+    // The fields are the API's own keys for this document type; the server validates them.
+    confirm.mutate({
+      documentId: document.id,
+      values: payStubValues(state.fields) as unknown as PayStubValues,
+    });
 
   const selected = state.fields.find((f) => f.key === state.selected) ?? null;
   const reason = statusReasonText(document.status_reason);

@@ -50,7 +50,9 @@ test('uploads a pay stub, reviews every field and continues to Spending', async 
       '',
     );
     await fields.getByRole('button', { name: `Edit ${label}`, exact: true }).click();
-    const input = fields.getByRole('group', { name: label, exact: true }).getByLabel(label);
+    const input = fields
+      .getByRole('group', { name: label, exact: true })
+      .getByLabel(label, { exact: true });
     if ((await input.inputValue()) === '') await input.fill('0');
     await input.press('Enter');
     await expect(
