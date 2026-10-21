@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import signal
 import subprocess
@@ -17,6 +19,7 @@ from sqlalchemy import Connection, Engine, text
 
 from app.config import REPO_ROOT
 from app.db import user_session_for
+from app.logs import JsonFormatter
 from db.enums import JobKind
 from jobs import queue
 from jobs.context import JobContext, Services
@@ -113,6 +116,72 @@ def test_unknown_kind_fails_the_job(empty_queue: Connection, user_a: FixtureUser
     assert job(empty_queue, job_id)["last_error"] == (
         "UnknownJobKind: no handler for job kind checkin.monthly"
     )
+
+
+def job_lines(caplog: pytest.LogCaptureFixture) -> list[dict[str, Any]]:
+    return [
+        dict(vars(r)) for r in caplog.records if r.name == "jobs.worker" and "job_id" in vars(r)
+    ]
+
+
+def test_each_job_run_logs_its_id_kind_user_attempt_and_duration(
+    empty_queue: Connection, user_a: FixtureUser, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO)
+
+    def handler(ctx: JobContext) -> dict[str, Any]:
+        logging.getLogger("jobs.handlers.test").info("handler says hi")
+        return {}
+
+    job_id = enqueue(empty_queue, user_a, JobKind.CATEGORIZE_RUN)
+    worker_for(empty_queue, {JobKind.CATEGORIZE_RUN: handler}).run_once()
+    [line] = job_lines(caplog)
+    assert line["job_id"] == str(job_id)
+    assert line["kind"] == "categorize.run"
+    assert line["user_id"] == str(user_a.id)
+    assert line["attempt"] == 1
+    assert line["outcome"] == "succeeded"
+    assert isinstance(line["duration_ms"], float)
+    # The handler's own lines carry the job's context.
+    [inner] = [r for r in caplog.records if r.name == "jobs.handlers.test"]
+    assert str(job_id) in JsonFormatter().format(inner)
+
+
+def test_a_failed_job_run_logs_the_outcome_and_error(
+    empty_queue: Connection, user_a: FixtureUser, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO)
+
+    def handler(ctx: JobContext) -> dict[str, Any]:
+        raise RuntimeError("plaid is down")
+
+    job_id = enqueue(empty_queue, user_a, JobKind.CATEGORIZE_RUN)
+    worker_for(empty_queue, {JobKind.CATEGORIZE_RUN: handler}).run_once()
+    [line] = job_lines(caplog)
+    assert (line["job_id"], line["attempt"], line["outcome"]) == (str(job_id), 1, "queued")
+    assert line["error"] == "RuntimeError: plaid is down"
+    assert line["levelname"] == "WARNING"
+
+
+def test_a_dead_job_logs_an_error_with_its_traceback(
+    empty_queue: Connection, user_a: FixtureUser, caplog: pytest.LogCaptureFixture
+) -> None:
+    """ERROR, so Sentry's logging integration reports the job that gave up."""
+    caplog.set_level(logging.INFO)
+
+    def handler(ctx: JobContext) -> dict[str, Any]:
+        raise RuntimeError("still down")
+
+    job_id = enqueue(empty_queue, user_a, JobKind.CATEGORIZE_RUN)
+    empty_queue.execute(
+        text("UPDATE jobs SET attempts = :n WHERE id = :id"),
+        {"n": queue.MAX_ATTEMPTS - 1, "id": job_id},
+    )
+    worker_for(empty_queue, {JobKind.CATEGORIZE_RUN: handler}).run_once()
+    [record] = [r for r in caplog.records if r.name == "jobs.worker" and "job_id" in vars(r)]
+    assert (vars(record)["outcome"], record.levelname) == ("dead", "ERROR")
+    assert record.exc_info is not None
+    assert record.exc_info[0] is RuntimeError
 
 
 def test_idle_worker_reports_no_work(empty_queue: Connection) -> None:
@@ -242,6 +311,8 @@ def test_worker_process_exits_cleanly_on_sigterm(scratch_database: tuple[str, En
         while "worker started" not in line and time.monotonic() < deadline:
             line = process.stderr.readline()
         assert "worker started" in line
+        # Not a development terminal: one JSON object per line.
+        assert json.loads(line)["message"] == "worker started"
         process.send_signal(signal.SIGTERM)
         assert process.wait(timeout=15) == 0
     finally:

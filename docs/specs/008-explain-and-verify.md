@@ -50,7 +50,7 @@ Explain a saved decision in plain words from the calculator's own numbers, the c
 19. **Latest.** The latest explanation of a decision is its row with the greatest `(created_at, attempt)`.
 20. **Idempotent `POST /explain`.** Without `force`, when the decision already has a verified explanation, the latest verified row is returned and nothing is generated. Otherwise (none yet, only fallbacks, or `force = true`) a new run starts.
 21. **No transaction across the model call.** The route reads the decision and its context in one short user session, calls the gateway with no transaction open, and writes the run's rows in a second user session, so a 30-second model call never holds a pooled connection.
-22. **Status codes.** `POST /explain` is 200 with the final row; another user's decision is 404; an LLM that is not configured (no key and `LLM_FAKE` off) is 503 `llm_unavailable`, raised only when a model call is needed: a 404 or a stored verified explanation is answered without a model. `GET /decisions/{id}/explanation` is 404 `not_found` when the decision has no explanation.
+22. **Status codes.** `POST /explain` is 200 with the final row; another user's decision is 404; an LLM that is not configured (no key and `LLM_FAKE` off) is 503 `llm_unavailable`, raised only when a model call is needed: a 404 or a stored verified explanation is answered without a model. `GET /decisions/{id}/explanation` is 404 `not_found` when the decision has no explanation. A user may start 30 runs per clock hour (UTC), counted with the upload limiter (`app/ratelimit.py`, bucket `explain.run`, spec 004 rule 5) in the first session, after the stored-explanation check and the model check: a 404, a stored verified explanation and a 503 do not count, and the 31st run in a window is 429 `rate_limited` with `Retry-After` (seconds to the next window) and writes nothing.
 23. **Citations in the response** resolve the row's keys against `irs_citations` for the decision's calculator and `tax_year`, in the row's order.
 
 ## Evals
@@ -96,6 +96,7 @@ Allowed: money 60,000.00, 1,800.00, 2,400.00, 600.00, 3,000.00, 46.15, 40.62, 24
 | `test_idempotent_post` | good | second POST adds no row | same id |
 | `test_force_regenerates` | good, good | `force=true` adds a row | new id |
 | `test_get_explanation_404_when_none` | none | 0 | 404 |
+| `test_rate_limit_is_thirty_runs_per_clock_hour` | 31 good | 30 forced runs; the 31st adds no row | 429 with `Retry-After: 30` at 14:59:30 |
 
 ## Edge cases
 
@@ -107,4 +108,3 @@ Allowed: money 60,000.00, 1,800.00, 2,400.00, 600.00, 3,000.00, 46.15, 40.62, 24
 
 - Explaining check-in findings (`finding_id`, M8).
 - Caching across users or reusing an explanation after the decision's version changes: each version is explained on its own.
-- Rate limiting `POST /explain` (M4: 30 per hour).

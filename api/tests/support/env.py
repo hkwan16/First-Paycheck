@@ -18,6 +18,8 @@ _BLANKED = (
     "SUPABASE_JWKS_URL",
     "CORS_ORIGINS",
     "CORS_ORIGIN_REGEX",
+    # Tests never report errors to a real Sentry project.
+    "SENTRY_DSN",
 )
 
 

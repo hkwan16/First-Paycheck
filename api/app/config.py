@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     llm_model_explain: str = "claude-sonnet-5-5"
     llm_daily_budget_cents: int = Field(default=50, ge=0)
 
+    # Error reporting (app/sentry.py); unset means no Sentry at all.
+    sentry_dsn: SecretStr | None = None
+
     @classmethod
     def settings_customise_sources(
         cls,

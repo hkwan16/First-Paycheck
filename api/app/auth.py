@@ -16,7 +16,7 @@ from functools import lru_cache
 from typing import Annotated, Any
 
 import jwt
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config import Settings, get_settings
@@ -106,12 +106,16 @@ _bearer = HTTPBearer(auto_error=False, description="Supabase access token")
 
 
 def get_current_user(
+    request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> AuthUser:
     if credentials is None or not credentials.credentials:
         raise Unauthorized("Missing bearer token")
-    return verify_jwt(credentials.credentials, settings)
+    user = verify_jwt(credentials.credentials, settings)
+    # The request's log line names the verified user (app.request_log).
+    request.state.user_id = str(user.id)
+    return user
 
 
 CurrentUser = Annotated[AuthUser, Depends(get_current_user)]

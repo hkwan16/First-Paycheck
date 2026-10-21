@@ -16,12 +16,14 @@ import threading
 import time
 import uuid
 from collections.abc import Mapping
+from typing import Any
 
 from sqlalchemy import Connection, Engine
 
 from app.config import get_settings
-from app.logs import configure_logging
-from db.enums import JobKind
+from app.logs import configure_logging, log_context
+from app.sentry import init_sentry
+from db.enums import JobKind, JobStatus
 from jobs import queue, scheduler
 from jobs.context import JobContext, Services
 from jobs.queue import QueueBind
@@ -32,6 +34,10 @@ logger = logging.getLogger("jobs.worker")
 
 HEARTBEAT_SECONDS = 30.0
 POLL_SECONDS = 1.0
+
+
+def _elapsed_ms(started: float) -> float:
+    return round((time.monotonic() - started) * 1000, 1)
 
 
 class _Heartbeat:
@@ -53,7 +59,8 @@ class _Heartbeat:
             try:
                 queue.heartbeat(self._job_id, bind=self._bind)
             except Exception:
-                logger.exception("heartbeat failed for job %s", self._job_id)
+                # A plain thread does not inherit the job's log context.
+                logger.exception("heartbeat failed", extra={"job_id": str(self._job_id)})
 
     def __enter__(self) -> _Heartbeat:
         if not isinstance(self._bind, Connection):
@@ -94,28 +101,40 @@ class Worker:
             queue_bind=self._queue_bind,
             user_bind=self._user_bind,
         )
-        try:
-            handler = handler_for(self._handlers, job.kind)
-            with _Heartbeat(job.id, self._queue_bind, self._heartbeat_seconds):
-                result = handler(ctx)
-        except Exception as exc:
-            status = queue.fail(job, exc, bind=self._queue_bind)
-            logger.warning(
-                "job %s %s attempt %d failed (%s): %s",
-                job.id,
-                job.kind.value,
-                job.attempts,
-                status.value if status else "no longer running",
-                queue.error_text(exc),
+        # Ids only: the payload and result may name documents, never their content.
+        fields: dict[str, Any] = {
+            "job_id": str(job.id),
+            "kind": job.kind.value,
+            "user_id": str(job.user_id) if job.user_id else None,
+            "attempt": job.attempts,
+        }
+        with log_context(**fields):
+            try:
+                handler = handler_for(self._handlers, job.kind)
+                with _Heartbeat(job.id, self._queue_bind, self._heartbeat_seconds):
+                    result = handler(ctx)
+            except Exception as exc:
+                status = queue.fail(job, exc, bind=self._queue_bind)
+                outcome = status.value if status else "no longer running"
+                # A job that gave up is an error (and a Sentry event); a retry is not.
+                dead = status is JobStatus.DEAD
+                logger.log(
+                    logging.ERROR if dead else logging.WARNING,
+                    "job failed",
+                    exc_info=exc if dead else None,
+                    extra={
+                        **fields,
+                        "outcome": outcome,
+                        "duration_ms": _elapsed_ms(started),
+                        "error": queue.error_text(exc),
+                    },
+                )
+                return True
+            queue.complete(job, result, bind=self._queue_bind)
+            logger.info(
+                "job succeeded",
+                extra={**fields, "outcome": "succeeded", "duration_ms": _elapsed_ms(started)},
             )
-            return True
-        queue.complete(job, result, bind=self._queue_bind)
-        logger.info(
-            "job %s %s succeeded in %d ms",
-            job.id,
-            job.kind.value,
-            (time.monotonic() - started) * 1000,
-        )
         return True
 
     def run(self, stop: threading.Event, *, poll_seconds: float = POLL_SECONDS) -> int:
@@ -136,10 +155,12 @@ class Worker:
 
 def main() -> int:
     configure_logging()
+    settings = get_settings()
+    init_sentry(settings, component="worker")
     stop = threading.Event()
     for signum in (signal.SIGTERM, signal.SIGINT):
         signal.signal(signum, lambda *_: stop.set())
-    return Worker(services=default_services(get_settings())).run(stop)
+    return Worker(services=default_services(settings)).run(stop)
 
 
 if __name__ == "__main__":

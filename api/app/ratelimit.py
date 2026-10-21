@@ -23,6 +23,7 @@ from db.models import RateLimitCounter
 
 __all__ = [
     "COUNTER_RETENTION",
+    "EXPLAIN_RUNS",
     "UPLOADS",
     "Limit",
     "RateLimited",
@@ -41,6 +42,8 @@ class Limit:
 
 
 UPLOADS = Limit(bucket="docs.upload", limit=10, window=dt.timedelta(hours=1))
+# Explain runs that reach the model (spec 008 rule 22); stored answers are free.
+EXPLAIN_RUNS = Limit(bucket="explain.run", limit=30, window=dt.timedelta(hours=1))
 # Counters are only read for the current window; older ones are pruned.
 COUNTER_RETENTION = dt.timedelta(days=1)
 

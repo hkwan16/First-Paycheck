@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 from collections.abc import Callable, Iterator
 from typing import Any
@@ -14,7 +15,7 @@ from sqlalchemy import Connection, text
 
 from app.config import Settings, get_settings
 from app.db import user_session_for
-from app.deps import get_llm_gateway
+from app.deps import get_llm_gateway, get_now
 from llm.gateway import REFUSAL_REPLY, Gateway, ScriptedGateway, ScriptStep, reply_with
 from llm.schemas import ExplanationDraft
 from tests.conftest import FixtureUser
@@ -79,9 +80,7 @@ def script(app: FastAPI, db_connection: Connection, seeded_citations: Connection
     return Script(app, db_connection)
 
 
-@pytest.fixture
-def decision(client_as: Client, user_a: FixtureUser) -> str:
-    client = client_as(user_a)
+def save_decision(client: TestClient) -> str:
     result = client.post("/calc/401k-match", json=EXAMPLE_1)
     saved = client.post(
         "/decisions",
@@ -90,6 +89,11 @@ def decision(client_as: Client, user_a: FixtureUser) -> str:
     assert saved.status_code == 201, saved.text
     decision_id: str = saved.json()["decision_id"]
     return decision_id
+
+
+@pytest.fixture
+def decision(client_as: Client, user_a: FixtureUser) -> str:
+    return save_decision(client_as(user_a))
 
 
 def explain(client: TestClient, decision_id: str, **body: Any) -> dict[str, Any]:
@@ -280,6 +284,50 @@ def test_without_seeded_citations_the_fallback_is_uncited(
     assert out["fallback"] is True
     assert out["citations"] == []
     assert len(rows(db_connection, decision)) == 3
+
+
+def test_rate_limit_is_thirty_runs_per_clock_hour(
+    script: Script,
+    app: FastAPI,
+    client_as: Client,
+    user_a: FixtureUser,
+    user_b: FixtureUser,
+    decision: str,
+    db_connection: Connection,
+) -> None:
+    clock = [dt.datetime(2026, 10, 21, 14, 59, 30, tzinfo=dt.UTC)]
+    app.dependency_overrides[get_now] = lambda: clock[0]
+    script(*[GOOD] * 32)
+    client = client_as(user_a)
+    for _ in range(30):
+        explain(client, decision, force=True)
+    # A stored verified explanation and a 404 start no run and do not count.
+    explain(client, decision)
+    assert client_as(user_b).post("/explain", json={"decision_id": decision}).status_code == 404
+    refused = client.post("/explain", json={"decision_id": decision, "force": True})
+    assert refused.status_code == 429
+    assert refused.json()["error"]["code"] == "rate_limited"
+    assert refused.headers["Retry-After"] == "30"
+    assert len(rows(db_connection, decision)) == 30
+    # Another user has their own limit; the next clock hour starts a new window.
+    explain(client_as(user_b), save_decision(client_as(user_b)), force=True)
+    clock[0] = dt.datetime(2026, 10, 21, 15, 0, 0, tzinfo=dt.UTC)
+    explain(client, decision, force=True)
+    assert len(rows(db_connection, decision)) == 31
+
+
+def test_unconfigured_llm_does_not_count_against_the_limit(
+    script: Script, app: FastAPI, client_as: Client, user_a: FixtureUser, decision: str
+) -> None:
+    app.dependency_overrides[get_now] = lambda: dt.datetime(2026, 10, 21, 14, 0, tzinfo=dt.UTC)
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        _env_file=None, llm_fake=False, anthropic_api_key=None
+    )
+    for _ in range(31):
+        response = client_as(user_a).post("/explain", json={"decision_id": decision})
+        assert response.status_code == 503
+    script(GOOD)
+    assert explain(client_as(user_a), decision)["verified"] is True
 
 
 @pytest.fixture

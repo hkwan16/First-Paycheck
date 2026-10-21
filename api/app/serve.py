@@ -5,11 +5,16 @@ so the single free web service runs both processes under this supervisor:
 
     python -m app.serve
 
-It starts uvicorn and ``python -m jobs.worker`` as children, forwards SIGTERM
-and SIGINT to both, and waits for them. If either child exits on its own the
+It starts the API (``python -m app.serve api``, uvicorn) and
+``python -m jobs.worker`` as children, forwards SIGTERM and SIGINT to both,
+and waits for them. If either child exits on its own the
 other is terminated and the supervisor exits 1, so Render restarts the service
 instead of running half of it. Migrations run from CI before the deploy hook
 fires (see .github/workflows/deploy.yml), not here.
+
+``python -m app.serve api`` runs uvicorn in-process with the logging config
+from ``app.logs``, so uvicorn's own lines are JSON like the app's and its
+access log gives way to ``app.request``'s one line per request.
 
 ``SERVE_COMMANDS_JSON`` overrides the child commands; tests use it.
 """
@@ -23,7 +28,12 @@ import signal
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any
+
+import uvicorn
+
+from app.logs import configure_logging, logging_config
 
 log = logging.getLogger(__name__)
 
@@ -32,24 +42,27 @@ GRACE_SECONDS = 25.0  # Render sends SIGKILL about 30 s after SIGTERM.
 
 
 def default_commands() -> dict[str, list[str]]:
-    port = os.environ.get("PORT", "8000")
-    workers = os.environ.get("WEB_CONCURRENCY", "1")
     return {
-        "api": [
-            "uvicorn",
-            "app.main:app",
-            "--host",
-            "0.0.0.0",  # noqa: S104 (the container must listen on all interfaces)
-            "--port",
-            port,
-            "--workers",
-            workers,
-            "--proxy-headers",
-            "--forwarded-allow-ips",
-            "*",
-        ],
+        "api": [sys.executable, "-m", "app.serve", "api"],
         "worker": [sys.executable, "-m", "jobs.worker"],
     }
+
+
+def api_options() -> dict[str, Any]:
+    """uvicorn settings for the API child, from Render's environment."""
+    return {
+        "host": "0.0.0.0",  # noqa: S104 (the container must listen on all interfaces)
+        "port": int(os.environ.get("PORT", "8000")),
+        "workers": int(os.environ.get("WEB_CONCURRENCY", "1")),
+        "proxy_headers": True,
+        "forwarded_allow_ips": "*",
+        "access_log": False,
+        "log_config": logging_config(),
+    }
+
+
+def run_api() -> None:
+    uvicorn.run("app.main:app", **api_options())
 
 
 def commands_json(commands: Mapping[str, list[str]]) -> str:
@@ -73,7 +86,7 @@ class Supervisor:
         for name, argv in self.commands.items():
             # argv comes from this module or the operator (SERVE_COMMANDS_JSON), never from users.
             self.processes[name] = subprocess.Popen(argv)  # noqa: S603
-            log.info("serve: started %s pid=%s", name, self.processes[name].pid)
+            log.info("child started", extra={"child": name, "pid": self.processes[name].pid})
 
     def _signal_all(self, signum: int) -> None:
         for name, proc in self.processes.items():
@@ -81,7 +94,7 @@ class Supervisor:
                 try:
                     proc.send_signal(signum)
                 except ProcessLookupError:
-                    log.info("serve: %s already gone", name)
+                    log.info("child already gone", extra={"child": name})
 
     def _wait_all(self, timeout: float) -> None:
         deadline = time.monotonic() + timeout
@@ -98,22 +111,23 @@ class Supervisor:
         self.start()
         while True:
             if stop_requested is not None and stop_requested(time.monotonic()):
-                log.info("serve: stop requested, terminating children")
+                log.info("stop requested, terminating children")
                 self._signal_all(signal.SIGTERM)
                 self._wait_all(GRACE_SECONDS)
                 return 0
             for name, proc in self.processes.items():
                 code = proc.poll()
                 if code is not None:
-                    log.error("serve: %s exited with %s, stopping the rest", name, code)
+                    log.error(
+                        "child exited, stopping the rest", extra={"child": name, "code": code}
+                    )
                     self._signal_all(signal.SIGTERM)
                     self._wait_all(GRACE_SECONDS)
                     return 1
             time.sleep(POLL_SECONDS)
 
 
-def main() -> int:
-    logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"), format="%(message)s")
+def supervise() -> int:
     stop = {"requested": False}
 
     def request_stop(*_: object) -> None:
@@ -123,6 +137,18 @@ def main() -> int:
         signal.signal(signum, request_stop)
     supervisor = Supervisor(commands_from_env())
     return supervisor.run(stop_requested=lambda _: stop["requested"])
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args == ["api"]:
+        run_api()
+        return 0
+    if args:
+        sys.stderr.write("usage: python -m app.serve [api]\n")
+        return 2
+    configure_logging()
+    return supervise()
 
 
 if __name__ == "__main__":

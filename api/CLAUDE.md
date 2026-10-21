@@ -214,6 +214,8 @@ explanation, `GET /calendar` shows the check it implies.
   (a factory, `app/deps.py`): read in one session, call the gateway with none
   open, write in a second. `LlmGateway` is lazy, so a 404 or a stored verified
   explanation needs no model; an unconfigured model is 503 `llm_unavailable`.
+  A run that reaches the model counts against `ratelimit.EXPLAIN_RUNS` (30 per
+  clock hour, 429 with `Retry-After`); stored answers, 404s and 503s are free.
 - **IRS passages** are curated in `db/seed/irs_citations/<prefix>.yaml`,
   quoted exactly from irs.gov (under 80 words, `...` for omissions, every part
   verified against the live page; `verified: false` entries are not loaded).
@@ -225,6 +227,34 @@ explanation, `GET /calendar` shows the check it implies.
 - `GET /spending/summary` is one `GROUP BY category` under RLS rolled up by
   the pure `calc/spending.py:summarize`; buckets are
   `sync/categories.py:CATEGORY_BUCKETS`.
+
+## Logging and operations (from M4)
+
+- `app/logs.py` is the one logging setup: JSON lines on stderr (`ts`, `level`,
+  `logger`, `message`, then fields), plain text only when `APP_ENV=development`
+  on a TTY. `configure_logging()` for CLIs and the worker; `app.serve api`
+  hands `logging_config()` to uvicorn, whose own lines then share the format;
+  a bare `uvicorn app.main:app` gets it from `ensure_logging()` in the lifespan.
+- Log fields with `extra={...}` or bind them with `log_context(...)`; ids,
+  counts and durations only. Never tokens, headers, request bodies, document
+  bytes, extracted values or secrets.
+- `app/request_log.py` writes one `app.request` line per request (`method`,
+  `path` without the query, `status`, `duration_ms`, `request_id`, `user_id`
+  once the token verified) and returns `X-Request-Id` (kept from the request
+  when it is a plain token, else generated), also on unhandled 500s. The worker
+  logs each run (`job_id`, `kind`, `user_id`, `attempt`, `outcome`,
+  `duration_ms`) and binds them for the handler's own lines; a job that goes
+  `dead` logs at ERROR with its traceback.
+- Sentry (`app/sentry.py`) runs only when `SENTRY_DSN` is set (Render's env
+  group; blank everywhere else, and tests blank it), from `create_app` and
+  `jobs.worker.main`, tagged `component=api|worker`. No PII, no request
+  bodies, no frame locals; `before_send` drops bodies, cookies and
+  `Authorization`. Without a DSN `sentry_sdk` is never imported.
+- `GET /health` adds `worker: ok | stale` from `jobs/scheduler.py:worker_status`
+  (a running job's heartbeat or a succeeded tick in the last 5 minutes, read on
+  the privileged connection; spec 002 rule 38). It stays 200 when the worker is
+  stale or the read fails. Tests point `get_queue_bind` at their connection
+  (the `app` fixture does) or override `worker_state`.
 
 ## Testing
 
@@ -269,6 +299,7 @@ explanation, `GET /calendar` shows the check it implies.
 cd api && uv run uvicorn app.main:app --reload     # or `make dev` from the root
 cd api && uv run python -m jobs.worker              # or `make worker`
 cd api && uv run python -m app.serve                # API plus worker in one process tree (Render Free)
+cd api && uv run python -m app.serve api            # the API alone, as Render runs it (JSON logs)
 cd api && uv run alembic upgrade head               # or `make migrate`
 docker build -f api/Dockerfile -t first-paycheck-api .   # from the repo root
 ```

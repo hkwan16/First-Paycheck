@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from app.config import Settings
-from app.deps import alembic_revision
+from app.deps import alembic_revision, worker_state
 from app.main import create_app
 
 ORIGIN = "https://first-paycheck.example"
@@ -14,6 +14,7 @@ ORIGIN = "https://first-paycheck.example"
 def client() -> TestClient:
     app = create_app(Settings(_env_file=None, cors_origins=[ORIGIN]))
     app.dependency_overrides[alembic_revision] = lambda: "0001_roles"
+    app.dependency_overrides[worker_state] = lambda: "ok"
     return TestClient(app)
 
 

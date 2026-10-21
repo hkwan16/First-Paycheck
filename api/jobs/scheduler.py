@@ -7,14 +7,15 @@ heartbeat is more than 10 minutes old (as a failed attempt, so the usual
 backoff and the 5-attempt limit apply), prunes finished ticks older than an
 hour, expires uploads left unconfirmed for 7 days and deletes day-old
 rate-limit counters (spec 004 rule 21), and queues the next tick 60 seconds
-out. This module may use the privileged connection: it changes rows across
-users.
+out. ``worker_status`` tells ``GET /health`` whether the worker is alive from
+the same rows (spec 002 rule 38). This module may use the privileged
+connection: it reads and changes rows across users.
 """
 
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import Connection, text
 
@@ -119,6 +120,35 @@ def ensure_tick(*, bind: QueueBind | None = None) -> bool:
             )
         ).first()
     return inserted is not None
+
+
+WorkerStatus = Literal["ok", "stale"]
+
+# A live worker heartbeats every 30 s while a handler runs and ticks every 60 s
+# when idle, so 5 quiet minutes means it is down (spec 002 rule 38).
+WORKER_STALE_AFTER_SECONDS = 300
+
+_LAST_SEEN = text(
+    """
+    SELECT greatest(
+      (SELECT max(heartbeat_at) FROM jobs WHERE status = 'running'),
+      (SELECT max(finished_at) FROM jobs
+        WHERE kind = 'schedule.tick' AND status = 'succeeded')
+    ) > now() - make_interval(secs => :stale)
+    """
+)
+
+
+def worker_status(*, bind: QueueBind | None = None) -> WorkerStatus:
+    """``ok`` when the worker heartbeated or finished a tick in the last 5 minutes.
+
+    For ``GET /health``. Reads across users, so it lives here, on the
+    privileged connection. ``greatest`` skips NULLs; no activity at all is
+    NULL, which is ``stale``.
+    """
+    with privileged_connection(bind) as connection:
+        recent = connection.execute(_LAST_SEEN, {"stale": WORKER_STALE_AFTER_SECONDS}).scalar()
+    return "ok" if recent else "stale"
 
 
 def run_tick(ctx: JobContext) -> dict[str, Any]:
