@@ -1,7 +1,6 @@
 'use client';
 
 import { Fragment, useId } from 'react';
-import { CheckIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import type { SourceLine } from '@/lib/api/types';
@@ -40,6 +39,8 @@ export interface SourcePaneProps {
   withheldPages: readonly number[];
   selectedKey: string | null;
   selectedLabel: string | null;
+  /** Manual entry: no field was read from a line, so nothing is highlighted. */
+  manual?: boolean;
   className?: string;
 }
 
@@ -55,6 +56,7 @@ export function SourcePane({
   withheldPages,
   selectedKey,
   selectedLabel,
+  manual = false,
   className,
 }: SourcePaneProps) {
   const titleId = useId();
@@ -67,10 +69,7 @@ export function SourcePane({
         <h2 id={titleId} className="m-0">
           Source, as the AI saw it
         </h2>
-        <Badge
-          tone={redactionCount > 0 ? 'coral' : 'neutral'}
-          icon={redactionCount > 0 ? <CheckIcon /> : undefined}
-        >
+        <Badge tone={redactionCount > 0 ? 'coral' : 'neutral'}>
           {formatNumber(redactionCount)} {redactionCount === 1 ? 'item' : 'items'} redacted
         </Badge>
       </div>
@@ -124,14 +123,16 @@ export function SourcePane({
         </p>
       )}
       <p className="m-0 text-tiny text-ink-3" aria-live="polite">
-        {selectedLabel !== null &&
-          (hasLine ? (
-            <>
-              Highlighted line: <strong>{selectedLabel}</strong>.{' '}
-            </>
-          ) : (
-            <>{selectedLabel} has no line of its own in the source. </>
-          ))}
+        {manual
+          ? 'Type each field from these lines. '
+          : selectedLabel !== null &&
+            (hasLine ? (
+              <>
+                Highlighted line: <strong>{selectedLabel}</strong>.{' '}
+              </>
+            ) : (
+              <>{selectedLabel} has no line of its own in the source. </>
+            ))}
         Redaction ran before extraction. The original file is deleted when you continue.
       </p>
     </Card>

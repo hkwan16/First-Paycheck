@@ -135,7 +135,6 @@ export function DocumentRow({ doc, jobId, starting, onRead, onReplace }: Documen
           {!reading && isReviewable(doc) && (
             <Button
               size="sm"
-              variant="primary"
               href={confirmRoute(doc.id)}
               aria-label={doc.status === 'proposed' ? `Review ${lower}` : `Enter ${lower} fields`}
             >

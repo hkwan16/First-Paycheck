@@ -216,6 +216,12 @@ describe('summarize', () => {
     expect(some).toMatchObject({ confirmedCount: 2, remaining: 12, progressPct: 14 });
   });
 
+  it('offers confirm-all only while some closed field can be confirmed', () => {
+    expect(summarize(proposed()).canConfirmAll).toBe(true);
+    expect(summarize(run(proposed(), { type: 'confirmAll' })).canConfirmAll).toBe(false);
+    expect(summarize(manual()).canConfirmAll).toBe(false);
+  });
+
   it('can continue once every field is confirmed, the math checks out and no draft is open', () => {
     const all = run(proposed(), { type: 'confirmAll' });
     expect(summarize(all)).toMatchObject({

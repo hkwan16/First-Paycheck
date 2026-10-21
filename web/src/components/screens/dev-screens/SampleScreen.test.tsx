@@ -4,6 +4,7 @@ import { SAMPLE_NOW } from '@/test/fixtures/sample';
 import { server } from '@/test/msw/server';
 import { SampleScreen } from './SampleScreen';
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 vi.mock('react-plaid-link', () => ({
   usePlaidLink: () => ({ open: vi.fn(), ready: false, error: null, exit: vi.fn() }),
 }));
@@ -46,6 +47,27 @@ describe('SampleScreen', () => {
       'aria-current',
       'page',
     );
+    expect(requests).toEqual([]);
+  });
+
+  it('renders the Confirm screen on the sample stub, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="confirm" />);
+    const fields = await screen.findByRole('region', { name: 'Extracted fields' });
+    expect(within(fields).getAllByRole('group')).toHaveLength(14);
+    expect(screen.getByText('2 items redacted')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Confirm pay stub' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(requests).toEqual([]);
+  });
+
+  it('renders the manual entry variant with every field open, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="confirm-manual" />);
+    const fields = await screen.findByRole('region', { name: 'Pay stub fields' });
+    expect(within(fields).getAllByRole('textbox')).toHaveLength(10);
     expect(requests).toEqual([]);
   });
 });

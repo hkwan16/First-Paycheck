@@ -93,7 +93,7 @@ export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
             </div>
             <Button
               size="sm"
-              disabled={summary.remaining === 0}
+              disabled={!summary.canConfirmAll}
               onClick={() => dispatch({ type: 'confirmAll' })}
             >
               Confirm all remaining
@@ -137,6 +137,7 @@ export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
           withheldPages={proposal.withheld_pages ?? []}
           selectedKey={state.selected}
           selectedLabel={selected?.label ?? null}
+          manual={manual}
         />
       </div>
 

@@ -294,6 +294,9 @@ describe('ConfirmScreen manual entry', () => {
       "Can't check the math yet. Gross pay is missing, so the difference is $?.",
     );
     expect(within(sourcePane()).getAllByRole('img', { name: 'Redacted' })).toHaveLength(2);
+    expect(sourcePane()).toHaveTextContent('Type each field from these lines.');
+    expect(within(row('Gross pay')).queryByRole('button', { name: /^Cancel/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Confirm all remaining' })).toBeDisabled();
     expect(continueButton()).toBeDisabled();
   });
 

@@ -245,6 +245,8 @@ export interface ConfirmSummary {
   /** Fields with an open editor. */
   editing: number;
   gate: Gate;
+  /** Confirm-all would confirm something: a closed, unconfirmed field has what it needs. */
+  canConfirmAll: boolean;
   /** Every field confirmed, nothing being typed, and the math checks out (or has nothing to check). */
   canContinue: boolean;
 }
@@ -261,6 +263,7 @@ export function summarize(state: ConfirmState): ConfirmSummary {
     progressPct: total === 0 ? 0 : Math.round((confirmedCount / total) * 100),
     editing,
     gate,
+    canConfirmAll: state.fields.some((f) => !f.confirmed && f.draft === null && hasWhatItNeeds(f)),
     canContinue:
       total > 0 &&
       confirmedCount === total &&

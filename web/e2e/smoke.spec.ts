@@ -22,6 +22,18 @@ const SCREENS: readonly Screen[] = [
     sample: true,
   },
   {
+    path: '/dev/screens/confirm',
+    name: 'confirm',
+    heading: 'Check what we read from your pay stub',
+    sample: true,
+  },
+  {
+    path: '/dev/screens/confirm/manual',
+    name: 'confirm-manual',
+    heading: 'Enter what your pay stub says',
+    sample: true,
+  },
+  {
     path: '/dev/screens/spending',
     name: 'spending',
     heading: 'Where your money went',

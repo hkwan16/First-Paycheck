@@ -169,15 +169,19 @@ export function FieldRow({ field, selected, manual, sourceId, dispatch }: FieldR
           <>
             <Button
               size="sm"
-              variant="primary"
+              // One blue action per screen: in manual entry every row is open at once.
+              variant={manual ? 'default' : 'primary'}
               onClick={save}
               aria-label={`Save and confirm ${label}`}
             >
               Save and confirm
             </Button>
-            <Button size="sm" onClick={cancel} aria-label={`Cancel ${label}`}>
-              Cancel
-            </Button>
+            {/* Nothing to go back to before a first value is typed. */}
+            {!(manual && field.value === null) && (
+              <Button size="sm" onClick={cancel} aria-label={`Cancel ${label}`}>
+                Cancel
+              </Button>
+            )}
           </>
         ) : (
           <>
