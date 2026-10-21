@@ -167,6 +167,9 @@ class CalendarKind(StrEnum):
     # rule 12); added by 0008_goals_and_birth_year.
     GOAL_CONTRIBUTION = "goal_contribution"
     GOAL_REVIEW = "goal_review"
+    # Hand the employer the W-4 a saved decision describes (spec 014 rule 18);
+    # added by 0009_w4_calendar_kind.
+    W4_SUBMIT = "w4_submit"
 
 
 class CalendarStatus(StrEnum):

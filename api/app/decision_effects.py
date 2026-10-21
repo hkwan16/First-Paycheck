@@ -1,5 +1,5 @@
 """What a saved decision changes besides the ``decisions`` row (spec 007 rules
-14-16, spec 011 rules 9-14, spec 012 rules 14-15).
+14-16, spec 011 rules 9-14, spec 012 rules 14-15, spec 014 rule 18).
 
 ``POST /decisions`` calls ``check_saveable`` before it inserts anything and
 ``apply`` right after the insert, in the same transaction, so a failure here
@@ -23,6 +23,7 @@ from calc.emergency_fund import EmergencyFundInput, EmergencyFundResult
 from calc.health_plans import HealthPlansInput
 from calc.k401 import K401MatchInput
 from calc.pay_dates import PERIODS, PayFrequency, add_months, frequency_for_periods, next_pay_date
+from calc.w4 import W4Input
 from db.enums import AccountRole, CalendarKind, CalendarStatus, GoalKind, GoalStatus
 from db.models import Account, CalendarEvent, Decision, Goal, PayStub, Profile
 
@@ -32,6 +33,7 @@ __all__ = [
     "GOAL_CONTRIBUTION_TITLE",
     "GOAL_REVIEW_TITLE",
     "REVIEW_AFTER_MONTHS",
+    "W4_SUBMIT_TITLE",
     "Effects",
     "apply",
     "check_saveable",
@@ -41,6 +43,7 @@ ELECTION_CHECK_TITLE = "Check that your next pay stub shows your new 401(k) cont
 GOAL_CONTRIBUTION_TITLE = "Make your first emergency fund contribution"
 GOAL_REVIEW_TITLE = "Review your emergency fund progress"
 ENROLLMENT_DEADLINE_TITLE = "Health plan enrollment deadline"
+W4_SUBMIT_TITLE = "Give your employer your updated Form W-4"
 # Spec 011 rule 12: the review is three months after the first contribution.
 REVIEW_AFTER_MONTHS = 3
 
@@ -70,6 +73,8 @@ def apply(
         return _emergency_fund(session, decision, inputs, result, today)
     if isinstance(inputs, HealthPlansInput):
         return _health_plans(session, decision, inputs, today)
+    if isinstance(inputs, W4Input):
+        return _w4(session, decision, inputs, today)
     return Effects()
 
 
@@ -196,4 +201,12 @@ def _health_plans(
     event = _event(
         session, decision, CalendarKind.ENROLLMENT_DEADLINE, ENROLLMENT_DEADLINE_TITLE, deadline
     )
+    return Effects(calendar_event_id=event.id)
+
+
+def _w4(session: Session, decision: Decision, inputs: W4Input, today: dt.date) -> Effects:
+    """Spec 014 rule 18: hand the employer the new form before the next paycheck."""
+    _dismiss_superseded(session, decision, [CalendarKind.W4_SUBMIT])
+    due = _next_pay_date(session, decision.user_id, inputs.pay_periods_per_year, today)
+    event = _event(session, decision, CalendarKind.W4_SUBMIT, W4_SUBMIT_TITLE, due)
     return Effects(calendar_event_id=event.id)
