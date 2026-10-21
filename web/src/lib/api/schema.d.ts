@@ -45,6 +45,90 @@ export interface paths {
     patch: operations['update_account'];
     trace?: never;
   };
+  '/docs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Documents
+     * @description The user's documents, newest first.
+     */
+    get: operations['list_documents'];
+    put?: never;
+    /**
+     * Upload Document
+     * @description Store an uploaded document for extraction.
+     */
+    post: operations['upload_document'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/docs/{document_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Document
+     * @description One document, with its proposal while it is being reviewed.
+     */
+    get: operations['get_document'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/docs/{document_id}/confirm': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Confirm Document
+     * @description Store the values the user checked, then delete the uploaded file.
+     */
+    post: operations['confirm_document'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/docs/{document_id}/extract': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Extract Document
+     * @description Queue reading the document; returns the running job while one is in flight.
+     */
+    post: operations['extract_document'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/health': {
     parameters: {
       query?: never;
@@ -78,6 +162,50 @@ export interface paths {
      */
     get: operations['get_job'];
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/pay-stubs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Pay Stubs
+     * @description The user's confirmed pay stubs, newest pay date first.
+     */
+    get: operations['list_pay_stubs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/profile': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Profile
+     * @description The saved profile, or the defaults when nothing is saved yet.
+     */
+    get: operations['get_profile'];
+    /**
+     * Put Profile
+     * @description Replace the profile.
+     */
+    put: operations['put_profile'];
     post?: never;
     delete?: never;
     options?: never;
@@ -263,6 +391,43 @@ export interface components {
      * @enum {string}
      */
     AccountRole: 'spending' | 'emergency_fund' | 'retirement';
+    /** BenefitsPlanOut */
+    BenefitsPlanOut: {
+      /** Coinsurance Pct */
+      coinsurance_pct: string;
+      /** Deductible Cents */
+      deductible_cents: number;
+      /** Employer Hsa Cents */
+      employer_hsa_cents: number;
+      /** Enrollment Deadline */
+      enrollment_deadline: string | null;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      kind: components['schemas']['PlanKind'];
+      /** Name */
+      name: string;
+      /** Oop Max Cents */
+      oop_max_cents: number;
+      /** Premium Per Period Cents */
+      premium_per_period_cents: number;
+    };
+    /** BenefitsValues */
+    BenefitsValues: {
+      /** Plans */
+      plans: components['schemas']['PlanValues'][];
+    };
+    /** Body_upload_document */
+    Body_upload_document: {
+      /**
+       * File
+       * @description A PDF, PNG or JPEG of at most 10 MB
+       */
+      file: string;
+      type: components['schemas']['DocumentType'];
+    };
     /** CategoryFix */
     CategoryFix: {
       /** Relabeled */
@@ -305,10 +470,109 @@ export interface components {
      * @enum {string}
      */
     CategorySource: 'rule' | 'user' | 'llm';
+    /**
+     * ConfirmIn
+     * @description Exactly one of ``pay_stub`` or ``benefits``, matching the document's type.
+     */
+    ConfirmIn: {
+      benefits?: components['schemas']['BenefitsValues'] | null;
+      pay_stub?: components['schemas']['PayStubValues'] | null;
+    };
+    /** Confirmed */
+    Confirmed: {
+      document: components['schemas']['DocumentOut'];
+      pay_stub: components['schemas']['PayStubOut'] | null;
+      /** Plans */
+      plans: components['schemas']['BenefitsPlanOut'][];
+    };
+    /** DocumentCreated */
+    DocumentCreated: {
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      document_id: string;
+    };
+    /** DocumentDetail */
+    DocumentDetail: {
+      /** Confirmed At */
+      confirmed_at: string | null;
+      /** Deleted At */
+      deleted_at: string | null;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Page Count */
+      page_count: number | null;
+      proposal: components['schemas']['Proposal'] | null;
+      /** Redaction Count */
+      redaction_count: number;
+      status: components['schemas']['DocumentStatus'];
+      status_reason: components['schemas']['DocumentStatusReason'] | null;
+      type: components['schemas']['DocumentType'];
+      /**
+       * Uploaded At
+       * Format: date-time
+       */
+      uploaded_at: string;
+    };
+    /** DocumentOut */
+    DocumentOut: {
+      /** Confirmed At */
+      confirmed_at: string | null;
+      /** Deleted At */
+      deleted_at: string | null;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Page Count */
+      page_count: number | null;
+      /** Redaction Count */
+      redaction_count: number;
+      status: components['schemas']['DocumentStatus'];
+      status_reason: components['schemas']['DocumentStatusReason'] | null;
+      type: components['schemas']['DocumentType'];
+      /**
+       * Uploaded At
+       * Format: date-time
+       */
+      uploaded_at: string;
+    };
+    /**
+     * DocumentStatus
+     * @enum {string}
+     */
+    DocumentStatus:
+      'uploaded' | 'extracting' | 'proposed' | 'confirmed' | 'manual_entry_required' | 'failed';
+    /**
+     * DocumentStatusReason
+     * @description Why a document is ``manual_entry_required`` or ``failed`` (spec 004 rule 22).
+     * @enum {string}
+     */
+    DocumentStatusReason:
+      | 'refused'
+      | 'no_readable_page'
+      | 'budget'
+      | 'extraction_failed'
+      | 'unreadable_file'
+      | 'expired';
+    /**
+     * DocumentType
+     * @enum {string}
+     */
+    DocumentType: 'pay_stub' | 'offer_letter' | 'benefits';
     /** ErrorDetail */
     ErrorDetail: {
       /** Code */
       code: string;
+      /** Details */
+      details?: {
+        [key: string]: unknown;
+      } | null;
       /** Message */
       message: string;
     };
@@ -316,6 +580,19 @@ export interface components {
     ErrorResponse: {
       error: components['schemas']['ErrorDetail'];
     };
+    /** ExtractionQueued */
+    ExtractionQueued: {
+      /**
+       * Job Id
+       * Format: uuid
+       */
+      job_id: string;
+    };
+    /**
+     * FilingStatus
+     * @enum {string}
+     */
+    FilingStatus: 'single' | 'married_filing_jointly' | 'head_of_household';
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -333,6 +610,11 @@ export interface components {
        */
       status: 'ok';
     };
+    /**
+     * HealthcareUsage
+     * @enum {string}
+     */
+    HealthcareUsage: 'low' | 'medium' | 'high';
     /**
      * JobKind
      * @enum {string}
@@ -376,6 +658,43 @@ export interface components {
      */
     JobStatus: 'queued' | 'running' | 'succeeded' | 'dead';
     /**
+     * LineItem
+     * @description One printed line of the stub's current-period column (spec 005 rule 3).
+     */
+    LineItem: {
+      /**
+       * Amount Cents
+       * @description This period's amount in cents, never negative
+       */
+      amount_cents: number;
+      /**
+       * Field
+       * @description The field above this line is already counted in, or null when it has no field of its own
+       */
+      field:
+        | (
+            | 'gross_cents'
+            | 'federal_withholding_cents'
+            | 'social_security_cents'
+            | 'medicare_cents'
+            | 'state_tax_cents'
+            | 'retirement_contribution_cents'
+            | 'medical_premium_cents'
+            | 'net_cents'
+          )
+        | null;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'earning' | 'tax' | 'pre_tax_deduction' | 'post_tax_deduction' | 'net' | 'info';
+      /**
+       * Label
+       * @description The line's label as printed
+       */
+      label: string;
+    };
+    /**
      * LinkItemRequest
      * @description Exactly one of ``public_token`` (from Plaid Link) or ``sandbox_institution_id``.
      */
@@ -405,6 +724,264 @@ export interface components {
        * Format: uuid
        */
       job_id: string;
+    };
+    /**
+     * MatchTier
+     * @description The employer puts in ``employer_pct`` of each dollar the employee
+     *     contributes, up to ``employee_pct_upto`` percent of pay (spec 006).
+     */
+    'MatchTier-Input': {
+      /** Employee Pct Upto */
+      employee_pct_upto: number | string;
+      /** Employer Pct */
+      employer_pct: number | string;
+    };
+    /**
+     * MatchTier
+     * @description The employer puts in ``employer_pct`` of each dollar the employee
+     *     contributes, up to ``employee_pct_upto`` percent of pay (spec 006).
+     */
+    'MatchTier-Output': {
+      /** Employee Pct Upto */
+      employee_pct_upto: string;
+      /** Employer Pct */
+      employer_pct: string;
+    };
+    /**
+     * OtherJob
+     * @description Another job's wages, for withholding (the W-4 multiple-jobs step).
+     */
+    OtherJob: {
+      /** Annual Wages Cents */
+      annual_wages_cents: number;
+    };
+    /**
+     * PayFrequency
+     * @enum {string}
+     */
+    PayFrequency: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
+    /** PayStubOut */
+    PayStubOut: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      document_id: string;
+      /** Employer Name */
+      employer_name: string | null;
+      /** Federal Withholding Cents */
+      federal_withholding_cents: number;
+      /** Gross Cents */
+      gross_cents: number;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Medical Premium Cents */
+      medical_premium_cents: number;
+      /** Medicare Cents */
+      medicare_cents: number;
+      /** Net Cents */
+      net_cents: number;
+      /** Other Deductions Cents */
+      other_deductions_cents: number;
+      /**
+       * Pay Date
+       * Format: date
+       */
+      pay_date: string;
+      pay_frequency: components['schemas']['PayFrequency'] | null;
+      /**
+       * Period End
+       * Format: date
+       */
+      period_end: string;
+      /**
+       * Period Start
+       * Format: date
+       */
+      period_start: string;
+      /** Retirement Contribution Cents */
+      retirement_contribution_cents: number;
+      /** Social Security Cents */
+      social_security_cents: number;
+      /** State Tax Cents */
+      state_tax_cents: number;
+      /** Tax Year */
+      tax_year: number;
+    };
+    /**
+     * PayStubValues
+     * @description What the user confirmed for a pay stub (rule 20): the extraction's keys
+     *     with plain values, plus ``other_deductions_cents``.
+     */
+    PayStubValues: {
+      /** Employer Name */
+      employer_name: string | null;
+      /** Federal Withholding Cents */
+      federal_withholding_cents: number;
+      /** Gross Cents */
+      gross_cents: number;
+      /** Medical Premium Cents */
+      medical_premium_cents: number;
+      /** Medicare Cents */
+      medicare_cents: number;
+      /** Net Cents */
+      net_cents: number;
+      /** Other Deductions Cents */
+      other_deductions_cents: number;
+      /**
+       * Pay Date
+       * Format: date
+       */
+      pay_date: string;
+      /** Pay Frequency */
+      pay_frequency: ('weekly' | 'biweekly' | 'semimonthly' | 'monthly') | null;
+      /**
+       * Period End
+       * Format: date
+       */
+      period_end: string;
+      /**
+       * Period Start
+       * Format: date
+       */
+      period_start: string;
+      /** Retirement Contribution Cents */
+      retirement_contribution_cents: number;
+      /** Social Security Cents */
+      social_security_cents: number;
+      /** State Tax Cents */
+      state_tax_cents: number;
+    };
+    /**
+     * PlanKind
+     * @enum {string}
+     */
+    PlanKind: 'hdhp' | 'ppo' | 'hmo';
+    /** PlanProposal */
+    PlanProposal: {
+      /** Fields */
+      fields: components['schemas']['ProposedField'][];
+    };
+    /**
+     * PlanValues
+     * @description One confirmed health plan (``benefits_plans`` row).
+     */
+    PlanValues: {
+      /** Coinsurance Pct */
+      coinsurance_pct: number | string;
+      /** Deductible Cents */
+      deductible_cents: number;
+      /** Employer Hsa Cents */
+      employer_hsa_cents: number;
+      /** Enrollment Deadline */
+      enrollment_deadline: string | null;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'hdhp' | 'ppo' | 'hmo';
+      /** Name */
+      name: string;
+      /** Oop Max Cents */
+      oop_max_cents: number;
+      /** Premium Per Period Cents */
+      premium_per_period_cents: number;
+    };
+    /**
+     * ProfileIn
+     * @description The whole profile; a field left out is reset to its default.
+     */
+    ProfileIn: {
+      /**
+       * Dependents
+       * @default 0
+       */
+      dependents: number;
+      expected_healthcare_usage?: components['schemas']['HealthcareUsage'] | null;
+      filing_status?: components['schemas']['FilingStatus'] | null;
+      /** Match Tiers */
+      match_tiers?: components['schemas']['MatchTier-Input'][];
+      /** Other Jobs */
+      other_jobs?: components['schemas']['OtherJob'][];
+      pay_frequency?: components['schemas']['PayFrequency'] | null;
+      /** Salary Cents */
+      salary_cents?: number | null;
+      /** Start Date */
+      start_date?: string | null;
+      /** Vesting Years */
+      vesting_years?: number | null;
+    };
+    /** ProfileOut */
+    ProfileOut: {
+      /**
+       * Dependents
+       * @default 0
+       */
+      dependents: number;
+      expected_healthcare_usage?: components['schemas']['HealthcareUsage'] | null;
+      filing_status?: components['schemas']['FilingStatus'] | null;
+      /** Match Tiers */
+      match_tiers?: components['schemas']['MatchTier-Output'][];
+      /** Other Jobs */
+      other_jobs?: components['schemas']['OtherJob'][];
+      pay_frequency?: components['schemas']['PayFrequency'] | null;
+      /** Salary Cents */
+      salary_cents?: number | null;
+      /** Start Date */
+      start_date?: string | null;
+      /** Updated At */
+      updated_at: string | null;
+      /** Vesting Years */
+      vesting_years?: number | null;
+    };
+    /**
+     * Proposal
+     * @description ``documents.proposal`` (spec 005 outputs).
+     */
+    Proposal: {
+      /** Fields */
+      fields?: components['schemas']['ProposedField'][];
+      /** Line Items */
+      line_items?: components['schemas']['LineItem'][];
+      /** Notes */
+      notes?: string | null;
+      /** Plans */
+      plans?: components['schemas']['PlanProposal'][];
+      /** Source Lines */
+      source_lines?: components['schemas']['SourceLine'][];
+      /** Withheld Pages */
+      withheld_pages?: number[];
+    };
+    /** ProposedField */
+    ProposedField: {
+      /** Confidence */
+      confidence: number | null;
+      /** Key */
+      key: string;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'money' | 'date' | 'text' | 'percent';
+      /** Label */
+      label: string;
+      /** Note */
+      note: string | null;
+      /**
+       * Role
+       * @enum {string}
+       */
+      role: 'gross' | 'deduction' | 'net' | 'info';
+      /** Value */
+      value: number | string | null;
     };
     /** QueuedJob */
     QueuedJob: {
@@ -445,6 +1022,17 @@ export interface components {
         | 'other';
       /** Merchant Norm */
       merchant_norm: string;
+    };
+    /** SourceLine */
+    SourceLine: {
+      /** Field Key */
+      field_key: string | null;
+      /** Page */
+      page: number;
+      /** Redacted */
+      redacted: boolean;
+      /** Text */
+      text: string;
     };
     /** SyncItemOut */
     SyncItemOut: {
@@ -644,6 +1232,273 @@ export interface operations {
       };
     };
   };
+  list_documents: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DocumentOut'][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  upload_document: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Body_upload_document'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DocumentCreated'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Request Entity Too Large */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unsupported Media Type */
+      415: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  get_document: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        document_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DocumentDetail'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  confirm_document: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        document_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ConfirmIn'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Confirmed'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  extract_document: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        document_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExtractionQueued'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
   health: {
     parameters: {
       query?: never;
@@ -704,6 +1559,106 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  list_pay_stubs: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PayStubOut'][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  get_profile: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProfileOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  put_profile: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ProfileIn'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProfileOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
         headers: {
           [name: string]: unknown;
         };
