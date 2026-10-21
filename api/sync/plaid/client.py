@@ -60,7 +60,7 @@ class PlaidLinking(Protocol):
     def item_public_token_exchange(self, public_token: str) -> tuple[SecretStr, str]: ...
 
     def sandbox_public_token_create(
-        self, institution_id: str, *, webhook: str | None = None
+        self, institution_id: str, *, webhook: str | None = None, username: str | None = None
     ) -> str: ...
 
     def institution_name(self, institution_id: str) -> str: ...
@@ -159,11 +159,18 @@ class PlaidClient:
         return SecretStr(str(body["access_token"])), str(body["item_id"])
 
     def sandbox_public_token_create(
-        self, institution_id: str, *, webhook: str | None = None
+        self, institution_id: str, *, webhook: str | None = None, username: str | None = None
     ) -> str:
-        fields: dict[str, Any] = {}
+        """Sandbox only: a public token without Link. ``username`` picks a sandbox
+        user (``user_good`` by default, or a custom sandbox user)."""
+        options: dict[str, Any] = {}
         if webhook:
-            fields["options"] = SandboxPublicTokenCreateRequestOptions(webhook=webhook)
+            options["webhook"] = webhook
+        if username:
+            options["override_username"] = username
+        fields: dict[str, Any] = {}
+        if options:
+            fields["options"] = SandboxPublicTokenCreateRequestOptions(**options)
         request = SandboxPublicTokenCreateRequest(
             institution_id=institution_id,
             initial_products=[Products("transactions"), Products("investments")],

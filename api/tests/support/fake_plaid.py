@@ -60,7 +60,7 @@ class FakePlaidClient:
         return {"link_token": f"link-sandbox-{user_id}", "expiration": "2026-10-21T20:00:00Z"}
 
     def sandbox_public_token_create(
-        self, institution_id: str, *, webhook: str | None = None
+        self, institution_id: str, *, webhook: str | None = None, username: str | None = None
     ) -> str:
         self._enter("sandbox_public_token_create", institution_id)
         return f"public-sandbox-{institution_id}"

@@ -98,6 +98,7 @@ def test_sandbox_public_token_and_institution_name() -> None:
     )
     assert plaid.sandbox_public_token_create("ins_109508") == "public-sandbox-2"
     assert pool.requests[0][1]["initial_products"] == ["transactions", "investments"]
+    assert "options" not in pool.requests[0][1]
     assert plaid.institution_name("ins_109508") == "First Platypus Bank"
 
 
@@ -152,3 +153,14 @@ def test_webhook_key_lookup() -> None:
 def test_missing_credentials_are_a_configuration_error() -> None:
     with pytest.raises(PlaidNotConfigured, match="PLAID_CLIENT_ID"):
         PlaidClient.from_settings(Settings(_env_file=None))
+
+
+def test_sandbox_options_carry_the_webhook_and_user() -> None:
+    plaid, pool = client((200, {"public_token": "public-sandbox-3"}))
+    plaid.sandbox_public_token_create(
+        "ins_109508", webhook="https://api.example/sync/webhook", username="user_custom"
+    )
+    assert pool.requests[0][1]["options"] == {
+        "webhook": "https://api.example/sync/webhook",
+        "override_username": "user_custom",
+    }
