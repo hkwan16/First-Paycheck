@@ -1,5 +1,9 @@
 {
   "calc": {
     "pass_rate": 1.0
+  },
+  "categorization-rules": {
+    "rules_coverage": 0.808,
+    "rules_precision": 0.9702970297029703
   }
 }
