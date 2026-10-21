@@ -5,10 +5,10 @@ import { e2eUser, NO_E2E_USER, waitForHydration } from './support/auth';
 /*
  * The 401(k) decision against the real API with the saved e2e session, after
  * confirm.spec.ts has confirmed a pay stub: fill in the plan details if the
- * profile has none, calculate, save a version, change it and save the next
- * one over it, then open its explanation. The e2e user keeps its decisions
- * between runs (they cannot be deleted), so the test reads which version is
- * current instead of assuming v1.
+ * profile lacks any (the birth year included), calculate, save a version,
+ * change it and save the next one over it, then open its explanation. The e2e
+ * user keeps its decisions between runs (they cannot be deleted), so the test
+ * reads which version is current instead of assuming v1.
  */
 
 test.describe.configure({ mode: 'serial' });
@@ -40,13 +40,12 @@ test('calculates, saves a version, saves the next one over it and opens why', as
     await form.getByRole('button', { name: 'Single' }).click();
     await form.getByLabel('Employer adds, % of what you put in').fill('100');
     await form.getByLabel('Up to, % of your pay').fill('4');
+    await form.getByLabel('Year you were born').fill('1996');
     await form.getByRole('button', { name: 'Save plan details' }).click();
   }
 
   const slider = card(page).getByRole('slider', { name: /Your contribution/ });
   await expect(slider).toBeVisible({ timeout: 30_000 });
-  const age = card(page).getByLabel(/Your age at the end of/);
-  if ((await age.inputValue()) === '') await age.fill('30');
 
   // Move away from whatever is saved, so there is a version to save.
   const start = Number(await slider.inputValue());

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Decision, DecisionList } from './api/types';
 import {
+  ageAtYearEnd,
   asK401Inputs,
   asK401Result,
   calculatorIdOf,
@@ -160,5 +161,19 @@ describe('asK401Inputs and asK401Result', () => {
     expect(asK401Inputs({ months: 3 })).toBeNull();
     expect(asK401Result({ ...result, missed_cents: undefined })).toBeNull();
     expect(asK401Result({ ...result, capped: 'no' })).toBeNull();
+  });
+});
+
+describe('ageAtYearEnd', () => {
+  // The 401(k) calculator wants the age reached by December 31 of the tax year (spec 006).
+  it('is the tax year less the birth year', () => {
+    expect(ageAtYearEnd(2026, 1996)).toBe(30);
+    expect(ageAtYearEnd(2026, 1976)).toBe(50);
+  });
+
+  it('is null without a birth year, or one after the tax year', () => {
+    expect(ageAtYearEnd(2026, null)).toBeNull();
+    expect(ageAtYearEnd(2026, undefined)).toBeNull();
+    expect(ageAtYearEnd(2026, 2027)).toBeNull();
   });
 });

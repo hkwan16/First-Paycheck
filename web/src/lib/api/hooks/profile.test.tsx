@@ -40,7 +40,7 @@ describe('useUpdateProfile', () => {
     await waitFor(() => expect(result.current.update.isSuccess).toBe(true));
     expect(result.current.profile.data).toMatchObject({
       pay_frequency: 'semimonthly',
-      match_tiers: [{ employee_pct_upto: '4', employer_pct: '100' }],
+      match_tiers: [{ employee_pct_upto: '4.00', employer_pct: '100.00' }],
       updated_at: expect.any(String),
     });
     expect(queryClient.getQueryData(queryKeys.profile())).toEqual(db.profile);

@@ -10,8 +10,9 @@ import { formatMoney, parseMoney } from '@/lib/money';
 
 /*
  * The plan details the 401(k) card needs from the profile: salary, filing
- * status, pay schedule and the employer's match formula. The API validates
- * them again on PUT /profile; these checks only say what to fix before then.
+ * status, pay schedule, the employer's match formula and the birth year (the
+ * calculator's age comes from it). The API validates them again on PUT
+ * /profile; these checks only say what to fix before then.
  */
 
 export interface TierDraft {
@@ -26,21 +27,26 @@ export interface PlanDetailsDraft {
   filingStatus: FilingStatus | null;
   payFrequency: PayFrequency | null;
   tiers: TierDraft[];
+  birthYear: string;
 }
 
-export type PlanDetailsField = 'salary' | 'filingStatus' | 'payFrequency' | 'tiers';
+export type PlanDetailsField = 'salary' | 'filingStatus' | 'payFrequency' | 'tiers' | 'birthYear';
 
 export type PlanDetailsResult =
   | {
       ok: true;
       values: Pick<ProfileIn, 'salary_cents' | 'filing_status' | 'pay_frequency'> & {
         match_tiers: MatchTierIn[];
+        birth_year: number;
       };
     }
   | { ok: false; errors: Partial<Record<PlanDetailsField, string>> };
 
 /** The most tiers the API accepts. */
 export const MAX_TIERS = 5;
+
+/** The earliest birth year `PUT /profile` accepts. */
+export const MIN_BIRTH_YEAR = 1900;
 
 /** The pay schedule: the profile's, else the confirmed pay stub's. */
 export const payFrequencyOf = (profile: Profile, payStub: PayStub | undefined) =>
@@ -52,6 +58,7 @@ export function needsPlanDetails(profile: Profile, payStub: PayStub | undefined)
     profile.salary_cents == null ||
     profile.filing_status == null ||
     (profile.match_tiers ?? []).length === 0 ||
+    profile.birth_year == null ||
     payFrequencyOf(profile, payStub) === null
   );
 }
@@ -72,6 +79,7 @@ export function draftFromProfile(profile: Profile, payStub: PayStub | undefined)
             employerPct: typedPercent(tier.employer_pct),
             uptoPct: typedPercent(tier.employee_pct_upto),
           })),
+    birthYear: profile.birth_year == null ? '' : String(profile.birth_year),
   };
 }
 
@@ -79,7 +87,13 @@ const PERCENT = /^\d{1,3}(?:\.\d{1,2})?$/;
 
 const isPercent = (text: string) => PERCENT.test(text) && Number(text) > 0 && Number(text) <= 100;
 
-export function readPlanDetails(draft: PlanDetailsDraft): PlanDetailsResult {
+const YEAR = /^\d{4}$/;
+
+/**
+ * The draft as profile fields, or what to fix. `taxYear` (the confirmed pay
+ * stub's) bounds the birth year, since the calculator takes no negative age.
+ */
+export function readPlanDetails(draft: PlanDetailsDraft, taxYear?: number): PlanDetailsResult {
   const errors: Partial<Record<PlanDetailsField, string>> = {};
   const salary = parseMoney(draft.salary);
   if (salary === null || salary <= 0) errors.salary = 'Enter your yearly salary, like 65,000.00.';
@@ -98,6 +112,14 @@ export function readPlanDetails(draft: PlanDetailsDraft): PlanDetailsResult {
     errors.tiers = 'Each tier must reach a higher percentage of pay than the one before.';
   }
 
+  const birthText = draft.birthYear.trim();
+  const birthYear = Number(birthText);
+  if (!YEAR.test(birthText) || birthYear < MIN_BIRTH_YEAR) {
+    errors.birthYear = 'Enter the year you were born, like 1996.';
+  } else if (taxYear !== undefined && birthYear > taxYear) {
+    errors.birthYear = `Enter a year no later than ${taxYear}.`;
+  }
+
   if (Object.keys(errors).length > 0 || salary === null) return { ok: false, errors };
   return {
     ok: true,
@@ -109,6 +131,7 @@ export function readPlanDetails(draft: PlanDetailsDraft): PlanDetailsResult {
         employer_pct: tier.employerPct,
         employee_pct_upto: tier.uptoPct,
       })),
+      birth_year: birthYear,
     },
   };
 }
@@ -116,6 +139,7 @@ export function readPlanDetails(draft: PlanDetailsDraft): PlanDetailsResult {
 /** The saved profile as `PUT /profile` takes it: every field, since one left out is reset. */
 export function profileInput(profile: Profile): ProfileIn {
   return {
+    birth_year: profile.birth_year ?? null,
     dependents: profile.dependents ?? 0,
     expected_healthcare_usage: profile.expected_healthcare_usage ?? null,
     filing_status: profile.filing_status ?? null,

@@ -44,6 +44,9 @@ const notFound = (message: string) =>
 const invalid = (message: string) =>
   HttpResponse.json({ error: { code: 'validation_error', message } }, { status: 422 });
 
+/** A percentage as the API stores it (a two-place Decimal string): `4` and `"4"` are `"4.00"`. */
+const storedPercent = (value: number | string) => Number(value).toFixed(2);
+
 const appError = (status: number, code: string, message: string, details?: object) =>
   HttpResponse.json({ error: { code, message, ...(details ? { details } : {}) } }, { status });
 
@@ -529,12 +532,13 @@ export const handlers = [
   http.put<never, ProfileIn>(apiUrl('/profile'), async ({ request }) => {
     const body = await request.json();
     db.profile = {
+      birth_year: body.birth_year ?? null,
       dependents: body.dependents ?? 0,
       expected_healthcare_usage: body.expected_healthcare_usage ?? null,
       filing_status: body.filing_status ?? null,
       match_tiers: (body.match_tiers ?? []).map((tier) => ({
-        employee_pct_upto: String(tier.employee_pct_upto),
-        employer_pct: String(tier.employer_pct),
+        employee_pct_upto: storedPercent(tier.employee_pct_upto),
+        employer_pct: storedPercent(tier.employer_pct),
       })),
       other_jobs: body.other_jobs ?? [],
       pay_frequency: body.pay_frequency ?? null,

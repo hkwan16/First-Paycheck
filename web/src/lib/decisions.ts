@@ -61,6 +61,17 @@ export const payPeriodsFor = (frequency: PayFrequency | null | undefined): PayPe
   frequency ? PAY_PERIODS[frequency] : null;
 
 /**
+ * The age the 401(k) calculator asks for: the age reached by December 31 of
+ * the tax year (spec 006), which is the tax year less the birth year. A
+ * difference of years, not money. Null without a birth year, or with one
+ * after the tax year (the calculator accepts no negative age).
+ */
+export function ageAtYearEnd(taxYear: number, birthYear: number | null | undefined): number | null {
+  if (birthYear == null || birthYear > taxYear) return null;
+  return taxYear - birthYear;
+}
+
+/**
  * A whole-number slider value as the API writes a percentage: `4` is
  * `"4.00"`. Sending the stored form keeps a saved decision's inputs and the
  * card's inputs comparable as they are.

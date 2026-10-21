@@ -16,11 +16,12 @@ const draft = (overrides: Partial<PlanDetailsDraft> = {}): PlanDetailsDraft => (
   filingStatus: 'single',
   payFrequency: 'semimonthly',
   tiers: [{ employerPct: '100', uptoPct: '4' }],
+  birthYear: '1996',
   ...overrides,
 });
 
 describe('needsPlanDetails', () => {
-  it('is false once salary, filing status, pay schedule and match formula are known', () => {
+  it('is false once salary, filing status, pay schedule, match formula and birth year are known', () => {
     expect(needsPlanDetails(sampleProfile, stub)).toBe(false);
   });
 
@@ -28,6 +29,7 @@ describe('needsPlanDetails', () => {
     ['salary', { salary_cents: null }],
     ['filing status', { filing_status: null }],
     ['match formula', { match_tiers: [] }],
+    ['birth year', { birth_year: null }],
   ])('is true without a %s', (_, overrides) => {
     expect(needsPlanDetails({ ...sampleProfile, ...overrides }, stub)).toBe(true);
   });
@@ -46,6 +48,7 @@ describe('draftFromProfile', () => {
       filingStatus: null,
       payFrequency: 'semimonthly',
       tiers: [{ employerPct: '', uptoPct: '' }],
+      birthYear: '',
     });
   });
 
@@ -72,6 +75,7 @@ describe('readPlanDetails', () => {
           { employer_pct: '100', employee_pct_upto: '3' },
           { employer_pct: '50', employee_pct_upto: '5.5' },
         ],
+        birth_year: 1996,
       },
     });
   });
@@ -82,6 +86,7 @@ describe('readPlanDetails', () => {
       filingStatus: null,
       payFrequency: null,
       tiers: [{ employerPct: '', uptoPct: '4' }],
+      birthYear: '',
     });
     expect(result).toEqual({
       ok: false,
@@ -90,8 +95,24 @@ describe('readPlanDetails', () => {
         filingStatus: 'Choose your filing status.',
         payFrequency: 'Choose how often you are paid.',
         tiers: 'Enter each percentage as a number above 0 and up to 100, like 4 or 4.5.',
+        birthYear: 'Enter the year you were born, like 1996.',
       },
     });
+  });
+
+  it.each(['96', '1899', 'nineteen', '1996.5'])('refuses the birth year %j', (birthYear) => {
+    expect(readPlanDetails(draft({ birthYear }))).toEqual({
+      ok: false,
+      errors: { birthYear: 'Enter the year you were born, like 1996.' },
+    });
+  });
+
+  it('refuses a birth year after the pay stub tax year', () => {
+    expect(readPlanDetails(draft({ birthYear: '2027' }), 2026)).toEqual({
+      ok: false,
+      errors: { birthYear: 'Enter a year no later than 2026.' },
+    });
+    expect(readPlanDetails(draft({ birthYear: '2026' }), 2026).ok).toBe(true);
   });
 
   it.each(['0', '101', '4.555', '-4', 'four'])('refuses the percentage %j', (pct) => {
@@ -119,6 +140,7 @@ describe('readPlanDetails', () => {
 describe('profileInput', () => {
   it('keeps every saved field, since PUT /profile resets what it is not sent', () => {
     expect(profileInput({ ...sampleProfile, dependents: 2, vesting_years: 3 })).toEqual({
+      birth_year: 1996,
       dependents: 2,
       expected_healthcare_usage: null,
       filing_status: 'single',

@@ -277,10 +277,11 @@ that is on but not built says "Coming in a later milestone."
 
 - **`Match401kCard`** always renders the same `DecisionCard` frame (a region named by its title)
   and swaps its body: skeleton, error, a link to Confirm when there is no confirmed pay stub,
-  `PlanDetailsForm` when the profile has no salary or match tiers (saved with `PUT /profile`;
-  the mockup has no such form), or the calculator. Inputs come from the confirmed pay stub and
-  profile; contribution and age start from the saved decision. Age is not in the profile (spec
-  006, open question 2), so the card asks for it and it lives in the decision's inputs.
+  `PlanDetailsForm` when the profile has no salary, match tiers or birth year (saved with
+  `PUT /profile`, so each is asked for once; the mockup has no such form), or the calculator.
+  Inputs come from the confirmed pay stub and profile; the contribution starts from the saved
+  decision. The calculator still takes `age`, which is `ageAtYearEnd(tax_year, birth_year)`
+  (`lib/decisions.ts`), a difference of years.
 - Every figure in the result (`K401ResultRows`, `K401Notices`, `matchHeadline`) is a field of the
   calculator's result. Percent inputs are sent as the API stores them, two-place strings
   (`percentInput`), so a saved decision compares equal to the inputs on screen.
