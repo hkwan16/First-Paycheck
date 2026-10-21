@@ -1,4 +1,4 @@
-"""POST /calc/401k-match: the stateless spec 006 calculator over HTTP."""
+"""POST /calc/*: the stateless calculators (specs 006, 011, 012 and 014) over HTTP."""
 
 from __future__ import annotations
 
@@ -140,3 +140,64 @@ def test_health_plans_refuses_employer_hsa_on_a_ppo(client: TestClient) -> None:
     response = client.post("/calc/health-plans", json=payload([plan], 6_500_000, 0))
     assert response.status_code == 422
     assert "employer_hsa_cents" in response.json()["error"]["message"]
+
+
+W4_EXAMPLE_5: dict[str, Any] = {
+    "salary_cents": 5_000_000,
+    "pay_periods_per_year": 26,
+    "filing_status": "single",
+    "tax_year": 2026,
+    "other_jobs_wages_cents": 2_000_000,
+    "other_jobs_withholding_cents": 39_000,
+}
+
+
+def test_w4_over_http(client: TestClient) -> None:
+    """Spec 014 example 5, with the defaults filled in by the model."""
+    response = client.post("/calc/w4", json=W4_EXAMPLE_5)
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "k401_annual_cents": 0,
+        "k401_capped": False,
+        "health_premium_annual_cents": 0,
+        "taxable_wages_per_paycheck_cents": 192_308,
+        "adjusted_annual_wage_cents": 4_140_000,
+        "withholding_schedule": "standard",
+        "withholding_rate_pct": "12.00",
+        "withholding_per_paycheck_cents": 14_692,
+        "annual_withholding_cents": 381_992,
+        "projected_taxable_income_cents": 5_390_000,
+        "projected_tax_cents": 657_000,
+        "projected_tax_after_credits_cents": 657_000,
+        "projected_refund_cents": -236_008,
+        "suggestion": "increase_extra_withholding",
+        "suggested_extra_withholding_cents": 9_100,
+        "suggested_deductions_cents": 0,
+        "suggested_refund_cents": 592,
+        "citation_keys": [
+            "w4.percentage_method",
+            "w4.form_adjustments",
+            "w4.standard_deduction",
+            "w4.federal_brackets",
+            "w4.multiple_jobs",
+        ],
+    }
+
+
+@pytest.mark.parametrize(
+    ("change", "fragment"),
+    [
+        ({"tax_year": 2027}, "2027"),
+        ({"health_premium_per_paycheck_cents": 200_000}, "exceed the salary"),
+        ({"extra_withholding_cents": 10.5}, "extra_withholding_cents"),
+    ],
+)
+def test_w4_invalid_input_is_422(client: TestClient, change: dict[str, Any], fragment: str) -> None:
+    response = client.post("/calc/w4", json={**W4_EXAMPLE_5, **change})
+    assert response.status_code == 422
+    assert fragment in response.json()["error"]["message"]
+
+
+def test_w4_requires_a_signed_in_user() -> None:
+    response = TestClient(create_app()).post("/calc/w4", json=W4_EXAMPLE_5)
+    assert response.status_code == 401

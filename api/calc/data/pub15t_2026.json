@@ -1,0 +1,74 @@
+{
+  "tax_year": 2026,
+  "worksheet_1g_cents": {
+    "single": 860000,
+    "married_filing_jointly": 1290000,
+    "head_of_household": 860000
+  },
+  "standard": {
+    "married_filing_jointly": [
+      {"at_least_cents": 0, "base_cents": 0, "rate_pct": "0"},
+      {"at_least_cents": 1930000, "base_cents": 0, "rate_pct": "10"},
+      {"at_least_cents": 4410000, "base_cents": 248000, "rate_pct": "12"},
+      {"at_least_cents": 12010000, "base_cents": 1160000, "rate_pct": "22"},
+      {"at_least_cents": 23070000, "base_cents": 3593200, "rate_pct": "24"},
+      {"at_least_cents": 42285000, "base_cents": 8204800, "rate_pct": "32"},
+      {"at_least_cents": 53175000, "base_cents": 11689600, "rate_pct": "35"},
+      {"at_least_cents": 78800000, "base_cents": 20658350, "rate_pct": "37"}
+    ],
+    "single": [
+      {"at_least_cents": 0, "base_cents": 0, "rate_pct": "0"},
+      {"at_least_cents": 750000, "base_cents": 0, "rate_pct": "10"},
+      {"at_least_cents": 1990000, "base_cents": 124000, "rate_pct": "12"},
+      {"at_least_cents": 5790000, "base_cents": 580000, "rate_pct": "22"},
+      {"at_least_cents": 11320000, "base_cents": 1796600, "rate_pct": "24"},
+      {"at_least_cents": 20927500, "base_cents": 4102400, "rate_pct": "32"},
+      {"at_least_cents": 26372500, "base_cents": 5844800, "rate_pct": "35"},
+      {"at_least_cents": 64810000, "base_cents": 19297925, "rate_pct": "37"}
+    ],
+    "head_of_household": [
+      {"at_least_cents": 0, "base_cents": 0, "rate_pct": "0"},
+      {"at_least_cents": 1555000, "base_cents": 0, "rate_pct": "10"},
+      {"at_least_cents": 3325000, "base_cents": 177000, "rate_pct": "12"},
+      {"at_least_cents": 8300000, "base_cents": 774000, "rate_pct": "22"},
+      {"at_least_cents": 12125000, "base_cents": 1615500, "rate_pct": "24"},
+      {"at_least_cents": 21730000, "base_cents": 3920700, "rate_pct": "32"},
+      {"at_least_cents": 27175000, "base_cents": 5663100, "rate_pct": "35"},
+      {"at_least_cents": 65615000, "base_cents": 19117100, "rate_pct": "37"}
+    ]
+  },
+  "step2_checkbox": {
+    "married_filing_jointly": [
+      {"at_least_cents": 0, "base_cents": 0, "rate_pct": "0"},
+      {"at_least_cents": 1610000, "base_cents": 0, "rate_pct": "10"},
+      {"at_least_cents": 2850000, "base_cents": 124000, "rate_pct": "12"},
+      {"at_least_cents": 6650000, "base_cents": 580000, "rate_pct": "22"},
+      {"at_least_cents": 12180000, "base_cents": 1796600, "rate_pct": "24"},
+      {"at_least_cents": 21787500, "base_cents": 4102400, "rate_pct": "32"},
+      {"at_least_cents": 27232500, "base_cents": 5844800, "rate_pct": "35"},
+      {"at_least_cents": 40045000, "base_cents": 10329175, "rate_pct": "37"}
+    ],
+    "single": [
+      {"at_least_cents": 0, "base_cents": 0, "rate_pct": "0"},
+      {"at_least_cents": 805000, "base_cents": 0, "rate_pct": "10"},
+      {"at_least_cents": 1425000, "base_cents": 62000, "rate_pct": "12"},
+      {"at_least_cents": 3325000, "base_cents": 290000, "rate_pct": "22"},
+      {"at_least_cents": 6090000, "base_cents": 898300, "rate_pct": "24"},
+      {"at_least_cents": 10893800, "base_cents": 2051200, "rate_pct": "32"},
+      {"at_least_cents": 13616300, "base_cents": 2922400, "rate_pct": "35"},
+      {"at_least_cents": 32835000, "base_cents": 9648963, "rate_pct": "37"}
+    ],
+    "head_of_household": [
+      {"at_least_cents": 0, "base_cents": 0, "rate_pct": "0"},
+      {"at_least_cents": 1207500, "base_cents": 0, "rate_pct": "10"},
+      {"at_least_cents": 2092500, "base_cents": 88500, "rate_pct": "12"},
+      {"at_least_cents": 4580000, "base_cents": 387000, "rate_pct": "22"},
+      {"at_least_cents": 6492500, "base_cents": 807750, "rate_pct": "24"},
+      {"at_least_cents": 11295000, "base_cents": 1960350, "rate_pct": "32"},
+      {"at_least_cents": 14017500, "base_cents": 2831550, "rate_pct": "35"},
+      {"at_least_cents": 33237500, "base_cents": 9558550, "rate_pct": "37"}
+    ]
+  },
+  "source": "IRS Publication 15-T (2026), Federal Income Tax Withholding Methods, Catalog Number 32112B, December 3, 2025: section 1, Worksheet 1A line 1g and the 2026 Percentage Method Tables for Automated Payroll Systems (annual STANDARD and Form W-4, Step 2, Checkbox withholding rate schedules; columns A, C and D, column B being the next row's A)",
+  "url": "https://www.irs.gov/pub/irs-pdf/p15t.pdf"
+}

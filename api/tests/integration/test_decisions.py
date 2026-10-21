@@ -15,6 +15,8 @@ from sqlalchemy.exc import DBAPIError, IntegrityError, ProgrammingError
 
 from app.db import user_session_for
 from app.deps import get_now
+from app.routers import decisions as decisions_router
+from calc.registry import Calculator, UnknownCalculator
 from tests.conftest import FixtureUser
 from tests.support.factories import make_document, make_pay_stub
 
@@ -367,8 +369,15 @@ def test_invalid_inputs_are_422(frozen: FastAPI, client_as: Client, user_a: Fixt
 
 
 def test_unregistered_calculator_is_422(
-    frozen: FastAPI, client_as: Client, user_a: FixtureUser
+    frozen: FastAPI, client_as: Client, user_a: FixtureUser, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Every kind is registered since spec 014; a kind added to the enum before its
+    calculator still gets a clean 422."""
+
+    def unregistered(name: str) -> Calculator:
+        raise UnknownCalculator(name)
+
+    monkeypatch.setattr(decisions_router, "calculator", unregistered)
     response = client_as(user_a).post(
         "/decisions", json={"calculator": "w4", "inputs": {}, "result": {}}
     )
