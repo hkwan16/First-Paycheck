@@ -23,5 +23,10 @@
     "pipeline_ok": 1.0,
     "redaction_recall": 1.0,
     "ssn_free": 1.0
+  },
+  "recurring": {
+    "fields_exact": 1.0,
+    "precision": 1.0,
+    "recall": 0.9545454545454546
   }
 }
