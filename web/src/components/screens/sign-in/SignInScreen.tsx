@@ -1,14 +1,11 @@
 'use client';
 
-import Link from 'next/link';
-import type { FormEvent, ReactNode } from 'react';
-import { CalendarIcon, LinesIcon, PlusCircleIcon, ShieldIcon } from '@/components/icons';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { Suspense, use, type ReactNode } from 'react';
+import { CalendarIcon, LinesIcon, ShieldIcon } from '@/components/icons';
 import { IconTile } from '@/components/ui/IconTile';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
+import { safeNextPath } from '@/lib/auth/next-path';
 import type { Hue } from '@/lib/design/tone';
+import { AuthForm } from './AuthForm';
 
 function Point({
   tone,
@@ -33,15 +30,33 @@ function Point({
   );
 }
 
-/**
- * Screen 0 of the mockup (Main.dc.html). Static for now: the Supabase
- * password, magic-link and sign-up flows replace the no-op submit next.
- */
-export function SignInScreen() {
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-  };
+export type SearchParams = Record<string, string | string[] | undefined>;
 
+/** A query parameter given exactly once; a repeated one is ignored. */
+const single = (value: string | string[] | undefined) => (typeof value === 'string' ? value : null);
+
+/** The form, configured by `?mode=sign-up`, `?next=<path>` and `?error=link`. */
+function AuthFormFromUrl({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const params = use(searchParams);
+  const mode = single(params.mode) === 'sign-up' ? 'sign-up' : 'sign-in';
+  return (
+    // A new mode starts clean: no stale notice or errors from the other form.
+    <AuthForm
+      key={mode}
+      mode={mode}
+      next={safeNextPath(single(params.next))}
+      linkError={single(params.error) === 'link'}
+    />
+  );
+}
+
+/**
+ * Screen 0 of the mockup (Main.dc.html). The pitch is static; the form depends
+ * on the page's `searchParams`, so it sits in Suspense (Cache Components) and
+ * streams in with the right mode, with the plain sign-in form as the static
+ * shell's fallback.
+ */
+export function SignInScreen({ searchParams }: { searchParams: Promise<SearchParams> }) {
   return (
     <div className="mx-auto flex w-full max-w-[1040px] flex-1 flex-wrap items-center justify-center gap-12 px-6 py-12">
       <div className="flex min-w-0 flex-[1_1_360px] flex-col gap-6">
@@ -70,51 +85,9 @@ export function SignInScreen() {
         </div>
       </div>
 
-      <Card
-        as="form"
-        padding={24}
-        aria-labelledby="signin-title"
-        onSubmit={onSubmit}
-        className="flex-[0_1_400px]"
-      >
-        <h2 id="signin-title" className="m-0 text-headline tracking-[-0.012em]">
-          Sign in
-        </h2>
-        <div>
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            name="email"
-            autoComplete="email"
-            placeholder="you@example.com"
-          />
-        </div>
-        <div>
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            name="password"
-            autoComplete="current-password"
-            placeholder="At least 12 characters"
-          />
-        </div>
-        <Button type="submit" variant="primary" block>
-          Sign in
-        </Button>
-        <div className="flex items-center gap-3 text-tiny leading-[1.5] tracking-[0.04em] text-ink-3 uppercase before:h-px before:flex-1 before:bg-ink/10 after:h-px after:flex-1 after:bg-ink/10">
-          or
-        </div>
-        <Button block>
-          <PlusCircleIcon className="text-ink" />
-          Email me a sign-in link
-        </Button>
-        <p className="mt-1 mb-0 text-small text-ink-3">
-          Secured by Supabase Auth. Your bank login never passes through First Paycheck; Plaid
-          handles it on the next step. <Link href="/sign-in?mode=sign-up">Create an account</Link>
-        </p>
-      </Card>
+      <Suspense fallback={<AuthForm mode="sign-in" next={null} linkError={false} />}>
+        <AuthFormFromUrl searchParams={searchParams} />
+      </Suspense>
     </div>
   );
 }
