@@ -28,7 +28,9 @@ export function useCalendar() {
 
 /** The calculator route that produces each calculator's result. */
 const CALC_PATHS: Partial<Record<CalculatorKind, CalcPath>> = {
+  emergency_fund: '/calc/emergency-fund',
   k401_match: '/calc/401k-match',
+  health_plans: '/calc/health-plans',
 };
 
 interface ApiErrorBody {

@@ -65,8 +65,6 @@ export const queryKeys = {
     ] as const,
   calendar: () => ['get', '/calendar'] as const,
 
-  // Routes that do not exist yet (see pending.ts). Their keys are reserved here
-  // so job invalidation already covers them when they land.
   /** Prefixes of every period's read (hooks/spending.ts). */
   spendingSummary: () => ['get', '/spending/summary'] as const,
   cashflow: () => ['get', '/cashflow'] as const,
@@ -77,8 +75,11 @@ export const queryKeys = {
   checkIns: () => ['get', '/check-ins'] as const,
   /** The plan screen's read (M4); a saved decision changes it. */
   plan: () => ['get', '/plan'] as const,
-  /** Savings goals (M6); a saved emergency fund decision creates one. */
+
+  /** Savings goals; a saved emergency fund decision creates or updates one. */
   goals: () => ['get', '/goals'] as const,
+  /** Health plans from confirmed benefits summaries; a benefits confirm adds them. */
+  benefitsPlans: () => ['get', '/benefits-plans'] as const,
 };
 
 /** The documents list and every document's detail (its own route, so not under the list's prefix). */
@@ -123,9 +124,17 @@ export const invalidateLinkedData = (client: QueryClient) =>
 /** After an upload or a queued extraction: statuses changed. */
 export const invalidateDocuments = (client: QueryClient) => invalidateAll(client, documentReads);
 
-/** After a confirm: the document is confirmed and a pay stub row exists. */
+/**
+ * After a confirm: the document is confirmed, and a pay stub row exists or a
+ * benefits summary's plans do (with its 401(k) match on the profile).
+ */
 export const invalidateAfterConfirm = (client: QueryClient) =>
-  invalidateAll(client, [...documentReads, queryKeys.payStubs()]);
+  invalidateAll(client, [
+    ...documentReads,
+    queryKeys.payStubs(),
+    queryKeys.benefitsPlans(),
+    queryKeys.profile(),
+  ]);
 
 /** The list and every version read (`is_current` changes when a version lands). */
 const decisionReads = [queryKeys.decisions(), queryKeys.decision()];
