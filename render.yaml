@@ -1,0 +1,77 @@
+# Render Blueprint: the API web service and the background worker, built from
+# one Docker image (api/Dockerfile). Deploys are triggered only by
+# .github/workflows/deploy.yml after CI passes on main (autoDeploy: false).
+#
+# Secrets are `sync: false`: Render asks for them when the Blueprint is first
+# applied and never reads them from this file. Pre-deploy commands need a paid
+# instance type, hence `plan: starter`.
+
+envVarGroups:
+  - name: first-paycheck
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      # Supavisor pooler URLs only (Render has no IPv6 egress).
+      # app_api role, transaction mode, port 6543.
+      - key: DATABASE_URL
+        sync: false
+      # postgres role, session mode, port 5432 (Alembic, queue, scheduler).
+      - key: DATABASE_URL_PRIVILEGED
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: CORS_ORIGIN_REGEX
+        sync: false
+      - key: PLAID_CLIENT_ID
+        sync: false
+      - key: PLAID_SECRET
+        sync: false
+      - key: PLAID_ENV
+        value: sandbox
+      - key: PLAID_WEBHOOK_URL
+        value: https://first-paycheck-api.onrender.com/sync/webhook
+      - key: PLAID_TOKEN_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: LLM_FAKE
+        value: "false"
+      - key: LLM_MODEL_EXTRACT
+        value: claude-sonnet-5-5
+      - key: LLM_MODEL_CATEGORIZE
+        value: claude-haiku-5-5
+      - key: LLM_MODEL_EXPLAIN
+        value: claude-sonnet-5-5
+      - key: LLM_DAILY_BUDGET_CENTS
+        value: "50"
+
+services:
+  - type: web
+    name: first-paycheck-api
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: .
+    # Image CMD: uvicorn with 2 workers on $PORT.
+    preDeployCommand: sh -c "alembic upgrade head && python -m db.seed.load"
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - fromGroup: first-paycheck
+
+  - type: worker
+    name: first-paycheck-worker
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: .
+    dockerCommand: python -m jobs.worker
+    autoDeploy: false
+    envVars:
+      - fromGroup: first-paycheck

@@ -1,0 +1,38 @@
+name: Deploy
+
+# Render services have autoDeploy off; this workflow deploys them after CI
+# passes on main, pinned to the commit CI tested.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-24.04
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: deploy the API
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+        run: |
+          test -n "$HOOK" || { echo "::error::RENDER_DEPLOY_HOOK_API is not set"; exit 1; }
+          curl --fail-with-body --silent --show-error --retry 3 -X POST "${HOOK}&ref=${SHA}"
+      - name: deploy the worker
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER }}
+        run: |
+          test -n "$HOOK" || { echo "::error::RENDER_DEPLOY_HOOK_WORKER is not set"; exit 1; }
+          curl --fail-with-body --silent --show-error --retry 3 -X POST "${HOOK}&ref=${SHA}"
