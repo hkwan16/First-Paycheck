@@ -40,3 +40,19 @@ export type ConfirmIn = Schemas['ConfirmIn'];
 export type Confirmed = Schemas['Confirmed'];
 export type Profile = Schemas['ProfileOut'];
 export type ProfileIn = Schemas['ProfileIn'];
+
+// Spending, cash flow, recurring charges and CSV import (M5).
+export type SpendingSummary = Schemas['SpendingSummary'];
+export type SpendingBucket = Schemas['CategoryTotal']['bucket'];
+export type CategoryTotal = Schemas['CategoryTotal'];
+export type CashFlow = Schemas['CashFlow'];
+export type PayStubFlow = Schemas['PayStubFlow'];
+export type WithholdingTotal = Schemas['WithholdingTotal'];
+export type WithholdingLine = Schemas['WithholdingLine'];
+export type RecurringCharge = Schemas['RecurringChargeOut'];
+export type RecurringPatch = Schemas['RecurringPatch'];
+export type RecurringStatus = Schemas['RecurringStatus'];
+export type RecurringUserStatus = Schemas['RecurringUserStatus'];
+export type RecurringCadence = Schemas['RecurringCadence'];
+export type CsvImport = Schemas['CsvImport'];
+export type AmountSign = Schemas['AmountSign'];
