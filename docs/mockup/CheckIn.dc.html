@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Monthly check-in</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+:root{--ink:#16181D;--ink-2:#3F4650;--ink-3:#5B6370;--ground:#F3F4F6;--surface:#FFFFFF;--blue:#1D4ED8;--blue-deep:#1E40AF;--blue-text:#1E40AF;--blue-tint:#E8EEFC;--coral:#EA580C;--coral-text:#9A3412;--coral-tint:#FFEDE3;--teal:#14B8A6;--teal-text:#115E59;--teal-tint:#D5F3EE;--plum:#7C3AED;--plum-text:#5B21B6;--plum-tint:#EDE9FE;--green:#0F7A4B;--green-text:#0F6B42;--green-tint:#E6F5EE;--amber:#D97706;--amber-text:#8A5A00;--amber-tint:#FFF1D6;--red:#DC2626;--red-text:#B42318;--red-tint:#FEE4E2}
+.badge-coral{background:var(--coral-tint);color:var(--coral-text)}.badge-teal{background:var(--teal-tint);color:var(--teal-text)}.badge-plum{background:var(--plum-tint);color:var(--plum-text)}
+.sev-change{background:var(--plum-tint);color:var(--plum-text)}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+*,*::before,*::after{box-sizing:border-box}
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 24px;background:rgba(243,244,246,.72);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(22,24,29,.08)}
+.wordmark{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:15px;letter-spacing:-0.01em;color:#16181D;text-decoration:none}
+.chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(22,24,29,.06);font-size:12px;font-weight:500;letter-spacing:.01em;color:#3F4650;white-space:nowrap}
+.shell{display:flex;flex-wrap:wrap;gap:24px;padding:24px;max-width:1280px;margin:0 auto;width:100%}
+.nav{flex:1 1 200px;max-width:240px}
+.nav-list{display:flex;flex-direction:column;gap:2px;list-style:none;margin:0;padding:0}
+.nav a{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 12px;border-radius:10px;color:#3F4650;text-decoration:none;font-weight:500;font-size:14px;letter-spacing:0}
+.nav a:hover{background:rgba(22,24,29,.05);color:#16181D}
+.nav a[aria-current=page]{background:#fff;color:#16181D;box-shadow:0 1px 2px rgba(22,24,29,.08),0 0 0 1px rgba(22,24,29,.05)}
+.nav-step{flex:none;width:22px;height:22px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;background:rgba(22,24,29,.07);color:#3F4650}
+.nav-step.done{background:#E6F5EE;color:#0F6B42}
+.nav-head{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#5B6370;margin:16px 12px 6px}
+.nav-head:first-child{margin-top:4px}
+.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:24px}
+h1{font-size:28px;line-height:1.15;letter-spacing:-0.02em;font-weight:700;margin:0}
+h2{font-size:17px;line-height:1.3;letter-spacing:-0.012em;font-weight:600;margin:0}
+.lead{font-size:15px;color:#5B6370;margin:6px 0 0}
+.card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 1px 2px rgba(22,24,29,.06),0 0 0 1px rgba(22,24,29,.06);display:flex;flex-direction:column;gap:14px;min-width:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:10px;border:0;font:inherit;font-weight:600;font-size:14px;cursor:pointer;text-decoration:none;transition:transform 100ms ease-out,background-color 120ms ease-out;background:rgba(22,24,29,.06);color:#16181D;white-space:nowrap}
+.btn:hover{background:rgba(22,24,29,.1);color:#16181D}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:#1D4ED8;color:#fff}.btn-primary:hover{background:#1E40AF;color:#fff}
+.btn-sm{min-height:36px;padding:0 12px;font-size:13px}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:#5B6370}
+.small{font-size:13px;line-height:1.45;letter-spacing:.004em}
+.tiny{font-size:12px;line-height:1.4;letter-spacing:.01em}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.01em;white-space:nowrap;text-decoration:none}
+.badge-ok{background:#E6F5EE;color:#0F6B42}
+.badge-warn{background:#FFF1D6;color:#8A5A00}
+.badge-bad{background:#FEE4E2;color:#B42318}
+.badge-info{background:#E8EEFC;color:#1E40AF}
+.badge-neutral{background:rgba(22,24,29,.06);color:#3F4650}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.finding{display:grid;grid-template-columns:36px minmax(0,1fr);gap:4px 14px;padding:16px 0;border-top:1px solid rgba(22,24,29,.08);transition:opacity 160ms ease-out}
+.finding:first-child{border-top:0;padding-top:0}
+.sev{width:36px;height:36px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center}
+.sev-high{background:#FEE4E2;color:#B42318}
+.sev-med{background:#FFF1D6;color:#8A5A00}
+.sev-ok{background:#E6F5EE;color:#0F6B42}
+.sev-low{background:#E8EEFC;color:#1E40AF}
+.sev-done{background:rgba(22,24,29,.06);color:#3F4650}
+.cf{display:grid;grid-template-columns:minmax(0,1.3fr) 96px 96px auto;gap:6px 12px;align-items:center;font-size:14px;padding:10px 0;border-top:1px solid rgba(22,24,29,.08)}
+.cf:first-child{border-top:0;padding-top:0}
+.cf .h{font-size:12px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:#5B6370}
+.cf .r{text-align:right}
+.track{grid-column:1 / -1;height:6px;border-radius:999px;background:rgba(22,24,29,.08);position:relative;overflow:hidden}
+.track > div{height:100%;border-radius:999px;transition:width 160ms ease-out}
+.nw{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid rgba(22,24,29,.08);font-size:14px}
+.nw:first-child{border-top:0;padding-top:0}
+@media (max-width:780px){.nav{max-width:none}.nav-list{flex-direction:row;flex-wrap:wrap}.nav-head{width:100%}.cf{grid-template-columns:minmax(0,1fr) auto auto auto}}
+@media (prefers-reduced-motion:reduce){.btn,.btn:active,.finding,.track > div{transition:none;transform:none}}
+@media (prefers-reduced-transparency:reduce){.top{background:#F3F4F6;backdrop-filter:none;-webkit-backdrop-filter:none}}
+</style>
+</helmet>
+<div style="min-height: 100vh">
+  <header class="top">
+    <a class="wordmark" href="Main.dc.html" aria-label="First Paycheck home">
+      <svg width="22" height="22" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="1" y="1" width="18" height="18" rx="5.5" fill="#EA580C"/><path d="M6 10.5l2.6 2.6L14 7.8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      First Paycheck
+    </a>
+    <div class="chips">
+      <span class="chip">Acme Corp · Semi-monthly</span>
+      <span class="chip">J. Rivera</span>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="nav" aria-label="Setup steps">
+      <div class="nav-head">Setup</div>
+      <ul class="nav-list">
+        <li><a href="Link.dc.html"><span class="nav-step done"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.5l2.3 2.3L9.5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Accounts and documents</a></li>
+        <li><a href="Confirm.dc.html"><span class="nav-step done"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.5l2.3 2.3L9.5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Confirm pay stub</a></li>
+        <li><a href="Spending.dc.html"><span class="nav-step done"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.5l2.3 2.3L9.5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Spending map</a></li>
+        <li><a href="Decisions.dc.html"><span class="nav-step done"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.5l2.3 2.3L9.5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Decisions</a></li>
+      </ul>
+      <div class="nav-head">Your plan</div>
+      <ul class="nav-list">
+        <li><a href="Why.dc.html"><span class="nav-step"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 8.5v-.3c0-.7.4-1 1-1.4.6-.4 1-.8 1-1.5A2 2 0 004 5.3M6 10.3h.01" stroke="#3F4650" stroke-width="1.4" stroke-linecap="round"/></svg></span>Why this decision</a></li>
+        <li><a href="Plan.dc.html"><span class="nav-step"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><rect x="2" y="2.5" width="8" height="7.5" rx="1.5" stroke="#3F4650" stroke-width="1.4"/><path d="M2 5h8" stroke="#3F4650" stroke-width="1.4"/></svg></span>Plan and calendar</a></li>
+        <li><a href="CheckIn.dc.html" aria-current="page"><span class="nav-step"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 9.5l3-3 2 2 3-4" stroke="#3F4650" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Monthly check-in</a></li>
+      </ul>
+    </nav>
+
+    <main class="main">
+      <div class="row" style="justify-content: space-between; align-items: flex-end">
+        <div>
+          <h1>November check-in</h1>
+          <p class="lead">Ran Nov 16, 2026 at 8:02 AM after Plaid delivered the Nov 15 pay stub deposit. Each finding compares new data against your plan and links to the calculator it affects.</p>
+        </div>
+        <button class="btn" type="button">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13 8a5 5 0 01-8.7 3.4M3 8a5 5 0 018.7-3.4M11.5 2v3h-3M4.5 14v-3h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Run again now
+        </button>
+      </div>
+
+      <section class="card" aria-labelledby="findings-title">
+        <div class="row" style="justify-content: space-between">
+          <h2 id="findings-title">What changed</h2>
+          <span class="badge badge-neutral"><span class="num">{{handled}}</span> of <span class="num">{{total}}</span> handled</span>
+        </div>
+        <div style="display: flex; flex-direction: column">
+          <sc-for list="{{findings}}" as="f" hint-placeholder-count="4">
+            <div class="finding" style="{{f.style}}">
+              <span class="sev {{f.sevCls}}" aria-hidden="true">
+                <sc-if value="{{f.isOpen}}" hint-placeholder-val="{{true}}">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="{{f.icon}}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </sc-if>
+                <sc-if value="{{f.isDone}}" hint-placeholder-val="{{false}}">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M4 9.5l3.2 3.2L14 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </sc-if>
+                <sc-if value="{{f.isDismissed}}" hint-placeholder-val="{{false}}">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M5 5l8 8M13 5l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </sc-if>
+              </span>
+              <div style="min-width: 0; display: flex; flex-direction: column; gap: 6px">
+                <div class="row" style="gap: 8px">
+                  <span class="badge {{f.kindCls}}">{{f.kind}}</span>
+                  <span class="tiny muted">{{f.when}}</span>
+                  <sc-if value="{{f.isDone}}" hint-placeholder-val="{{false}}"><span class="badge badge-ok">Done</span></sc-if>
+                  <sc-if value="{{f.isDismissed}}" hint-placeholder-val="{{false}}"><span class="badge badge-neutral">Dismissed</span></sc-if>
+                </div>
+                <div style="font-weight: 600">{{f.title}}</div>
+                <div class="small muted">{{f.body}}</div>
+                <div class="row" style="gap: 8px; margin-top: 4px">
+                  <a href="{{f.href}}" class="badge {{f.affectsCls}}">
+                    Affects: {{f.affects}}
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 5h6M5.5 2.5L8 5 5.5 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </a>
+                  <sc-if value="{{f.isOpen}}" hint-placeholder-val="{{true}}">
+                    <button class="btn btn-sm btn-primary" type="button" onClick="{{f.done}}">{{f.action}}</button>
+                    <button class="btn btn-sm" type="button" onClick="{{f.dismiss}}">Dismiss</button>
+                  </sc-if>
+                  <sc-if value="{{f.isClosed}}" hint-placeholder-val="{{false}}">
+                    <button class="btn btn-sm" type="button" onClick="{{f.reopen}}">Undo</button>
+                  </sc-if>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+        <section class="card" aria-labelledby="cf-title" style="flex: 1 1 440px; min-width: 0">
+          <div class="row" style="justify-content: space-between">
+            <h2 id="cf-title">November cash flow against the plan</h2>
+            <span class="tiny muted">Nov 1 to 16 · both paychecks in</span>
+          </div>
+          <div>
+            <div class="cf"><span class="h">Line</span><span class="h r">Actual</span><span class="h r">Plan</span><span class="h"></span></div>
+            <div class="cf">
+              <span>Net income</span><span class="num r">$4,054.96</span><span class="num r">$4,009.52</span><span class="badge badge-ok">On plan</span>
+              <div class="track"><div style="width: 100%; background: #7C3AED"></div></div>
+            </div>
+            <div class="cf">
+              <span>Essentials</span><span class="num r">$1,905.40</span><span class="num r">$1,823.00 max</span><span class="badge badge-warn">$82 over</span>
+              <div class="track"><div style="width: 100%; background: #1D4ED8"></div></div>
+            </div>
+            <div class="cf">
+              <span>Flexible</span><span class="num r">$612.30</span><span class="num r">$700.00 max</span><span class="badge badge-ok">Under</span>
+              <div class="track"><div style="width: 87%; background: #EA580C"></div></div>
+            </div>
+            <div class="cf">
+              <span>Savings transfer</span><span class="num r">$300.00</span><span class="num r">$300.00</span><span class="badge badge-ok">On plan</span>
+              <div class="track"><div style="width: 100%; background: #14B8A6"></div></div>
+            </div>
+            <div class="cf">
+              <span>401(k) from pay stubs</span><span class="num r">$54.17</span><span class="num r">$216.66</span><span class="badge badge-bad">25% of plan</span>
+              <div class="track"><div style="width: 25%; background: #7C3AED"></div></div>
+            </div>
+            <div class="cf">
+              <span style="font-weight: 600">Left after all of the above</span><span class="num r" style="font-weight: 600">$1,237.26</span><span class="num r">$1,186.52</span><span class="badge badge-neutral">Unallocated</span>
+            </div>
+          </div>
+          <p class="tiny muted" style="margin: 0">Essentials went over because of a $82.15 PG&E bill in the first cold month. Flexible includes the new $185 Equinox charge.</p>
+        </section>
+
+        <section class="card" aria-labelledby="nw-title" style="flex: 1 1 320px; min-width: 0">
+          <div class="row" style="justify-content: space-between">
+            <h2 id="nw-title">Net worth</h2>
+            <span class="badge badge-ok">+$857.54 since Oct 20</span>
+          </div>
+          <div style="font-size: 30px; font-weight: 700; letter-spacing: -0.022em; line-height: 1.1" class="num">$6,077.54</div>
+          <div>
+            <div class="nw"><span>Chase Total Checking <span class="muted num">··4821</span></span><span class="num">$3,120.44</span></div>
+            <div class="nw"><span>Chase Savings <span class="muted num">··7730</span> <span class="tiny muted">emergency fund</span></span><span class="num">$2,740.00</span></div>
+            <div class="nw"><span>Acme 401(k) at Fidelity <span class="tiny muted">via Plaid Investments</span></span><span class="num">$217.10</span></div>
+          </div>
+          <div style="background: #F4F1FD; border-radius: 10px; padding: 12px 14px">
+            <div class="tiny muted" style="margin-bottom: 6px">401(k) holdings · as of Nov 15</div>
+            <div class="row" style="justify-content: space-between; font-size: 14px">
+              <span><strong>Vanguard Target Retirement 2070</strong> <span class="muted num">VSVNX</span></span>
+              <span class="num">14.21 shares · $217.10</span>
+            </div>
+            <div class="tiny muted" style="margin-top: 4px">Cost basis $216.68: your $108.34 plus Acme's $108.34 match over two paychecks.</div>
+          </div>
+          <div class="row" style="justify-content: space-between">
+            <a href="Plan.dc.html" class="small">Open the plan</a>
+            <a href="Decisions.dc.html" class="btn btn-sm">Re-run a calculator</a>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1640}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const list = [
+      { id: 1, kind: 'Election not applied', sev: 'high', when: 'Nov 15 pay stub', title: 'Your 401(k) contribution is 2%, not the 4% you chose.',
+        body: 'The Nov 15 stub shows $54.17 withheld for the 401(k). Your Oct 20 decision was $108.33 per check. At 2% you capture $1,300 of the $2,600 match.',
+        affects: '401(k) match', href: 'Decisions.dc.html', action: 'I fixed it in the benefits portal',
+        icon: 'M9 4v5.5M9 12.6h.01M9 16.5a7.5 7.5 0 100-15 7.5 7.5 0 000 15z' },
+      { id: 2, kind: 'Deduction changed', sev: 'change', when: 'Nov 15 pay stub', title: 'Medical premium fell from $62.50 to $31.25.',
+        body: 'That matches the HDHP + HSA election in your plan. Acme\'s $600 HSA deposit should appear in January.',
+        affects: 'Health plan', href: 'Decisions.dc.html', action: 'Got it',
+        icon: 'M4 9.5l3.2 3.2L14 6' },
+      { id: 3, kind: 'Goal on pace', sev: 'ok', when: 'Nov 6 transfer', title: 'Emergency fund is on pace: $2,740 of $5,470.',
+        body: '$300 landed in Chase Savings ··7730 on Nov 6, as planned. At this rate you reach the 3-month target around Oct 2027.',
+        affects: 'Emergency fund', href: 'Decisions.dc.html', action: 'Got it',
+        icon: 'M3 12.5l4-4 3 3 5-6' },
+      { id: 4, kind: 'New recurring charge', sev: 'med', when: 'Nov 3 · Chase ··4821', title: 'Equinox, $185.00, looks monthly.',
+        body: 'First seen Nov 3. It was not in October, so it is not in the flexible budget. Keeping it puts flexible spending at about $800 a month, above the $700 target.',
+        affects: 'Spending map', href: 'Spending.dc.html', action: 'Keep it and raise the flexible target',
+        icon: 'M9 3.5v5.5l3 2M9 16.5a7.5 7.5 0 100-15 7.5 7.5 0 000 15z' },
+      { id: 5, kind: 'Pay change', sev: 'change', when: 'Nov 15 pay stub', title: 'Federal withholding dropped from $297.76 to $211.96.',
+        body: 'That matches the W-4 you submitted on Oct 21 and the calculator\'s projection. Net pay rose to $2,058.92 this check.',
+        affects: 'W-4', href: 'Decisions.dc.html', action: 'Got it',
+        icon: 'M4 9.5l3.2 3.2L14 6' },
+      { id: 6, kind: 'Upcoming date', sev: 'low', when: 'Jan 31, 2027', title: 'Your W-2 arrives by Jan 31. Tax season starts.',
+        body: 'Box 2 should read about $6,290 for 2026. The plan projects a refund near $2,059 from withholding before the new W-4 took effect.',
+        affects: 'W-4', href: 'Plan.dc.html', action: 'Remind me Jan 31',
+        icon: 'M3.5 5h11v9.5h-11zM3.5 8.5h11M6.5 3v3M11.5 3v3' }
+    ];
+    this.state = { findings: list.map((f) => Object.assign({}, f, { status: 'open' })) };
+  }
+
+  set(id, status) {
+    this.setState((s) => ({ findings: s.findings.map((f) => (f.id === id ? Object.assign({}, f, { status }) : f)) }));
+  }
+
+  renderVals() {
+    const s = this.state;
+    const kindCls = { high: 'badge-bad', med: 'badge-warn', ok: 'badge-ok', low: 'badge-info', change: 'badge-plum' };
+    const affectsCls = { '401(k) match': 'badge-plum', 'Health plan': 'badge-coral', 'Emergency fund': 'badge-teal' };
+    const findings = s.findings.map((f) => {
+      const open = f.status === 'open';
+      return Object.assign({}, f, {
+        affectsCls: affectsCls[f.affects] || 'badge-info',
+        isOpen: open,
+        isDone: f.status === 'done',
+        isDismissed: f.status === 'dismissed',
+        isClosed: !open,
+        sevCls: open ? 'sev-' + f.sev : 'sev-done',
+        kindCls: open ? kindCls[f.sev] : 'badge-neutral',
+        style: open ? 'opacity: 1' : 'opacity: 0.6',
+        done: () => this.set(f.id, 'done'),
+        dismiss: () => this.set(f.id, 'dismissed'),
+        reopen: () => this.set(f.id, 'open')
+      });
+    });
+    return {
+      findings,
+      total: s.findings.length,
+      handled: s.findings.filter((f) => f.status !== 'open').length
+    };
+  }
+}
+</script>
+</body>
+</html>
