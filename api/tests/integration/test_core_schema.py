@@ -22,7 +22,7 @@ from tests.support.factories import (
 )
 
 
-def seed_rule(connection: Connection, merchant_norm: str = "netflix") -> uuid.UUID:
+def seed_rule(connection: Connection, merchant_norm: str = "zz test streaming") -> uuid.UUID:
     """A seed row, written the way the seed loader writes it (privileged)."""
     rule_id: uuid.UUID = connection.execute(
         text(
@@ -113,14 +113,15 @@ def test_user_rules_are_private(
             ),
             {"u": user_a.id},
         )
-    assert count(db_connection, user_a, "SELECT count(*) FROM category_rules") == 1
-    assert count(db_connection, user_b, "SELECT count(*) FROM category_rules") == 0
+    owned = "SELECT count(*) FROM category_rules WHERE user_id IS NOT NULL"
+    assert count(db_connection, user_a, owned) == 1
+    assert count(db_connection, user_b, owned) == 0
 
 
 def test_seed_rule_uniqueness_treats_null_owners_as_equal(db_connection: Connection) -> None:
-    seed_rule(db_connection, "spotify")
+    seed_rule(db_connection, "zz test unique")
     with pytest.raises(IntegrityError, match="uq_category_rules"):
-        seed_rule(db_connection, "spotify")
+        seed_rule(db_connection, "zz test unique")
 
 
 def test_jobs_not_updatable_by_user(db_connection: Connection, user_a: FixtureUser) -> None:

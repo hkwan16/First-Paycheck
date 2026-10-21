@@ -106,6 +106,26 @@ def _insert_user(connection: Connection, user: FixtureUser) -> FixtureUser:
 
 
 @pytest.fixture
+def no_seed_rules(db_connection: Connection) -> Connection:
+    """Remove committed seed category rules for this test (rolled back after).
+
+    ``make seed`` may have loaded them into the test database; tests that
+    count or write seed rows start from none.
+    """
+    db_connection.execute(text("DELETE FROM category_rules WHERE user_id IS NULL"))
+    return db_connection
+
+
+@pytest.fixture
+def seeded_rules(no_seed_rules: Connection) -> Connection:
+    """Exactly the committed seed file's category rules, for this test."""
+    from db.seed.load import load_category_rules, read_seed_rules
+
+    load_category_rules(no_seed_rules, read_seed_rules())
+    return no_seed_rules
+
+
+@pytest.fixture
 def user_a(db_connection: Connection) -> FixtureUser:
     return _insert_user(db_connection, USER_A)
 

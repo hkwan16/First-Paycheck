@@ -1,4 +1,7 @@
-"""Process entrypoints used by Render and Procfile.dev: the worker and the seed loader."""
+"""The worker process entrypoint used by Render and Procfile.dev.
+
+The seed loader entrypoint needs a database and is covered by
+``tests/integration/test_seed_load.py``."""
 
 from __future__ import annotations
 
@@ -12,7 +15,6 @@ import time
 import pytest
 
 from app.config import REPO_ROOT
-from db.seed import load
 from jobs import worker
 
 API = REPO_ROOT / "api"
@@ -48,17 +50,3 @@ def test_worker_process_exits_cleanly_on_sigterm() -> None:
             process.wait()
         if process.stderr is not None:
             process.stderr.close()
-
-
-def test_seed_loader_is_a_logged_no_op(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.INFO):
-        assert load.load() == 0
-    assert "no seeds yet" in caplog.text
-
-
-def test_seed_loader_module_runs() -> None:
-    result = subprocess.run(
-        [sys.executable, "-m", "db.seed.load"], cwd=API, capture_output=True, text=True, check=False
-    )
-    assert result.returncode == 0
-    assert "no seeds yet" in result.stderr
