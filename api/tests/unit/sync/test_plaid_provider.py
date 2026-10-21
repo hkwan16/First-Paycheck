@@ -248,7 +248,8 @@ def test_recorded_sandbox_transactions_parse_as_one_complete_page() -> None:
     assert first.has_more is False
     assert first.next_cursor == page["next_cursor"]
     assert len(first.added) == 49
-    assert first.modified == [] and first.removed == []
+    assert first.modified == []
+    assert first.removed == []
     assert all(isinstance(t.amount_cents, int) for t in first.added)
     assert all(t.merchant_raw for t in first.added)
     assert all(isinstance(t.posted_at, dt.date) for t in first.added)
