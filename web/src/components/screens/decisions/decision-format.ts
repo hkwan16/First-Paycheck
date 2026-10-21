@@ -1,5 +1,5 @@
 import type { DecisionSaveState } from '@/lib/decisions';
-import type { K401MatchResult, MatchTier } from '@/lib/api/types';
+import type { K401MatchResult, MatchTier, MatchTierIn } from '@/lib/api/types';
 import type { Tone } from '@/lib/design/tone';
 import { formatMoney, formatRate } from '@/lib/money';
 
@@ -29,7 +29,7 @@ export function matchHeadline(result: K401MatchResult): string {
  * The match formula in words. Tiers are cumulative bounds (spec 006), so each
  * is read as "up to" its bound rather than as a width worked out here.
  */
-export function tiersText(tiers: readonly MatchTier[]): string {
+export function tiersText(tiers: readonly (MatchTier | MatchTierIn)[]): string {
   return tiers
     .map(({ employer_pct, employee_pct_upto }, index) =>
       index === 0
