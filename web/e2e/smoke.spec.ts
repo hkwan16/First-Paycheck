@@ -57,6 +57,7 @@ const SCREENS: readonly Screen[] = [
     heading: 'Why contribute 4% to your 401(k)',
     sample: true,
   },
+  { path: '/dev/screens/why-index', name: 'why-index', heading: 'Why each decision', sample: true },
 ];
 
 /** Collect console errors and uncaught exceptions for the life of the page. */

@@ -9,6 +9,7 @@ import { ConfirmScreen } from '@/components/screens/confirm/ConfirmScreen';
 import { DecisionsScreen } from '@/components/screens/decisions/DecisionsScreen';
 import { LinkScreen } from '@/components/screens/link/LinkScreen';
 import { SpendingScreen } from '@/components/screens/spending/SpendingScreen';
+import { WhyIndexScreen } from '@/components/screens/why/WhyIndexScreen';
 import { WhyScreen } from '@/components/screens/why/WhyScreen';
 import { $api } from '@/lib/api/client';
 import { ACCOUNT_COUNT_LIMIT, TRANSACTIONS_PAGE_SIZE } from '@/lib/api/hooks';
@@ -46,7 +47,14 @@ import {
  */
 
 export type SampleScreenName =
-  'link' | 'confirm' | 'confirm-manual' | 'spending' | 'decisions' | 'why' | 'why-fallback';
+  | 'link'
+  | 'confirm'
+  | 'confirm-manual'
+  | 'spending'
+  | 'decisions'
+  | 'why'
+  | 'why-fallback'
+  | 'why-index';
 
 /** The manual-entry variant's document: the same stub, which the AI declined to read. */
 const MANUAL_DOC_ID = '4d000000-0000-4000-8000-0000000000aa';
@@ -112,6 +120,7 @@ const SCREENS: Record<
       seed(queryKeys.explanation(DECISION_V1_ID), sampleFallbackExplanation());
     },
   },
+  'why-index': { nav: 'why', render: () => <WhyIndexScreen />, seed: seedDecided },
 };
 
 /**
