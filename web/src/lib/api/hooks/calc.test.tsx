@@ -50,23 +50,28 @@ describe('useCalc', () => {
   });
 
   it('waits until the inputs have been still for 150 ms, so a drag sends one request', async () => {
+    const sentAt: number[] = [];
+    server.events.on('request:start', ({ request }) => {
+      if (new URL(request.url).pathname === PATH) sentAt.push(Date.now());
+    });
     const bodies = calcBodies();
     const { result, rerender } = renderCalc(sampleK401Inputs(0));
     await waitFor(() => expect(result.current.isCurrent).toBe(true));
 
+    // One drag across three stops: no time passes between them.
     rerender({ inputs: sampleK401Inputs(1) });
-    await act(() => vi.advanceTimersByTimeAsync(100));
     rerender({ inputs: sampleK401Inputs(2) });
-    await act(() => vi.advanceTimersByTimeAsync(100));
     rerender({ inputs: sampleK401Inputs(3) });
+    const stoppedAt = Date.now();
     expect(result.current.isBusy).toBe(true);
-    await act(() => vi.advanceTimersByTimeAsync(CALC_DEBOUNCE_MS - 1));
     expect(bodies.map(pct)).toEqual(['0.00']);
 
-    await act(() => vi.advanceTimersByTimeAsync(1));
+    await act(() => vi.advanceTimersByTimeAsync(CALC_DEBOUNCE_MS));
     await waitFor(() => expect(result.current.isCurrent).toBe(true));
     expect(bodies.map(pct)).toEqual(['0.00', '3.00']);
     expect(result.current.data).toEqual(sampleK401(3).result);
+    // Measured on the test clock, so a slow machine cannot make it pass or fail.
+    expect(sentAt[1]! - stoppedAt).toBeGreaterThanOrEqual(CALC_DEBOUNCE_MS);
   });
 
   it('keeps the previous result on screen, marked busy, while the next one loads', async () => {

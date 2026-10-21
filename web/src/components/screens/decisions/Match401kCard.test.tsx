@@ -12,13 +12,18 @@ import { Match401kCard } from './Match401kCard';
 
 /** Request bodies by path, in order. */
 function requests() {
-  const seen: { calc: { contribution_pct: string }[]; save: Record<string, unknown>[] } = {
-    calc: [],
-    save: [],
+  const seen = {
+    calc: [] as { contribution_pct: string }[],
+    /** When each calculator request left, on the test clock. */
+    calcAt: [] as number[],
+    save: [] as Record<string, unknown>[],
   };
   server.events.on('request:start', async ({ request }) => {
     const path = new URL(request.url).pathname;
-    if (path === '/calc/401k-match') seen.calc.push(await request.clone().json());
+    if (path === '/calc/401k-match') {
+      seen.calcAt.push(Date.now());
+      seen.calc.push(await request.clone().json());
+    }
     if (path === '/decisions' && request.method === 'POST') {
       seen.save.push(await request.clone().json());
     }
@@ -44,6 +49,10 @@ async function renderReady() {
   await waitFor(() => expect(result()).not.toHaveAttribute('aria-busy', 'true'));
   return rendered;
 }
+
+/** The whole age at once, as a paste would, so no half-typed age is ever sent. */
+const enterAge = (input: HTMLElement, age: string) =>
+  fireEvent.change(input, { target: { value: age } });
 
 const drag = (percent: number) =>
   fireEvent.change(slider(), { target: { value: String(percent) } });
@@ -116,7 +125,7 @@ describe('Match401kCard calculating', () => {
   it('asks for the age the calculator needs, then calculates from 0%', async () => {
     decisionsReady();
     const seen = requests();
-    const { user } = renderCard();
+    renderCard();
     const age = await within(
       await screen.findByRole('region', { name: '401(k) match' }),
     ).findByLabelText('Your age at the end of 2026');
@@ -124,7 +133,7 @@ describe('Match401kCard calculating', () => {
     expect(saveButton()).toBeDisabled();
     expect(within(card()).getByText('Not saved')).toBeInTheDocument();
 
-    await user.type(age, '30');
+    enterAge(age, '30');
     await settle();
     await waitFor(() =>
       expect(result()).toHaveTextContent('You leave the whole $2,600 match behind'),
@@ -141,19 +150,22 @@ describe('Match401kCard calculating', () => {
     await renderReady();
     expect(seen.calc).toHaveLength(1);
 
+    // One drag across three stops: no time passes between them.
     drag(1);
     drag(2);
     drag(3);
+    const stoppedAt = Date.now();
     expect(result()).toHaveAttribute('aria-busy', 'true');
     // The previous numbers stay while the next ones load.
     expect(result()).toHaveTextContent('You capture the full $2,600 match');
     expect(saveButton()).toBeDisabled();
-    await act(() => vi.advanceTimersByTimeAsync(CALC_DEBOUNCE_MS - 1));
     expect(seen.calc).toHaveLength(1);
 
-    await act(() => vi.advanceTimersByTimeAsync(1));
+    await settle();
     await waitFor(() => expect(result()).not.toHaveAttribute('aria-busy', 'true'));
     expect(seen.calc.map((body) => body.contribution_pct)).toEqual(['4.00', '3.00']);
+    // Measured on the test clock, so a slow machine cannot make it pass or fail.
+    expect(seen.calcAt[1]! - stoppedAt).toBeGreaterThanOrEqual(CALC_DEBOUNCE_MS);
     expect(result()).toHaveTextContent('You leave $650 of match behind');
     expect(within(result()).getByText('$27.08')).toBeInTheDocument();
     expect(within(card()).getByText('Changed since v1')).toBeInTheDocument();
@@ -166,7 +178,7 @@ describe('Match401kCard saving', () => {
     decisionsReady();
     const seen = requests();
     const { user } = renderCard();
-    await user.type(
+    enterAge(
       await within(await screen.findByRole('region', { name: '401(k) match' })).findByLabelText(
         'Your age at the end of 2026',
       ),
