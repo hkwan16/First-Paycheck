@@ -154,6 +154,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/calc/w4': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Calc W4
+     * @description The W-4 calculator (spec 014): Publication 15-T percentage-method
+     *     withholding per paycheck, the projected federal tax, refund or balance due,
+     *     and the Step 4(c) or 4(b) entry that brings it within $100 of zero. The
+     *     401(k) rate and the health premium come from the client's saved decisions.
+     */
+    post: operations['calc_w4'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/calendar': {
     parameters: {
       query?: never;
@@ -849,7 +872,8 @@ export interface components {
       | 'goal_target'
       | 'election_check'
       | 'goal_contribution'
-      | 'goal_review';
+      | 'goal_review'
+      | 'w4_submit';
     /**
      * CalendarStatus
      * @enum {string}
@@ -2342,6 +2366,167 @@ export interface components {
       /** Numbers Unmatched */
       numbers_unmatched: string[];
     };
+    /**
+     * W4Input
+     * @description The calculator's inputs, exactly as spec 014 lists them.
+     */
+    W4Input: {
+      /**
+       * Age
+       * @description Age reached by December 31 of tax_year, for the 401(k) catch-up
+       */
+      age?: number | null;
+      /**
+       * Deductions Cents
+       * @description Step 4(b), for the year
+       * @default 0
+       */
+      deductions_cents: number;
+      /**
+       * Dependents Credit Cents
+       * @description Step 3, for the year
+       * @default 0
+       */
+      dependents_credit_cents: number;
+      /**
+       * Expected Deductions Cents
+       * @description Deductions beyond the standard deduction expected on the return; null means the Step 4(b) entry
+       */
+      expected_deductions_cents?: number | null;
+      /**
+       * Extra Withholding Cents
+       * @description Step 4(c), per paycheck
+       * @default 0
+       */
+      extra_withholding_cents: number;
+      /**
+       * Filing Status
+       * @description Form W-4 Step 1(c)
+       * @enum {string}
+       */
+      filing_status: 'single' | 'married_filing_jointly' | 'head_of_household';
+      /**
+       * Health Premium Per Paycheck Cents
+       * @description Pre-tax health premium per paycheck, from the saved health plan
+       * @default 0
+       */
+      health_premium_per_paycheck_cents: number;
+      /**
+       * K401 Contribution Pct
+       * @description Pre-tax 401(k) rate, from the saved 401(k) decision
+       * @default 0
+       */
+      k401_contribution_pct: number | string;
+      /**
+       * Multiple Jobs
+       * @description Step 2(c) is checked
+       * @default false
+       */
+      multiple_jobs: boolean;
+      /**
+       * Other Income Cents
+       * @description Step 4(a), for the year
+       * @default 0
+       */
+      other_income_cents: number;
+      /**
+       * Other Jobs Wages Cents
+       * @description The household's other jobs' annual wages, for the projection
+       * @default 0
+       */
+      other_jobs_wages_cents: number;
+      /**
+       * Other Jobs Withholding Cents
+       * @description Federal income tax those jobs withhold in the year
+       * @default 0
+       */
+      other_jobs_withholding_cents: number;
+      /**
+       * Pay Periods Per Year
+       * @enum {integer}
+       */
+      pay_periods_per_year: 12 | 24 | 26 | 52;
+      /**
+       * Salary Cents
+       * @description Annual salary from this job
+       */
+      salary_cents: number;
+      /**
+       * Tax Year
+       * @description The pay stub's tax year
+       */
+      tax_year: number;
+    };
+    /** W4Result */
+    W4Result: {
+      /**
+       * Adjusted Annual Wage Cents
+       * @description Worksheet 1A line 1i
+       */
+      adjusted_annual_wage_cents: number;
+      /** Annual Withholding Cents */
+      annual_withholding_cents: number;
+      /** Citation Keys */
+      citation_keys: string[];
+      /** Health Premium Annual Cents */
+      health_premium_annual_cents: number;
+      /** K401 Annual Cents */
+      k401_annual_cents: number;
+      /** K401 Capped */
+      k401_capped: boolean;
+      /**
+       * Projected Refund Cents
+       * @description Positive is a refund, negative a balance due
+       */
+      projected_refund_cents: number;
+      /** Projected Tax After Credits Cents */
+      projected_tax_after_credits_cents: number;
+      /** Projected Tax Cents */
+      projected_tax_cents: number;
+      /** Projected Taxable Income Cents */
+      projected_taxable_income_cents: number;
+      /**
+       * Suggested Deductions Cents
+       * @description Step 4(b) to use, for the year
+       */
+      suggested_deductions_cents: number;
+      /**
+       * Suggested Extra Withholding Cents
+       * @description Step 4(c) to use, per paycheck
+       */
+      suggested_extra_withholding_cents: number;
+      /** Suggested Refund Cents */
+      suggested_refund_cents: number;
+      /**
+       * Suggestion
+       * @enum {string}
+       */
+      suggestion:
+        | 'none'
+        | 'increase_extra_withholding'
+        | 'decrease_extra_withholding'
+        | 'increase_deductions';
+      /**
+       * Taxable Wages Per Paycheck Cents
+       * @description Worksheet 1A line 1a
+       */
+      taxable_wages_per_paycheck_cents: number;
+      /**
+       * Withholding Per Paycheck Cents
+       * @description Worksheet 1A line 4b
+       */
+      withholding_per_paycheck_cents: number;
+      /**
+       * Withholding Rate Pct
+       * @description Column D of the row used
+       */
+      withholding_rate_pct: string;
+      /**
+       * Withholding Schedule
+       * @enum {string}
+       */
+      withholding_schedule: 'standard' | 'step2_checkbox';
+    };
     /** WithholdingLine */
     WithholdingLine: {
       /** Amount Cents */
@@ -2673,6 +2858,48 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['HealthPlansResult'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  calc_w4: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['W4Input'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['W4Result'];
         };
       };
       /** @description Unauthorized */
