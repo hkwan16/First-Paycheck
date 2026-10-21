@@ -27,8 +27,8 @@ const KINDS: readonly { value: AccountKind; label: string }[] = [
 ];
 
 const SIGNS = [
-  { value: 'negative_is_out', label: 'Negative amounts' },
-  { value: 'positive_is_out', label: 'Positive amounts' },
+  { value: 'negative_is_out', label: 'Negative' },
+  { value: 'positive_is_out', label: 'Positive' },
 ] as const satisfies readonly { value: AmountSign; label: string }[];
 
 /** "Row 3, date: ...", "Row 1: ...", "The file: ...". */

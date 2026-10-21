@@ -58,7 +58,14 @@ describe('CsvImport', () => {
     const { xhr, user } = setup();
     await user.selectOptions(within(region()).getByLabelText('Account type'), 'Savings');
     await user.type(within(region()).getByLabelText('Account name (optional)'), 'Credit union');
-    await user.click(within(region()).getByRole('button', { name: 'Positive amounts' }));
+    const sign = within(region()).getByRole('group', {
+      name: 'Money going out shows in the file as',
+    });
+    expect(within(sign).getByRole('button', { name: 'Negative' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await user.click(within(sign).getByRole('button', { name: 'Positive' }));
     await chooseAndImport(user);
 
     await waitFor(() => expect(xhr.requests).toHaveLength(1));

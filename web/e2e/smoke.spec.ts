@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /** When the sample data was synced plus four minutes ("Synced 4 minutes ago"). */
 const SAMPLE_NOW = new Date('2026-10-17T16:00:00Z');
@@ -36,7 +36,7 @@ const SCREENS: readonly Screen[] = [
   {
     path: '/dev/screens/spending',
     name: 'spending',
-    heading: 'Where your money went',
+    heading: "Where October's money went",
     sample: true,
   },
 ];
@@ -76,20 +76,41 @@ test('the root sends visitors to sign in', async ({ page }) => {
   await expect(page).toHaveURL(/\/sign-in$/);
 });
 
+/** Serious and critical axe violations on the page as it is now. */
+async function blockingViolations(page: Page) {
+  const { violations } = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
+    .analyze();
+  return violations
+    .filter((v) => v.impact === 'serious' || v.impact === 'critical')
+    .map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
+}
+
+const screenAt = (path: string) => SCREENS.find((s) => s.path === path)!;
+
+/**
+ * Make the window tall enough that a screenshot of part of the page never
+ * scrolls: scrolling would slide the sticky header over it and move the page
+ * under a hovering mouse.
+ */
+async function tallWindow(page: Page) {
+  const width = page.viewportSize()?.width ?? 1280;
+  await page.setViewportSize({ width, height: 2400 });
+}
+
+/** Wait for an element's CSS animations (a popover's entrance) to finish. */
+async function settled(locator: Locator) {
+  await locator.evaluate((element) =>
+    Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+  );
+}
+
 for (const screen of SCREENS) {
   test.describe(screen.path, () => {
     test('renders cleanly with no serious or critical axe violations', async ({ page }) => {
       const errors = watchErrors(page);
       await open(page, screen);
-
-      const { violations } = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
-        .analyze();
-      const blocking = violations
-        .filter((v) => v.impact === 'serious' || v.impact === 'critical')
-        .map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
-
-      expect(blocking).toEqual([]);
+      expect(await blockingViolations(page)).toEqual([]);
       expect(errors).toEqual([]);
     });
 
@@ -99,3 +120,64 @@ for (const screen of SCREENS) {
     });
   });
 }
+
+test.describe('the cash-flow Sankey', () => {
+  test.beforeEach(({ page }) => {
+    // Under 640 px the diagram is stacked bars, with no popovers.
+    test.skip((page.viewportSize()?.width ?? 0) < 640, 'The Sankey is desktop only');
+  });
+
+  test('opens a node with the keyboard, moves with the arrows, and stays accessible', async ({
+    page,
+  }) => {
+    const errors = watchErrors(page);
+    await open(page, screenAt('/dev/screens/spending'));
+    const card = page.getByRole('region', { name: 'Where each dollar of October pay went' });
+    const gross = card.getByRole('button', { name: 'Gross pay, 2 stubs $5,416.66' });
+    await gross.focus();
+    await expect(card.getByRole('group', { name: 'Gross pay, 2 stubs' })).toBeVisible();
+
+    // Gross pay, Federal tax, Take-home, Essentials, Flexible.
+    for (const key of ['ArrowRight', 'End', 'ArrowRight', 'ArrowDown']) {
+      await page.keyboard.press(key);
+    }
+    const flexible = card.getByRole('button', { name: 'Flexible $249.89' });
+    await expect(flexible).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    const dining = card.getByRole('group', { name: 'Dining' });
+    await expect(dining).toBeVisible();
+    // Mid fade-in its text is translucent, and axe would measure that contrast.
+    await settled(dining);
+    expect(await blockingViolations(page)).toEqual([]);
+
+    await page.keyboard.press('Escape');
+    await expect(card.getByRole('group')).toHaveCount(0);
+    await expect(card.getByRole('button', { name: 'Dining $21.00' })).toBeFocused();
+    expect(errors).toEqual([]);
+  });
+
+  test('shows a category popover on hover, matching its baseline', async ({ page }) => {
+    await tallWindow(page);
+    await open(page, screenAt('/dev/screens/spending'));
+    const card = page.getByRole('region', { name: 'Where each dollar of October pay went' });
+    await card.getByRole('button', { name: 'Shopping $204.90' }).hover();
+    const shopping = card.getByRole('group', { name: 'Shopping' });
+    await expect(shopping).toBeVisible();
+    await settled(shopping);
+    await expect(card).toHaveScreenshot('spending-sankey-popover.png');
+  });
+});
+
+test('the CSV import panel opens next to the bank link and stays accessible', async ({ page }) => {
+  const errors = watchErrors(page);
+  await tallWindow(page);
+  await open(page, screenAt('/dev/screens/link'));
+  const toggle = page.getByRole('button', { name: 'Import a CSV' });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  const panel = page.getByRole('region', { name: 'Import a CSV' });
+  await expect(panel.getByRole('button', { name: 'Import CSV' })).toBeDisabled();
+  expect(await blockingViolations(page)).toEqual([]);
+  await expect(panel).toHaveScreenshot('link-csv-import.png');
+  expect(errors).toEqual([]);
+});
