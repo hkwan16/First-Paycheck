@@ -9,7 +9,7 @@ export const buttonClasses = cva(
   [
     'relative inline-flex items-center justify-center gap-2 rounded-control border-0',
     'leading-[1.5] font-semibold whitespace-nowrap no-underline select-none',
-    'transition-[transform,background-color] duration-(--duration-press) ease-out',
+    'transition-[scale,background-color] duration-(--duration-press) ease-out',
     // Feedback on press, not release. Reduced motion keeps the color change only.
     'active:scale-[.97] motion-reduce:active:scale-100',
     'disabled:cursor-not-allowed disabled:bg-fill disabled:text-ink-3 disabled:active:scale-100',
