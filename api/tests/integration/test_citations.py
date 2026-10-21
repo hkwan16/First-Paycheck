@@ -124,6 +124,31 @@ def test_benefits_search_ranks_the_matching_chunk_first(
     )
 
 
+def test_benefits_search_matches_any_word(db_connection: Connection, user_a: FixtureUser) -> None:
+    """A chunk needs only one of the words; more words rank higher. Real plan
+    text rarely says "401(k)", "retirement", "match" and "vesting" in one chunk."""
+    add_chunks(
+        db_connection,
+        user_a,
+        "Employer matching contributions vest after one year of service.",
+        "Dental coverage includes two cleanings a year.",
+        "The 401(k) retirement plan matches contributions, which vest after one year.",
+    )
+    with user_session_for(user_a.id, bind=db_connection) as session:
+        results = search(session, user_a.id, "401(k) retirement match vesting", 3)
+    assert [result.chunk_index for result in results] == [2, 0]
+
+
+def test_benefits_search_treats_words_as_words(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    """tsquery operators in the query are plain text, never syntax."""
+    add_chunks(db_connection, user_a, "401(k) match")
+    with user_session_for(user_a.id, bind=db_connection) as session:
+        assert len(search(session, user_a.id, "match & !(| :* <->", 3)) == 1
+        assert search(session, user_a.id, "the and of", 3) == []
+
+
 def test_benefits_search_respects_k_and_empty_queries(
     db_connection: Connection, user_a: FixtureUser
 ) -> None:
