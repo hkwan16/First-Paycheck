@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { SignInScreen } from '@/components/screens/sign-in/SignInScreen';
 import { parseSignInParams } from '@/components/screens/sign-in/sign-in-params';
+import { HydrationMarker } from '@/app/hydration-marker';
 
 export const metadata: Metadata = { title: 'Sign in' };
 
@@ -11,5 +12,10 @@ export const metadata: Metadata = { title: 'Sign in' };
 export const instant = false;
 
 export default async function SignInPage({ searchParams }: PageProps<'/sign-in'>) {
-  return <SignInScreen {...parseSignInParams(await searchParams)} />;
+  return (
+    <>
+      <SignInScreen {...parseSignInParams(await searchParams)} />
+      <HydrationMarker />
+    </>
+  );
 }
