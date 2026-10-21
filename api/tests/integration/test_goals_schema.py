@@ -46,7 +46,9 @@ def labels(connection: Connection, name: str) -> list[str]:
 def test_python_enums_match_the_database(db_connection: Connection) -> None:
     for name, enum in GOAL_ENUMS.items():
         assert labels(db_connection, name) == [member.value for member in enum], name
-    assert labels(db_connection, "calendar_kind")[-2:] == [
+    kinds = labels(db_connection, "calendar_kind")
+    start = kinds.index(CalendarKind.GOAL_CONTRIBUTION.value)
+    assert kinds[start : start + 2] == [
         CalendarKind.GOAL_CONTRIBUTION.value,
         CalendarKind.GOAL_REVIEW.value,
     ]

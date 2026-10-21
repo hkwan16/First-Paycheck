@@ -14,6 +14,7 @@ from typing import Any
 
 from calc.health_plans import HealthPlansInput, HealthPlansResult
 from calc.k401 import K401MatchInput, K401MatchResult
+from calc.w4 import W4Input, W4Result
 from db.enums import CalculatorKind
 from llm.schemas import ExplainCitation, ExplainContext, ExplainFact
 from retrieval.benefits_search import BenefitsPassage
@@ -28,6 +29,7 @@ __all__ = [
     "health_notes",
     "k401_notes",
     "name_numbers",
+    "w4_notes",
 ]
 
 # The full-text query run over the user's benefits text for each calculator
@@ -36,6 +38,7 @@ __all__ = [
 BENEFITS_QUERIES: dict[CalculatorKind, str] = {
     CalculatorKind.K401_MATCH: "401(k) retirement match vesting",
     CalculatorKind.HEALTH_PLANS: "health plan deductible coinsurance out-of-pocket premium HSA",
+    CalculatorKind.W4: "pre-tax premium payroll deduction 401(k)",
 }
 BENEFITS_PASSAGES = 3
 
@@ -237,6 +240,142 @@ def _health_facts(data: HealthPlansInput, result: HealthPlansResult) -> list[Exp
     return facts
 
 
+REFUND_NOTE = "The projection is a refund: more is withheld than the year's tax."
+BALANCE_DUE_NOTE = "The projection is a balance due: less is withheld than the year's tax."
+EVEN_NOTE = "What is withheld matches the projected tax for the year."
+STEP2_NOTE = (
+    "Step 2 is checked, so this job's withholding uses half the standard deduction and half"
+    " of each tax bracket, on the assumption that the other job pays about the same."
+)
+STEP2_ALONE_NOTE = (
+    "Step 2 is checked but no other job's wages were given, so this job withholds more than"
+    " it needs; leaving Step 2 unchecked is the simpler fix."
+)
+RAISE_EXTRA_NOTE = (
+    "The suggestion adds whole dollars of extra withholding in Step 4(c) to each paycheck,"
+    " which brings the projection close to zero."
+)
+LOWER_EXTRA_NOTE = (
+    "The suggestion lowers the extra withholding in Step 4(c), which brings the projection"
+    " closer to zero."
+)
+ADD_DEDUCTIONS_NOTE = (
+    "The suggested Step 4(b) amount is more than the deductions expected; it only lowers"
+    " withholding, so the expected deductions stay as they are when it is saved."
+)
+CREDITS_EXCEED_NOTE = (
+    "The credits are more than the tax, so nothing is withheld for income tax; the part of"
+    " the credits left over is not counted as a refund here."
+)
+K401_CAPPED_NOTE = (
+    "The 401(k) rate asks for more than the yearly contribution limit, so only the limit is"
+    " counted as pre-tax pay."
+)
+
+
+def w4_notes(data: W4Input, result: W4Result) -> list[str]:
+    """The plain-words situation: refund or balance due, Step 2, the suggestion and
+    the caveats. No digits, so a draft that repeats a note adds no number."""
+    if result.projected_refund_cents > 0:
+        notes = [REFUND_NOTE]
+    elif result.projected_refund_cents < 0:
+        notes = [BALANCE_DUE_NOTE]
+    else:
+        notes = [EVEN_NOTE]
+    if data.multiple_jobs:
+        notes.append(STEP2_NOTE if data.other_jobs_wages_cents > 0 else STEP2_ALONE_NOTE)
+    notes += {
+        "increase_extra_withholding": [RAISE_EXTRA_NOTE],
+        "decrease_extra_withholding": [LOWER_EXTRA_NOTE],
+        "increase_deductions": [ADD_DEDUCTIONS_NOTE],
+        "none": [],
+    }[result.suggestion]
+    if 0 < result.projected_tax_cents <= data.dependents_credit_cents:
+        notes.append(CREDITS_EXCEED_NOTE)
+    if result.k401_capped:
+        notes.append(K401_CAPPED_NOTE)
+    return notes
+
+
+def _refund_fact(label: str, cents: int) -> ExplainFact:
+    """A refund as itself, a balance due by its size under its own label."""
+    if cents < 0:
+        return ExplainFact(label=label.replace("refund", "balance due"), value=dollars(-cents))
+    return ExplainFact(label=label, value=dollars(cents))
+
+
+def _w4_facts(data: W4Input, result: W4Result) -> list[ExplainFact]:
+    def fact(label: str, cents: int) -> ExplainFact:
+        return ExplainFact(label=label, value=dollars(cents))
+
+    facts = [
+        fact("Federal income tax withheld per paycheck", result.withholding_per_paycheck_cents),
+        fact("Federal income tax withheld per year", result.annual_withholding_cents),
+        fact(
+            "Projected federal income tax for the year before credits", result.projected_tax_cents
+        ),
+        fact(
+            "Projected federal income tax for the year after credits",
+            result.projected_tax_after_credits_cents,
+        ),
+        _refund_fact("Projected refund", result.projected_refund_cents),
+        fact("Projected taxable income", result.projected_taxable_income_cents),
+        fact(
+            "Wages subject to income tax withholding per paycheck",
+            result.taxable_wages_per_paycheck_cents,
+        ),
+        fact("Yearly wage amount the withholding table uses", result.adjusted_annual_wage_cents),
+        ExplainFact(label="Withholding table rate", value=percent(result.withholding_rate_pct)),
+    ]
+    if result.k401_annual_cents:
+        facts += [
+            ExplainFact(
+                label="401(k) contribution rate", value=percent(data.k401_contribution_pct)
+            ),
+            fact("401(k) contributions per year, before tax", result.k401_annual_cents),
+        ]
+    if result.health_premium_annual_cents:
+        facts.append(
+            fact("Health premiums per year, before tax", result.health_premium_annual_cents)
+        )
+    entries = (
+        ("Step 3 credits per year", data.dependents_credit_cents),
+        ("Step 4(a) other income per year", data.other_income_cents),
+        ("Step 4(b) deductions per year", data.deductions_cents),
+        ("Step 4(c) extra withholding per paycheck", data.extra_withholding_cents),
+        ("Other jobs' wages per year", data.other_jobs_wages_cents),
+        ("Other jobs' federal income tax withheld per year", data.other_jobs_withholding_cents),
+    )
+    facts += [fact(label, cents) for label, cents in entries if cents]
+    if data.expected_deductions_cents is not None:
+        facts.append(
+            fact(
+                "Deductions expected beyond the standard deduction", data.expected_deductions_cents
+            )
+        )
+    if result.suggestion != "none":
+        if result.suggested_extra_withholding_cents != data.extra_withholding_cents:
+            facts.append(
+                fact(
+                    "Suggested Step 4(c) extra withholding per paycheck",
+                    result.suggested_extra_withholding_cents,
+                )
+            )
+        if result.suggested_deductions_cents != data.deductions_cents:
+            facts.append(fact("Suggested Step 4(b) deductions", result.suggested_deductions_cents))
+        facts.append(
+            _refund_fact(
+                "Projected refund with the suggested entries", result.suggested_refund_cents
+            )
+        )
+    facts += [
+        fact("Salary", data.salary_cents),
+        ExplainFact(label="Paychecks per year", value=str(data.pay_periods_per_year)),
+        ExplainFact(label="Tax year", value=str(data.tax_year)),
+    ]
+    return facts
+
+
 def name_numbers(calculator: str, inputs: Mapping[str, Any]) -> dict[str, list[Any]]:
     """The numbers inside health plan names ("Gold PPO 2", "Silver $500"), keyed so
     ``AllowedNumbers.from_decision`` reads them as plain, money and percent values.
@@ -290,6 +429,20 @@ def explain_context(
             citations=[
                 ExplainCitation(key=c.key, title=c.title, passage=c.passage)
                 for c in _ordered(citations, compared.citation_keys)
+            ],
+            benefits_passages=[passage.text for passage in passages],
+        )
+    if calculator == CalculatorKind.W4:
+        entries = W4Input.model_validate(inputs)
+        projected = W4Result.model_validate(result)
+        return ExplainContext(
+            calculator=calculator,
+            tax_year=entries.tax_year,
+            facts=_w4_facts(entries, projected),
+            notes=w4_notes(entries, projected),
+            citations=[
+                ExplainCitation(key=c.key, title=c.title, passage=c.passage)
+                for c in _ordered(citations, projected.citation_keys)
             ],
             benefits_passages=[passage.text for passage in passages],
         )

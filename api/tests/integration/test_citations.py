@@ -84,7 +84,17 @@ def test_for_calculator_returns_the_keys(no_citations: Connection, user_a: Fixtu
         )
         assert all(c.url.startswith("https://www.irs.gov/") for c in found)
         assert for_calculator(session, "k401_match", 2027) == []
-        assert for_calculator(session, "w4", 2026) == []
+        assert for_calculator(session, "emergency_fund", 2026) == []
+        # Spec 014 rule 15: the W-4 calculator's passages, by key.
+        assert [c.key for c in for_calculator(session, "w4", 2026)] == [
+            "w4.dependents_credit",
+            "w4.federal_brackets",
+            "w4.form_adjustments",
+            "w4.multiple_jobs",
+            "w4.percentage_method",
+            "w4.pretax_deferral",
+            "w4.standard_deduction",
+        ]
 
 
 def add_chunks(connection: Connection, user: FixtureUser, *bodies: str) -> uuid.UUID:

@@ -57,6 +57,9 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   runs over `NEW_CALCULATOR_SPECS`. `expected` holds only the fields an example
   states; a list in it (the plan costs, the break-even pairs) is compared item
   by item, each item by its stated fields.
+- `fixtures/calc/w4.json`: every spec 014 example (`spec-014-<name>`, rows 1,
+  2a, 2b and 3 to 10) posted to `POST /calc/w4`; `test_every_spec_014_example_is_a_case`
+  fails on a table row with no case.
 - `fixtures/benefits/`: 5 synthetic benefits summaries (`summary-0N.pdf`, text
   PDFs written by hand in Helvetica with no embedded font) and labels beside
   each, from `gen/make_benefits.py` with a fixed seed (`uv run python -m
@@ -83,9 +86,12 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   targets (0.8, 0.95, 1.0) until the first live run. `SuiteUnavailable`
   without `ANTHROPIC_API_KEY`.
 - `suites/explain_smoke.py` (`explain-smoke`, free): the same flow with
-  `ScriptedGateway` over three scripted runs (pass, fail-then-pass,
-  fail-twice); `flow_correct` checks rows, the retry's feedback and that the
-  fallback verifies and is cited.
+  `ScriptedGateway` over five scripted runs (pass, fail-then-pass,
+  fail-twice on a 401(k) decision; pass and fail-twice on the W-4 decision in
+  `fixtures/explain/w4_decisions.json`, spec 014 example 9); `flow_correct`
+  checks rows, the retry's feedback and that the fallback verifies and is
+  cited. Fixture entries name their `calculator` (default `k401_match`) and
+  `load_decisions` computes results through `calc/registry.py`.
 - `suites/recurring.py` (`recurring`, free): spec 009's `sync.recurring.detect`
   over two labeled histories, no database. `recorded-sandbox` is the recorded
   Plaid `/transactions/sync` page in `api/tests/fixtures/plaid/recorded/`,

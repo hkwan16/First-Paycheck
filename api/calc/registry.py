@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from calc.emergency_fund import EmergencyFundInput, EmergencyFundResult, emergency_fund
 from calc.health_plans import HealthPlansInput, HealthPlansResult, health_plans
 from calc.k401 import K401MatchInput, K401MatchResult, k401_match
+from calc.w4 import W4Input, W4Result, w4
 
 __all__ = ["CALCULATORS", "Calculator", "UnknownCalculator", "calculator"]
 
@@ -41,6 +42,7 @@ CALCULATORS: Mapping[str, Calculator] = {
     "health_plans": Calculator(
         input_model=HealthPlansInput, result_model=HealthPlansResult, run=health_plans
     ),
+    "w4": Calculator(input_model=W4Input, result_model=W4Result, run=w4),
 }
 
 

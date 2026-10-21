@@ -8,6 +8,7 @@ from calc.emergency_fund import EmergencyFundInput, EmergencyFundResult, emergen
 from calc.health_plans import HealthPlansInput, HealthPlansResult, health_plans
 from calc.k401 import K401MatchInput, K401MatchResult, k401_match
 from calc.registry import CALCULATORS, UnknownCalculator, calculator
+from calc.w4 import W4Input, W4Result, w4
 from db.enums import CalculatorKind
 
 
@@ -22,9 +23,14 @@ def test_k401_is_registered() -> None:
     assert entry.run is k401_match
 
 
+def test_every_calculator_kind_is_registered() -> None:
+    """Spec 014 registers the last kind, so every saved decision can be recomputed."""
+    assert set(CALCULATORS) == {kind.value for kind in CalculatorKind}
+
+
 def test_unregistered_calculator() -> None:
-    with pytest.raises(UnknownCalculator, match="w4"):
-        calculator("w4")
+    with pytest.raises(UnknownCalculator, match="pension"):
+        calculator("pension")
 
 
 @pytest.mark.parametrize(
@@ -32,9 +38,10 @@ def test_unregistered_calculator() -> None:
     [
         ("emergency_fund", EmergencyFundInput, EmergencyFundResult, emergency_fund),
         ("health_plans", HealthPlansInput, HealthPlansResult, health_plans),
+        ("w4", W4Input, W4Result, w4),
     ],
 )
-def test_m6_calculators_are_registered(
+def test_later_calculators_are_registered(
     name: str, input_model: type, result_model: type, run: object
 ) -> None:
     entry = calculator(name)

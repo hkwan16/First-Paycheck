@@ -1,4 +1,5 @@
-"""The plain calculator result, written by code (spec 008 rule 17, spec 012 rule 16).
+"""The plain calculator result, written by code (spec 008 rule 17, spec 012 rule 16,
+spec 014 rule 19).
 
 Shown when two drafts fail verification or the model cannot be reached. It
 uses only the decision's numbers, so it verifies, and it cites the result's
@@ -12,6 +13,7 @@ from typing import Any
 
 from calc.health_plans import HealthPlansInput, HealthPlansResult
 from calc.k401 import K401MatchInput, K401MatchResult
+from calc.w4 import W4Input, W4Result
 from llm.schemas import ExplanationDraft, NumberClaim
 from verify.format import dollars, percent
 
@@ -23,6 +25,10 @@ FALLBACK_VERSION = "fallback/v1"
 
 K401_CONCEPT = "Your employer's 401(k) match and what it costs you to earn all of it."
 HEALTH_CONCEPT = "Comparing health plans by what each costs you in a year, not just by the premium."
+W4_CONCEPT = (
+    "How your Form W-4 entries set the federal income tax taken from each paycheck, and"
+    " whether that covers the year's tax."
+)
 
 
 def _k401(data: K401MatchInput, result: K401MatchResult) -> tuple[str, list[NumberClaim]]:
@@ -133,12 +139,105 @@ def _health(data: HealthPlansInput, result: HealthPlansResult) -> tuple[str, lis
     return " ".join(sentences), claims
 
 
+def _projection_words(cents: int) -> str:
+    """A projected refund (positive) or balance due (negative) in words."""
+    if cents > 0:
+        return f"a refund of about {dollars(cents)}"
+    if cents < 0:
+        return f"a balance due of about {dollars(-cents)}"
+    return "no refund and nothing to pay"
+
+
+def _w4(data: W4Input, result: W4Result) -> tuple[str, list[NumberClaim]]:
+    per_paycheck = dollars(result.withholding_per_paycheck_cents)
+    yearly = dollars(result.annual_withholding_cents)
+    tax = dollars(result.projected_tax_after_credits_cents)
+    sentences = [
+        f"With these Form W-4 entries your employer withholds {per_paycheck} of federal income"
+        f" tax from each paycheck, {yearly} over the year.",
+    ]
+    claims = [
+        NumberClaim(value=per_paycheck, label="Withheld per paycheck"),
+        NumberClaim(value=tax, label="Projected federal income tax after credits"),
+    ]
+    tax_sentence = f"Your projected federal income tax for {data.tax_year} is {tax}"
+    if data.dependents_credit_cents:
+        tax_sentence += f" after {dollars(data.dependents_credit_cents)} of credits"
+    if data.other_jobs_wages_cents:
+        tax_sentence += (
+            f", counting {dollars(data.other_jobs_wages_cents)} of wages from your other job and"
+            f" the {dollars(data.other_jobs_withholding_cents)} it withholds"
+        )
+    refund = result.projected_refund_cents
+    if refund > 0:
+        sentences.append(f"{tax_sentence}, so you would get a refund of about {dollars(refund)}.")
+    elif refund < 0:
+        sentences.append(f"{tax_sentence}, so you would owe about {dollars(-refund)}.")
+    else:
+        sentences.append(f"{tax_sentence}, which matches what is withheld.")
+    pretax = []
+    if result.k401_annual_cents:
+        pretax.append(f"{dollars(result.k401_annual_cents)} of 401(k) contributions")
+    if result.health_premium_annual_cents:
+        pretax.append(f"{dollars(result.health_premium_annual_cents)} of health premiums")
+    if pretax:
+        sentences.append(
+            f"Your {' and '.join(pretax)} a year come out before tax, which lowers what is"
+            " withheld."
+        )
+    if data.multiple_jobs:
+        sentences.append(
+            "Step 2 is checked, so the withholding uses half the standard deduction and half of"
+            " each tax bracket."
+        )
+    after = _projection_words(result.suggested_refund_cents)
+    extra = dollars(result.suggested_extra_withholding_cents)
+    if result.suggestion == "increase_extra_withholding":
+        sentences.append(
+            f"Entering {extra} a paycheck in Step 4(c) changes the projection to {after}."
+        )
+        claims.append(NumberClaim(value=extra, label="Suggested Step 4(c)"))
+    elif result.suggestion == "decrease_extra_withholding":
+        sentences.append(
+            f"Lowering Step 4(c) to {extra} a paycheck changes the projection to {after}."
+        )
+        claims.append(NumberClaim(value=extra, label="Suggested Step 4(c)"))
+    elif result.suggestion == "increase_deductions":
+        deductions = dollars(result.suggested_deductions_cents)
+        lead = (
+            f"Lowering Step 4(c) to {extra} a paycheck and entering"
+            if result.suggested_extra_withholding_cents != data.extra_withholding_cents
+            else "Entering"
+        )
+        sentences.append(
+            f"{lead} {deductions} in Step 4(b) lowers what is withheld and changes the"
+            f" projection to {after}; keep your expected deductions as they are when you save it."
+        )
+        claims.append(NumberClaim(value=deductions, label="Suggested Step 4(b)"))
+    if result.k401_capped:
+        sentences.append(
+            "Your 401(k) rate asks for more than the yearly limit, so only the limit is counted."
+        )
+    return " ".join(sentences), claims
+
+
 def fallback_draft(
     calculator: str,
     inputs: Mapping[str, Any],
     result: Mapping[str, Any],
     allowed_citation_keys: Collection[str],
 ) -> ExplanationDraft:
+    if calculator == "w4":
+        entries = W4Input.model_validate(inputs)
+        projected = W4Result.model_validate(result)
+        text, claims = _w4(entries, projected)
+        return ExplanationDraft(
+            concept=W4_CONCEPT,
+            text=text,
+            numbers=claims,
+            what_ifs=[],
+            citation_keys=[key for key in projected.citation_keys if key in allowed_citation_keys],
+        )
     if calculator == "health_plans":
         plans = HealthPlansInput.model_validate(inputs)
         compared = HealthPlansResult.model_validate(result)

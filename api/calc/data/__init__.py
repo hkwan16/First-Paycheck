@@ -6,12 +6,16 @@ calculator receives ``tax_year`` explicitly and reads its constants through
 ``tax_year(year)``; a year with no file is an ``UnknownTaxYear``, never a silent
 fallback to another year. The files are committed reference data, read once
 and cached, so calculators stay deterministic.
+
+``pub15t_<year>.json`` holds that year's IRS Publication 15-T percentage method
+withholding tables (spec 014), read through ``pub15t(year)`` the same way.
 """
 
 from __future__ import annotations
 
 from decimal import Decimal
 from functools import cache
+from itertools import pairwise
 from pathlib import Path
 from typing import Annotated, Literal, Self
 
@@ -24,10 +28,13 @@ __all__ = [
     "FilingStatus",
     "HsaLimits",
     "K401Limits",
+    "Pub15T",
     "StandardDeduction",
     "TaxYearData",
     "UnknownTaxYear",
+    "WithholdingRow",
     "available_years",
+    "pub15t",
     "tax_year",
 ]
 
@@ -135,6 +142,62 @@ def tax_year(year: int) -> TaxYearData:
     if not path.is_file():
         raise UnknownTaxYear(f"no federal constants for tax year {year}")
     data = TaxYearData.model_validate_json(path.read_text(encoding="utf-8"))
+    if data.tax_year != year:
+        raise UnknownTaxYear(f"{path.name} declares tax year {data.tax_year}, not {year}")
+    return data
+
+
+# ------------------------------------------------- Pub 15-T withholding (spec 014)
+
+
+class WithholdingRow(_Frozen):
+    """One row of an annual percentage method table: an adjusted annual wage of at
+    least ``at_least_cents`` (column A, also column E) withholds ``base_cents``
+    (column C) plus ``rate_pct`` (column D) of the excess. Column B is the next
+    row's column A."""
+
+    at_least_cents: _Cents
+    base_cents: _Cents
+    rate_pct: Decimal = Field(ge=0, le=100)
+
+
+def _check_table(status: str, rows: tuple[WithholdingRow, ...]) -> None:
+    if not rows or rows[0].at_least_cents != 0:
+        raise ValueError(f"{status}: a withholding table must start at 0")
+    starts = [row.at_least_cents for row in rows]
+    if any(later <= earlier for earlier, later in pairwise(starts)):
+        raise ValueError(f"{status}: withholding rows must ascend")
+
+
+class Pub15T(_Frozen):
+    """IRS Publication 15-T: Worksheet 1A's line 1g and the annual percentage
+    method tables for automated payroll systems with 2020 or later Forms W-4."""
+
+    tax_year: int
+    worksheet_1g_cents: dict[FilingStatus, _Cents]
+    standard: dict[FilingStatus, tuple[WithholdingRow, ...]]
+    step2_checkbox: dict[FilingStatus, tuple[WithholdingRow, ...]]
+    source: str
+    url: str
+
+    @model_validator(mode="after")
+    def _well_formed(self) -> Self:
+        for part in (self.worksheet_1g_cents, self.standard, self.step2_checkbox):
+            if set(part) != set(FILING_STATUSES):
+                raise ValueError("pub15t needs exactly one entry per filing status")
+        for tables in (self.standard, self.step2_checkbox):
+            for status, rows in tables.items():
+                _check_table(status, rows)
+        return self
+
+
+@cache
+def pub15t(year: int) -> Pub15T:
+    """Publication 15-T's withholding tables for ``year`` (``pub15t_<year>.json``)."""
+    path = DATA_DIR / f"pub15t_{year}.json"
+    if not path.is_file():
+        raise UnknownTaxYear(f"no Publication 15-T tables for tax year {year}")
+    data = Pub15T.model_validate_json(path.read_text(encoding="utf-8"))
     if data.tax_year != year:
         raise UnknownTaxYear(f"{path.name} declares tax year {data.tax_year}, not {year}")
     return data

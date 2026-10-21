@@ -1,0 +1,19 @@
+[
+  {
+    "id": "w4-step2-unequal-jobs",
+    "calculator": "w4",
+    "note": "Spec 014 example 9: both spouses check Step 2 with unequal pay, so the suggestion is a Step 4(b) entry.",
+    "inputs": {
+      "salary_cents": 9000000,
+      "pay_periods_per_year": 26,
+      "filing_status": "married_filing_jointly",
+      "tax_year": 2026,
+      "multiple_jobs": true,
+      "other_jobs_wages_cents": 3000000,
+      "other_jobs_withholding_cents": 142012
+    },
+    "benefits_passages": [
+      "Medical premiums are taken from your pay before federal income tax."
+    ]
+  }
+]

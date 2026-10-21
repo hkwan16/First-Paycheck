@@ -3,7 +3,8 @@
 Reads ``$1,234.56``, ``1234``, ``6%``, ``6.0%``, ``5 percent`` and ``-$12``.
 Digits that are part of a word or a reference are not numbers: statute
 sections followed by a parenthesis (``401(k)``, ``414(v)``), form names
-(``W-4``, ``Form 1040``) and digits glued to letters (``3rd``, ``k401``).
+(``W-4``, ``Form 1040``), Form W-4 steps (``Step 2``) and digits glued to
+letters (``3rd``, ``k401``).
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ _NUMBER = re.compile(
     r"""
     (?<![\w.$-])                # not inside a word, a decimal or another number
     (?<!Form\ )                 # "Form 1040" names a form
+    (?<!Step\ )(?<!Steps\ )     # "Step 2", "Steps 3": Form W-4 steps (spec 014)
     (?<!\)\()                   # "401(a)(17)": a statute subsection
     (?P<sign>-)?
     (?P<dollar>\$)?

@@ -10,6 +10,7 @@ from app.errors import error_responses
 from calc.emergency_fund import EmergencyFundInput, EmergencyFundResult, emergency_fund
 from calc.health_plans import HealthPlansInput, HealthPlansResult, health_plans
 from calc.k401 import K401MatchInput, K401MatchResult, k401_match
+from calc.w4 import W4Input, W4Result, w4
 
 router = APIRouter(prefix="/calc", tags=["calc"])
 
@@ -40,3 +41,13 @@ def calc_health_plans(body: HealthPlansInput, user: CurrentUser) -> HealthPlansR
     expected usage."""
     del user  # signed-in users only; the calculator reads nothing of theirs
     return health_plans(body)
+
+
+@router.post("/w4", responses=error_responses(401, 422))
+def calc_w4(body: W4Input, user: CurrentUser) -> W4Result:
+    """The W-4 calculator (spec 014): Publication 15-T percentage-method
+    withholding per paycheck, the projected federal tax, refund or balance due,
+    and the Step 4(c) or 4(b) entry that brings it within $100 of zero. The
+    401(k) rate and the health premium come from the client's saved decisions."""
+    del user  # signed-in users only; the calculator reads nothing of theirs
+    return w4(body)

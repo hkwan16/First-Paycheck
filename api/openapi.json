@@ -432,7 +432,8 @@
           "goal_target",
           "election_check",
           "goal_contribution",
-          "goal_review"
+          "goal_review",
+          "w4_submit"
         ],
         "title": "CalendarKind",
         "type": "string"
@@ -4187,6 +4188,301 @@
         "title": "VerificationOut",
         "type": "object"
       },
+      "W4Input": {
+        "additionalProperties": false,
+        "description": "The calculator's inputs, exactly as spec 014 lists them.",
+        "properties": {
+          "age": {
+            "anyOf": [
+              {
+                "maximum": 130.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Age reached by December 31 of tax_year, for the 401(k) catch-up",
+            "title": "Age"
+          },
+          "deductions_cents": {
+            "default": 0,
+            "description": "Step 4(b), for the year",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Deductions Cents",
+            "type": "integer"
+          },
+          "dependents_credit_cents": {
+            "default": 0,
+            "description": "Step 3, for the year",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Dependents Credit Cents",
+            "type": "integer"
+          },
+          "expected_deductions_cents": {
+            "anyOf": [
+              {
+                "maximum": 100000000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deductions beyond the standard deduction expected on the return; null means the Step 4(b) entry",
+            "title": "Expected Deductions Cents"
+          },
+          "extra_withholding_cents": {
+            "default": 0,
+            "description": "Step 4(c), per paycheck",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Extra Withholding Cents",
+            "type": "integer"
+          },
+          "filing_status": {
+            "description": "Form W-4 Step 1(c)",
+            "enum": [
+              "single",
+              "married_filing_jointly",
+              "head_of_household"
+            ],
+            "title": "Filing Status",
+            "type": "string"
+          },
+          "health_premium_per_paycheck_cents": {
+            "default": 0,
+            "description": "Pre-tax health premium per paycheck, from the saved health plan",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Health Premium Per Paycheck Cents",
+            "type": "integer"
+          },
+          "k401_contribution_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "description": "Pre-tax 401(k) rate, from the saved 401(k) decision",
+            "title": "K401 Contribution Pct"
+          },
+          "multiple_jobs": {
+            "default": false,
+            "description": "Step 2(c) is checked",
+            "title": "Multiple Jobs",
+            "type": "boolean"
+          },
+          "other_income_cents": {
+            "default": 0,
+            "description": "Step 4(a), for the year",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Other Income Cents",
+            "type": "integer"
+          },
+          "other_jobs_wages_cents": {
+            "default": 0,
+            "description": "The household's other jobs' annual wages, for the projection",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Other Jobs Wages Cents",
+            "type": "integer"
+          },
+          "other_jobs_withholding_cents": {
+            "default": 0,
+            "description": "Federal income tax those jobs withhold in the year",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Other Jobs Withholding Cents",
+            "type": "integer"
+          },
+          "pay_periods_per_year": {
+            "enum": [
+              12,
+              24,
+              26,
+              52
+            ],
+            "title": "Pay Periods Per Year",
+            "type": "integer"
+          },
+          "salary_cents": {
+            "description": "Annual salary from this job",
+            "exclusiveMinimum": 0.0,
+            "maximum": 100000000000.0,
+            "title": "Salary Cents",
+            "type": "integer"
+          },
+          "tax_year": {
+            "description": "The pay stub's tax year",
+            "title": "Tax Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "salary_cents",
+          "pay_periods_per_year",
+          "filing_status",
+          "tax_year"
+        ],
+        "title": "W4Input",
+        "type": "object"
+      },
+      "W4Result": {
+        "properties": {
+          "adjusted_annual_wage_cents": {
+            "description": "Worksheet 1A line 1i",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Adjusted Annual Wage Cents",
+            "type": "integer"
+          },
+          "annual_withholding_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Annual Withholding Cents",
+            "type": "integer"
+          },
+          "citation_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Citation Keys",
+            "type": "array"
+          },
+          "health_premium_annual_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Health Premium Annual Cents",
+            "type": "integer"
+          },
+          "k401_annual_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "K401 Annual Cents",
+            "type": "integer"
+          },
+          "k401_capped": {
+            "title": "K401 Capped",
+            "type": "boolean"
+          },
+          "projected_refund_cents": {
+            "description": "Positive is a refund, negative a balance due",
+            "maximum": 100000000000.0,
+            "minimum": -100000000000.0,
+            "title": "Projected Refund Cents",
+            "type": "integer"
+          },
+          "projected_tax_after_credits_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Projected Tax After Credits Cents",
+            "type": "integer"
+          },
+          "projected_tax_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Projected Tax Cents",
+            "type": "integer"
+          },
+          "projected_taxable_income_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Projected Taxable Income Cents",
+            "type": "integer"
+          },
+          "suggested_deductions_cents": {
+            "description": "Step 4(b) to use, for the year",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Suggested Deductions Cents",
+            "type": "integer"
+          },
+          "suggested_extra_withholding_cents": {
+            "description": "Step 4(c) to use, per paycheck",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Suggested Extra Withholding Cents",
+            "type": "integer"
+          },
+          "suggested_refund_cents": {
+            "maximum": 100000000000.0,
+            "minimum": -100000000000.0,
+            "title": "Suggested Refund Cents",
+            "type": "integer"
+          },
+          "suggestion": {
+            "enum": [
+              "none",
+              "increase_extra_withholding",
+              "decrease_extra_withholding",
+              "increase_deductions"
+            ],
+            "title": "Suggestion",
+            "type": "string"
+          },
+          "taxable_wages_per_paycheck_cents": {
+            "description": "Worksheet 1A line 1a",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Taxable Wages Per Paycheck Cents",
+            "type": "integer"
+          },
+          "withholding_per_paycheck_cents": {
+            "description": "Worksheet 1A line 4b",
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Withholding Per Paycheck Cents",
+            "type": "integer"
+          },
+          "withholding_rate_pct": {
+            "description": "Column D of the row used",
+            "title": "Withholding Rate Pct",
+            "type": "string"
+          },
+          "withholding_schedule": {
+            "enum": [
+              "standard",
+              "step2_checkbox"
+            ],
+            "title": "Withholding Schedule",
+            "type": "string"
+          }
+        },
+        "required": [
+          "k401_annual_cents",
+          "k401_capped",
+          "health_premium_annual_cents",
+          "taxable_wages_per_paycheck_cents",
+          "adjusted_annual_wage_cents",
+          "withholding_schedule",
+          "withholding_rate_pct",
+          "withholding_per_paycheck_cents",
+          "annual_withholding_cents",
+          "projected_taxable_income_cents",
+          "projected_tax_cents",
+          "projected_tax_after_credits_cents",
+          "projected_refund_cents",
+          "suggestion",
+          "suggested_extra_withholding_cents",
+          "suggested_deductions_cents",
+          "suggested_refund_cents",
+          "citation_keys"
+        ],
+        "title": "W4Result",
+        "type": "object"
+      },
       "WithholdingLine": {
         "properties": {
           "amount_cents": {
@@ -4699,6 +4995,63 @@
           }
         ],
         "summary": "Calc Health Plans",
+        "tags": [
+          "calc"
+        ]
+      }
+    },
+    "/calc/w4": {
+      "post": {
+        "description": "The W-4 calculator (spec 014): Publication 15-T percentage-method\nwithholding per paycheck, the projected federal tax, refund or balance due,\nand the Step 4(c) or 4(b) entry that brings it within $100 of zero. The\n401(k) rate and the health premium come from the client's saved decisions.",
+        "operationId": "calc_w4",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/W4Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/W4Result"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Calc W4",
         "tags": [
           "calc"
         ]

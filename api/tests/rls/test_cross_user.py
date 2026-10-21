@@ -42,6 +42,7 @@ EXEMPT = {
     ("POST", "/calc/401k-match"),
     ("POST", "/calc/emergency-fund"),
     ("POST", "/calc/health-plans"),
+    ("POST", "/calc/w4"),
 }
 
 
