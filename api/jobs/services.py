@@ -3,7 +3,7 @@
 A missing credential never stops the worker: Plaid and the token cipher are
 built on first use, so a sync job fails with a clear error and is retried,
 while every other job kind keeps running. The gateway is built at startup;
-without ``ANTHROPIC_API_KEY`` (and with ``LLM_FAKE`` off) categorize jobs fail
+without ``ANTHROPIC_API_KEY`` (and with ``LLM_FAKE`` off) categorize and extract jobs fail
 with "no LLM gateway is configured" until the key is set.
 """
 
@@ -16,7 +16,7 @@ from collections.abc import Callable
 from app.config import Settings
 from db.enums import SyncProvider as SyncProviderKind
 from jobs.context import Services
-from llm.gateway import LLMNotConfigured, get_gateway
+from llm.gateway import Gateway, LLMNotConfigured, get_gateway
 from sync.crypto import TokenCipher, cipher_from_settings
 from sync.pipeline import ProviderFactory, SyncItemSecrets
 from sync.plaid.client import PlaidClient
@@ -56,8 +56,10 @@ def plaid_provider_factory(settings: Settings) -> ProviderFactory:
 
 def default_services(settings: Settings) -> Services:
     try:
-        labeler = get_gateway(settings)
+        gateway: Gateway | None = get_gateway(settings)
     except LLMNotConfigured as exc:
-        log.warning("categorize jobs will fail: %s", exc)
-        labeler = None
-    return Services(provider_for=plaid_provider_factory(settings), labeler=labeler)
+        log.warning("categorize and ingest.extract jobs will fail: %s", exc)
+        gateway = None
+    return Services(
+        provider_for=plaid_provider_factory(settings), labeler=gateway, extractor=gateway
+    )
