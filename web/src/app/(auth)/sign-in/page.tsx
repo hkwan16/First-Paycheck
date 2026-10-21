@@ -1,3 +1,8 @@
+import type { Metadata } from 'next';
+import { SignInScreen } from '@/components/screens/sign-in/SignInScreen';
+
+export const metadata: Metadata = { title: 'Sign in' };
+
 export default function SignInPage() {
-  return <h1>Sign in</h1>;
+  return <SignInScreen />;
 }
