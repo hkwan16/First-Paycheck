@@ -40,4 +40,14 @@ describe('Bar', () => {
     render(<Bar value={25} tone="off" label="401(k)" valueText="25% of plan" />);
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '25% of plan');
   });
+
+  it('can be indeterminate while work has started but reported no progress', () => {
+    render(<Bar indeterminate value={0} tone="blue" label="Syncing" />);
+    const bar = screen.getByRole('progressbar', { name: 'Syncing' });
+    // An indeterminate progressbar has no current value (WAI-ARIA).
+    expect(bar).not.toHaveAttribute('aria-valuenow');
+    const fill = bar.firstElementChild as HTMLElement;
+    expect(fill).toHaveClass('animate-indeterminate', 'motion-reduce:animate-pulse', 'bg-blue');
+    expect(fill.style.width).toBe('');
+  });
 });

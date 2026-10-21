@@ -122,6 +122,18 @@
   --duration-press: 100ms;
   --duration-fast: 120ms;
   --duration-bar: 160ms;
+
+  /* A segment sliding along a progress track while work reports no percent. */
+  --animate-indeterminate: indeterminate 1.4s ease-in-out infinite;
+
+  @keyframes indeterminate {
+    from {
+      translate: -100% 0;
+    }
+    to {
+      translate: 250% 0;
+    }
+  }
 }
 
 @layer base {

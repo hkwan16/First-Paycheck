@@ -1,4 +1,4 @@
-import { $api } from './client';
+import { $api } from '../client';
 
 /**
  * Typed TanStack Query hooks over the generated API. Screens call these (or

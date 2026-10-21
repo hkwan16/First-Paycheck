@@ -34,4 +34,16 @@ describe('StatTile', () => {
     const { container } = render(<StatTile label="Savings" value="$300.00" tone="teal" />);
     expect(container.firstElementChild?.children).toHaveLength(2);
   });
+
+  it('shows a skeleton instead of a value while loading, and says it is busy', () => {
+    const { container } = render(
+      <StatTile loading label="Income" value="$3,992.08" sub="2 paychecks" tone="plum" />,
+    );
+    const tile = container.firstElementChild as HTMLElement;
+    expect(tile).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByText('Income')).toBeInTheDocument();
+    expect(screen.queryByText('$3,992.08')).not.toBeInTheDocument();
+    expect(screen.queryByText('2 paychecks')).not.toBeInTheDocument();
+    expect(tile.querySelectorAll('[data-skeleton]')).toHaveLength(2);
+  });
 });

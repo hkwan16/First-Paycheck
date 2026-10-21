@@ -42,6 +42,24 @@ export function formatMoney(cents: number, options: FormatMoneyOptions = {}): st
   return `${sign}$${wholeNumber.format(dollars)}${fraction}`;
 }
 
+export type TransactionFlow = 'in' | 'out' | 'none';
+
+/**
+ * Which way a transaction moved money. The API keeps Plaid's sign convention:
+ * a positive amount is money out of the account, a negative one money in.
+ */
+export function transactionFlow(cents: number): TransactionFlow {
+  assertCents(cents);
+  return cents > 0 ? 'out' : cents < 0 ? 'in' : 'none';
+}
+
+/** A transaction as a person reads it: money out `"-$84.12"`, money in `"+$1,996.04"`. */
+export function formatTransactionAmount(cents: number): string {
+  const flow = transactionFlow(cents);
+  const text = formatMoney(Math.abs(cents));
+  return flow === 'out' ? `-${text}` : flow === 'in' ? `+${text}` : text;
+}
+
 const MONEY_INPUT = /^(-)?\$?(\d{1,3}(?:,\d{3})+|\d*)(?:\.(\d{1,2}))?$/;
 
 /**

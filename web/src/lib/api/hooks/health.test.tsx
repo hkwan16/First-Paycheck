@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { server } from '@/test/msw/server';
 import { apiUrl } from '@/test/msw/handlers';
 import { makeTestQueryClient } from '@/test/render';
-import { $api } from './client';
-import { useHealth } from './hooks';
+import { $api } from '../client';
+import { useHealth } from './health';
 
 function renderHealth() {
   const queryClient = makeTestQueryClient();
