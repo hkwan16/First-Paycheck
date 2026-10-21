@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { PlaidLinkOptionsWithLinkToken } from 'react-plaid-link';
+import type { PlaidScriptState } from '@/lib/plaid-script';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JOB_POLL_MS } from '@/lib/api/hooks';
 import { installFakeXhr } from '@/test/fake-xhr';
@@ -12,23 +13,50 @@ import { act, renderWithProviders, screen, userEvent, waitFor, within } from '@/
 import { LinkScreen } from './LinkScreen';
 
 // Plaid Link is a third-party iframe: the test stands in for it and calls
-// the callbacks Plaid would.
-const plaid = vi.hoisted(() => ({
-  config: null as PlaidLinkOptionsWithLinkToken | null,
-  open: vi.fn(),
-  scriptError: null as ErrorEvent | null,
-}));
+// the callbacks Plaid would. Its script's state is a tiny store, so a test
+// can let it finish loading part way through.
+const plaid = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  let waiting: { resolve: () => void; reject: (error: Error) => void }[] = [];
+  const state = {
+    config: null as PlaidLinkOptionsWithLinkToken | null,
+    open: vi.fn(),
+    script: 'ready' as PlaidScriptState,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    load: () =>
+      state.script === 'loading'
+        ? new Promise<void>((resolve, reject) => waiting.push({ resolve, reject }))
+        : state.script === 'ready'
+          ? Promise.resolve()
+          : Promise.reject(new Error('Could not load Plaid Link')),
+    setScript: (next: PlaidScriptState) => {
+      state.script = next;
+      for (const w of waiting) {
+        if (next === 'ready') w.resolve();
+        if (next === 'failed') w.reject(new Error('Could not load Plaid Link'));
+      }
+      if (next !== 'loading') waiting = [];
+      for (const listener of listeners) listener();
+    },
+  };
+  return state;
+});
 vi.mock('react-plaid-link', () => ({
   usePlaidLink: (config: PlaidLinkOptionsWithLinkToken) => {
     plaid.config = config;
-    return {
-      open: plaid.open,
-      ready: config.token !== null && !plaid.scriptError,
-      error: plaid.scriptError,
-      exit: vi.fn(),
-    };
+    return { open: plaid.open, ready: config.token !== null, error: null, exit: vi.fn() };
   },
 }));
+vi.mock('@/lib/plaid-script', async () => {
+  const { useSyncExternalStore } = await import('react');
+  return {
+    loadPlaidScript: plaid.load,
+    usePlaidScript: () => useSyncExternalStore(plaid.subscribe, () => plaid.script),
+  };
+});
 
 const platypus = {
   institution: { name: 'First Platypus Bank', institution_id: 'ins_109508' },
@@ -71,7 +99,7 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) });
   plaid.open.mockReset();
   plaid.config = null;
-  plaid.scriptError = null;
+  plaid.setScript('ready');
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -220,6 +248,40 @@ describe('LinkScreen linking a bank', () => {
     expect(screen.getByRole('link', { name: /Continue to spending/ })).toBeInTheDocument();
   });
 
+  it('waits for the Plaid Link script before opening Link, busy all the while', async () => {
+    plaid.script = 'loading';
+    plaidSucceeds();
+    const tokens = requests('POST', '/sync/link-token');
+    const { user } = renderLink();
+    await screen.findByRole('group', { name: 'Chase Total Checking' });
+    const button = screen.getByRole('button', { name: 'Link another bank with Plaid' });
+
+    await user.click(button);
+    await waitFor(() => expect(tokens).toHaveLength(1));
+    await act(() => vi.advanceTimersByTimeAsync(50));
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(plaid.open).not.toHaveBeenCalled();
+
+    act(() => plaid.setScript('ready'));
+    await waitFor(() => expect(plaid.open).toHaveBeenCalledOnce());
+  });
+
+  it('says so when the Plaid Link script fails while a press waits for it', async () => {
+    plaid.script = 'loading';
+    const { user } = renderLink();
+    await screen.findByRole('group', { name: 'Chase Total Checking' });
+    const button = screen.getByRole('button', { name: 'Link another bank with Plaid' });
+    await user.click(button);
+    await waitFor(() => expect(button).toHaveAttribute('aria-busy', 'true'));
+
+    act(() => plaid.setScript('failed'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not load Plaid Link. Check your connection and reload the page.',
+    );
+    expect(button).not.toHaveAttribute('aria-busy');
+    expect(plaid.open).not.toHaveBeenCalled();
+  });
+
   it("shows Plaid Link's exit error as a warning", async () => {
     plaid.open.mockImplementation(() =>
       plaid.config?.onExit?.(
@@ -286,7 +348,7 @@ describe('LinkScreen linking a bank', () => {
   });
 
   it('says so when the Plaid Link script could not load', async () => {
-    plaid.scriptError = new ErrorEvent('error');
+    plaid.script = 'failed';
     const tokens = requests('POST', '/sync/link-token');
     const { user } = renderLink();
     await screen.findByRole('group', { name: 'Chase Total Checking' });
