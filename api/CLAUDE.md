@@ -243,7 +243,13 @@ explanation, `GET /calendar` shows the check it implies.
   once the token verified) and returns `X-Request-Id` (kept from the request
   when it is a plain token, else generated), also on unhandled 500s. The worker
   logs each run (`job_id`, `kind`, `user_id`, `attempt`, `outcome`,
-  `duration_ms`) and binds them for the handler's own lines.
+  `duration_ms`) and binds them for the handler's own lines; a job that goes
+  `dead` logs at ERROR with its traceback.
+- Sentry (`app/sentry.py`) runs only when `SENTRY_DSN` is set (Render's env
+  group; blank everywhere else, and tests blank it), from `create_app` and
+  `jobs.worker.main`, tagged `component=api|worker`. No PII, no request
+  bodies, no frame locals; `before_send` drops bodies, cookies and
+  `Authorization`. Without a DSN `sentry_sdk` is never imported.
 
 ## Testing
 

@@ -30,6 +30,7 @@ from app.routers import (
     sync,
     transactions,
 )
+from app.sentry import init_sentry
 from app.version import resolve_git_sha
 
 API_VERSION = "0.1.0"
@@ -56,6 +57,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    init_sentry(settings, component="api")
     app = FastAPI(
         title="First Paycheck API",
         version=API_VERSION,

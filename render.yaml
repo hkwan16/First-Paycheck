@@ -56,6 +56,9 @@ envVarGroups:
         value: claude-sonnet-5-5
       - key: LLM_DAILY_BUDGET_CENTS
         value: "50"
+      # Sentry free tier; API and worker events are tagged by component.
+      - key: SENTRY_DSN
+        sync: false
 
 services:
   - type: web

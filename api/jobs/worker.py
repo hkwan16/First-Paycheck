@@ -22,7 +22,8 @@ from sqlalchemy import Connection, Engine
 
 from app.config import get_settings
 from app.logs import configure_logging, log_context
-from db.enums import JobKind
+from app.sentry import init_sentry
+from db.enums import JobKind, JobStatus
 from jobs import queue, scheduler
 from jobs.context import JobContext, Services
 from jobs.queue import QueueBind
@@ -115,8 +116,12 @@ class Worker:
             except Exception as exc:
                 status = queue.fail(job, exc, bind=self._queue_bind)
                 outcome = status.value if status else "no longer running"
-                logger.warning(
+                # A job that gave up is an error (and a Sentry event); a retry is not.
+                dead = status is JobStatus.DEAD
+                logger.log(
+                    logging.ERROR if dead else logging.WARNING,
                     "job failed",
+                    exc_info=exc if dead else None,
                     extra={
                         **fields,
                         "outcome": outcome,
@@ -150,10 +155,12 @@ class Worker:
 
 def main() -> int:
     configure_logging()
+    settings = get_settings()
+    init_sentry(settings, component="worker")
     stop = threading.Event()
     for signum in (signal.SIGTERM, signal.SIGINT):
         signal.signal(signum, lambda *_: stop.set())
-    return Worker(services=default_services(get_settings())).run(stop)
+    return Worker(services=default_services(settings)).run(stop)
 
 
 if __name__ == "__main__":

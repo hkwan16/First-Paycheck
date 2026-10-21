@@ -163,6 +163,27 @@ def test_a_failed_job_run_logs_the_outcome_and_error(
     assert line["levelname"] == "WARNING"
 
 
+def test_a_dead_job_logs_an_error_with_its_traceback(
+    empty_queue: Connection, user_a: FixtureUser, caplog: pytest.LogCaptureFixture
+) -> None:
+    """ERROR, so Sentry's logging integration reports the job that gave up."""
+    caplog.set_level(logging.INFO)
+
+    def handler(ctx: JobContext) -> dict[str, Any]:
+        raise RuntimeError("still down")
+
+    job_id = enqueue(empty_queue, user_a, JobKind.CATEGORIZE_RUN)
+    empty_queue.execute(
+        text("UPDATE jobs SET attempts = :n WHERE id = :id"),
+        {"n": queue.MAX_ATTEMPTS - 1, "id": job_id},
+    )
+    worker_for(empty_queue, {JobKind.CATEGORIZE_RUN: handler}).run_once()
+    [record] = [r for r in caplog.records if r.name == "jobs.worker" and "job_id" in vars(r)]
+    assert (vars(record)["outcome"], record.levelname) == ("dead", "ERROR")
+    assert record.exc_info is not None
+    assert record.exc_info[0] is RuntimeError
+
+
 def test_idle_worker_reports_no_work(empty_queue: Connection) -> None:
     assert worker_for(empty_queue, {}).run_once() is False
 
