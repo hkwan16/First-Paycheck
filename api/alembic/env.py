@@ -29,11 +29,20 @@ def database_url() -> str:
     return str(url)
 
 
+def include_object(
+    obj: object, name: str | None, type_: str, reflected: bool, compare_to: object
+) -> bool:
+    """Leave Supabase's ``auth`` schema out of autogenerate: models declare
+    ``auth.users`` only so foreign keys resolve, and migrations never create it."""
+    return not (type_ == "table" and getattr(obj, "schema", None) == "auth")
+
+
 def run_migrations_offline() -> None:
     """Emit SQL to stdout instead of running it (`alembic upgrade head --sql`)."""
     context.configure(
         url=database_url(),
         target_metadata=target_metadata,
+        include_object=include_object,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -45,6 +54,7 @@ def _run(connection: Connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
+        include_object=include_object,
         compare_type=True,
         transaction_per_migration=True,
     )
