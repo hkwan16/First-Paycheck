@@ -264,7 +264,8 @@ export interface paths {
     };
     /**
      * Health
-     * @description The running commit and the database's migration revision. No auth.
+     * @description The running commit, the database's migration revision and whether the
+     *     worker was active in the last 5 minutes. No auth.
      */
     get: operations['health'];
     put?: never;
@@ -964,6 +965,11 @@ export interface components {
        * @constant
        */
       status: 'ok';
+      /**
+       * Worker
+       * @enum {string}
+       */
+      worker: 'ok' | 'stale';
     };
     /**
      * HealthcareUsage
@@ -2311,6 +2317,15 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
         };
       };
       /** @description Service Unavailable */
