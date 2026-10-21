@@ -8,7 +8,7 @@ description = "Offline evals for First Paycheck (calculators, extraction, catego
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "first-paycheck-api",
-  "httpx>=0.28",
+  "httpx2>=2",
 ]
 
 [tool.uv]

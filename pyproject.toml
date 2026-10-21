@@ -5,15 +5,19 @@
 [tool.uv.workspace]
 members = ["api", "evals"]
 
+[tool.uv]
+# Supply-chain cooldown: resolve only releases that have been public for a week.
+exclude-newer = "7 days"
+
 [dependency-groups]
 dev = [
   "honcho>=2.0",
-  "mypy>=2.4",
-  "pre-commit>=4.7",
-  "pytest>=9.1",
-  "pytest-cov>=7.1",
+  "mypy>=1.15",
+  "pre-commit>=4.0",
+  "pytest>=8.3",
+  "pytest-cov>=6.0",
   "pyyaml>=6.0",
-  "ruff>=0.17",
+  "ruff>=0.11",
   "types-pyyaml>=6.0",
 ]
 
