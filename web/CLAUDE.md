@@ -12,13 +12,15 @@ over a generated OpenAPI client, and Supabase Auth. The visual target is Mockup 
   Confirm screen's consistency check (`mathGate`, below): a display-side gate over the person's
   own entries, with the server's 422 as the authority.
 - **Tokens only.** Colors, radii, shadows, type sizes and durations are the `@theme` tokens in
-  `src/app/globals.css`. No raw hex anywhere else in `src/` (only `globals.css` and
-  `components/sankey/palette.ts`); `src/lib/design/tokens.test.ts` and ESLint both enforce it.
+  `src/app/globals.css`. No raw hex anywhere else in `src/`; `src/lib/design/tokens.test.ts` and
+  ESLint both enforce it.
 - **Color means something.** Components take a `Tone`, not a color (`lib/design/tone.ts`): a
   `Hue` (`blue | coral | teal | plum | neutral`) marks a kind of thing, a `Status`
   (`confirmed | warning | off`) marks a state. Green is reachable only as `confirmed`, amber as
   `warning`, red as `off`. ESLint rejects `bg-|text-|border-|fill-|stroke-|ring-` plus
-  `green|amber|red` outside `components/ui/**`, `lib/design/**` and `sankey/palette.ts`.
+  `green|amber|red` outside `components/ui/**` and `lib/design/**`. The cash-flow diagram and
+  legend swatches take a `FlowColor` (token names, mapped to classes by `flowBg`, `flowFill`,
+  `flowRing`), never a status.
 - **Tests first.** Every component, hook, reducer and lib function gets a failing `*.test.ts(x)`
   before the implementation. Config files are exempt.
 - **No em dash** in any text, code, comment or commit. ESLint flags it in strings and JSX.

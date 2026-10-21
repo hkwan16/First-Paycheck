@@ -1,27 +1,8 @@
 import { cn } from '@/lib/cn';
+import { flowBg, type FlowColor } from '@/lib/design/tone';
 
-export type SwatchColor =
-  | 'blue'
-  | 'coral'
-  | 'teal'
-  | 'plum'
-  | 'ink-2'
-  | 'flow-tax'
-  | 'flow-idle'
-  | 'blue-soft'
-  | 'coral-soft';
-
-const COLOR: Record<SwatchColor, string> = {
-  blue: 'bg-blue',
-  coral: 'bg-coral',
-  teal: 'bg-teal',
-  plum: 'bg-plum',
-  'ink-2': 'bg-ink-2',
-  'flow-tax': 'bg-flow-tax',
-  'flow-idle': 'bg-flow-idle',
-  'blue-soft': 'bg-blue-soft',
-  'coral-soft': 'bg-coral-soft',
-};
+/** A swatch's color: one of the flow colors (lib/design/tone.ts). */
+export type SwatchColor = FlowColor;
 
 export interface SwatchProps {
   color?: SwatchColor;
@@ -39,7 +20,7 @@ export function Swatch({ color = 'flow-tax', dashed = false, size = 10, classNam
       className={cn(
         'inline-block flex-none rounded-[3px]',
         size === 10 ? 'size-2.5' : 'size-3',
-        dashed ? 'border-[1.5px] border-dashed border-flow-tax bg-transparent' : COLOR[color],
+        dashed ? 'border-[1.5px] border-dashed border-flow-tax bg-transparent' : flowBg[color],
         className,
       )}
     />

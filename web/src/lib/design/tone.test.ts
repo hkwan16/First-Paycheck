@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  FLOW_COLORS,
   HUES,
   STATUSES,
   TONES,
+  flowBg,
+  flowFill,
+  flowRing,
+  isQuietFlow,
   isStatus,
   toneFill,
   toneSoft,
@@ -54,5 +59,35 @@ describe('tone', () => {
     expect(toneSolid.warning).toBe('bg-amber-text text-white');
     expect(toneSolid.coral).toBe('bg-coral-text text-white');
     expect(toneSolid.teal).toBe('bg-teal-text text-white');
+  });
+});
+
+describe('flow colors', () => {
+  it('are the Sankey token names: hues for things, quiet greys for taxes and idle money', () => {
+    expect(FLOW_COLORS).toEqual([
+      'blue',
+      'coral',
+      'teal',
+      'plum',
+      'ink-2',
+      'flow-tax',
+      'flow-idle',
+      'blue-soft',
+      'coral-soft',
+    ]);
+  });
+
+  it.each(Object.entries({ flowBg, flowFill, flowRing }))(
+    '%s maps every flow color to its token class and never to a status color',
+    (_, map) => {
+      for (const color of FLOW_COLORS) {
+        expect(map[color]).toMatch(new RegExp(`-${color}$`));
+        expect(map[color]).not.toMatch(/-(green|amber|red)\b/);
+      }
+    },
+  );
+
+  it('marks the greys as quiet, so their bands are drawn lighter', () => {
+    expect(FLOW_COLORS.filter(isQuietFlow)).toEqual(['ink-2', 'flow-tax', 'flow-idle']);
   });
 });

@@ -89,3 +89,70 @@ export const toneWash: Record<Tone, string> = {
   warning: 'bg-amber-tint/60',
   off: 'bg-red-tint/60',
 };
+
+/*
+ * Flow colors: the cash-flow diagram's keys (components/sankey and the
+ * legend swatches). Each is a token name; the hues keep their meanings
+ * (plum pay and 401(k), blue essentials, coral health and flexible, teal
+ * savings), the -soft shades mark a bucket's categories, and the greys are
+ * quiet: ink-2 take-home, flow-tax taxes and other, flow-idle money not yet
+ * spent. No status color is a flow color.
+ */
+
+export const FLOW_COLORS = [
+  'blue',
+  'coral',
+  'teal',
+  'plum',
+  'ink-2',
+  'flow-tax',
+  'flow-idle',
+  'blue-soft',
+  'coral-soft',
+] as const;
+
+export type FlowColor = (typeof FLOW_COLORS)[number];
+
+const QUIET_FLOWS: ReadonlySet<FlowColor> = new Set(['ink-2', 'flow-tax', 'flow-idle']);
+
+/** Greys carry no meaning of their own, so their bands are drawn lighter. */
+export const isQuietFlow = (color: FlowColor) => QUIET_FLOWS.has(color);
+
+/** Background fill: swatches, Sankey node keys, stacked bar segments. */
+export const flowBg: Record<FlowColor, string> = {
+  blue: 'bg-blue',
+  coral: 'bg-coral',
+  teal: 'bg-teal',
+  plum: 'bg-plum',
+  'ink-2': 'bg-ink-2',
+  'flow-tax': 'bg-flow-tax',
+  'flow-idle': 'bg-flow-idle',
+  'blue-soft': 'bg-blue-soft',
+  'coral-soft': 'bg-coral-soft',
+};
+
+/** SVG fill for a Sankey band. */
+export const flowFill: Record<FlowColor, string> = {
+  blue: 'fill-blue',
+  coral: 'fill-coral',
+  teal: 'fill-teal',
+  plum: 'fill-plum',
+  'ink-2': 'fill-ink-2',
+  'flow-tax': 'fill-flow-tax',
+  'flow-idle': 'fill-flow-idle',
+  'blue-soft': 'fill-blue-soft',
+  'coral-soft': 'fill-coral-soft',
+};
+
+/** The ring around an open Sankey node. */
+export const flowRing: Record<FlowColor, string> = {
+  blue: 'ring-blue',
+  coral: 'ring-coral',
+  teal: 'ring-teal',
+  plum: 'ring-plum',
+  'ink-2': 'ring-ink-2',
+  'flow-tax': 'ring-flow-tax',
+  'flow-idle': 'ring-flow-idle',
+  'blue-soft': 'ring-blue-soft',
+  'coral-soft': 'ring-coral-soft',
+};
