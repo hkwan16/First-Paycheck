@@ -34,4 +34,6 @@ Specs may add an **Open questions** section for decisions not yet made. A spec w
 | Spec | Status |
 |---|---|
 | [001 Data model](001-data-model.md) | Draft, M0 |
+| [002 Sync pipeline, Plaid, webhooks and jobs](002-sync-pipeline.md) | Implemented, M1 |
+| [003 Categorization, the LLM gateway and transaction routes](003-categorization.md) | Implemented, M1 |
 | [006 401(k) match calculator](006-401k-match.md) | Draft, M3 |

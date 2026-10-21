@@ -4,6 +4,47 @@
  */
 
 export interface paths {
+  '/accounts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Accounts
+     * @description Every linked account, by institution then name, with its latest balance.
+     */
+    get: operations['list_accounts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/accounts/{account_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update Account
+     * @description Set an account's role or active flag. Making an account the emergency
+     *     fund takes the role from the user's previous one.
+     */
+    patch: operations['update_account'];
+    trace?: never;
+  };
   '/health': {
     parameters: {
       query?: never;
@@ -24,10 +65,246 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/jobs/{job_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Job
+     * @description One of the user's jobs.
+     */
+    get: operations['get_job'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/sync/items': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Link Item
+     * @description Exchange a Link public token (or, outside production, create one for a
+     *     sandbox institution), store the encrypted access token and queue the
+     *     initial sync.
+     */
+    post: operations['link_item'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/sync/items/{item_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete Item
+     * @description Unlink an institution: remove it at Plaid (best effort) and delete it with
+     *     its accounts, transactions, balances and holdings.
+     */
+    delete: operations['delete_item'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/sync/items/{item_id}/sync': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Sync Item
+     * @description Queue an incremental sync, or return the one already waiting.
+     */
+    post: operations['sync_item'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/sync/link-token': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Create Link Token
+     * @description A Plaid Link token for the signed-in user.
+     */
+    post: operations['create_link_token'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/transactions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Transactions
+     * @description The user's transactions, newest first (posted_at, then id, descending).
+     */
+    get: operations['list_transactions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/transactions/{transaction_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update Transaction Category
+     * @description Correct a transaction's category. The fix becomes the user's rule for
+     *     that merchant and relabels the merchant's other transactions, except
+     *     ones the user labeled individually.
+     */
+    patch: operations['update_transaction_category'];
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /**
+     * AccountKind
+     * @enum {string}
+     */
+    AccountKind: 'checking' | 'savings' | 'credit' | 'investment' | 'retirement';
+    /** AccountOut */
+    AccountOut: {
+      /** Balance As Of */
+      balance_as_of: string | null;
+      /** Balance Cents */
+      balance_cents: number | null;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Institution Name */
+      institution_name: string | null;
+      /** Is Active */
+      is_active: boolean;
+      kind: components['schemas']['AccountKind'];
+      /** Mask */
+      mask: string | null;
+      /** Name */
+      name: string;
+      role: components['schemas']['AccountRole'] | null;
+      /**
+       * Sync Item Id
+       * Format: uuid
+       */
+      sync_item_id: string;
+    };
+    /**
+     * AccountPatch
+     * @description Omitted fields are unchanged; ``role: null`` clears the role.
+     */
+    AccountPatch: {
+      /**
+       * Is Active
+       * @default true
+       */
+      is_active: boolean;
+      role?: components['schemas']['AccountRole'] | null;
+    };
+    /**
+     * AccountRole
+     * @enum {string}
+     */
+    AccountRole: 'spending' | 'emergency_fund' | 'retirement';
+    /** CategoryFix */
+    CategoryFix: {
+      /** Relabeled */
+      relabeled: number;
+      rule: components['schemas']['RuleOut'] | null;
+      transaction: components['schemas']['TransactionOut'];
+    };
+    /** CategoryPatch */
+    CategoryPatch: {
+      /**
+       * Category
+       * @enum {string}
+       */
+      category:
+        | 'income'
+        | 'transfer'
+        | 'housing'
+        | 'utilities'
+        | 'phone_internet'
+        | 'groceries'
+        | 'dining'
+        | 'transport'
+        | 'subscriptions'
+        | 'insurance'
+        | 'healthcare'
+        | 'shopping'
+        | 'entertainment'
+        | 'travel'
+        | 'personal_care'
+        | 'education'
+        | 'gifts_donations'
+        | 'fees'
+        | 'taxes'
+        | 'debt_payment'
+        | 'savings_investment'
+        | 'other';
+    };
+    /**
+     * CategorySource
+     * @enum {string}
+     */
+    CategorySource: 'rule' | 'user' | 'llm';
     /** ErrorDetail */
     ErrorDetail: {
       /** Code */
@@ -38,6 +315,11 @@ export interface components {
     /** ErrorResponse */
     ErrorResponse: {
       error: components['schemas']['ErrorDetail'];
+    };
+    /** HTTPValidationError */
+    HTTPValidationError: {
+      /** Detail */
+      detail?: components['schemas']['ValidationError'][];
     };
     /** Health */
     Health: {
@@ -51,6 +333,226 @@ export interface components {
        */
       status: 'ok';
     };
+    /**
+     * JobKind
+     * @enum {string}
+     */
+    JobKind:
+      | 'sync.initial'
+      | 'sync.incremental'
+      | 'categorize.run'
+      | 'ingest.extract'
+      | 'recurring.detect'
+      | 'checkin.monthly'
+      | 'schedule.tick';
+    /** JobOut */
+    JobOut: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Finished At */
+      finished_at: string | null;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      kind: components['schemas']['JobKind'];
+      /** Last Error */
+      last_error: string | null;
+      /** Progress */
+      progress: number;
+      /** Result */
+      result: {
+        [key: string]: unknown;
+      } | null;
+      status: components['schemas']['JobStatus'];
+    };
+    /**
+     * JobStatus
+     * @enum {string}
+     */
+    JobStatus: 'queued' | 'running' | 'succeeded' | 'dead';
+    /**
+     * LinkItemRequest
+     * @description Exactly one of ``public_token`` (from Plaid Link) or ``sandbox_institution_id``.
+     */
+    LinkItemRequest: {
+      /** Institution Name */
+      institution_name?: string | null;
+      /** Public Token */
+      public_token?: string | null;
+      /**
+       * Sandbox Institution Id
+       * @example ins_109508
+       */
+      sandbox_institution_id?: string | null;
+    };
+    /** LinkToken */
+    LinkToken: {
+      /** Expiration */
+      expiration: string;
+      /** Link Token */
+      link_token: string;
+    };
+    /** LinkedItem */
+    LinkedItem: {
+      item: components['schemas']['SyncItemOut'];
+      /**
+       * Job Id
+       * Format: uuid
+       */
+      job_id: string;
+    };
+    /** QueuedJob */
+    QueuedJob: {
+      /**
+       * Job Id
+       * Format: uuid
+       */
+      job_id: string;
+    };
+    /** RuleOut */
+    RuleOut: {
+      /**
+       * Category
+       * @enum {string}
+       */
+      category:
+        | 'income'
+        | 'transfer'
+        | 'housing'
+        | 'utilities'
+        | 'phone_internet'
+        | 'groceries'
+        | 'dining'
+        | 'transport'
+        | 'subscriptions'
+        | 'insurance'
+        | 'healthcare'
+        | 'shopping'
+        | 'entertainment'
+        | 'travel'
+        | 'personal_care'
+        | 'education'
+        | 'gifts_donations'
+        | 'fees'
+        | 'taxes'
+        | 'debt_payment'
+        | 'savings_investment'
+        | 'other';
+      /** Merchant Norm */
+      merchant_norm: string;
+    };
+    /** SyncItemOut */
+    SyncItemOut: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Institution Name */
+      institution_name: string | null;
+      /** Last Synced At */
+      last_synced_at: string | null;
+      provider: components['schemas']['SyncProvider'];
+      status: components['schemas']['SyncStatus'];
+    };
+    /**
+     * SyncProvider
+     * @enum {string}
+     */
+    SyncProvider: 'plaid' | 'csv';
+    /**
+     * SyncStatus
+     * @enum {string}
+     */
+    SyncStatus: 'active' | 'login_required' | 'error';
+    /** TransactionOut */
+    TransactionOut: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string;
+      /** Amount Cents */
+      amount_cents: number;
+      /** Category */
+      category:
+        | (
+            | 'income'
+            | 'transfer'
+            | 'housing'
+            | 'utilities'
+            | 'phone_internet'
+            | 'groceries'
+            | 'dining'
+            | 'transport'
+            | 'subscriptions'
+            | 'insurance'
+            | 'healthcare'
+            | 'shopping'
+            | 'entertainment'
+            | 'travel'
+            | 'personal_care'
+            | 'education'
+            | 'gifts_donations'
+            | 'fees'
+            | 'taxes'
+            | 'debt_payment'
+            | 'savings_investment'
+            | 'other'
+          )
+        | null;
+      category_source: components['schemas']['CategorySource'] | null;
+      /** Confidence */
+      confidence: number | null;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Merchant Clean */
+      merchant_clean: string | null;
+      /** Merchant Norm */
+      merchant_norm: string;
+      /** Merchant Raw */
+      merchant_raw: string;
+      /** Pending */
+      pending: boolean;
+      /**
+       * Posted At
+       * Format: date
+       */
+      posted_at: string;
+    };
+    /** TransactionPage */
+    TransactionPage: {
+      /** Items */
+      items: components['schemas']['TransactionOut'][];
+      /** Next Cursor */
+      next_cursor: string | null;
+    };
+    /** ValidationError */
+    ValidationError: {
+      /** Context */
+      ctx?: Record<string, never>;
+      /** Input */
+      input?: unknown;
+      /** Location */
+      loc: (string | number)[];
+      /** Message */
+      msg: string;
+      /** Error Type */
+      type: string;
+    };
   };
   responses: never;
   parameters: never;
@@ -60,6 +562,88 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  list_accounts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountOut'][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  update_account: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AccountPatch'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
   health: {
     parameters: {
       query?: never;
@@ -80,6 +664,403 @@ export interface operations {
       };
       /** @description Service Unavailable */
       503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  get_job: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  link_item: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LinkItemRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LinkedItem'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Bad Gateway */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  delete_item: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        item_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  sync_item: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        item_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['QueuedJob'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  create_link_token: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LinkToken'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Bad Gateway */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  list_transactions: {
+    parameters: {
+      query?: {
+        account_id?: string | null;
+        /** @description Earliest posted_at, inclusive */
+        start?: string | null;
+        /** @description Latest posted_at, inclusive */
+        end?: string | null;
+        category?:
+          | (
+              | 'income'
+              | 'transfer'
+              | 'housing'
+              | 'utilities'
+              | 'phone_internet'
+              | 'groceries'
+              | 'dining'
+              | 'transport'
+              | 'subscriptions'
+              | 'insurance'
+              | 'healthcare'
+              | 'shopping'
+              | 'entertainment'
+              | 'travel'
+              | 'personal_care'
+              | 'education'
+              | 'gifts_donations'
+              | 'fees'
+              | 'taxes'
+              | 'debt_payment'
+              | 'savings_investment'
+              | 'other'
+            )
+          | null;
+        /** @description Rule and user labels count as 1; uncategorized excluded */
+        min_confidence?: number | null;
+        limit?: number;
+        cursor?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TransactionPage'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  update_transaction_category: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        transaction_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CategoryPatch'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CategoryFix'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
         headers: {
           [name: string]: unknown;
         };
