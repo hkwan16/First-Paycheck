@@ -25,6 +25,9 @@ __all__ = [
     "CategoryBatch",
     "Cents",
     "DateField",
+    "ExplainCitation",
+    "ExplainContext",
+    "ExplainFact",
     "ExplanationDraft",
     "ExtractedField",
     "LineItem",
@@ -186,6 +189,32 @@ class ExplanationDraft(_Strict):
         max_length=3, description="Up to three short what-if sentences using only the facts"
     )
     citation_keys: list[str] = Field(description="Keys of the allowed citations the text relies on")
+
+
+class ExplainFact(_Strict):
+    """One number the explanation may use, already formatted ("$2,400.00", "5%")."""
+
+    label: str
+    value: str
+
+
+class ExplainCitation(_Strict):
+    key: str
+    title: str
+    passage: str
+
+
+class ExplainContext(_Strict):
+    """What ``explain`` sends the model (spec 008 rule 7): the calculator's
+    numbers, the curated passages it may cite and redacted benefits text."""
+
+    calculator: str
+    tax_year: int
+    facts: list[ExplainFact]
+    # Situations the explanation should mention (a deferral limit that binds).
+    notes: list[str]
+    citations: list[ExplainCitation]
+    benefits_passages: list[str]
 
 
 SCHEMAS: dict[str, type[BaseModel]] = {

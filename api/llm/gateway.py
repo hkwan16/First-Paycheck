@@ -48,18 +48,29 @@ from db.enums import LlmPurpose, LlmStatus
 from db.models import LlmCall
 from llm.cost import cost_microcents, price_for
 from llm.prompts import Prompt, load_prompt
-from llm.schemas import BenefitsExtraction, CategoryAssignment, CategoryBatch, PayStubExtraction
+from llm.schemas import (
+    BenefitsExtraction,
+    CategoryAssignment,
+    CategoryBatch,
+    ExplainContext,
+    ExplanationDraft,
+    NumberClaim,
+    PayStubExtraction,
+)
 
 log = logging.getLogger(__name__)
 
 CATEGORIZE_PROMPT = ("categorize", "v1")
 EXTRACT_PAY_STUB_PROMPT = ("extract_pay_stub", "v1")
 EXTRACT_BENEFITS_PROMPT = ("extract_benefits", "v1")
+EXPLAIN_PROMPT = ("explain", "v1")
 REQUEST_TIMEOUT_SECONDS = 120.0
 MICROCENTS_PER_CENT = 1_000_000
 FAKE_MODEL = "fake"
 FAKE_FIXTURES = REPO_ROOT / "api" / "tests" / "fixtures" / "llm"
 FAKE_DEFAULT = ("other", 0.5)
+# How many facts FakeGateway's explanation states.
+FAKE_EXPLAIN_FACTS = 4
 
 Schema = TypeVar("Schema", bound=BaseModel)
 Clock = Callable[[], dt.datetime]
@@ -371,6 +382,26 @@ class Gateway(ABC):
             content=self._pages(pages),
         )
 
+    def explain(
+        self,
+        user_id: uuid.UUID,
+        context: ExplainContext,
+        *,
+        feedback: str | None = None,
+    ) -> ExplanationDraft:
+        """Draft an explanation of a decision from its facts (spec 008 rule 10).
+
+        ``feedback`` is the verifier's account of an earlier draft's problems,
+        sent with the one retry. The draft is unverified until ``verify`` says so.
+        """
+        payload: dict[str, Any] = {"context": context.model_dump(mode="json")}
+        if feedback:
+            payload["feedback"] = feedback
+        prompt = load_prompt(*EXPLAIN_PROMPT)
+        return self._call(
+            prompt, ExplanationDraft, user_id=user_id, job_id=None, content=json.dumps(payload)
+        )
+
     @staticmethod
     def _pages(pages: Sequence[ModelPage]) -> list[ContentBlockParam]:
         if not pages:
@@ -570,6 +601,8 @@ class FakeGateway(Gateway):
             text = self._fixture_text("extract_pay_stub.json")
         elif prompt.schema is BenefitsExtraction:
             text = self._fixture_text("extract_benefits.json")
+        elif prompt.schema is ExplanationDraft and isinstance(content, str):
+            text = self._explain(content)
         else:
             raise LLMError(f"FakeGateway has no answers for {prompt.version}")
         return Reply(stop_reason="end_turn", text=text, usage=Usage())
@@ -583,6 +616,21 @@ class FakeGateway(Gateway):
             for item in items
         ]
         return CategoryBatch(items=answers).model_dump_json()
+
+    @staticmethod
+    def _explain(content: str) -> str:
+        """A draft that states the first facts as given and cites the first
+        allowed key, so it passes verification (spec 008 rule 10)."""
+        context = ExplainContext.model_validate(json.loads(content)["context"])
+        facts = context.facts[:FAKE_EXPLAIN_FACTS]
+        draft = ExplanationDraft(
+            concept="Your employer adds money to your 401(k) when you contribute.",
+            text=" ".join(f"{fact.label}: {fact.value}." for fact in facts),
+            numbers=[NumberClaim(value=fact.value, label=fact.label) for fact in facts],
+            what_ifs=[],
+            citation_keys=[context.citations[0].key] if context.citations else [],
+        )
+        return draft.model_dump_json()
 
     def _fixture_text(self, name: str) -> str:
         path = self._fixtures / name
