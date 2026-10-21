@@ -1,10 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { SignInScreen } from './SignInScreen';
+import { SignInScreen, type SignInScreenProps } from './SignInScreen';
+
+const renderScreen = (props: Partial<SignInScreenProps> = {}) =>
+  render(<SignInScreen mode="sign-in" next={null} linkError={false} {...props} />);
 
 describe('SignInScreen', () => {
   it('leads with the promise, highlighting "with your own numbers"', () => {
-    render(<SignInScreen />);
+    renderScreen();
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveTextContent("Your first month's money decisions, with your own numbers.");
     expect(heading).toHaveClass('text-display');
@@ -12,7 +15,7 @@ describe('SignInScreen', () => {
   });
 
   it('explains the three guarantees', () => {
-    render(<SignInScreen />);
+    renderScreen();
     for (const title of [
       'Money math runs in tested code.',
       'AI reads, it does not decide.',
@@ -22,27 +25,33 @@ describe('SignInScreen', () => {
     }
   });
 
-  it('has a labeled sign-in form with email and password', () => {
-    render(<SignInScreen />);
-    const form = screen.getByRole('form', { name: 'Sign in' });
-    expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'email');
-    expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'current-password');
-    expect(screen.getByRole('button', { name: 'Sign in' })).toHaveAttribute('type', 'submit');
-    expect(screen.getByRole('button', { name: 'Email me a sign-in link' })).toBeInTheDocument();
-    expect(form).toHaveClass('rounded-card');
-  });
-
-  it('does not navigate on submit until auth is wired', () => {
-    render(<SignInScreen />);
-    const notPrevented = fireEvent.submit(screen.getByRole('form', { name: 'Sign in' }));
-    expect(notPrevented).toBe(false);
-  });
-
-  it('links to account creation', () => {
-    render(<SignInScreen />);
+  it('shows the sign-in form', () => {
+    renderScreen();
+    expect(screen.getByRole('form', { name: 'Sign in' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Create an account' })).toHaveAttribute(
       'href',
       '/sign-in?mode=sign-up',
     );
+  });
+
+  it('shows the create-account form, keeping the next path', () => {
+    renderScreen({ mode: 'sign-up', next: '/setup/link' });
+    expect(screen.getByRole('form', { name: 'Create an account' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/sign-in?next=/setup/link',
+    );
+  });
+
+  it('starts a fresh form when the mode changes', () => {
+    const { rerender } = renderScreen({ linkError: true });
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    rerender(<SignInScreen mode="sign-up" next={null} linkError={false} />);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('shows the link error from /auth/callback', () => {
+    renderScreen({ linkError: true });
+    expect(screen.getByRole('alert')).toHaveTextContent('That sign-in link is invalid');
   });
 });

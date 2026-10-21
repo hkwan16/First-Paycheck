@@ -1,13 +1,22 @@
+import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
+import { STORAGE_STATE } from './e2e/support/auth';
+
+// Local runs read web/.env.local like `next dev` does (Supabase project, e2e
+// credentials); variables already in the environment win. CI has no such
+// file, so the auth tests skip there unless the variables are set.
+if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 
 const PORT = Number(process.env.E2E_PORT ?? 3100);
 const CI = Boolean(process.env.CI);
 
+const desktop = { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 820 } };
+
 /**
- * Smoke and visual checks at the two widths the mockup targets. The server is
- * `next dev` because /dev/kit is a 404 in production builds. Supabase env vars
- * are blanked so the (app) guard renders without a session, and the e2e flag
- * hides dev-only overlays from the screenshots.
+ * Smoke and visual checks at the two widths the mockup targets, plus the auth
+ * flows against the configured Supabase project. The server is `next dev`
+ * because /dev/kit is a 404 in production builds; the e2e flag hides dev-only
+ * overlays from the screenshots.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -29,18 +38,24 @@ export default defineConfig({
     reducedMotion: 'no-preference',
   },
   projects: [
-    {
-      name: 'desktop',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 820 } },
-    },
+    { name: 'desktop', testMatch: 'smoke.spec.ts', use: desktop },
     {
       name: 'phone',
+      testMatch: 'smoke.spec.ts',
       use: {
         ...devices['iPhone 14'],
         // CI installs Chromium only; the device still sets touch, mobile UA and DPR.
         browserName: 'chromium',
         viewport: { width: 390, height: 844 },
       },
+    },
+    // Signs in once and saves the session; skips without E2E_USER_EMAIL/PASSWORD.
+    { name: 'setup', testMatch: 'auth.setup.ts', use: desktop },
+    {
+      name: 'authenticated',
+      testMatch: 'auth.spec.ts',
+      dependencies: ['setup'],
+      use: { ...desktop, storageState: STORAGE_STATE },
     },
   ],
   webServer: {
@@ -52,8 +67,9 @@ export default defineConfig({
     stderr: 'pipe',
     env: {
       NEXT_PUBLIC_FEATURES: 'e2e',
-      NEXT_PUBLIC_SUPABASE_URL: '',
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: '',
+      // The e2e account's header shows the "Sample data" chip.
+      NEXT_PUBLIC_E2E_USER_EMAIL:
+        process.env.NEXT_PUBLIC_E2E_USER_EMAIL ?? process.env.E2E_USER_EMAIL ?? '',
       NEXT_TELEMETRY_DISABLED: '1',
     },
   },
