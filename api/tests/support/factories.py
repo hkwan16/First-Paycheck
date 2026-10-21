@@ -14,8 +14,14 @@ from sqlalchemy import Connection
 from app.db import user_session_for
 from db.enums import (
     AccountKind,
+    CalculatorKind,
+    CalendarKind,
     CategorySource,
+    CheckinTrigger,
     DocumentType,
+    FindingKind,
+    FindingSeverity,
+    GoalKind,
     JobKind,
     PayFrequency,
     RecurringCadence,
@@ -24,7 +30,12 @@ from db.enums import (
 from db.models import (
     Account,
     BalanceSnapshot,
+    CalendarEvent,
+    CheckIn,
+    CheckInFinding,
+    Decision,
     Document,
+    Goal,
     Holding,
     Job,
     PayStub,
@@ -138,19 +149,21 @@ def make_snapshot(
         return snapshot.id
 
 
-def make_holding(connection: Connection, user_id: uuid.UUID, account_id: uuid.UUID) -> uuid.UUID:
+def make_holding(
+    connection: Connection, user_id: uuid.UUID, account_id: uuid.UUID, **fields: Any
+) -> uuid.UUID:
+    values: dict[str, Any] = {
+        "as_of": dt.date(2026, 10, 1),
+        "security_id": "sec-vti",
+        "name": "Vanguard Total Stock Market ETF",
+        "ticker": "VTI",
+        "quantity": Decimal("3.5"),
+        "value_cents": 98_000,
+        "cost_basis_cents": 90_000,
+        **fields,
+    }
     with user_session_for(user_id, bind=connection) as session:
-        holding = Holding(
-            user_id=user_id,
-            account_id=account_id,
-            as_of=dt.date(2026, 10, 1),
-            security_id="sec-vti",
-            name="Vanguard Total Stock Market ETF",
-            ticker="VTI",
-            quantity=Decimal("3.5"),
-            value_cents=98_000,
-            cost_basis_cents=90_000,
-        )
+        holding = Holding(user_id=user_id, account_id=account_id, **values)
         session.add(holding)
         session.flush()
         return holding.id
@@ -261,3 +274,110 @@ def make_recurring_charge(
         session.add(charge)
         session.flush()
         return charge.id
+
+
+def make_decision(
+    connection: Connection,
+    user_id: uuid.UUID,
+    calculator: CalculatorKind,
+    inputs: dict[str, Any],
+    *,
+    created_at: dt.datetime,
+    result: dict[str, Any] | None = None,
+    version: int = 1,
+    supersedes_id: uuid.UUID | None = None,
+) -> uuid.UUID:
+    """A saved decision with a chosen ``created_at``. ``POST /decisions`` is the only
+    writer in the product; tests that need a decision of a given date write it here."""
+    with user_session_for(user_id, bind=connection) as session:
+        decision = Decision(
+            user_id=user_id,
+            calculator=calculator,
+            inputs=inputs,
+            result=result or {},
+            version=version,
+            supersedes_id=supersedes_id,
+            created_at=created_at,
+        )
+        session.add(decision)
+        session.flush()
+        return decision.id
+
+
+def make_goal(
+    connection: Connection,
+    user_id: uuid.UUID,
+    *,
+    kind: GoalKind = GoalKind.EMERGENCY_FUND,
+    target_amount_cents: int = 547_000,
+    monthly_contribution_cents: int = 30_000,
+    **fields: Any,
+) -> uuid.UUID:
+    with user_session_for(user_id, bind=connection) as session:
+        goal = Goal(
+            user_id=user_id,
+            kind=kind,
+            target_amount_cents=target_amount_cents,
+            monthly_contribution_cents=monthly_contribution_cents,
+            **fields,
+        )
+        session.add(goal)
+        session.flush()
+        return goal.id
+
+
+def make_check_in(
+    connection: Connection,
+    user_id: uuid.UUID,
+    *,
+    period: dt.date = dt.date(2026, 11, 1),
+    triggered_by: CheckinTrigger = CheckinTrigger.SCHEDULE,
+    **fields: Any,
+) -> uuid.UUID:
+    with user_session_for(user_id, bind=connection) as session:
+        check_in = CheckIn(user_id=user_id, period=period, triggered_by=triggered_by, **fields)
+        session.add(check_in)
+        session.flush()
+        return check_in.id
+
+
+def make_finding(
+    connection: Connection,
+    user_id: uuid.UUID,
+    check_in_id: uuid.UUID,
+    *,
+    key: str | None = None,
+    kind: FindingKind = FindingKind.PAY_CHANGE,
+    severity: FindingSeverity = FindingSeverity.INFO,
+    payload: dict[str, Any] | None = None,
+    **fields: Any,
+) -> uuid.UUID:
+    with user_session_for(user_id, bind=connection) as session:
+        finding = CheckInFinding(
+            user_id=user_id,
+            check_in_id=check_in_id,
+            kind=kind,
+            severity=severity,
+            key=key or f"{kind.value}:{uuid.uuid4()}",
+            payload=payload or {},
+            **fields,
+        )
+        session.add(finding)
+        session.flush()
+        return finding.id
+
+
+def make_calendar_event(
+    connection: Connection,
+    user_id: uuid.UUID,
+    *,
+    due_at: dt.date,
+    kind: CalendarKind = CalendarKind.GOAL_REVIEW,
+    title: str = "Review your emergency fund progress",
+    **fields: Any,
+) -> uuid.UUID:
+    with user_session_for(user_id, bind=connection) as session:
+        event = CalendarEvent(user_id=user_id, kind=kind, title=title, due_at=due_at, **fields)
+        session.add(event)
+        session.flush()
+        return event.id
