@@ -337,6 +337,42 @@
         "title": "CalendarStatus",
         "type": "string"
       },
+      "CashFlow": {
+        "properties": {
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "pay_stubs": {
+            "items": {
+              "$ref": "#/components/schemas/PayStubFlow"
+            },
+            "title": "Pay Stubs",
+            "type": "array"
+          },
+          "spending": {
+            "$ref": "#/components/schemas/SpendingSummary"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "withholding": {
+            "$ref": "#/components/schemas/WithholdingTotal"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "pay_stubs",
+          "withholding",
+          "spending"
+        ],
+        "title": "CashFlow",
+        "type": "object"
+      },
       "CategoryFix": {
         "properties": {
           "relabeled": {
@@ -1739,6 +1775,53 @@
         "title": "PayFrequency",
         "type": "string"
       },
+      "PayStubFlow": {
+        "properties": {
+          "deductions_cents": {
+            "title": "Deductions Cents",
+            "type": "integer"
+          },
+          "gross_cents": {
+            "title": "Gross Cents",
+            "type": "integer"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/WithholdingLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "net_cents": {
+            "title": "Net Cents",
+            "type": "integer"
+          },
+          "pay_date": {
+            "format": "date",
+            "title": "Pay Date",
+            "type": "string"
+          },
+          "pay_stub_id": {
+            "format": "uuid",
+            "title": "Pay Stub Id",
+            "type": "string"
+          },
+          "roles": {
+            "$ref": "#/components/schemas/RoleTotals"
+          }
+        },
+        "required": [
+          "gross_cents",
+          "lines",
+          "roles",
+          "deductions_cents",
+          "net_cents",
+          "pay_stub_id",
+          "pay_date"
+        ],
+        "title": "PayStubFlow",
+        "type": "object"
+      },
       "PayStubOut": {
         "properties": {
           "created_at": {
@@ -2575,6 +2658,34 @@
         "title": "RecurringUserStatus",
         "type": "string"
       },
+      "RoleTotals": {
+        "properties": {
+          "health_cents": {
+            "title": "Health Cents",
+            "type": "integer"
+          },
+          "other_cents": {
+            "title": "Other Cents",
+            "type": "integer"
+          },
+          "retirement_cents": {
+            "title": "Retirement Cents",
+            "type": "integer"
+          },
+          "tax_cents": {
+            "title": "Tax Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tax_cents",
+          "retirement_cents",
+          "health_cents",
+          "other_cents"
+        ],
+        "title": "RoleTotals",
+        "type": "object"
+      },
       "RuleOut": {
         "properties": {
           "category": {
@@ -3081,6 +3192,89 @@
         ],
         "title": "VerificationOut",
         "type": "object"
+      },
+      "WithholdingLine": {
+        "properties": {
+          "amount_cents": {
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "key": {
+            "enum": [
+              "federal_withholding",
+              "social_security",
+              "medicare",
+              "state_tax",
+              "retirement_contribution",
+              "medical_premium",
+              "other_deductions"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "tax",
+              "retirement",
+              "health",
+              "other"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "role",
+          "amount_cents"
+        ],
+        "title": "WithholdingLine",
+        "type": "object"
+      },
+      "WithholdingTotal": {
+        "properties": {
+          "deductions_cents": {
+            "title": "Deductions Cents",
+            "type": "integer"
+          },
+          "gross_cents": {
+            "title": "Gross Cents",
+            "type": "integer"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/WithholdingLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "net_cents": {
+            "title": "Net Cents",
+            "type": "integer"
+          },
+          "paycheck_count": {
+            "title": "Paycheck Count",
+            "type": "integer"
+          },
+          "roles": {
+            "$ref": "#/components/schemas/RoleTotals"
+          }
+        },
+        "required": [
+          "gross_cents",
+          "lines",
+          "roles",
+          "deductions_cents",
+          "net_cents",
+          "paycheck_count"
+        ],
+        "title": "WithholdingTotal",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -3312,6 +3506,93 @@
         "summary": "List Calendar",
         "tags": [
           "calendar"
+        ]
+      }
+    },
+    "/cashflow": {
+      "get": {
+        "description": "Gross-to-net lines of each pay stub and the spending summary; the last full UTC\nmonth by default.",
+        "operationId": "get_cashflow",
+        "parameters": [
+          {
+            "description": "First day, inclusive",
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First day, inclusive",
+              "title": "Start"
+            }
+          },
+          {
+            "description": "Last day, inclusive",
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last day, inclusive",
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashFlow"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Cashflow",
+        "tags": [
+          "spending"
         ]
       }
     },

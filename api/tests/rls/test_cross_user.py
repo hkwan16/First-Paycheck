@@ -394,6 +394,24 @@ def spending_summary(
     return Case("GET", "/spending/summary?start=2026-09-01&end=2026-09-30", 200, body=body)
 
 
+def get_cashflow(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    account = a_account(connection)
+    make_transaction(connection, USER_A.id, account, posted_at=dt.date(2026, 9, 10))
+    make_pay_stub(
+        connection,
+        USER_A.id,
+        a_document(connection, with_blob=False),
+        pay_date=dt.date(2026, 9, 15),
+    )
+
+    def body(data: Any) -> None:
+        assert data["pay_stubs"] == []
+        assert data["withholding"]["gross_cents"] == 0
+        assert data["spending"]["transaction_count"] == 0
+
+    return Case("GET", "/cashflow?start=2026-09-01&end=2026-09-30", 200, body=body)
+
+
 def list_recurring(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
     make_recurring_charge(connection, USER_A.id)
 
@@ -425,6 +443,7 @@ def update_recurring(
 
 
 ROUTE_CASES: dict[tuple[str, str], Builder] = {
+    ("GET", "/cashflow"): get_cashflow,
     ("GET", "/recurring"): list_recurring,
     ("PATCH", "/recurring/{charge_id}"): update_recurring,
     ("POST", "/decisions"): save_decision,

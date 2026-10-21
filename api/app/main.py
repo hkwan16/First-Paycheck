@@ -17,6 +17,7 @@ from app.routers import (
     accounts,
     calc,
     calendar,
+    cashflow,
     decisions,
     docs,
     explain,
@@ -95,6 +96,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(calendar.router)
     app.include_router(spending.router)
     app.include_router(recurring.router)
+    app.include_router(cashflow.router)
     return app
 
 
