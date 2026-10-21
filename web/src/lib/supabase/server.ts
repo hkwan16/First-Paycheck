@@ -2,16 +2,23 @@ import 'server-only';
 import { createServerClient } from '@supabase/ssr';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { connection } from 'next/server';
 import { cache } from 'react';
 import { readSupabaseEnv } from './env';
 
 /**
  * A Supabase client bound to this request's cookies, or null when Supabase is
  * not configured. Create one per request; never share it.
+ *
+ * It renders at request time only (`connection()`): supabase-js compares the
+ * session's expiry with `Date.now()`, which Cache Components rejects while
+ * prerendering (dev validates each route's instant UI with the request's
+ * cookies, so cookies() alone does not keep it out of the prerender).
  */
 export async function getSupabaseServerClient(): Promise<SupabaseClient | null> {
   const env = readSupabaseEnv();
   if (!env) return null;
+  await connection();
   const cookieStore = await cookies();
   return createServerClient(env.url, env.publishableKey, {
     cookies: {

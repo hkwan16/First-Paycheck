@@ -11,10 +11,17 @@ const mocks = vi.hoisted(() => {
   const createServerClient = vi.fn(
     (_url: string, _key: string, _options: { cookies: CookieOptions }) => ({ auth: { getUser } }),
   );
-  return { store, getUser, createServerClient, cookies: vi.fn(async () => store) };
+  return {
+    store,
+    getUser,
+    createServerClient,
+    cookies: vi.fn(async () => store),
+    connection: vi.fn(async () => undefined),
+  };
 });
 
 vi.mock('next/headers', () => ({ cookies: mocks.cookies }));
+vi.mock('next/server', () => ({ connection: mocks.connection }));
 vi.mock('@supabase/ssr', () => ({ createServerClient: mocks.createServerClient }));
 
 import { getCurrentUser, getSupabaseServerClient } from './server';
@@ -30,6 +37,19 @@ describe('getSupabaseServerClient', () => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
     expect(await getSupabaseServerClient()).toBeNull();
     expect(mocks.cookies).not.toHaveBeenCalled();
+  });
+
+  it('waits for the request before building a client, because supabase-js reads the clock', async () => {
+    // auth-js compares the session's expiry with Date.now(). Read during a
+    // prerender (dev validates each route's instant UI with the request's
+    // cookies), that is an unstable value Next reports as an error.
+    mocks.connection.mockClear();
+    mocks.createServerClient.mockClear();
+    await getSupabaseServerClient();
+    expect(mocks.connection).toHaveBeenCalledOnce();
+    expect(mocks.connection.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.createServerClient.mock.invocationCallOrder[0] ?? 0,
+    );
   });
 
   it('wires the request cookies through getAll and setAll', async () => {
