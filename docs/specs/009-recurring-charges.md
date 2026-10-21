@@ -20,7 +20,7 @@ Code: the pure detector and status rules in `api/sync/recurring.py`, the amount 
 ## Outputs
 
 - `detect(transactions, today) -> list[DetectedCharge]` (pure): one per recurring series, with `merchant_norm`, `merchant_clean` (display name), `cadence`, `typical_amount_cents`, `first_seen`, `last_seen`, `occurrences` and `overdue`.
-- `next_status(stored, detected, today) -> RecurringStatus` (pure): the status rules below.
+- `next_status(stored, detected) -> RecurringStatus` and `undetected_status(stored, today) -> RecurringStatus` (pure): the status rules below (12 and 14).
 - `recurring_charges` rows (spec 001): `merchant_norm`, `merchant_clean`, `cadence` (`weekly`, `monthly`, `yearly`), `typical_amount_cents` (> 0, money out), `first_seen`, `last_seen`, `status` (`active`, `new`, `changed`, `stopped`), `user_status` (`confirmed`, `ignored`, `cancelled`, or null).
 - `recurring.detect` job result: `{"detected": n, "new": n, "changed": n, "stopped": n, "deleted": n}`, where `new`, `changed` and `stopped` count the rows that entered that status in this run.
 - `GET /recurring` returns `RecurringChargeOut` items: `id`, `merchant_norm`, `merchant_clean`, `cadence`, `typical_amount_cents`, `first_seen`, `last_seen`, `status`, `user_status`, `updated_at`.
@@ -54,7 +54,7 @@ Code: the pure detector and status rules in `api/sync/recurring.py`, the amount 
     4. otherwise the stored status, unchanged.
 13. Flags are sticky. A `new` or `changed` row stays flagged across runs until the check-in (M8) reports it and sets it `active`; a price change on a `new` row keeps it `new`, with the new typical amount.
 14. **Not detected this run.** A stored row whose merchant still has qualifying transactions (rule 1) but no longer forms a series keeps its values; it becomes `stopped` once overdue by its stored `last_seen` and cadence (rule 10), otherwise its status is unchanged. A stored row whose merchant has no qualifying transactions left (its account was unlinked or hidden, or the provider removed them) is deleted.
-15. **Writes.** A detected series upserts on `(user_id, merchant_norm, cadence)`: `typical_amount_cents`, `first_seen`, `last_seen` and `status` are refreshed. `merchant_clean` is written only when the row is created, so the user's rename survives every later run. The job reads, decides and writes in one user session.
+15. **Writes.** A detected series upserts on `(user_id, merchant_norm, cadence)`: `typical_amount_cents`, `first_seen`, `last_seen` and `status` are refreshed. `merchant_clean` is written only when the row is created, so the user's rename survives every later run. The job reads, decides and writes in one user session, under a per-user transaction advisory lock, so two runs for one user never interleave.
 
 ### Job and triggers
 

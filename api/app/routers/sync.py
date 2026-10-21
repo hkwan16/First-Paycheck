@@ -220,7 +220,11 @@ def link_item(
     responses=error_responses(401, 404, 503),
 )
 def delete_item(
-    item_id: uuid.UUID, session: UserSession, plaid: PlaidDep, cipher: CipherDep
+    item_id: uuid.UUID,
+    user: CurrentUser,
+    session: UserSession,
+    plaid: PlaidDep,
+    cipher: CipherDep,
 ) -> None:
     """Unlink an institution: remove it at Plaid (best effort) and delete it with
     its accounts, transactions, balances and holdings."""
@@ -232,6 +236,8 @@ def delete_item(
             logger.warning("could not remove item %s at Plaid: %s", item.id, exc)
     session.delete(item)
     session.flush()
+    # Charges seen only in this item's transactions go on the next run (spec 009 rule 16).
+    queue.enqueue_unless_queued(session, user_id=user.id, kind=JobKind.RECURRING_DETECT)
 
 
 @router.post(

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
+from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -20,6 +22,10 @@ if TYPE_CHECKING:
     from sync.pipeline import ProviderFactory
 
 
+def utc_now() -> dt.datetime:
+    return dt.datetime.now(dt.UTC)
+
+
 @dataclass(frozen=True)
 class Services:
     """Collaborators built once per worker process and shared by every job.
@@ -30,6 +36,8 @@ class Services:
     provider_for: ProviderFactory | None = None
     labeler: CategoryLabeler | None = None
     extractor: DocumentExtractor | None = None
+    # The jobs' clock (UTC); tests pass a fixed one.
+    clock: Callable[[], dt.datetime] = utc_now
 
 
 @dataclass
