@@ -166,3 +166,52 @@ def test_0008_numbers_existing_plans_in_list_order(scratch_database: tuple[str, 
             text("SELECT name, position FROM benefits_plans ORDER BY name")
         ).all()
     assert [tuple(row) for row in rows] == [("By hand", 0), ("First", 0), ("Second", 1)]
+
+
+def test_0012_keys_old_findings_and_maps_their_actions(
+    scratch_database: tuple[str, Engine],
+) -> None:
+    url, engine = scratch_database
+    upgrade(url, "0011_no_model_reason")
+    user = "00000000-0000-4000-8000-0000000000c2"
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO auth.users (id) VALUES (:u)"), {"u": user})
+        check_in = connection.execute(
+            text(
+                "INSERT INTO check_ins (user_id, period, triggered_by)"
+                " VALUES (:u, '2026-10-01', 'schedule') RETURNING id"
+            ),
+            {"u": user},
+        ).scalar_one()
+        for action in ("acknowledged", "acted", "dismissed", None):
+            connection.execute(
+                text(
+                    "INSERT INTO check_in_findings (user_id, check_in_id, kind, severity,"
+                    " payload, user_action, user_action_at) VALUES (:u, :c, 'pay_change',"
+                    " 'info', '{}', CAST(:a AS finding_action),"
+                    " CASE WHEN CAST(:a AS text) IS NULL THEN NULL ELSE now() END)"
+                ),
+                {"u": user, "c": check_in, "a": action},
+            )
+
+    upgrade(url, "head")
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text(
+                "SELECT user_action::text, key = 'pay_change:' || id::text"
+                " FROM check_in_findings ORDER BY 1 NULLS LAST"
+            )
+        ).all()
+    assert [tuple(row) for row in rows] == [
+        ("dismissed", True),
+        ("done", True),
+        ("done", True),
+        (None, True),
+    ]
+
+    downgrade(url, "0011_no_model_reason")
+    with engine.connect() as connection:
+        actions = connection.execute(
+            text("SELECT user_action::text FROM check_in_findings ORDER BY 1 NULLS LAST")
+        ).scalars()
+        assert list(actions) == ["acted", "acted", "dismissed", None]
