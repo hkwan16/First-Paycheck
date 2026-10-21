@@ -33,8 +33,9 @@ from tests.support.factories import (
     make_transaction,
 )
 
-# Routes with no user data behind them, or no user at all.
-EXEMPT = {("GET", "/health"), ("POST", "/sync/webhook")}
+# Routes with no user data behind them, or no user at all. The calculators
+# are stateless: they read and write nothing (spec 007 rule 6).
+EXEMPT = {("GET", "/health"), ("POST", "/sync/webhook"), ("POST", "/calc/401k-match")}
 
 
 @dataclass

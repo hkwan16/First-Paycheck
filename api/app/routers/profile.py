@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import datetime as dt
-from itertools import pairwise
 from typing import Any, Self
 
 from fastapi import APIRouter
@@ -14,7 +13,8 @@ from app.auth import CurrentUser
 from app.deps import UserSession
 from app.errors import error_responses
 from app.types import UtcDateTime
-from calc.types import PositiveCents, PositivePercent
+from calc.k401 import MAX_TIERS, MatchTier, tiers_ascending
+from calc.types import PositiveCents
 from db.enums import FilingStatus, HealthcareUsage, PayFrequency
 from db.models import Profile
 
@@ -29,16 +29,6 @@ class OtherJob(BaseModel):
     annual_wages_cents: PositiveCents
 
 
-class MatchTier(BaseModel):
-    """The employer puts in ``employer_pct`` of each dollar the employee
-    contributes, up to ``employee_pct_upto`` percent of pay (spec 006)."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    employee_pct_upto: PositivePercent
-    employer_pct: PositivePercent
-
-
 class ProfileFields(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -49,14 +39,12 @@ class ProfileFields(BaseModel):
     dependents: int = Field(default=0, ge=0, le=20, strict=True)
     expected_healthcare_usage: HealthcareUsage | None = None
     start_date: dt.date | None = None
-    match_tiers: list[MatchTier] = Field(default_factory=list, max_length=5)
+    match_tiers: list[MatchTier] = Field(default_factory=list, max_length=MAX_TIERS)
     vesting_years: int | None = Field(default=None, ge=0, le=10, strict=True)
 
     @model_validator(mode="after")
     def _tiers_ascending(self) -> Self:
-        uptos = [tier.employee_pct_upto for tier in self.match_tiers]
-        if any(later <= earlier for earlier, later in pairwise(uptos)):
-            raise ValueError("match_tiers must have strictly ascending employee_pct_upto")
+        tiers_ascending(self.match_tiers)
         return self
 
 

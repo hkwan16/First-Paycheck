@@ -806,6 +806,178 @@
         "title": "JobStatus",
         "type": "string"
       },
+      "K401MatchInput": {
+        "additionalProperties": false,
+        "description": "The calculator's inputs, exactly as spec 006 lists them.",
+        "properties": {
+          "age": {
+            "description": "Age reached by December 31 of tax_year",
+            "maximum": 130.0,
+            "minimum": 0.0,
+            "title": "Age",
+            "type": "integer"
+          },
+          "contribution_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "Pre-tax deferral rate in percent of salary",
+            "title": "Contribution Pct"
+          },
+          "filing_status": {
+            "enum": [
+              "single",
+              "married_filing_jointly",
+              "head_of_household"
+            ],
+            "title": "Filing Status",
+            "type": "string"
+          },
+          "match_tiers": {
+            "description": "The employer formula; cumulative bounds in percent of salary, ascending",
+            "items": {
+              "$ref": "#/components/schemas/MatchTier-Input"
+            },
+            "maxItems": 5,
+            "title": "Match Tiers",
+            "type": "array"
+          },
+          "pay_periods_per_year": {
+            "enum": [
+              12,
+              24,
+              26,
+              52
+            ],
+            "title": "Pay Periods Per Year",
+            "type": "integer"
+          },
+          "salary_cents": {
+            "description": "Annual base salary in cents",
+            "exclusiveMinimum": 0.0,
+            "maximum": 100000000000.0,
+            "title": "Salary Cents",
+            "type": "integer"
+          },
+          "tax_year": {
+            "description": "The pay stub's tax year",
+            "title": "Tax Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "salary_cents",
+          "pay_periods_per_year",
+          "match_tiers",
+          "contribution_pct",
+          "tax_year",
+          "filing_status",
+          "age"
+        ],
+        "title": "K401MatchInput",
+        "type": "object"
+      },
+      "K401MatchResult": {
+        "properties": {
+          "capped": {
+            "title": "Capped",
+            "type": "boolean"
+          },
+          "citation_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Citation Keys",
+            "type": "array"
+          },
+          "compensation_capped": {
+            "title": "Compensation Capped",
+            "type": "boolean"
+          },
+          "deferral_limit_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Deferral Limit Cents",
+            "type": "integer"
+          },
+          "employee_annual_cents_current": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Employee Annual Cents Current",
+            "type": "integer"
+          },
+          "employee_annual_cents_full": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Employee Annual Cents Full",
+            "type": "integer"
+          },
+          "employer_match_cents_current": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Employer Match Cents Current",
+            "type": "integer"
+          },
+          "employer_match_cents_full": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Employer Match Cents Full",
+            "type": "integer"
+          },
+          "full_match_pct": {
+            "description": "Lowest contribution percentage that earns the whole match",
+            "title": "Full Match Pct",
+            "type": "string"
+          },
+          "marginal_rate_used": {
+            "description": "Federal bracket rate, in percent points, at the current contribution",
+            "title": "Marginal Rate Used",
+            "type": "string"
+          },
+          "missed_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Missed Cents",
+            "type": "integer"
+          },
+          "per_paycheck_after_tax_cost_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Per Paycheck After Tax Cost Cents",
+            "type": "integer"
+          },
+          "per_paycheck_cost_delta_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Per Paycheck Cost Delta Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "full_match_pct",
+          "employer_match_cents_current",
+          "employer_match_cents_full",
+          "missed_cents",
+          "employee_annual_cents_current",
+          "employee_annual_cents_full",
+          "per_paycheck_cost_delta_cents",
+          "per_paycheck_after_tax_cost_cents",
+          "marginal_rate_used",
+          "deferral_limit_cents",
+          "capped",
+          "compensation_capped",
+          "citation_keys"
+        ],
+        "title": "K401MatchResult",
+        "type": "object"
+      },
       "LineItem": {
         "additionalProperties": false,
         "description": "One printed line of the stub's current-period column (spec 005 rule 3).",
@@ -2209,6 +2381,63 @@
         "summary": "Update Account",
         "tags": [
           "accounts"
+        ]
+      }
+    },
+    "/calc/401k-match": {
+      "post": {
+        "description": "The 401(k) match calculator (spec 006): full-match percentage, the match\nat the current and full-match percentages, dollars missed and the\nper-paycheck cost before and after federal income tax.",
+        "operationId": "calc_401k_match",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/K401MatchInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/K401MatchResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Calc 401K Match",
+        "tags": [
+          "calc"
         ]
       }
     },

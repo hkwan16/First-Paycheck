@@ -13,7 +13,17 @@ from app.body_limit import BodySizeLimit
 from app.config import Settings, get_settings
 from app.db import dispose_engines
 from app.errors import install_error_handlers
-from app.routers import accounts, docs, health, jobs, pay_stubs, profile, sync, transactions
+from app.routers import (
+    accounts,
+    calc,
+    docs,
+    health,
+    jobs,
+    pay_stubs,
+    profile,
+    sync,
+    transactions,
+)
 from app.version import resolve_git_sha
 
 API_VERSION = "0.1.0"
@@ -72,6 +82,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(docs.router)
     app.include_router(pay_stubs.router)
     app.include_router(profile.router)
+    app.include_router(calc.router)
     return app
 
 
