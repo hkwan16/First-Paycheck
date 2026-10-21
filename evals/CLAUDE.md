@@ -1,0 +1,38 @@
+# evals/
+
+Offline evals that measure what unit tests cannot: calculator correctness on the
+spec's hand-worked examples now, and extraction, categorization, explanation and
+recurring-detection quality as those features land.
+
+## Run
+
+```
+make eval                                                     # free suites, no API spend
+make eval-llm                                                 # LLM suites, capped by EVAL_MAX_COST_CENTS
+uv run python -m evals.run --suite calc --max-cost-cents 0    # one suite
+uv run python -m evals.run --suite free --max-cost-cents 0 --report evals/results/run.json
+```
+
+Run from the repo root (`evals` is imported as a package). Exit code 0 means
+every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
+
+## Layout
+
+- `run.py`: CLI, suite selection (`free`, `llm`, `all` aliases), baseline comparison.
+- `suites/base.py`: `Suite`, `SuiteResult`, `Budget`. `suites/__init__.py`: the registry.
+- `suites/<name>.py`: one module per suite exposing `SUITE`.
+- `fixtures/<suite>/`: inputs and labels. `fixtures/calc/*.json` holds spec
+  examples as `[{"id", "route", "request", "expected"}]`.
+- `baseline.json`: the committed metrics every run is compared with.
+
+## Rules
+
+- Metrics are scores in [0, 1], higher is better.
+- Deterministic suites (`llm=False`) tolerate no drop; LLM suites tolerate 2 points.
+- A new suite needs a registry entry and a baseline entry (a test checks both).
+- Update the baseline only with `--update-baseline`, in a commit of its own, with
+  the reason in the message.
+- Calc cases go through the HTTP route as a fixed eval user, never by calling
+  `calc/` directly, so routing and serialization are covered too.
+- LLM suites charge `Budget` before reading each result and use only synthetic
+  fixtures; never real pay stubs or real bank data.
