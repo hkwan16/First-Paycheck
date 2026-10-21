@@ -129,6 +129,7 @@ Working:
 - Two charges on the same day give a gap of 0, which fits no band; it counts against the three-quarters rule like any other off-band gap.
 - A price change above 15% splits the series: the new amounts fall outside the series until they reach half of the merchant's history (rule 4), so the charge reads as `stopped` and later `new`. Rule 13's sticky flags make both visible to the check-in.
 - A merchant whose charges come from two accounts is one series (rule 2).
+- A bill that swings more than 15% around its median (a utility bill between $62 and $98) loses the far months from its series, and the gaps they leave can push it under the three-quarters rule. The recurring eval's custom user has such a bill, and its baseline recall records the miss.
 - A charge in `stopped` with `user_status = cancelled` is the expected outcome of a cancellation; the check-in (M8) decides how to word it.
 - `merchant_clean` set to whitespace only is 422, not an empty name.
 

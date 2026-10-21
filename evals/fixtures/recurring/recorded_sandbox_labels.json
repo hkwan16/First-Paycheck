@@ -1,0 +1,14 @@
+[
+  {"merchant_norm": "ach electronic creditgusto pay", "cadence": "monthly", "typical_amount_cents": 585000, "overdue": false},
+  {"merchant_norm": "automatic payment thank", "cadence": "monthly", "typical_amount_cents": 207850, "overdue": false},
+  {"merchant_norm": "cd deposit initial", "cadence": "monthly", "typical_amount_cents": 100000, "overdue": false},
+  {"merchant_norm": "credit card payment", "cadence": "monthly", "typical_amount_cents": 2500, "overdue": false},
+  {"merchant_norm": "kfc", "cadence": "monthly", "typical_amount_cents": 50000, "overdue": false},
+  {"merchant_norm": "madison bicycle shop", "cadence": "monthly", "typical_amount_cents": 50000, "overdue": false},
+  {"merchant_norm": "mcdonalds", "cadence": "monthly", "typical_amount_cents": 1200, "overdue": false},
+  {"merchant_norm": "sparkfun", "cadence": "monthly", "typical_amount_cents": 8940, "overdue": false},
+  {"merchant_norm": "starbucks", "cadence": "monthly", "typical_amount_cents": 433, "overdue": false},
+  {"merchant_norm": "tectra inc", "cadence": "monthly", "typical_amount_cents": 50000, "overdue": false},
+  {"merchant_norm": "touchstone climbing", "cadence": "monthly", "typical_amount_cents": 7850, "overdue": false},
+  {"merchant_norm": "united airlines", "cadence": "monthly", "typical_amount_cents": 50000, "overdue": false}
+]

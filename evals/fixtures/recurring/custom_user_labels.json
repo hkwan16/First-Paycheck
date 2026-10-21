@@ -1,0 +1,62 @@
+[
+  {
+    "cadence": "yearly",
+    "merchant_norm": "amazon prime",
+    "overdue": false,
+    "typical_amount_cents": 13900
+  },
+  {
+    "cadence": "monthly",
+    "merchant_norm": "apple.com bill",
+    "overdue": false,
+    "typical_amount_cents": 299
+  },
+  {
+    "cadence": "monthly",
+    "merchant_norm": "comcast xfinity",
+    "overdue": false,
+    "typical_amount_cents": 7999
+  },
+  {
+    "cadence": "weekly",
+    "merchant_norm": "core power yoga",
+    "overdue": false,
+    "typical_amount_cents": 2000
+  },
+  {
+    "cadence": "monthly",
+    "merchant_norm": "hulu",
+    "overdue": true,
+    "typical_amount_cents": 799
+  },
+  {
+    "cadence": "monthly",
+    "merchant_norm": "netflix.com",
+    "overdue": false,
+    "typical_amount_cents": 1699
+  },
+  {
+    "cadence": "monthly",
+    "merchant_norm": "parkside apts rent",
+    "overdue": false,
+    "typical_amount_cents": 185000
+  },
+  {
+    "cadence": "monthly",
+    "merchant_norm": "pg&e web online",
+    "overdue": false,
+    "typical_amount_cents": null
+  },
+  {
+    "cadence": "monthly",
+    "merchant_norm": "spotify usa",
+    "overdue": false,
+    "typical_amount_cents": 1199
+  },
+  {
+    "cadence": "monthly",
+    "merchant_norm": "transfer to savings",
+    "overdue": false,
+    "typical_amount_cents": 20000
+  }
+]

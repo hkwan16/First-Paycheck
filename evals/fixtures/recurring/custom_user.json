@@ -1,0 +1,5124 @@
+{
+  "override_accounts": [
+    {
+      "meta": {
+        "mask": "4821",
+        "name": "Paycheck Checking",
+        "official_name": "Paycheck Checking"
+      },
+      "starting_balance": 2500,
+      "subtype": "checking",
+      "transactions": [
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2025-01-01",
+          "date_transacted": "2025-01-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 136.75,
+          "currency": "USD",
+          "date_posted": "2025-01-06",
+          "date_transacted": "2025-01-06",
+          "description": "SAFEWAY #1007"
+        },
+        {
+          "amount": 106.35,
+          "currency": "USD",
+          "date_posted": "2025-01-10",
+          "date_transacted": "2025-01-10",
+          "description": "SAFEWAY #2466"
+        },
+        {
+          "amount": 89.19,
+          "currency": "USD",
+          "date_posted": "2025-01-13",
+          "date_transacted": "2025-01-13",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 114.79,
+          "currency": "USD",
+          "date_posted": "2025-01-13",
+          "date_transacted": "2025-01-13",
+          "description": "SAFEWAY #2774"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-01-15",
+          "date_transacted": "2025-01-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 154.75,
+          "currency": "USD",
+          "date_posted": "2025-01-18",
+          "date_transacted": "2025-01-18",
+          "description": "SAFEWAY #2389"
+        },
+        {
+          "amount": 159.63,
+          "currency": "USD",
+          "date_posted": "2025-01-19",
+          "date_transacted": "2025-01-19",
+          "description": "SAFEWAY #1888"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2025-01-20",
+          "date_transacted": "2025-01-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2025-01-25",
+          "date_transacted": "2025-01-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-01-31",
+          "date_transacted": "2025-01-31",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2025-02-01",
+          "date_transacted": "2025-02-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 156.92,
+          "currency": "USD",
+          "date_posted": "2025-02-08",
+          "date_transacted": "2025-02-08",
+          "description": "SAFEWAY #861"
+        },
+        {
+          "amount": 44.7,
+          "currency": "USD",
+          "date_posted": "2025-02-10",
+          "date_transacted": "2025-02-10",
+          "description": "SAFEWAY #1121"
+        },
+        {
+          "amount": 69.46,
+          "currency": "USD",
+          "date_posted": "2025-02-14",
+          "date_transacted": "2025-02-14",
+          "description": "SAFEWAY #2718"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-02-15",
+          "date_transacted": "2025-02-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 88.59,
+          "currency": "USD",
+          "date_posted": "2025-02-15",
+          "date_transacted": "2025-02-15",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2025-02-20",
+          "date_transacted": "2025-02-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 130.61,
+          "currency": "USD",
+          "date_posted": "2025-02-21",
+          "date_transacted": "2025-02-21",
+          "description": "SAFEWAY #1222"
+        },
+        {
+          "amount": 133.13,
+          "currency": "USD",
+          "date_posted": "2025-02-22",
+          "date_transacted": "2025-02-22",
+          "description": "SAFEWAY #1541"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2025-02-25",
+          "date_transacted": "2025-02-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-02-28",
+          "date_transacted": "2025-02-28",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2025-03-01",
+          "date_transacted": "2025-03-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 86.4,
+          "currency": "USD",
+          "date_posted": "2025-03-03",
+          "date_transacted": "2025-03-03",
+          "description": "SAFEWAY #1788"
+        },
+        {
+          "amount": 93.91,
+          "currency": "USD",
+          "date_posted": "2025-03-07",
+          "date_transacted": "2025-03-07",
+          "description": "SAFEWAY #503"
+        },
+        {
+          "amount": 150.14,
+          "currency": "USD",
+          "date_posted": "2025-03-10",
+          "date_transacted": "2025-03-10",
+          "description": "SAFEWAY #645"
+        },
+        {
+          "amount": 71.69,
+          "currency": "USD",
+          "date_posted": "2025-03-13",
+          "date_transacted": "2025-03-13",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-03-15",
+          "date_transacted": "2025-03-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2025-03-20",
+          "date_transacted": "2025-03-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2025-03-25",
+          "date_transacted": "2025-03-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": 95.21,
+          "currency": "USD",
+          "date_posted": "2025-03-27",
+          "date_transacted": "2025-03-27",
+          "description": "SAFEWAY #531"
+        },
+        {
+          "amount": 100.23,
+          "currency": "USD",
+          "date_posted": "2025-03-30",
+          "date_transacted": "2025-03-30",
+          "description": "SAFEWAY #2639"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-03-31",
+          "date_transacted": "2025-03-31",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2025-04-01",
+          "date_transacted": "2025-04-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 53.87,
+          "currency": "USD",
+          "date_posted": "2025-04-11",
+          "date_transacted": "2025-04-11",
+          "description": "SAFEWAY #1153"
+        },
+        {
+          "amount": 93.25,
+          "currency": "USD",
+          "date_posted": "2025-04-12",
+          "date_transacted": "2025-04-12",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-04-15",
+          "date_transacted": "2025-04-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2025-04-20",
+          "date_transacted": "2025-04-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 107.35,
+          "currency": "USD",
+          "date_posted": "2025-04-20",
+          "date_transacted": "2025-04-20",
+          "description": "SAFEWAY #2218"
+        },
+        {
+          "amount": 123.87,
+          "currency": "USD",
+          "date_posted": "2025-04-25",
+          "date_transacted": "2025-04-25",
+          "description": "SAFEWAY #2117"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2025-04-25",
+          "date_transacted": "2025-04-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": 145.1,
+          "currency": "USD",
+          "date_posted": "2025-04-29",
+          "date_transacted": "2025-04-29",
+          "description": "SAFEWAY #141"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-04-30",
+          "date_transacted": "2025-04-30",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 108.82,
+          "currency": "USD",
+          "date_posted": "2025-04-30",
+          "date_transacted": "2025-04-30",
+          "description": "SAFEWAY #1031"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2025-05-01",
+          "date_transacted": "2025-05-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 112.77,
+          "currency": "USD",
+          "date_posted": "2025-05-02",
+          "date_transacted": "2025-05-02",
+          "description": "SAFEWAY #2681"
+        },
+        {
+          "amount": 82.93,
+          "currency": "USD",
+          "date_posted": "2025-05-08",
+          "date_transacted": "2025-05-08",
+          "description": "SAFEWAY #2754"
+        },
+        {
+          "amount": 116.34,
+          "currency": "USD",
+          "date_posted": "2025-05-12",
+          "date_transacted": "2025-05-12",
+          "description": "SAFEWAY #2691"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-05-15",
+          "date_transacted": "2025-05-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 73.84,
+          "currency": "USD",
+          "date_posted": "2025-05-16",
+          "date_transacted": "2025-05-16",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 73.01,
+          "currency": "USD",
+          "date_posted": "2025-05-16",
+          "date_transacted": "2025-05-16",
+          "description": "SAFEWAY #2664"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2025-05-20",
+          "date_transacted": "2025-05-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 110.95,
+          "currency": "USD",
+          "date_posted": "2025-05-24",
+          "date_transacted": "2025-05-24",
+          "description": "SAFEWAY #251"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2025-05-25",
+          "date_transacted": "2025-05-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": 37.59,
+          "currency": "USD",
+          "date_posted": "2025-05-28",
+          "date_transacted": "2025-05-28",
+          "description": "SAFEWAY #1588"
+        },
+        {
+          "amount": 25.39,
+          "currency": "USD",
+          "date_posted": "2025-05-29",
+          "date_transacted": "2025-05-29",
+          "description": "SAFEWAY #2832"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-05-31",
+          "date_transacted": "2025-05-31",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 130.34,
+          "currency": "USD",
+          "date_posted": "2025-05-31",
+          "date_transacted": "2025-05-31",
+          "description": "SAFEWAY #943"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2025-06-01",
+          "date_transacted": "2025-06-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 25.99,
+          "currency": "USD",
+          "date_posted": "2025-06-04",
+          "date_transacted": "2025-06-04",
+          "description": "SAFEWAY #1903"
+        },
+        {
+          "amount": 36.33,
+          "currency": "USD",
+          "date_posted": "2025-06-08",
+          "date_transacted": "2025-06-08",
+          "description": "SAFEWAY #2127"
+        },
+        {
+          "amount": 27.7,
+          "currency": "USD",
+          "date_posted": "2025-06-13",
+          "date_transacted": "2025-06-13",
+          "description": "SAFEWAY #1706"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-06-15",
+          "date_transacted": "2025-06-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 89.58,
+          "currency": "USD",
+          "date_posted": "2025-06-15",
+          "date_transacted": "2025-06-15",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 67.43,
+          "currency": "USD",
+          "date_posted": "2025-06-19",
+          "date_transacted": "2025-06-19",
+          "description": "SAFEWAY #466"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2025-06-20",
+          "date_transacted": "2025-06-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 71.23,
+          "currency": "USD",
+          "date_posted": "2025-06-20",
+          "date_transacted": "2025-06-20",
+          "description": "SAFEWAY #2099"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2025-06-25",
+          "date_transacted": "2025-06-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": 82.76,
+          "currency": "USD",
+          "date_posted": "2025-06-27",
+          "date_transacted": "2025-06-27",
+          "description": "SAFEWAY #2726"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-06-30",
+          "date_transacted": "2025-06-30",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2025-07-01",
+          "date_transacted": "2025-07-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 84.21,
+          "currency": "USD",
+          "date_posted": "2025-07-01",
+          "date_transacted": "2025-07-01",
+          "description": "SAFEWAY #1761"
+        },
+        {
+          "amount": 96.0,
+          "currency": "USD",
+          "date_posted": "2025-07-10",
+          "date_transacted": "2025-07-10",
+          "description": "SAFEWAY #1299"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-07-15",
+          "date_transacted": "2025-07-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 83.05,
+          "currency": "USD",
+          "date_posted": "2025-07-15",
+          "date_transacted": "2025-07-15",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 113.03,
+          "currency": "USD",
+          "date_posted": "2025-07-19",
+          "date_transacted": "2025-07-19",
+          "description": "SAFEWAY #695"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2025-07-20",
+          "date_transacted": "2025-07-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2025-07-25",
+          "date_transacted": "2025-07-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": 59.45,
+          "currency": "USD",
+          "date_posted": "2025-07-28",
+          "date_transacted": "2025-07-28",
+          "description": "SAFEWAY #1979"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-07-31",
+          "date_transacted": "2025-07-31",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2025-08-01",
+          "date_transacted": "2025-08-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 37.75,
+          "currency": "USD",
+          "date_posted": "2025-08-07",
+          "date_transacted": "2025-08-07",
+          "description": "SAFEWAY #287"
+        },
+        {
+          "amount": 144.26,
+          "currency": "USD",
+          "date_posted": "2025-08-08",
+          "date_transacted": "2025-08-08",
+          "description": "SAFEWAY #2451"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-08-15",
+          "date_transacted": "2025-08-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 71.7,
+          "currency": "USD",
+          "date_posted": "2025-08-15",
+          "date_transacted": "2025-08-15",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2025-08-20",
+          "date_transacted": "2025-08-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 150.23,
+          "currency": "USD",
+          "date_posted": "2025-08-23",
+          "date_transacted": "2025-08-23",
+          "description": "SAFEWAY #1690"
+        },
+        {
+          "amount": 56.13,
+          "currency": "USD",
+          "date_posted": "2025-08-25",
+          "date_transacted": "2025-08-25",
+          "description": "SAFEWAY #2506"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2025-08-25",
+          "date_transacted": "2025-08-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": 158.95,
+          "currency": "USD",
+          "date_posted": "2025-08-29",
+          "date_transacted": "2025-08-29",
+          "description": "SAFEWAY #1275"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-08-31",
+          "date_transacted": "2025-08-31",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2025-09-01",
+          "date_transacted": "2025-09-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 62.16,
+          "currency": "USD",
+          "date_posted": "2025-09-02",
+          "date_transacted": "2025-09-02",
+          "description": "SAFEWAY #574"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-09-15",
+          "date_transacted": "2025-09-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 87.39,
+          "currency": "USD",
+          "date_posted": "2025-09-15",
+          "date_transacted": "2025-09-15",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 81.02,
+          "currency": "USD",
+          "date_posted": "2025-09-16",
+          "date_transacted": "2025-09-16",
+          "description": "SAFEWAY #116"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2025-09-20",
+          "date_transacted": "2025-09-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 118.34,
+          "currency": "USD",
+          "date_posted": "2025-09-20",
+          "date_transacted": "2025-09-20",
+          "description": "SAFEWAY #1350"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2025-09-25",
+          "date_transacted": "2025-09-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": 105.81,
+          "currency": "USD",
+          "date_posted": "2025-09-27",
+          "date_transacted": "2025-09-27",
+          "description": "SAFEWAY #111"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-09-30",
+          "date_transacted": "2025-09-30",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2025-10-01",
+          "date_transacted": "2025-10-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 133.06,
+          "currency": "USD",
+          "date_posted": "2025-10-09",
+          "date_transacted": "2025-10-09",
+          "description": "SAFEWAY #2806"
+        },
+        {
+          "amount": 39.79,
+          "currency": "USD",
+          "date_posted": "2025-10-12",
+          "date_transacted": "2025-10-12",
+          "description": "SAFEWAY #1894"
+        },
+        {
+          "amount": 44.73,
+          "currency": "USD",
+          "date_posted": "2025-10-14",
+          "date_transacted": "2025-10-14",
+          "description": "SAFEWAY #1751"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-10-15",
+          "date_transacted": "2025-10-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 94.81,
+          "currency": "USD",
+          "date_posted": "2025-10-15",
+          "date_transacted": "2025-10-15",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 155.72,
+          "currency": "USD",
+          "date_posted": "2025-10-15",
+          "date_transacted": "2025-10-15",
+          "description": "SAFEWAY #2338"
+        },
+        {
+          "amount": 84.8,
+          "currency": "USD",
+          "date_posted": "2025-10-17",
+          "date_transacted": "2025-10-17",
+          "description": "SAFEWAY #1061"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2025-10-20",
+          "date_transacted": "2025-10-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 156.87,
+          "currency": "USD",
+          "date_posted": "2025-10-22",
+          "date_transacted": "2025-10-22",
+          "description": "SAFEWAY #1093"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2025-10-25",
+          "date_transacted": "2025-10-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": 69.21,
+          "currency": "USD",
+          "date_posted": "2025-10-27",
+          "date_transacted": "2025-10-27",
+          "description": "SAFEWAY #2867"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-10-31",
+          "date_transacted": "2025-10-31",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2025-11-01",
+          "date_transacted": "2025-11-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-11-15",
+          "date_transacted": "2025-11-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 157.3,
+          "currency": "USD",
+          "date_posted": "2025-11-15",
+          "date_transacted": "2025-11-15",
+          "description": "SAFEWAY #1996"
+        },
+        {
+          "amount": 64.62,
+          "currency": "USD",
+          "date_posted": "2025-11-16",
+          "date_transacted": "2025-11-16",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2025-11-20",
+          "date_transacted": "2025-11-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 55.15,
+          "currency": "USD",
+          "date_posted": "2025-11-24",
+          "date_transacted": "2025-11-24",
+          "description": "SAFEWAY #548"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2025-11-25",
+          "date_transacted": "2025-11-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": 55.55,
+          "currency": "USD",
+          "date_posted": "2025-11-26",
+          "date_transacted": "2025-11-26",
+          "description": "SAFEWAY #632"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-11-30",
+          "date_transacted": "2025-11-30",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2025-12-01",
+          "date_transacted": "2025-12-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 97.92,
+          "currency": "USD",
+          "date_posted": "2025-12-08",
+          "date_transacted": "2025-12-08",
+          "description": "SAFEWAY #2044"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-12-15",
+          "date_transacted": "2025-12-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 92.17,
+          "currency": "USD",
+          "date_posted": "2025-12-16",
+          "date_transacted": "2025-12-16",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2025-12-20",
+          "date_transacted": "2025-12-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2025-12-25",
+          "date_transacted": "2025-12-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": 30.73,
+          "currency": "USD",
+          "date_posted": "2025-12-28",
+          "date_transacted": "2025-12-28",
+          "description": "SAFEWAY #1429"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2025-12-31",
+          "date_transacted": "2025-12-31",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2026-01-01",
+          "date_transacted": "2026-01-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 52.94,
+          "currency": "USD",
+          "date_posted": "2026-01-01",
+          "date_transacted": "2026-01-01",
+          "description": "SAFEWAY #2291"
+        },
+        {
+          "amount": 152.21,
+          "currency": "USD",
+          "date_posted": "2026-01-06",
+          "date_transacted": "2026-01-06",
+          "description": "SAFEWAY #887"
+        },
+        {
+          "amount": 58.99,
+          "currency": "USD",
+          "date_posted": "2026-01-10",
+          "date_transacted": "2026-01-10",
+          "description": "SAFEWAY #1186"
+        },
+        {
+          "amount": 28.27,
+          "currency": "USD",
+          "date_posted": "2026-01-13",
+          "date_transacted": "2026-01-13",
+          "description": "SAFEWAY #580"
+        },
+        {
+          "amount": 145.66,
+          "currency": "USD",
+          "date_posted": "2026-01-14",
+          "date_transacted": "2026-01-14",
+          "description": "SAFEWAY #2942"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-01-15",
+          "date_transacted": "2026-01-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 96.7,
+          "currency": "USD",
+          "date_posted": "2026-01-15",
+          "date_transacted": "2026-01-15",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2026-01-20",
+          "date_transacted": "2026-01-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 125.65,
+          "currency": "USD",
+          "date_posted": "2026-01-24",
+          "date_transacted": "2026-01-24",
+          "description": "SAFEWAY #461"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2026-01-25",
+          "date_transacted": "2026-01-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": 97.52,
+          "currency": "USD",
+          "date_posted": "2026-01-27",
+          "date_transacted": "2026-01-27",
+          "description": "SAFEWAY #2326"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-01-31",
+          "date_transacted": "2026-01-31",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2026-02-01",
+          "date_transacted": "2026-02-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 55.48,
+          "currency": "USD",
+          "date_posted": "2026-02-02",
+          "date_transacted": "2026-02-02",
+          "description": "SAFEWAY #658"
+        },
+        {
+          "amount": 67.63,
+          "currency": "USD",
+          "date_posted": "2026-02-13",
+          "date_transacted": "2026-02-13",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 101.86,
+          "currency": "USD",
+          "date_posted": "2026-02-14",
+          "date_transacted": "2026-02-14",
+          "description": "SAFEWAY #1073"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-02-15",
+          "date_transacted": "2026-02-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 104.93,
+          "currency": "USD",
+          "date_posted": "2026-02-17",
+          "date_transacted": "2026-02-17",
+          "description": "SAFEWAY #1059"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2026-02-20",
+          "date_transacted": "2026-02-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 84.29,
+          "currency": "USD",
+          "date_posted": "2026-02-20",
+          "date_transacted": "2026-02-20",
+          "description": "SAFEWAY #1229"
+        },
+        {
+          "amount": 48.99,
+          "currency": "USD",
+          "date_posted": "2026-02-21",
+          "date_transacted": "2026-02-21",
+          "description": "SAFEWAY #287"
+        },
+        {
+          "amount": 36.89,
+          "currency": "USD",
+          "date_posted": "2026-02-22",
+          "date_transacted": "2026-02-22",
+          "description": "SAFEWAY #2564"
+        },
+        {
+          "amount": 150.1,
+          "currency": "USD",
+          "date_posted": "2026-02-23",
+          "date_transacted": "2026-02-23",
+          "description": "SAFEWAY #1713"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2026-02-25",
+          "date_transacted": "2026-02-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-02-28",
+          "date_transacted": "2026-02-28",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2026-03-01",
+          "date_transacted": "2026-03-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 81.24,
+          "currency": "USD",
+          "date_posted": "2026-03-08",
+          "date_transacted": "2026-03-08",
+          "description": "SAFEWAY #581"
+        },
+        {
+          "amount": 83.6,
+          "currency": "USD",
+          "date_posted": "2026-03-13",
+          "date_transacted": "2026-03-13",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 101.39,
+          "currency": "USD",
+          "date_posted": "2026-03-13",
+          "date_transacted": "2026-03-13",
+          "description": "SAFEWAY #1679"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-03-15",
+          "date_transacted": "2026-03-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 71.47,
+          "currency": "USD",
+          "date_posted": "2026-03-16",
+          "date_transacted": "2026-03-16",
+          "description": "SAFEWAY #2927"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2026-03-20",
+          "date_transacted": "2026-03-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2026-03-25",
+          "date_transacted": "2026-03-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": 36.09,
+          "currency": "USD",
+          "date_posted": "2026-03-26",
+          "date_transacted": "2026-03-26",
+          "description": "SAFEWAY #2239"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-03-31",
+          "date_transacted": "2026-03-31",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2026-04-01",
+          "date_transacted": "2026-04-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 69.32,
+          "currency": "USD",
+          "date_posted": "2026-04-02",
+          "date_transacted": "2026-04-02",
+          "description": "SAFEWAY #2497"
+        },
+        {
+          "amount": 83.8,
+          "currency": "USD",
+          "date_posted": "2026-04-03",
+          "date_transacted": "2026-04-03",
+          "description": "SAFEWAY #439"
+        },
+        {
+          "amount": 36.89,
+          "currency": "USD",
+          "date_posted": "2026-04-09",
+          "date_transacted": "2026-04-09",
+          "description": "SAFEWAY #444"
+        },
+        {
+          "amount": 64.74,
+          "currency": "USD",
+          "date_posted": "2026-04-12",
+          "date_transacted": "2026-04-12",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 92.92,
+          "currency": "USD",
+          "date_posted": "2026-04-13",
+          "date_transacted": "2026-04-13",
+          "description": "SAFEWAY #1262"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-04-15",
+          "date_transacted": "2026-04-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 123.16,
+          "currency": "USD",
+          "date_posted": "2026-04-15",
+          "date_transacted": "2026-04-15",
+          "description": "SAFEWAY #676"
+        },
+        {
+          "amount": 81.5,
+          "currency": "USD",
+          "date_posted": "2026-04-16",
+          "date_transacted": "2026-04-16",
+          "description": "SAFEWAY #1754"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2026-04-20",
+          "date_transacted": "2026-04-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 33.18,
+          "currency": "USD",
+          "date_posted": "2026-04-20",
+          "date_transacted": "2026-04-20",
+          "description": "SAFEWAY #2001"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2026-04-25",
+          "date_transacted": "2026-04-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-04-30",
+          "date_transacted": "2026-04-30",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2026-05-01",
+          "date_transacted": "2026-05-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 86.16,
+          "currency": "USD",
+          "date_posted": "2026-05-02",
+          "date_transacted": "2026-05-02",
+          "description": "SAFEWAY #2025"
+        },
+        {
+          "amount": 149.11,
+          "currency": "USD",
+          "date_posted": "2026-05-04",
+          "date_transacted": "2026-05-04",
+          "description": "SAFEWAY #2245"
+        },
+        {
+          "amount": 75.32,
+          "currency": "USD",
+          "date_posted": "2026-05-07",
+          "date_transacted": "2026-05-07",
+          "description": "SAFEWAY #1091"
+        },
+        {
+          "amount": 85.68,
+          "currency": "USD",
+          "date_posted": "2026-05-12",
+          "date_transacted": "2026-05-12",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 31.24,
+          "currency": "USD",
+          "date_posted": "2026-05-12",
+          "date_transacted": "2026-05-12",
+          "description": "SAFEWAY #927"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-05-15",
+          "date_transacted": "2026-05-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 118.69,
+          "currency": "USD",
+          "date_posted": "2026-05-15",
+          "date_transacted": "2026-05-15",
+          "description": "SAFEWAY #896"
+        },
+        {
+          "amount": 83.26,
+          "currency": "USD",
+          "date_posted": "2026-05-16",
+          "date_transacted": "2026-05-16",
+          "description": "SAFEWAY #1341"
+        },
+        {
+          "amount": 49.67,
+          "currency": "USD",
+          "date_posted": "2026-05-18",
+          "date_transacted": "2026-05-18",
+          "description": "SAFEWAY #1671"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2026-05-20",
+          "date_transacted": "2026-05-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 120.54,
+          "currency": "USD",
+          "date_posted": "2026-05-25",
+          "date_transacted": "2026-05-25",
+          "description": "SAFEWAY #526"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2026-05-25",
+          "date_transacted": "2026-05-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": 26.86,
+          "currency": "USD",
+          "date_posted": "2026-05-27",
+          "date_transacted": "2026-05-27",
+          "description": "SAFEWAY #388"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-05-31",
+          "date_transacted": "2026-05-31",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2026-06-01",
+          "date_transacted": "2026-06-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 141.22,
+          "currency": "USD",
+          "date_posted": "2026-06-01",
+          "date_transacted": "2026-06-01",
+          "description": "SAFEWAY #104"
+        },
+        {
+          "amount": 67.09,
+          "currency": "USD",
+          "date_posted": "2026-06-05",
+          "date_transacted": "2026-06-05",
+          "description": "SAFEWAY #2874"
+        },
+        {
+          "amount": 150.41,
+          "currency": "USD",
+          "date_posted": "2026-06-06",
+          "date_transacted": "2026-06-06",
+          "description": "SAFEWAY #2129"
+        },
+        {
+          "amount": 25.16,
+          "currency": "USD",
+          "date_posted": "2026-06-08",
+          "date_transacted": "2026-06-08",
+          "description": "SAFEWAY #2749"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-06-15",
+          "date_transacted": "2026-06-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 77.0,
+          "currency": "USD",
+          "date_posted": "2026-06-16",
+          "date_transacted": "2026-06-16",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2026-06-20",
+          "date_transacted": "2026-06-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2026-06-25",
+          "date_transacted": "2026-06-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": 145.49,
+          "currency": "USD",
+          "date_posted": "2026-06-28",
+          "date_transacted": "2026-06-28",
+          "description": "SAFEWAY #1595"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-06-30",
+          "date_transacted": "2026-06-30",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2026-07-01",
+          "date_transacted": "2026-07-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 147.77,
+          "currency": "USD",
+          "date_posted": "2026-07-02",
+          "date_transacted": "2026-07-02",
+          "description": "SAFEWAY #610"
+        },
+        {
+          "amount": 55.77,
+          "currency": "USD",
+          "date_posted": "2026-07-09",
+          "date_transacted": "2026-07-09",
+          "description": "SAFEWAY #462"
+        },
+        {
+          "amount": 69.01,
+          "currency": "USD",
+          "date_posted": "2026-07-11",
+          "date_transacted": "2026-07-11",
+          "description": "SAFEWAY #315"
+        },
+        {
+          "amount": 117.8,
+          "currency": "USD",
+          "date_posted": "2026-07-12",
+          "date_transacted": "2026-07-12",
+          "description": "SAFEWAY #1825"
+        },
+        {
+          "amount": 64.05,
+          "currency": "USD",
+          "date_posted": "2026-07-13",
+          "date_transacted": "2026-07-13",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-07-15",
+          "date_transacted": "2026-07-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 93.97,
+          "currency": "USD",
+          "date_posted": "2026-07-16",
+          "date_transacted": "2026-07-16",
+          "description": "SAFEWAY #2470"
+        },
+        {
+          "amount": 83.72,
+          "currency": "USD",
+          "date_posted": "2026-07-18",
+          "date_transacted": "2026-07-18",
+          "description": "SAFEWAY #2499"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2026-07-20",
+          "date_transacted": "2026-07-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 93.22,
+          "currency": "USD",
+          "date_posted": "2026-07-22",
+          "date_transacted": "2026-07-22",
+          "description": "SAFEWAY #2207"
+        },
+        {
+          "amount": 26.17,
+          "currency": "USD",
+          "date_posted": "2026-07-25",
+          "date_transacted": "2026-07-25",
+          "description": "SAFEWAY #2244"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2026-07-25",
+          "date_transacted": "2026-07-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-07-31",
+          "date_transacted": "2026-07-31",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2026-08-01",
+          "date_transacted": "2026-08-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 64.07,
+          "currency": "USD",
+          "date_posted": "2026-08-03",
+          "date_transacted": "2026-08-03",
+          "description": "SAFEWAY #1578"
+        },
+        {
+          "amount": 25.91,
+          "currency": "USD",
+          "date_posted": "2026-08-09",
+          "date_transacted": "2026-08-09",
+          "description": "SAFEWAY #2608"
+        },
+        {
+          "amount": 124.43,
+          "currency": "USD",
+          "date_posted": "2026-08-12",
+          "date_transacted": "2026-08-12",
+          "description": "SAFEWAY #178"
+        },
+        {
+          "amount": 91.29,
+          "currency": "USD",
+          "date_posted": "2026-08-14",
+          "date_transacted": "2026-08-14",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-08-15",
+          "date_transacted": "2026-08-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2026-08-20",
+          "date_transacted": "2026-08-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 155.45,
+          "currency": "USD",
+          "date_posted": "2026-08-20",
+          "date_transacted": "2026-08-20",
+          "description": "SAFEWAY #1391"
+        },
+        {
+          "amount": 159.71,
+          "currency": "USD",
+          "date_posted": "2026-08-21",
+          "date_transacted": "2026-08-21",
+          "description": "SAFEWAY #1750"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2026-08-25",
+          "date_transacted": "2026-08-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-08-31",
+          "date_transacted": "2026-08-31",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2026-09-01",
+          "date_transacted": "2026-09-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 35.58,
+          "currency": "USD",
+          "date_posted": "2026-09-01",
+          "date_transacted": "2026-09-01",
+          "description": "SAFEWAY #1194"
+        },
+        {
+          "amount": 143.87,
+          "currency": "USD",
+          "date_posted": "2026-09-03",
+          "date_transacted": "2026-09-03",
+          "description": "SAFEWAY #2969"
+        },
+        {
+          "amount": 28.78,
+          "currency": "USD",
+          "date_posted": "2026-09-09",
+          "date_transacted": "2026-09-09",
+          "description": "SAFEWAY #2164"
+        },
+        {
+          "amount": 117.4,
+          "currency": "USD",
+          "date_posted": "2026-09-10",
+          "date_transacted": "2026-09-10",
+          "description": "SAFEWAY #2643"
+        },
+        {
+          "amount": 66.63,
+          "currency": "USD",
+          "date_posted": "2026-09-13",
+          "date_transacted": "2026-09-13",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-09-15",
+          "date_transacted": "2026-09-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 87.24,
+          "currency": "USD",
+          "date_posted": "2026-09-18",
+          "date_transacted": "2026-09-18",
+          "description": "SAFEWAY #1274"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2026-09-20",
+          "date_transacted": "2026-09-20",
+          "description": "COMCAST XFINITY"
+        },
+        {
+          "amount": 117.89,
+          "currency": "USD",
+          "date_posted": "2026-09-23",
+          "date_transacted": "2026-09-23",
+          "description": "SAFEWAY #1695"
+        },
+        {
+          "amount": 200.0,
+          "currency": "USD",
+          "date_posted": "2026-09-25",
+          "date_transacted": "2026-09-25",
+          "description": "TRANSFER TO SAVINGS 7730"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-09-30",
+          "date_transacted": "2026-09-30",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 1850.0,
+          "currency": "USD",
+          "date_posted": "2026-10-01",
+          "date_transacted": "2026-10-01",
+          "description": "PARKSIDE APTS RENT"
+        },
+        {
+          "amount": 67.59,
+          "currency": "USD",
+          "date_posted": "2026-10-13",
+          "date_transacted": "2026-10-13",
+          "description": "PG&E WEB ONLINE"
+        },
+        {
+          "amount": -1996.04,
+          "currency": "USD",
+          "date_posted": "2026-10-15",
+          "date_transacted": "2026-10-15",
+          "description": "ACME CORP PAYROLL PPD"
+        },
+        {
+          "amount": 155.96,
+          "currency": "USD",
+          "date_posted": "2026-10-15",
+          "date_transacted": "2026-10-15",
+          "description": "SAFEWAY #710"
+        },
+        {
+          "amount": 79.99,
+          "currency": "USD",
+          "date_posted": "2026-10-20",
+          "date_transacted": "2026-10-20",
+          "description": "COMCAST XFINITY"
+        }
+      ],
+      "type": "depository"
+    },
+    {
+      "meta": {
+        "mask": "3333",
+        "name": "Everyday Card",
+        "official_name": "Everyday Card"
+      },
+      "starting_balance": 0,
+      "subtype": "credit card",
+      "transactions": [
+        {
+          "amount": 4.0,
+          "currency": "USD",
+          "date_posted": "2025-01-02",
+          "date_transacted": "2025-01-02",
+          "description": "STARBUCKS STORE 37565"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2025-01-03",
+          "date_transacted": "2025-01-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 15.33,
+          "currency": "USD",
+          "date_posted": "2025-01-03",
+          "date_transacted": "2025-01-03",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 30.42,
+          "currency": "USD",
+          "date_posted": "2025-01-04",
+          "date_transacted": "2025-01-04",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 100.51,
+          "currency": "USD",
+          "date_posted": "2025-01-08",
+          "date_transacted": "2025-01-08",
+          "description": "AMZN Mktp US*4WXK99"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2025-01-08",
+          "date_transacted": "2025-01-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 4.38,
+          "currency": "USD",
+          "date_posted": "2025-01-11",
+          "date_transacted": "2025-01-11",
+          "description": "STARBUCKS STORE 35527"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2025-01-12",
+          "date_transacted": "2025-01-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 12.64,
+          "currency": "USD",
+          "date_posted": "2025-01-15",
+          "date_transacted": "2025-01-15",
+          "description": "AMZN Mktp US*52SFT0"
+        },
+        {
+          "amount": 7.23,
+          "currency": "USD",
+          "date_posted": "2025-01-16",
+          "date_transacted": "2025-01-16",
+          "description": "STARBUCKS STORE 63921"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2025-01-17",
+          "date_transacted": "2025-01-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 104.08,
+          "currency": "USD",
+          "date_posted": "2025-01-21",
+          "date_transacted": "2025-01-21",
+          "description": "AMZN Mktp US*L2CFY5"
+        },
+        {
+          "amount": 5.33,
+          "currency": "USD",
+          "date_posted": "2025-01-21",
+          "date_transacted": "2025-01-21",
+          "description": "STARBUCKS STORE 23042"
+        },
+        {
+          "amount": 7.38,
+          "currency": "USD",
+          "date_posted": "2025-01-24",
+          "date_transacted": "2025-01-24",
+          "description": "STARBUCKS STORE 67476"
+        },
+        {
+          "amount": 4.78,
+          "currency": "USD",
+          "date_posted": "2025-01-25",
+          "date_transacted": "2025-01-25",
+          "description": "STARBUCKS STORE 62297"
+        },
+        {
+          "amount": 5.95,
+          "currency": "USD",
+          "date_posted": "2025-01-26",
+          "date_transacted": "2025-01-26",
+          "description": "STARBUCKS STORE 56993"
+        },
+        {
+          "amount": 5.35,
+          "currency": "USD",
+          "date_posted": "2025-01-27",
+          "date_transacted": "2025-01-27",
+          "description": "STARBUCKS STORE 89031"
+        },
+        {
+          "amount": 6.07,
+          "currency": "USD",
+          "date_posted": "2025-01-28",
+          "date_transacted": "2025-01-28",
+          "description": "STARBUCKS STORE 33713"
+        },
+        {
+          "amount": -22.96,
+          "currency": "USD",
+          "date_posted": "2025-01-29",
+          "date_transacted": "2025-01-29",
+          "description": "AMZN Mktp US*FBYLL2"
+        },
+        {
+          "amount": 30.46,
+          "currency": "USD",
+          "date_posted": "2025-01-29",
+          "date_transacted": "2025-01-29",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 7.32,
+          "currency": "USD",
+          "date_posted": "2025-02-02",
+          "date_transacted": "2025-02-02",
+          "description": "STARBUCKS STORE 17981"
+        },
+        {
+          "amount": -43.57,
+          "currency": "USD",
+          "date_posted": "2025-02-03",
+          "date_transacted": "2025-02-03",
+          "description": "AMZN Mktp US*4UW4Y4"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2025-02-03",
+          "date_transacted": "2025-02-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 5.37,
+          "currency": "USD",
+          "date_posted": "2025-02-03",
+          "date_transacted": "2025-02-03",
+          "description": "STARBUCKS STORE 36481"
+        },
+        {
+          "amount": 114.48,
+          "currency": "USD",
+          "date_posted": "2025-02-06",
+          "date_transacted": "2025-02-06",
+          "description": "AMZN Mktp US*W4OON7"
+        },
+        {
+          "amount": 5.32,
+          "currency": "USD",
+          "date_posted": "2025-02-06",
+          "date_transacted": "2025-02-06",
+          "description": "STARBUCKS STORE 47268"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2025-02-08",
+          "date_transacted": "2025-02-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 7.23,
+          "currency": "USD",
+          "date_posted": "2025-02-08",
+          "date_transacted": "2025-02-08",
+          "description": "STARBUCKS STORE 96371"
+        },
+        {
+          "amount": 24.46,
+          "currency": "USD",
+          "date_posted": "2025-02-10",
+          "date_transacted": "2025-02-10",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2025-02-12",
+          "date_transacted": "2025-02-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": -24.98,
+          "currency": "USD",
+          "date_posted": "2025-02-13",
+          "date_transacted": "2025-02-13",
+          "description": "AMZN Mktp US*J80G34"
+        },
+        {
+          "amount": 139.0,
+          "currency": "USD",
+          "date_posted": "2025-02-14",
+          "date_transacted": "2025-02-14",
+          "description": "AMAZON PRIME*BR4NI9"
+        },
+        {
+          "amount": 109.96,
+          "currency": "USD",
+          "date_posted": "2025-02-14",
+          "date_transacted": "2025-02-14",
+          "description": "AMZN Mktp US*GLO554"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2025-02-17",
+          "date_transacted": "2025-02-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": -10.34,
+          "currency": "USD",
+          "date_posted": "2025-02-20",
+          "date_transacted": "2025-02-20",
+          "description": "AMZN Mktp US*74MZ14"
+        },
+        {
+          "amount": 5.78,
+          "currency": "USD",
+          "date_posted": "2025-02-21",
+          "date_transacted": "2025-02-21",
+          "description": "STARBUCKS STORE 29161"
+        },
+        {
+          "amount": 5.99,
+          "currency": "USD",
+          "date_posted": "2025-02-23",
+          "date_transacted": "2025-02-23",
+          "description": "STARBUCKS STORE 13296"
+        },
+        {
+          "amount": 7.11,
+          "currency": "USD",
+          "date_posted": "2025-02-25",
+          "date_transacted": "2025-02-25",
+          "description": "STARBUCKS STORE 63759"
+        },
+        {
+          "amount": -46.53,
+          "currency": "USD",
+          "date_posted": "2025-02-27",
+          "date_transacted": "2025-02-27",
+          "description": "AMZN Mktp US*377P93"
+        },
+        {
+          "amount": 6.31,
+          "currency": "USD",
+          "date_posted": "2025-02-27",
+          "date_transacted": "2025-02-27",
+          "description": "STARBUCKS STORE 43940"
+        },
+        {
+          "amount": 14.03,
+          "currency": "USD",
+          "date_posted": "2025-02-28",
+          "date_transacted": "2025-02-28",
+          "description": "AMZN Mktp US*J0YRO0"
+        },
+        {
+          "amount": 85.41,
+          "currency": "USD",
+          "date_posted": "2025-03-02",
+          "date_transacted": "2025-03-02",
+          "description": "AMZN Mktp US*XFMVK2"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2025-03-03",
+          "date_transacted": "2025-03-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 7.22,
+          "currency": "USD",
+          "date_posted": "2025-03-03",
+          "date_transacted": "2025-03-03",
+          "description": "STARBUCKS STORE 3476"
+        },
+        {
+          "amount": 26.66,
+          "currency": "USD",
+          "date_posted": "2025-03-04",
+          "date_transacted": "2025-03-04",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 5.55,
+          "currency": "USD",
+          "date_posted": "2025-03-06",
+          "date_transacted": "2025-03-06",
+          "description": "STARBUCKS STORE 98807"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2025-03-08",
+          "date_transacted": "2025-03-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 20.06,
+          "currency": "USD",
+          "date_posted": "2025-03-10",
+          "date_transacted": "2025-03-10",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2025-03-12",
+          "date_transacted": "2025-03-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 5.55,
+          "currency": "USD",
+          "date_posted": "2025-03-14",
+          "date_transacted": "2025-03-14",
+          "description": "STARBUCKS STORE 73321"
+        },
+        {
+          "amount": 26.63,
+          "currency": "USD",
+          "date_posted": "2025-03-14",
+          "date_transacted": "2025-03-14",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 7.04,
+          "currency": "USD",
+          "date_posted": "2025-03-15",
+          "date_transacted": "2025-03-15",
+          "description": "STARBUCKS STORE 18966"
+        },
+        {
+          "amount": 5.65,
+          "currency": "USD",
+          "date_posted": "2025-03-16",
+          "date_transacted": "2025-03-16",
+          "description": "STARBUCKS STORE 28831"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2025-03-17",
+          "date_transacted": "2025-03-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": -40.91,
+          "currency": "USD",
+          "date_posted": "2025-03-18",
+          "date_transacted": "2025-03-18",
+          "description": "AMZN Mktp US*IUWIC5"
+        },
+        {
+          "amount": 4.46,
+          "currency": "USD",
+          "date_posted": "2025-03-18",
+          "date_transacted": "2025-03-18",
+          "description": "STARBUCKS STORE 24699"
+        },
+        {
+          "amount": 6.8,
+          "currency": "USD",
+          "date_posted": "2025-03-19",
+          "date_transacted": "2025-03-19",
+          "description": "STARBUCKS STORE 19861"
+        },
+        {
+          "amount": 21.68,
+          "currency": "USD",
+          "date_posted": "2025-03-19",
+          "date_transacted": "2025-03-19",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 50.96,
+          "currency": "USD",
+          "date_posted": "2025-03-20",
+          "date_transacted": "2025-03-20",
+          "description": "AMZN Mktp US*0198K4"
+        },
+        {
+          "amount": 5.67,
+          "currency": "USD",
+          "date_posted": "2025-03-22",
+          "date_transacted": "2025-03-22",
+          "description": "STARBUCKS STORE 67971"
+        },
+        {
+          "amount": 4.03,
+          "currency": "USD",
+          "date_posted": "2025-03-24",
+          "date_transacted": "2025-03-24",
+          "description": "STARBUCKS STORE 41919"
+        },
+        {
+          "amount": 68.96,
+          "currency": "USD",
+          "date_posted": "2025-03-26",
+          "date_transacted": "2025-03-26",
+          "description": "AMZN Mktp US*0QOKO6"
+        },
+        {
+          "amount": 10.27,
+          "currency": "USD",
+          "date_posted": "2025-03-28",
+          "date_transacted": "2025-03-28",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2025-04-03",
+          "date_transacted": "2025-04-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 4.6,
+          "currency": "USD",
+          "date_posted": "2025-04-05",
+          "date_transacted": "2025-04-05",
+          "description": "STARBUCKS STORE 55594"
+        },
+        {
+          "amount": 33.72,
+          "currency": "USD",
+          "date_posted": "2025-04-05",
+          "date_transacted": "2025-04-05",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 33.38,
+          "currency": "USD",
+          "date_posted": "2025-04-06",
+          "date_transacted": "2025-04-06",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 4.66,
+          "currency": "USD",
+          "date_posted": "2025-04-07",
+          "date_transacted": "2025-04-07",
+          "description": "STARBUCKS STORE 36416"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2025-04-08",
+          "date_transacted": "2025-04-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2025-04-12",
+          "date_transacted": "2025-04-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 4.08,
+          "currency": "USD",
+          "date_posted": "2025-04-12",
+          "date_transacted": "2025-04-12",
+          "description": "STARBUCKS STORE 76553"
+        },
+        {
+          "amount": -8.32,
+          "currency": "USD",
+          "date_posted": "2025-04-14",
+          "date_transacted": "2025-04-14",
+          "description": "AMZN Mktp US*SXB997"
+        },
+        {
+          "amount": 25.46,
+          "currency": "USD",
+          "date_posted": "2025-04-16",
+          "date_transacted": "2025-04-16",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2025-04-17",
+          "date_transacted": "2025-04-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 23.45,
+          "currency": "USD",
+          "date_posted": "2025-04-18",
+          "date_transacted": "2025-04-18",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 63.07,
+          "currency": "USD",
+          "date_posted": "2025-04-19",
+          "date_transacted": "2025-04-19",
+          "description": "AMZN Mktp US*PMWVE0"
+        },
+        {
+          "amount": 10.14,
+          "currency": "USD",
+          "date_posted": "2025-04-21",
+          "date_transacted": "2025-04-21",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 17.04,
+          "currency": "USD",
+          "date_posted": "2025-04-26",
+          "date_transacted": "2025-04-26",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2025-05-03",
+          "date_transacted": "2025-05-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 4.25,
+          "currency": "USD",
+          "date_posted": "2025-05-03",
+          "date_transacted": "2025-05-03",
+          "description": "STARBUCKS STORE 1238"
+        },
+        {
+          "amount": 32.89,
+          "currency": "USD",
+          "date_posted": "2025-05-03",
+          "date_transacted": "2025-05-03",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 7.28,
+          "currency": "USD",
+          "date_posted": "2025-05-07",
+          "date_transacted": "2025-05-07",
+          "description": "STARBUCKS STORE 84690"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2025-05-08",
+          "date_transacted": "2025-05-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2025-05-12",
+          "date_transacted": "2025-05-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 7.25,
+          "currency": "USD",
+          "date_posted": "2025-05-16",
+          "date_transacted": "2025-05-16",
+          "description": "STARBUCKS STORE 80676"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2025-05-17",
+          "date_transacted": "2025-05-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 28.6,
+          "currency": "USD",
+          "date_posted": "2025-05-21",
+          "date_transacted": "2025-05-21",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 7.37,
+          "currency": "USD",
+          "date_posted": "2025-05-23",
+          "date_transacted": "2025-05-23",
+          "description": "STARBUCKS STORE 33936"
+        },
+        {
+          "amount": 5.0,
+          "currency": "USD",
+          "date_posted": "2025-05-26",
+          "date_transacted": "2025-05-26",
+          "description": "STARBUCKS STORE 61718"
+        },
+        {
+          "amount": 20.92,
+          "currency": "USD",
+          "date_posted": "2025-05-28",
+          "date_transacted": "2025-05-28",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 7.27,
+          "currency": "USD",
+          "date_posted": "2025-05-31",
+          "date_transacted": "2025-05-31",
+          "description": "STARBUCKS STORE 80886"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2025-06-03",
+          "date_transacted": "2025-06-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 14.0,
+          "currency": "USD",
+          "date_posted": "2025-06-03",
+          "date_transacted": "2025-06-03",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 4.62,
+          "currency": "USD",
+          "date_posted": "2025-06-04",
+          "date_transacted": "2025-06-04",
+          "description": "STARBUCKS STORE 17081"
+        },
+        {
+          "amount": 22.38,
+          "currency": "USD",
+          "date_posted": "2025-06-06",
+          "date_transacted": "2025-06-06",
+          "description": "AMZN Mktp US*RHFJ20"
+        },
+        {
+          "amount": 5.79,
+          "currency": "USD",
+          "date_posted": "2025-06-06",
+          "date_transacted": "2025-06-06",
+          "description": "STARBUCKS STORE 19969"
+        },
+        {
+          "amount": -43.53,
+          "currency": "USD",
+          "date_posted": "2025-06-07",
+          "date_transacted": "2025-06-07",
+          "description": "AMZN Mktp US*PS1JR1"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2025-06-08",
+          "date_transacted": "2025-06-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 6.02,
+          "currency": "USD",
+          "date_posted": "2025-06-09",
+          "date_transacted": "2025-06-09",
+          "description": "STARBUCKS STORE 99605"
+        },
+        {
+          "amount": 7.02,
+          "currency": "USD",
+          "date_posted": "2025-06-10",
+          "date_transacted": "2025-06-10",
+          "description": "STARBUCKS STORE 29966"
+        },
+        {
+          "amount": 5.12,
+          "currency": "USD",
+          "date_posted": "2025-06-11",
+          "date_transacted": "2025-06-11",
+          "description": "STARBUCKS STORE 6354"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2025-06-12",
+          "date_transacted": "2025-06-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 29.44,
+          "currency": "USD",
+          "date_posted": "2025-06-16",
+          "date_transacted": "2025-06-16",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2025-06-17",
+          "date_transacted": "2025-06-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 7.38,
+          "currency": "USD",
+          "date_posted": "2025-06-17",
+          "date_transacted": "2025-06-17",
+          "description": "STARBUCKS STORE 13953"
+        },
+        {
+          "amount": 31.46,
+          "currency": "USD",
+          "date_posted": "2025-06-18",
+          "date_transacted": "2025-06-18",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 13.15,
+          "currency": "USD",
+          "date_posted": "2025-06-19",
+          "date_transacted": "2025-06-19",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 113.27,
+          "currency": "USD",
+          "date_posted": "2025-06-21",
+          "date_transacted": "2025-06-21",
+          "description": "AMZN Mktp US*YGE023"
+        },
+        {
+          "amount": 6.85,
+          "currency": "USD",
+          "date_posted": "2025-06-21",
+          "date_transacted": "2025-06-21",
+          "description": "STARBUCKS STORE 10058"
+        },
+        {
+          "amount": 15.93,
+          "currency": "USD",
+          "date_posted": "2025-06-21",
+          "date_transacted": "2025-06-21",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 5.34,
+          "currency": "USD",
+          "date_posted": "2025-06-22",
+          "date_transacted": "2025-06-22",
+          "description": "STARBUCKS STORE 74731"
+        },
+        {
+          "amount": 4.25,
+          "currency": "USD",
+          "date_posted": "2025-06-24",
+          "date_transacted": "2025-06-24",
+          "description": "STARBUCKS STORE 19136"
+        },
+        {
+          "amount": 5.89,
+          "currency": "USD",
+          "date_posted": "2025-06-25",
+          "date_transacted": "2025-06-25",
+          "description": "STARBUCKS STORE 11727"
+        },
+        {
+          "amount": 4.85,
+          "currency": "USD",
+          "date_posted": "2025-06-27",
+          "date_transacted": "2025-06-27",
+          "description": "STARBUCKS STORE 63066"
+        },
+        {
+          "amount": 7.0,
+          "currency": "USD",
+          "date_posted": "2025-06-29",
+          "date_transacted": "2025-06-29",
+          "description": "STARBUCKS STORE 12688"
+        },
+        {
+          "amount": 19.3,
+          "currency": "USD",
+          "date_posted": "2025-06-29",
+          "date_transacted": "2025-06-29",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 6.56,
+          "currency": "USD",
+          "date_posted": "2025-06-30",
+          "date_transacted": "2025-06-30",
+          "description": "STARBUCKS STORE 79642"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2025-07-03",
+          "date_transacted": "2025-07-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 4.53,
+          "currency": "USD",
+          "date_posted": "2025-07-03",
+          "date_transacted": "2025-07-03",
+          "description": "STARBUCKS STORE 51303"
+        },
+        {
+          "amount": 54.92,
+          "currency": "USD",
+          "date_posted": "2025-07-04",
+          "date_transacted": "2025-07-04",
+          "description": "AMZN Mktp US*WSYN81"
+        },
+        {
+          "amount": 7.33,
+          "currency": "USD",
+          "date_posted": "2025-07-04",
+          "date_transacted": "2025-07-04",
+          "description": "STARBUCKS STORE 56999"
+        },
+        {
+          "amount": 6.52,
+          "currency": "USD",
+          "date_posted": "2025-07-06",
+          "date_transacted": "2025-07-06",
+          "description": "STARBUCKS STORE 11645"
+        },
+        {
+          "amount": 4.63,
+          "currency": "USD",
+          "date_posted": "2025-07-07",
+          "date_transacted": "2025-07-07",
+          "description": "STARBUCKS STORE 61260"
+        },
+        {
+          "amount": 14.45,
+          "currency": "USD",
+          "date_posted": "2025-07-08",
+          "date_transacted": "2025-07-08",
+          "description": "AMZN Mktp US*4ACPJ2"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2025-07-08",
+          "date_transacted": "2025-07-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 7.03,
+          "currency": "USD",
+          "date_posted": "2025-07-09",
+          "date_transacted": "2025-07-09",
+          "description": "STARBUCKS STORE 11809"
+        },
+        {
+          "amount": 4.91,
+          "currency": "USD",
+          "date_posted": "2025-07-11",
+          "date_transacted": "2025-07-11",
+          "description": "STARBUCKS STORE 80677"
+        },
+        {
+          "amount": 26.7,
+          "currency": "USD",
+          "date_posted": "2025-07-12",
+          "date_transacted": "2025-07-12",
+          "description": "AMZN Mktp US*LIIGV7"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2025-07-12",
+          "date_transacted": "2025-07-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 6.4,
+          "currency": "USD",
+          "date_posted": "2025-07-12",
+          "date_transacted": "2025-07-12",
+          "description": "STARBUCKS STORE 78304"
+        },
+        {
+          "amount": 6.0,
+          "currency": "USD",
+          "date_posted": "2025-07-16",
+          "date_transacted": "2025-07-16",
+          "description": "STARBUCKS STORE 9589"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2025-07-17",
+          "date_transacted": "2025-07-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 6.28,
+          "currency": "USD",
+          "date_posted": "2025-07-17",
+          "date_transacted": "2025-07-17",
+          "description": "STARBUCKS STORE 2628"
+        },
+        {
+          "amount": 6.59,
+          "currency": "USD",
+          "date_posted": "2025-07-18",
+          "date_transacted": "2025-07-18",
+          "description": "STARBUCKS STORE 9906"
+        },
+        {
+          "amount": 4.03,
+          "currency": "USD",
+          "date_posted": "2025-07-19",
+          "date_transacted": "2025-07-19",
+          "description": "STARBUCKS STORE 16724"
+        },
+        {
+          "amount": 50.76,
+          "currency": "USD",
+          "date_posted": "2025-07-23",
+          "date_transacted": "2025-07-23",
+          "description": "AMZN Mktp US*D07CF2"
+        },
+        {
+          "amount": 5.85,
+          "currency": "USD",
+          "date_posted": "2025-07-23",
+          "date_transacted": "2025-07-23",
+          "description": "STARBUCKS STORE 81990"
+        },
+        {
+          "amount": -49.64,
+          "currency": "USD",
+          "date_posted": "2025-07-25",
+          "date_transacted": "2025-07-25",
+          "description": "AMZN Mktp US*AYTNB2"
+        },
+        {
+          "amount": 33.13,
+          "currency": "USD",
+          "date_posted": "2025-07-25",
+          "date_transacted": "2025-07-25",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 70.47,
+          "currency": "USD",
+          "date_posted": "2025-07-27",
+          "date_transacted": "2025-07-27",
+          "description": "AMZN Mktp US*7LLUW0"
+        },
+        {
+          "amount": 82.81,
+          "currency": "USD",
+          "date_posted": "2025-07-29",
+          "date_transacted": "2025-07-29",
+          "description": "AMZN Mktp US*6901Q5"
+        },
+        {
+          "amount": 5.41,
+          "currency": "USD",
+          "date_posted": "2025-07-29",
+          "date_transacted": "2025-07-29",
+          "description": "STARBUCKS STORE 86609"
+        },
+        {
+          "amount": 48.5,
+          "currency": "USD",
+          "date_posted": "2025-07-30",
+          "date_transacted": "2025-07-30",
+          "description": "AMZN Mktp US*432L75"
+        },
+        {
+          "amount": 6.75,
+          "currency": "USD",
+          "date_posted": "2025-07-30",
+          "date_transacted": "2025-07-30",
+          "description": "STARBUCKS STORE 11749"
+        },
+        {
+          "amount": 22.3,
+          "currency": "USD",
+          "date_posted": "2025-07-30",
+          "date_transacted": "2025-07-30",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 6.26,
+          "currency": "USD",
+          "date_posted": "2025-08-01",
+          "date_transacted": "2025-08-01",
+          "description": "STARBUCKS STORE 74353"
+        },
+        {
+          "amount": 9.37,
+          "currency": "USD",
+          "date_posted": "2025-08-02",
+          "date_transacted": "2025-08-02",
+          "description": "AMZN Mktp US*SDLRF3"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2025-08-03",
+          "date_transacted": "2025-08-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 19.83,
+          "currency": "USD",
+          "date_posted": "2025-08-04",
+          "date_transacted": "2025-08-04",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 7.35,
+          "currency": "USD",
+          "date_posted": "2025-08-06",
+          "date_transacted": "2025-08-06",
+          "description": "STARBUCKS STORE 65310"
+        },
+        {
+          "amount": 5.73,
+          "currency": "USD",
+          "date_posted": "2025-08-07",
+          "date_transacted": "2025-08-07",
+          "description": "STARBUCKS STORE 57028"
+        },
+        {
+          "amount": 27.47,
+          "currency": "USD",
+          "date_posted": "2025-08-08",
+          "date_transacted": "2025-08-08",
+          "description": "AMZN Mktp US*BXS866"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2025-08-08",
+          "date_transacted": "2025-08-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 4.86,
+          "currency": "USD",
+          "date_posted": "2025-08-08",
+          "date_transacted": "2025-08-08",
+          "description": "STARBUCKS STORE 18398"
+        },
+        {
+          "amount": 6.65,
+          "currency": "USD",
+          "date_posted": "2025-08-10",
+          "date_transacted": "2025-08-10",
+          "description": "STARBUCKS STORE 44859"
+        },
+        {
+          "amount": 18.25,
+          "currency": "USD",
+          "date_posted": "2025-08-11",
+          "date_transacted": "2025-08-11",
+          "description": "AMZN Mktp US*21A2G8"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2025-08-12",
+          "date_transacted": "2025-08-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 3.96,
+          "currency": "USD",
+          "date_posted": "2025-08-14",
+          "date_transacted": "2025-08-14",
+          "description": "STARBUCKS STORE 3884"
+        },
+        {
+          "amount": 5.31,
+          "currency": "USD",
+          "date_posted": "2025-08-15",
+          "date_transacted": "2025-08-15",
+          "description": "STARBUCKS STORE 86027"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2025-08-17",
+          "date_transacted": "2025-08-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 4.95,
+          "currency": "USD",
+          "date_posted": "2025-08-19",
+          "date_transacted": "2025-08-19",
+          "description": "STARBUCKS STORE 6510"
+        },
+        {
+          "amount": 115.52,
+          "currency": "USD",
+          "date_posted": "2025-08-23",
+          "date_transacted": "2025-08-23",
+          "description": "AMZN Mktp US*6EK8W9"
+        },
+        {
+          "amount": 93.78,
+          "currency": "USD",
+          "date_posted": "2025-08-24",
+          "date_transacted": "2025-08-24",
+          "description": "AMZN Mktp US*L9S8P1"
+        },
+        {
+          "amount": 6.58,
+          "currency": "USD",
+          "date_posted": "2025-08-24",
+          "date_transacted": "2025-08-24",
+          "description": "STARBUCKS STORE 66970"
+        },
+        {
+          "amount": 7.16,
+          "currency": "USD",
+          "date_posted": "2025-08-25",
+          "date_transacted": "2025-08-25",
+          "description": "STARBUCKS STORE 21105"
+        },
+        {
+          "amount": 5.11,
+          "currency": "USD",
+          "date_posted": "2025-08-29",
+          "date_transacted": "2025-08-29",
+          "description": "STARBUCKS STORE 55665"
+        },
+        {
+          "amount": 9.52,
+          "currency": "USD",
+          "date_posted": "2025-08-29",
+          "date_transacted": "2025-08-29",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 4.35,
+          "currency": "USD",
+          "date_posted": "2025-08-30",
+          "date_transacted": "2025-08-30",
+          "description": "STARBUCKS STORE 12392"
+        },
+        {
+          "amount": -38.86,
+          "currency": "USD",
+          "date_posted": "2025-08-31",
+          "date_transacted": "2025-08-31",
+          "description": "AMZN Mktp US*O2DKM9"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2025-09-03",
+          "date_transacted": "2025-09-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 7.12,
+          "currency": "USD",
+          "date_posted": "2025-09-05",
+          "date_transacted": "2025-09-05",
+          "description": "STARBUCKS STORE 95497"
+        },
+        {
+          "amount": 25.23,
+          "currency": "USD",
+          "date_posted": "2025-09-05",
+          "date_transacted": "2025-09-05",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 86.36,
+          "currency": "USD",
+          "date_posted": "2025-09-07",
+          "date_transacted": "2025-09-07",
+          "description": "AMZN Mktp US*PLEVL2"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2025-09-08",
+          "date_transacted": "2025-09-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2025-09-12",
+          "date_transacted": "2025-09-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 5.65,
+          "currency": "USD",
+          "date_posted": "2025-09-14",
+          "date_transacted": "2025-09-14",
+          "description": "STARBUCKS STORE 18762"
+        },
+        {
+          "amount": -13.13,
+          "currency": "USD",
+          "date_posted": "2025-09-15",
+          "date_transacted": "2025-09-15",
+          "description": "AMZN Mktp US*FKWOW7"
+        },
+        {
+          "amount": 5.48,
+          "currency": "USD",
+          "date_posted": "2025-09-15",
+          "date_transacted": "2025-09-15",
+          "description": "STARBUCKS STORE 49768"
+        },
+        {
+          "amount": 29.75,
+          "currency": "USD",
+          "date_posted": "2025-09-15",
+          "date_transacted": "2025-09-15",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 83.03,
+          "currency": "USD",
+          "date_posted": "2025-09-16",
+          "date_transacted": "2025-09-16",
+          "description": "AMZN Mktp US*C16VX8"
+        },
+        {
+          "amount": 13.19,
+          "currency": "USD",
+          "date_posted": "2025-09-16",
+          "date_transacted": "2025-09-16",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": -45.42,
+          "currency": "USD",
+          "date_posted": "2025-09-17",
+          "date_transacted": "2025-09-17",
+          "description": "AMZN Mktp US*Y75GF8"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2025-09-17",
+          "date_transacted": "2025-09-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": -36.56,
+          "currency": "USD",
+          "date_posted": "2025-09-18",
+          "date_transacted": "2025-09-18",
+          "description": "AMZN Mktp US*V0NTN5"
+        },
+        {
+          "amount": 16.74,
+          "currency": "USD",
+          "date_posted": "2025-09-19",
+          "date_transacted": "2025-09-19",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 4.28,
+          "currency": "USD",
+          "date_posted": "2025-09-20",
+          "date_transacted": "2025-09-20",
+          "description": "STARBUCKS STORE 16750"
+        },
+        {
+          "amount": 23.71,
+          "currency": "USD",
+          "date_posted": "2025-09-21",
+          "date_transacted": "2025-09-21",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 10.58,
+          "currency": "USD",
+          "date_posted": "2025-09-22",
+          "date_transacted": "2025-09-22",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 7.13,
+          "currency": "USD",
+          "date_posted": "2025-09-23",
+          "date_transacted": "2025-09-23",
+          "description": "STARBUCKS STORE 30497"
+        },
+        {
+          "amount": 6.36,
+          "currency": "USD",
+          "date_posted": "2025-09-27",
+          "date_transacted": "2025-09-27",
+          "description": "STARBUCKS STORE 96970"
+        },
+        {
+          "amount": 29.09,
+          "currency": "USD",
+          "date_posted": "2025-09-28",
+          "date_transacted": "2025-09-28",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 21.37,
+          "currency": "USD",
+          "date_posted": "2025-09-29",
+          "date_transacted": "2025-09-29",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 18.48,
+          "currency": "USD",
+          "date_posted": "2025-10-01",
+          "date_transacted": "2025-10-01",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 31.22,
+          "currency": "USD",
+          "date_posted": "2025-10-02",
+          "date_transacted": "2025-10-02",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2025-10-03",
+          "date_transacted": "2025-10-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 4.34,
+          "currency": "USD",
+          "date_posted": "2025-10-03",
+          "date_transacted": "2025-10-03",
+          "description": "STARBUCKS STORE 38633"
+        },
+        {
+          "amount": 6.93,
+          "currency": "USD",
+          "date_posted": "2025-10-04",
+          "date_transacted": "2025-10-04",
+          "description": "STARBUCKS STORE 98448"
+        },
+        {
+          "amount": -47.75,
+          "currency": "USD",
+          "date_posted": "2025-10-06",
+          "date_transacted": "2025-10-06",
+          "description": "AMZN Mktp US*GSFR95"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2025-10-08",
+          "date_transacted": "2025-10-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 6.52,
+          "currency": "USD",
+          "date_posted": "2025-10-10",
+          "date_transacted": "2025-10-10",
+          "description": "STARBUCKS STORE 80032"
+        },
+        {
+          "amount": 7.03,
+          "currency": "USD",
+          "date_posted": "2025-10-11",
+          "date_transacted": "2025-10-11",
+          "description": "STARBUCKS STORE 36652"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2025-10-12",
+          "date_transacted": "2025-10-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 20.19,
+          "currency": "USD",
+          "date_posted": "2025-10-13",
+          "date_transacted": "2025-10-13",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 5.81,
+          "currency": "USD",
+          "date_posted": "2025-10-16",
+          "date_transacted": "2025-10-16",
+          "description": "STARBUCKS STORE 65835"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2025-10-17",
+          "date_transacted": "2025-10-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 5.08,
+          "currency": "USD",
+          "date_posted": "2025-10-18",
+          "date_transacted": "2025-10-18",
+          "description": "STARBUCKS STORE 35997"
+        },
+        {
+          "amount": 111.15,
+          "currency": "USD",
+          "date_posted": "2025-10-21",
+          "date_transacted": "2025-10-21",
+          "description": "AMZN Mktp US*UR0GV1"
+        },
+        {
+          "amount": 20.89,
+          "currency": "USD",
+          "date_posted": "2025-10-21",
+          "date_transacted": "2025-10-21",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 4.38,
+          "currency": "USD",
+          "date_posted": "2025-10-27",
+          "date_transacted": "2025-10-27",
+          "description": "STARBUCKS STORE 50646"
+        },
+        {
+          "amount": 108.47,
+          "currency": "USD",
+          "date_posted": "2025-10-30",
+          "date_transacted": "2025-10-30",
+          "description": "AMZN Mktp US*V7YI90"
+        },
+        {
+          "amount": 95.88,
+          "currency": "USD",
+          "date_posted": "2025-10-31",
+          "date_transacted": "2025-10-31",
+          "description": "AMZN Mktp US*0J7KU5"
+        },
+        {
+          "amount": 6.26,
+          "currency": "USD",
+          "date_posted": "2025-10-31",
+          "date_transacted": "2025-10-31",
+          "description": "STARBUCKS STORE 55520"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2025-11-03",
+          "date_transacted": "2025-11-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 7.33,
+          "currency": "USD",
+          "date_posted": "2025-11-03",
+          "date_transacted": "2025-11-03",
+          "description": "STARBUCKS STORE 6671"
+        },
+        {
+          "amount": -10.64,
+          "currency": "USD",
+          "date_posted": "2025-11-04",
+          "date_transacted": "2025-11-04",
+          "description": "AMZN Mktp US*KPCWY9"
+        },
+        {
+          "amount": 5.96,
+          "currency": "USD",
+          "date_posted": "2025-11-04",
+          "date_transacted": "2025-11-04",
+          "description": "STARBUCKS STORE 40430"
+        },
+        {
+          "amount": 104.17,
+          "currency": "USD",
+          "date_posted": "2025-11-06",
+          "date_transacted": "2025-11-06",
+          "description": "AMZN Mktp US*W97JU4"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2025-11-08",
+          "date_transacted": "2025-11-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 60.98,
+          "currency": "USD",
+          "date_posted": "2025-11-10",
+          "date_transacted": "2025-11-10",
+          "description": "AMZN Mktp US*6HICU7"
+        },
+        {
+          "amount": 5.01,
+          "currency": "USD",
+          "date_posted": "2025-11-11",
+          "date_transacted": "2025-11-11",
+          "description": "STARBUCKS STORE 28339"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2025-11-12",
+          "date_transacted": "2025-11-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": -33.47,
+          "currency": "USD",
+          "date_posted": "2025-11-16",
+          "date_transacted": "2025-11-16",
+          "description": "AMZN Mktp US*18JZL8"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2025-11-17",
+          "date_transacted": "2025-11-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 6.3,
+          "currency": "USD",
+          "date_posted": "2025-11-17",
+          "date_transacted": "2025-11-17",
+          "description": "STARBUCKS STORE 16195"
+        },
+        {
+          "amount": 12.26,
+          "currency": "USD",
+          "date_posted": "2025-11-17",
+          "date_transacted": "2025-11-17",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 4.54,
+          "currency": "USD",
+          "date_posted": "2025-11-18",
+          "date_transacted": "2025-11-18",
+          "description": "STARBUCKS STORE 97273"
+        },
+        {
+          "amount": 6.59,
+          "currency": "USD",
+          "date_posted": "2025-11-19",
+          "date_transacted": "2025-11-19",
+          "description": "STARBUCKS STORE 27689"
+        },
+        {
+          "amount": 6.19,
+          "currency": "USD",
+          "date_posted": "2025-11-21",
+          "date_transacted": "2025-11-21",
+          "description": "STARBUCKS STORE 5509"
+        },
+        {
+          "amount": 26.9,
+          "currency": "USD",
+          "date_posted": "2025-11-21",
+          "date_transacted": "2025-11-21",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 11.53,
+          "currency": "USD",
+          "date_posted": "2025-11-22",
+          "date_transacted": "2025-11-22",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 6.71,
+          "currency": "USD",
+          "date_posted": "2025-11-25",
+          "date_transacted": "2025-11-25",
+          "description": "STARBUCKS STORE 74148"
+        },
+        {
+          "amount": 7.26,
+          "currency": "USD",
+          "date_posted": "2025-11-27",
+          "date_transacted": "2025-11-27",
+          "description": "STARBUCKS STORE 43905"
+        },
+        {
+          "amount": 51.7,
+          "currency": "USD",
+          "date_posted": "2025-11-28",
+          "date_transacted": "2025-11-28",
+          "description": "AMZN Mktp US*1UD6D9"
+        },
+        {
+          "amount": 5.34,
+          "currency": "USD",
+          "date_posted": "2025-11-30",
+          "date_transacted": "2025-11-30",
+          "description": "STARBUCKS STORE 79377"
+        },
+        {
+          "amount": 87.36,
+          "currency": "USD",
+          "date_posted": "2025-12-01",
+          "date_transacted": "2025-12-01",
+          "description": "AMZN Mktp US*JF7MD9"
+        },
+        {
+          "amount": 7.34,
+          "currency": "USD",
+          "date_posted": "2025-12-01",
+          "date_transacted": "2025-12-01",
+          "description": "STARBUCKS STORE 86268"
+        },
+        {
+          "amount": 7.04,
+          "currency": "USD",
+          "date_posted": "2025-12-02",
+          "date_transacted": "2025-12-02",
+          "description": "STARBUCKS STORE 98124"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2025-12-03",
+          "date_transacted": "2025-12-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 30.37,
+          "currency": "USD",
+          "date_posted": "2025-12-03",
+          "date_transacted": "2025-12-03",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 89.1,
+          "currency": "USD",
+          "date_posted": "2025-12-04",
+          "date_transacted": "2025-12-04",
+          "description": "AMZN Mktp US*UHY288"
+        },
+        {
+          "amount": 6.67,
+          "currency": "USD",
+          "date_posted": "2025-12-05",
+          "date_transacted": "2025-12-05",
+          "description": "STARBUCKS STORE 42337"
+        },
+        {
+          "amount": 28.73,
+          "currency": "USD",
+          "date_posted": "2025-12-05",
+          "date_transacted": "2025-12-05",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2025-12-08",
+          "date_transacted": "2025-12-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 4.18,
+          "currency": "USD",
+          "date_posted": "2025-12-08",
+          "date_transacted": "2025-12-08",
+          "description": "STARBUCKS STORE 80001"
+        },
+        {
+          "amount": 6.22,
+          "currency": "USD",
+          "date_posted": "2025-12-11",
+          "date_transacted": "2025-12-11",
+          "description": "STARBUCKS STORE 93240"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2025-12-12",
+          "date_transacted": "2025-12-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 16.23,
+          "currency": "USD",
+          "date_posted": "2025-12-12",
+          "date_transacted": "2025-12-12",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": -21.63,
+          "currency": "USD",
+          "date_posted": "2025-12-13",
+          "date_transacted": "2025-12-13",
+          "description": "AMZN Mktp US*3SCEJ8"
+        },
+        {
+          "amount": 27.4,
+          "currency": "USD",
+          "date_posted": "2025-12-13",
+          "date_transacted": "2025-12-13",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 5.28,
+          "currency": "USD",
+          "date_posted": "2025-12-14",
+          "date_transacted": "2025-12-14",
+          "description": "STARBUCKS STORE 67517"
+        },
+        {
+          "amount": 56.13,
+          "currency": "USD",
+          "date_posted": "2025-12-16",
+          "date_transacted": "2025-12-16",
+          "description": "AMZN Mktp US*IFS0N2"
+        },
+        {
+          "amount": -31.42,
+          "currency": "USD",
+          "date_posted": "2025-12-16",
+          "date_transacted": "2025-12-16",
+          "description": "AMZN Mktp US*OI8GX3"
+        },
+        {
+          "amount": 9.38,
+          "currency": "USD",
+          "date_posted": "2025-12-17",
+          "date_transacted": "2025-12-17",
+          "description": "AMZN Mktp US*EZE2P6"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2025-12-17",
+          "date_transacted": "2025-12-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 32.97,
+          "currency": "USD",
+          "date_posted": "2025-12-18",
+          "date_transacted": "2025-12-18",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 41.27,
+          "currency": "USD",
+          "date_posted": "2025-12-19",
+          "date_transacted": "2025-12-19",
+          "description": "AMZN Mktp US*J98WB6"
+        },
+        {
+          "amount": 6.32,
+          "currency": "USD",
+          "date_posted": "2025-12-19",
+          "date_transacted": "2025-12-19",
+          "description": "STARBUCKS STORE 97935"
+        },
+        {
+          "amount": 4.48,
+          "currency": "USD",
+          "date_posted": "2025-12-20",
+          "date_transacted": "2025-12-20",
+          "description": "STARBUCKS STORE 14881"
+        },
+        {
+          "amount": 7.36,
+          "currency": "USD",
+          "date_posted": "2025-12-23",
+          "date_transacted": "2025-12-23",
+          "description": "STARBUCKS STORE 77135"
+        },
+        {
+          "amount": 4.65,
+          "currency": "USD",
+          "date_posted": "2025-12-24",
+          "date_transacted": "2025-12-24",
+          "description": "STARBUCKS STORE 30387"
+        },
+        {
+          "amount": 29.75,
+          "currency": "USD",
+          "date_posted": "2025-12-24",
+          "date_transacted": "2025-12-24",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 6.49,
+          "currency": "USD",
+          "date_posted": "2025-12-25",
+          "date_transacted": "2025-12-25",
+          "description": "STARBUCKS STORE 3910"
+        },
+        {
+          "amount": 14.18,
+          "currency": "USD",
+          "date_posted": "2025-12-31",
+          "date_transacted": "2025-12-31",
+          "description": "AMZN Mktp US*WW0KF5"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2026-01-03",
+          "date_transacted": "2026-01-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 6.21,
+          "currency": "USD",
+          "date_posted": "2026-01-03",
+          "date_transacted": "2026-01-03",
+          "description": "STARBUCKS STORE 14203"
+        },
+        {
+          "amount": 18.09,
+          "currency": "USD",
+          "date_posted": "2026-01-05",
+          "date_transacted": "2026-01-05",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 30.14,
+          "currency": "USD",
+          "date_posted": "2026-01-07",
+          "date_transacted": "2026-01-07",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2026-01-08",
+          "date_transacted": "2026-01-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 6.25,
+          "currency": "USD",
+          "date_posted": "2026-01-08",
+          "date_transacted": "2026-01-08",
+          "description": "STARBUCKS STORE 94360"
+        },
+        {
+          "amount": 4.43,
+          "currency": "USD",
+          "date_posted": "2026-01-09",
+          "date_transacted": "2026-01-09",
+          "description": "STARBUCKS STORE 18085"
+        },
+        {
+          "amount": 46.75,
+          "currency": "USD",
+          "date_posted": "2026-01-11",
+          "date_transacted": "2026-01-11",
+          "description": "AMZN Mktp US*B3MY42"
+        },
+        {
+          "amount": 5.85,
+          "currency": "USD",
+          "date_posted": "2026-01-11",
+          "date_transacted": "2026-01-11",
+          "description": "STARBUCKS STORE 17047"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2026-01-12",
+          "date_transacted": "2026-01-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 4.42,
+          "currency": "USD",
+          "date_posted": "2026-01-14",
+          "date_transacted": "2026-01-14",
+          "description": "STARBUCKS STORE 72953"
+        },
+        {
+          "amount": 8.2,
+          "currency": "USD",
+          "date_posted": "2026-01-15",
+          "date_transacted": "2026-01-15",
+          "description": "AMZN Mktp US*IW2SI4"
+        },
+        {
+          "amount": 26.35,
+          "currency": "USD",
+          "date_posted": "2026-01-16",
+          "date_transacted": "2026-01-16",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2026-01-17",
+          "date_transacted": "2026-01-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 7.24,
+          "currency": "USD",
+          "date_posted": "2026-01-19",
+          "date_transacted": "2026-01-19",
+          "description": "STARBUCKS STORE 21707"
+        },
+        {
+          "amount": 4.19,
+          "currency": "USD",
+          "date_posted": "2026-01-22",
+          "date_transacted": "2026-01-22",
+          "description": "STARBUCKS STORE 84649"
+        },
+        {
+          "amount": 5.32,
+          "currency": "USD",
+          "date_posted": "2026-01-24",
+          "date_transacted": "2026-01-24",
+          "description": "STARBUCKS STORE 22832"
+        },
+        {
+          "amount": 7.21,
+          "currency": "USD",
+          "date_posted": "2026-01-29",
+          "date_transacted": "2026-01-29",
+          "description": "STARBUCKS STORE 82519"
+        },
+        {
+          "amount": 27.72,
+          "currency": "USD",
+          "date_posted": "2026-01-30",
+          "date_transacted": "2026-01-30",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 4.57,
+          "currency": "USD",
+          "date_posted": "2026-02-01",
+          "date_transacted": "2026-02-01",
+          "description": "STARBUCKS STORE 17774"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2026-02-03",
+          "date_transacted": "2026-02-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 17.32,
+          "currency": "USD",
+          "date_posted": "2026-02-04",
+          "date_transacted": "2026-02-04",
+          "description": "AMZN Mktp US*7VX4F1"
+        },
+        {
+          "amount": 6.08,
+          "currency": "USD",
+          "date_posted": "2026-02-05",
+          "date_transacted": "2026-02-05",
+          "description": "STARBUCKS STORE 7401"
+        },
+        {
+          "amount": 4.5,
+          "currency": "USD",
+          "date_posted": "2026-02-06",
+          "date_transacted": "2026-02-06",
+          "description": "STARBUCKS STORE 14798"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2026-02-08",
+          "date_transacted": "2026-02-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 13.37,
+          "currency": "USD",
+          "date_posted": "2026-02-08",
+          "date_transacted": "2026-02-08",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 24.01,
+          "currency": "USD",
+          "date_posted": "2026-02-09",
+          "date_transacted": "2026-02-09",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 101.48,
+          "currency": "USD",
+          "date_posted": "2026-02-10",
+          "date_transacted": "2026-02-10",
+          "description": "AMZN Mktp US*TB3QK6"
+        },
+        {
+          "amount": 5.63,
+          "currency": "USD",
+          "date_posted": "2026-02-10",
+          "date_transacted": "2026-02-10",
+          "description": "STARBUCKS STORE 94279"
+        },
+        {
+          "amount": -11.82,
+          "currency": "USD",
+          "date_posted": "2026-02-11",
+          "date_transacted": "2026-02-11",
+          "description": "AMZN Mktp US*46YKA4"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2026-02-12",
+          "date_transacted": "2026-02-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 4.01,
+          "currency": "USD",
+          "date_posted": "2026-02-12",
+          "date_transacted": "2026-02-12",
+          "description": "STARBUCKS STORE 83129"
+        },
+        {
+          "amount": 16.74,
+          "currency": "USD",
+          "date_posted": "2026-02-12",
+          "date_transacted": "2026-02-12",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 4.43,
+          "currency": "USD",
+          "date_posted": "2026-02-13",
+          "date_transacted": "2026-02-13",
+          "description": "STARBUCKS STORE 23393"
+        },
+        {
+          "amount": 139.0,
+          "currency": "USD",
+          "date_posted": "2026-02-14",
+          "date_transacted": "2026-02-14",
+          "description": "AMAZON PRIME*XFWEA5"
+        },
+        {
+          "amount": 5.72,
+          "currency": "USD",
+          "date_posted": "2026-02-15",
+          "date_transacted": "2026-02-15",
+          "description": "STARBUCKS STORE 9963"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2026-02-17",
+          "date_transacted": "2026-02-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 4.08,
+          "currency": "USD",
+          "date_posted": "2026-02-18",
+          "date_transacted": "2026-02-18",
+          "description": "STARBUCKS STORE 30550"
+        },
+        {
+          "amount": -27.0,
+          "currency": "USD",
+          "date_posted": "2026-02-25",
+          "date_transacted": "2026-02-25",
+          "description": "AMZN Mktp US*Z2LXE9"
+        },
+        {
+          "amount": 108.5,
+          "currency": "USD",
+          "date_posted": "2026-02-26",
+          "date_transacted": "2026-02-26",
+          "description": "AMZN Mktp US*UUXLW6"
+        },
+        {
+          "amount": 47.12,
+          "currency": "USD",
+          "date_posted": "2026-02-27",
+          "date_transacted": "2026-02-27",
+          "description": "AMZN Mktp US*RC1CD3"
+        },
+        {
+          "amount": 6.83,
+          "currency": "USD",
+          "date_posted": "2026-02-28",
+          "date_transacted": "2026-02-28",
+          "description": "STARBUCKS STORE 22984"
+        },
+        {
+          "amount": 16.79,
+          "currency": "USD",
+          "date_posted": "2026-03-01",
+          "date_transacted": "2026-03-01",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 4.87,
+          "currency": "USD",
+          "date_posted": "2026-03-02",
+          "date_transacted": "2026-03-02",
+          "description": "STARBUCKS STORE 59479"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2026-03-03",
+          "date_transacted": "2026-03-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 71.59,
+          "currency": "USD",
+          "date_posted": "2026-03-04",
+          "date_transacted": "2026-03-04",
+          "description": "AMZN Mktp US*WA3GZ1"
+        },
+        {
+          "amount": 6.14,
+          "currency": "USD",
+          "date_posted": "2026-03-04",
+          "date_transacted": "2026-03-04",
+          "description": "STARBUCKS STORE 29941"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2026-03-08",
+          "date_transacted": "2026-03-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2026-03-12",
+          "date_transacted": "2026-03-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 93.2,
+          "currency": "USD",
+          "date_posted": "2026-03-15",
+          "date_transacted": "2026-03-15",
+          "description": "AMZN Mktp US*JTQI22"
+        },
+        {
+          "amount": 111.6,
+          "currency": "USD",
+          "date_posted": "2026-03-16",
+          "date_transacted": "2026-03-16",
+          "description": "AMZN Mktp US*OAMTB4"
+        },
+        {
+          "amount": -30.82,
+          "currency": "USD",
+          "date_posted": "2026-03-16",
+          "date_transacted": "2026-03-16",
+          "description": "AMZN Mktp US*OR0U73"
+        },
+        {
+          "amount": 95.2,
+          "currency": "USD",
+          "date_posted": "2026-03-17",
+          "date_transacted": "2026-03-17",
+          "description": "AMZN Mktp US*JLBTO4"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2026-03-17",
+          "date_transacted": "2026-03-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 7.07,
+          "currency": "USD",
+          "date_posted": "2026-03-17",
+          "date_transacted": "2026-03-17",
+          "description": "STARBUCKS STORE 99420"
+        },
+        {
+          "amount": 113.54,
+          "currency": "USD",
+          "date_posted": "2026-03-20",
+          "date_transacted": "2026-03-20",
+          "description": "AMZN Mktp US*NU6QY5"
+        },
+        {
+          "amount": 5.72,
+          "currency": "USD",
+          "date_posted": "2026-03-20",
+          "date_transacted": "2026-03-20",
+          "description": "STARBUCKS STORE 12737"
+        },
+        {
+          "amount": 9.99,
+          "currency": "USD",
+          "date_posted": "2026-03-22",
+          "date_transacted": "2026-03-22",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 16.33,
+          "currency": "USD",
+          "date_posted": "2026-03-22",
+          "date_transacted": "2026-03-22",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 77.97,
+          "currency": "USD",
+          "date_posted": "2026-03-23",
+          "date_transacted": "2026-03-23",
+          "description": "AMZN Mktp US*0HGOA6"
+        },
+        {
+          "amount": 5.03,
+          "currency": "USD",
+          "date_posted": "2026-03-25",
+          "date_transacted": "2026-03-25",
+          "description": "STARBUCKS STORE 8614"
+        },
+        {
+          "amount": 105.18,
+          "currency": "USD",
+          "date_posted": "2026-03-26",
+          "date_transacted": "2026-03-26",
+          "description": "AMZN Mktp US*YT6WO6"
+        },
+        {
+          "amount": 16.18,
+          "currency": "USD",
+          "date_posted": "2026-03-27",
+          "date_transacted": "2026-03-27",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 22.71,
+          "currency": "USD",
+          "date_posted": "2026-04-01",
+          "date_transacted": "2026-04-01",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2026-04-03",
+          "date_transacted": "2026-04-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 4.35,
+          "currency": "USD",
+          "date_posted": "2026-04-03",
+          "date_transacted": "2026-04-03",
+          "description": "STARBUCKS STORE 86466"
+        },
+        {
+          "amount": 5.45,
+          "currency": "USD",
+          "date_posted": "2026-04-05",
+          "date_transacted": "2026-04-05",
+          "description": "STARBUCKS STORE 20237"
+        },
+        {
+          "amount": 98.29,
+          "currency": "USD",
+          "date_posted": "2026-04-08",
+          "date_transacted": "2026-04-08",
+          "description": "AMZN Mktp US*I1PG09"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2026-04-08",
+          "date_transacted": "2026-04-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 20.27,
+          "currency": "USD",
+          "date_posted": "2026-04-09",
+          "date_transacted": "2026-04-09",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": -13.32,
+          "currency": "USD",
+          "date_posted": "2026-04-12",
+          "date_transacted": "2026-04-12",
+          "description": "AMZN Mktp US*29I369"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2026-04-12",
+          "date_transacted": "2026-04-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 31.04,
+          "currency": "USD",
+          "date_posted": "2026-04-15",
+          "date_transacted": "2026-04-15",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2026-04-17",
+          "date_transacted": "2026-04-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 7.37,
+          "currency": "USD",
+          "date_posted": "2026-04-17",
+          "date_transacted": "2026-04-17",
+          "description": "STARBUCKS STORE 28769"
+        },
+        {
+          "amount": 8.01,
+          "currency": "USD",
+          "date_posted": "2026-04-18",
+          "date_transacted": "2026-04-18",
+          "description": "AMZN Mktp US*SK8KO0"
+        },
+        {
+          "amount": 9.55,
+          "currency": "USD",
+          "date_posted": "2026-04-19",
+          "date_transacted": "2026-04-19",
+          "description": "AMZN Mktp US*YAURB6"
+        },
+        {
+          "amount": 32.65,
+          "currency": "USD",
+          "date_posted": "2026-04-19",
+          "date_transacted": "2026-04-19",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 6.68,
+          "currency": "USD",
+          "date_posted": "2026-04-20",
+          "date_transacted": "2026-04-20",
+          "description": "STARBUCKS STORE 2128"
+        },
+        {
+          "amount": 7.33,
+          "currency": "USD",
+          "date_posted": "2026-04-21",
+          "date_transacted": "2026-04-21",
+          "description": "STARBUCKS STORE 13417"
+        },
+        {
+          "amount": 7.33,
+          "currency": "USD",
+          "date_posted": "2026-04-23",
+          "date_transacted": "2026-04-23",
+          "description": "STARBUCKS STORE 36848"
+        },
+        {
+          "amount": -33.33,
+          "currency": "USD",
+          "date_posted": "2026-04-29",
+          "date_transacted": "2026-04-29",
+          "description": "AMZN Mktp US*SOQN10"
+        },
+        {
+          "amount": 18.17,
+          "currency": "USD",
+          "date_posted": "2026-04-30",
+          "date_transacted": "2026-04-30",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 15.49,
+          "currency": "USD",
+          "date_posted": "2026-05-03",
+          "date_transacted": "2026-05-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 5.0,
+          "currency": "USD",
+          "date_posted": "2026-05-03",
+          "date_transacted": "2026-05-03",
+          "description": "STARBUCKS STORE 33640"
+        },
+        {
+          "amount": 6.27,
+          "currency": "USD",
+          "date_posted": "2026-05-05",
+          "date_transacted": "2026-05-05",
+          "description": "STARBUCKS STORE 8712"
+        },
+        {
+          "amount": 4.76,
+          "currency": "USD",
+          "date_posted": "2026-05-06",
+          "date_transacted": "2026-05-06",
+          "description": "STARBUCKS STORE 77932"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2026-05-08",
+          "date_transacted": "2026-05-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 6.82,
+          "currency": "USD",
+          "date_posted": "2026-05-10",
+          "date_transacted": "2026-05-10",
+          "description": "STARBUCKS STORE 51952"
+        },
+        {
+          "amount": 95.03,
+          "currency": "USD",
+          "date_posted": "2026-05-12",
+          "date_transacted": "2026-05-12",
+          "description": "AMZN Mktp US*I53HC2"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2026-05-12",
+          "date_transacted": "2026-05-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 4.12,
+          "currency": "USD",
+          "date_posted": "2026-05-13",
+          "date_transacted": "2026-05-13",
+          "description": "STARBUCKS STORE 13136"
+        },
+        {
+          "amount": -26.76,
+          "currency": "USD",
+          "date_posted": "2026-05-14",
+          "date_transacted": "2026-05-14",
+          "description": "AMZN Mktp US*MMQ9T1"
+        },
+        {
+          "amount": 7.13,
+          "currency": "USD",
+          "date_posted": "2026-05-14",
+          "date_transacted": "2026-05-14",
+          "description": "STARBUCKS STORE 92313"
+        },
+        {
+          "amount": 5.8,
+          "currency": "USD",
+          "date_posted": "2026-05-15",
+          "date_transacted": "2026-05-15",
+          "description": "STARBUCKS STORE 90439"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2026-05-17",
+          "date_transacted": "2026-05-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 4.06,
+          "currency": "USD",
+          "date_posted": "2026-05-17",
+          "date_transacted": "2026-05-17",
+          "description": "STARBUCKS STORE 85913"
+        },
+        {
+          "amount": 7.32,
+          "currency": "USD",
+          "date_posted": "2026-05-19",
+          "date_transacted": "2026-05-19",
+          "description": "STARBUCKS STORE 81669"
+        },
+        {
+          "amount": 79.27,
+          "currency": "USD",
+          "date_posted": "2026-05-22",
+          "date_transacted": "2026-05-22",
+          "description": "AMZN Mktp US*W7FK48"
+        },
+        {
+          "amount": 4.51,
+          "currency": "USD",
+          "date_posted": "2026-05-22",
+          "date_transacted": "2026-05-22",
+          "description": "STARBUCKS STORE 50573"
+        },
+        {
+          "amount": 15.47,
+          "currency": "USD",
+          "date_posted": "2026-05-25",
+          "date_transacted": "2026-05-25",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 102.72,
+          "currency": "USD",
+          "date_posted": "2026-05-26",
+          "date_transacted": "2026-05-26",
+          "description": "AMZN Mktp US*4TZ0L9"
+        },
+        {
+          "amount": 6.17,
+          "currency": "USD",
+          "date_posted": "2026-05-26",
+          "date_transacted": "2026-05-26",
+          "description": "STARBUCKS STORE 69157"
+        },
+        {
+          "amount": 14.09,
+          "currency": "USD",
+          "date_posted": "2026-05-26",
+          "date_transacted": "2026-05-26",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 7.24,
+          "currency": "USD",
+          "date_posted": "2026-05-27",
+          "date_transacted": "2026-05-27",
+          "description": "STARBUCKS STORE 64451"
+        },
+        {
+          "amount": 5.6,
+          "currency": "USD",
+          "date_posted": "2026-05-31",
+          "date_transacted": "2026-05-31",
+          "description": "STARBUCKS STORE 19318"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-06-02",
+          "date_transacted": "2026-06-02",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 4.94,
+          "currency": "USD",
+          "date_posted": "2026-06-02",
+          "date_transacted": "2026-06-02",
+          "description": "STARBUCKS STORE 49815"
+        },
+        {
+          "amount": 14.85,
+          "currency": "USD",
+          "date_posted": "2026-06-02",
+          "date_transacted": "2026-06-02",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 43.83,
+          "currency": "USD",
+          "date_posted": "2026-06-03",
+          "date_transacted": "2026-06-03",
+          "description": "AMZN Mktp US*VWSB59"
+        },
+        {
+          "amount": 16.99,
+          "currency": "USD",
+          "date_posted": "2026-06-03",
+          "date_transacted": "2026-06-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 106.31,
+          "currency": "USD",
+          "date_posted": "2026-06-05",
+          "date_transacted": "2026-06-05",
+          "description": "AMZN Mktp US*52S6L1"
+        },
+        {
+          "amount": 6.43,
+          "currency": "USD",
+          "date_posted": "2026-06-06",
+          "date_transacted": "2026-06-06",
+          "description": "STARBUCKS STORE 7801"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2026-06-08",
+          "date_transacted": "2026-06-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-06-09",
+          "date_transacted": "2026-06-09",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 49.43,
+          "currency": "USD",
+          "date_posted": "2026-06-10",
+          "date_transacted": "2026-06-10",
+          "description": "AMZN Mktp US*7R7JB9"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2026-06-12",
+          "date_transacted": "2026-06-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 6.27,
+          "currency": "USD",
+          "date_posted": "2026-06-13",
+          "date_transacted": "2026-06-13",
+          "description": "STARBUCKS STORE 67253"
+        },
+        {
+          "amount": 48.84,
+          "currency": "USD",
+          "date_posted": "2026-06-14",
+          "date_transacted": "2026-06-14",
+          "description": "AMZN Mktp US*2VRZ19"
+        },
+        {
+          "amount": -42.64,
+          "currency": "USD",
+          "date_posted": "2026-06-14",
+          "date_transacted": "2026-06-14",
+          "description": "AMZN Mktp US*U2LEA3"
+        },
+        {
+          "amount": 6.89,
+          "currency": "USD",
+          "date_posted": "2026-06-14",
+          "date_transacted": "2026-06-14",
+          "description": "STARBUCKS STORE 55051"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-06-16",
+          "date_transacted": "2026-06-16",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2026-06-17",
+          "date_transacted": "2026-06-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 6.01,
+          "currency": "USD",
+          "date_posted": "2026-06-17",
+          "date_transacted": "2026-06-17",
+          "description": "STARBUCKS STORE 44052"
+        },
+        {
+          "amount": 13.51,
+          "currency": "USD",
+          "date_posted": "2026-06-21",
+          "date_transacted": "2026-06-21",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-06-23",
+          "date_transacted": "2026-06-23",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 7.06,
+          "currency": "USD",
+          "date_posted": "2026-06-23",
+          "date_transacted": "2026-06-23",
+          "description": "STARBUCKS STORE 4340"
+        },
+        {
+          "amount": 42.4,
+          "currency": "USD",
+          "date_posted": "2026-06-27",
+          "date_transacted": "2026-06-27",
+          "description": "AMZN Mktp US*917EP0"
+        },
+        {
+          "amount": 7.31,
+          "currency": "USD",
+          "date_posted": "2026-06-27",
+          "date_transacted": "2026-06-27",
+          "description": "STARBUCKS STORE 18132"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-06-30",
+          "date_transacted": "2026-06-30",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 16.99,
+          "currency": "USD",
+          "date_posted": "2026-07-03",
+          "date_transacted": "2026-07-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 6.49,
+          "currency": "USD",
+          "date_posted": "2026-07-03",
+          "date_transacted": "2026-07-03",
+          "description": "STARBUCKS STORE 99583"
+        },
+        {
+          "amount": 24.01,
+          "currency": "USD",
+          "date_posted": "2026-07-03",
+          "date_transacted": "2026-07-03",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-07-07",
+          "date_transacted": "2026-07-07",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 7.99,
+          "currency": "USD",
+          "date_posted": "2026-07-08",
+          "date_transacted": "2026-07-08",
+          "description": "HULU 877-8244858"
+        },
+        {
+          "amount": 42.88,
+          "currency": "USD",
+          "date_posted": "2026-07-09",
+          "date_transacted": "2026-07-09",
+          "description": "AMZN Mktp US*5AVK93"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2026-07-12",
+          "date_transacted": "2026-07-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-07-14",
+          "date_transacted": "2026-07-14",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 6.01,
+          "currency": "USD",
+          "date_posted": "2026-07-14",
+          "date_transacted": "2026-07-14",
+          "description": "STARBUCKS STORE 66497"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2026-07-17",
+          "date_transacted": "2026-07-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 50.49,
+          "currency": "USD",
+          "date_posted": "2026-07-19",
+          "date_transacted": "2026-07-19",
+          "description": "AMZN Mktp US*R7CQE1"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-07-21",
+          "date_transacted": "2026-07-21",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 33.34,
+          "currency": "USD",
+          "date_posted": "2026-07-21",
+          "date_transacted": "2026-07-21",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 26.44,
+          "currency": "USD",
+          "date_posted": "2026-07-22",
+          "date_transacted": "2026-07-22",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 102.11,
+          "currency": "USD",
+          "date_posted": "2026-07-23",
+          "date_transacted": "2026-07-23",
+          "description": "AMZN Mktp US*TD2VY3"
+        },
+        {
+          "amount": 6.22,
+          "currency": "USD",
+          "date_posted": "2026-07-25",
+          "date_transacted": "2026-07-25",
+          "description": "STARBUCKS STORE 60999"
+        },
+        {
+          "amount": 5.77,
+          "currency": "USD",
+          "date_posted": "2026-07-26",
+          "date_transacted": "2026-07-26",
+          "description": "STARBUCKS STORE 14034"
+        },
+        {
+          "amount": 94.83,
+          "currency": "USD",
+          "date_posted": "2026-07-28",
+          "date_transacted": "2026-07-28",
+          "description": "AMZN Mktp US*MT1BA6"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-07-28",
+          "date_transacted": "2026-07-28",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 6.0,
+          "currency": "USD",
+          "date_posted": "2026-08-01",
+          "date_transacted": "2026-08-01",
+          "description": "STARBUCKS STORE 29745"
+        },
+        {
+          "amount": 16.99,
+          "currency": "USD",
+          "date_posted": "2026-08-03",
+          "date_transacted": "2026-08-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-08-04",
+          "date_transacted": "2026-08-04",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 9.99,
+          "currency": "USD",
+          "date_posted": "2026-08-05",
+          "date_transacted": "2026-08-05",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 6.13,
+          "currency": "USD",
+          "date_posted": "2026-08-05",
+          "date_transacted": "2026-08-05",
+          "description": "STARBUCKS STORE 58055"
+        },
+        {
+          "amount": 4.23,
+          "currency": "USD",
+          "date_posted": "2026-08-09",
+          "date_transacted": "2026-08-09",
+          "description": "STARBUCKS STORE 97903"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-08-11",
+          "date_transacted": "2026-08-11",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 53.35,
+          "currency": "USD",
+          "date_posted": "2026-08-12",
+          "date_transacted": "2026-08-12",
+          "description": "AMZN Mktp US*VPGE49"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2026-08-12",
+          "date_transacted": "2026-08-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 99.94,
+          "currency": "USD",
+          "date_posted": "2026-08-13",
+          "date_transacted": "2026-08-13",
+          "description": "AMZN Mktp US*UVAPN8"
+        },
+        {
+          "amount": 5.79,
+          "currency": "USD",
+          "date_posted": "2026-08-13",
+          "date_transacted": "2026-08-13",
+          "description": "STARBUCKS STORE 84681"
+        },
+        {
+          "amount": 5.07,
+          "currency": "USD",
+          "date_posted": "2026-08-14",
+          "date_transacted": "2026-08-14",
+          "description": "STARBUCKS STORE 49893"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2026-08-17",
+          "date_transacted": "2026-08-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 4.22,
+          "currency": "USD",
+          "date_posted": "2026-08-17",
+          "date_transacted": "2026-08-17",
+          "description": "STARBUCKS STORE 25505"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-08-18",
+          "date_transacted": "2026-08-18",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": -24.77,
+          "currency": "USD",
+          "date_posted": "2026-08-19",
+          "date_transacted": "2026-08-19",
+          "description": "AMZN Mktp US*H2Z636"
+        },
+        {
+          "amount": 67.27,
+          "currency": "USD",
+          "date_posted": "2026-08-19",
+          "date_transacted": "2026-08-19",
+          "description": "AMZN Mktp US*SL2PR0"
+        },
+        {
+          "amount": 17.84,
+          "currency": "USD",
+          "date_posted": "2026-08-20",
+          "date_transacted": "2026-08-20",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 5.55,
+          "currency": "USD",
+          "date_posted": "2026-08-21",
+          "date_transacted": "2026-08-21",
+          "description": "STARBUCKS STORE 6552"
+        },
+        {
+          "amount": 52.44,
+          "currency": "USD",
+          "date_posted": "2026-08-23",
+          "date_transacted": "2026-08-23",
+          "description": "AMZN Mktp US*KPYQK9"
+        },
+        {
+          "amount": 14.25,
+          "currency": "USD",
+          "date_posted": "2026-08-23",
+          "date_transacted": "2026-08-23",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 60.01,
+          "currency": "USD",
+          "date_posted": "2026-08-24",
+          "date_transacted": "2026-08-24",
+          "description": "AMZN Mktp US*BRFXN3"
+        },
+        {
+          "amount": 5.2,
+          "currency": "USD",
+          "date_posted": "2026-08-24",
+          "date_transacted": "2026-08-24",
+          "description": "STARBUCKS STORE 81288"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-08-25",
+          "date_transacted": "2026-08-25",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 6.83,
+          "currency": "USD",
+          "date_posted": "2026-08-29",
+          "date_transacted": "2026-08-29",
+          "description": "STARBUCKS STORE 69117"
+        },
+        {
+          "amount": 10.56,
+          "currency": "USD",
+          "date_posted": "2026-08-30",
+          "date_transacted": "2026-08-30",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-09-01",
+          "date_transacted": "2026-09-01",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 16.99,
+          "currency": "USD",
+          "date_posted": "2026-09-03",
+          "date_transacted": "2026-09-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 113.15,
+          "currency": "USD",
+          "date_posted": "2026-09-04",
+          "date_transacted": "2026-09-04",
+          "description": "AMZN Mktp US*DYANC0"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-09-08",
+          "date_transacted": "2026-09-08",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 10.89,
+          "currency": "USD",
+          "date_posted": "2026-09-10",
+          "date_transacted": "2026-09-10",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 6.74,
+          "currency": "USD",
+          "date_posted": "2026-09-11",
+          "date_transacted": "2026-09-11",
+          "description": "STARBUCKS STORE 52208"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2026-09-12",
+          "date_transacted": "2026-09-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 5.54,
+          "currency": "USD",
+          "date_posted": "2026-09-12",
+          "date_transacted": "2026-09-12",
+          "description": "STARBUCKS STORE 5096"
+        },
+        {
+          "amount": 4.41,
+          "currency": "USD",
+          "date_posted": "2026-09-13",
+          "date_transacted": "2026-09-13",
+          "description": "STARBUCKS STORE 58655"
+        },
+        {
+          "amount": 4.45,
+          "currency": "USD",
+          "date_posted": "2026-09-14",
+          "date_transacted": "2026-09-14",
+          "description": "STARBUCKS STORE 95284"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-09-15",
+          "date_transacted": "2026-09-15",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2026-09-17",
+          "date_transacted": "2026-09-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 4.85,
+          "currency": "USD",
+          "date_posted": "2026-09-17",
+          "date_transacted": "2026-09-17",
+          "description": "STARBUCKS STORE 66875"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-09-22",
+          "date_transacted": "2026-09-22",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 97.07,
+          "currency": "USD",
+          "date_posted": "2026-09-24",
+          "date_transacted": "2026-09-24",
+          "description": "AMZN Mktp US*RV0150"
+        },
+        {
+          "amount": 7.26,
+          "currency": "USD",
+          "date_posted": "2026-09-24",
+          "date_transacted": "2026-09-24",
+          "description": "STARBUCKS STORE 91290"
+        },
+        {
+          "amount": 10.8,
+          "currency": "USD",
+          "date_posted": "2026-09-24",
+          "date_transacted": "2026-09-24",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 21.93,
+          "currency": "USD",
+          "date_posted": "2026-09-25",
+          "date_transacted": "2026-09-25",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 4.03,
+          "currency": "USD",
+          "date_posted": "2026-09-26",
+          "date_transacted": "2026-09-26",
+          "description": "STARBUCKS STORE 97651"
+        },
+        {
+          "amount": 12.82,
+          "currency": "USD",
+          "date_posted": "2026-09-26",
+          "date_transacted": "2026-09-26",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 4.37,
+          "currency": "USD",
+          "date_posted": "2026-09-27",
+          "date_transacted": "2026-09-27",
+          "description": "STARBUCKS STORE 31289"
+        },
+        {
+          "amount": 23.32,
+          "currency": "USD",
+          "date_posted": "2026-09-28",
+          "date_transacted": "2026-09-28",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-09-29",
+          "date_transacted": "2026-09-29",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 7.43,
+          "currency": "USD",
+          "date_posted": "2026-10-01",
+          "date_transacted": "2026-10-01",
+          "description": "STARBUCKS STORE 48532"
+        },
+        {
+          "amount": 22.37,
+          "currency": "USD",
+          "date_posted": "2026-10-02",
+          "date_transacted": "2026-10-02",
+          "description": "AMZN Mktp US*H8LXN9"
+        },
+        {
+          "amount": 16.99,
+          "currency": "USD",
+          "date_posted": "2026-10-03",
+          "date_transacted": "2026-10-03",
+          "description": "NETFLIX.COM"
+        },
+        {
+          "amount": 6.25,
+          "currency": "USD",
+          "date_posted": "2026-10-04",
+          "date_transacted": "2026-10-04",
+          "description": "STARBUCKS STORE 10397"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-10-06",
+          "date_transacted": "2026-10-06",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 5.36,
+          "currency": "USD",
+          "date_posted": "2026-10-06",
+          "date_transacted": "2026-10-06",
+          "description": "STARBUCKS STORE 95763"
+        },
+        {
+          "amount": 5.49,
+          "currency": "USD",
+          "date_posted": "2026-10-08",
+          "date_transacted": "2026-10-08",
+          "description": "STARBUCKS STORE 44429"
+        },
+        {
+          "amount": 11.99,
+          "currency": "USD",
+          "date_posted": "2026-10-12",
+          "date_transacted": "2026-10-12",
+          "description": "SPOTIFY USA"
+        },
+        {
+          "amount": 4.18,
+          "currency": "USD",
+          "date_posted": "2026-10-12",
+          "date_transacted": "2026-10-12",
+          "description": "STARBUCKS STORE 79553"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-10-13",
+          "date_transacted": "2026-10-13",
+          "description": "CORE POWER YOGA"
+        },
+        {
+          "amount": 6.79,
+          "currency": "USD",
+          "date_posted": "2026-10-13",
+          "date_transacted": "2026-10-13",
+          "description": "STARBUCKS STORE 39162"
+        },
+        {
+          "amount": 37.06,
+          "currency": "USD",
+          "date_posted": "2026-10-14",
+          "date_transacted": "2026-10-14",
+          "description": "AMZN Mktp US*QSNT12"
+        },
+        {
+          "amount": 5.66,
+          "currency": "USD",
+          "date_posted": "2026-10-14",
+          "date_transacted": "2026-10-14",
+          "description": "STARBUCKS STORE 4759"
+        },
+        {
+          "amount": 7.44,
+          "currency": "USD",
+          "date_posted": "2026-10-15",
+          "date_transacted": "2026-10-15",
+          "description": "STARBUCKS STORE 43216"
+        },
+        {
+          "amount": 2.99,
+          "currency": "USD",
+          "date_posted": "2026-10-17",
+          "date_transacted": "2026-10-17",
+          "description": "APPLE.COM/BILL"
+        },
+        {
+          "amount": 22.28,
+          "currency": "USD",
+          "date_posted": "2026-10-18",
+          "date_transacted": "2026-10-18",
+          "description": "UBER *TRIP"
+        },
+        {
+          "amount": 7.35,
+          "currency": "USD",
+          "date_posted": "2026-10-19",
+          "date_transacted": "2026-10-19",
+          "description": "STARBUCKS STORE 84784"
+        },
+        {
+          "amount": 73.41,
+          "currency": "USD",
+          "date_posted": "2026-10-20",
+          "date_transacted": "2026-10-20",
+          "description": "AMZN Mktp US*5RNAO6"
+        },
+        {
+          "amount": 20.0,
+          "currency": "USD",
+          "date_posted": "2026-10-20",
+          "date_transacted": "2026-10-20",
+          "description": "CORE POWER YOGA"
+        }
+      ],
+      "type": "credit"
+    }
+  ]
+}
