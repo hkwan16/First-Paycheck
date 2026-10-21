@@ -12,9 +12,10 @@ kinds of object never went through it:
   DEFINER, meant for ``app_api`` alone) was callable as an RPC by anyone.
 
 Each object is revoked from PUBLIC, ``anon`` and ``authenticated`` and then
-granted back exactly what its migration intended. The test suite's auth shim
-copies the same default privileges, so a future object that skips its revoke
-fails ``test_migrations`` instead of leaking on the hosted project.
+granted back exactly what its migration intended, through
+``db.rls.restrict_function`` so later migrations do the same. The test suite's
+auth shim copies the same default privileges, so a future object that skips
+its revoke fails ``test_migrations`` instead of leaking on the hosted project.
 
 Revision ID: 0007_lock_alembic_version
 Revises: 0003_documents
@@ -25,31 +26,26 @@ from collections.abc import Sequence
 
 from alembic import op
 
+from db.rls import restrict_function
+
 revision: str = "0007_lock_alembic_version"
 down_revision: str | None = "0003_documents"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-API_ROLES = "PUBLIC, anon, authenticated"
-
 
 def upgrade() -> None:
-    op.execute(f"REVOKE ALL ON public.alembic_version FROM {API_ROLES}")
+    op.execute("REVOKE ALL ON public.alembic_version FROM PUBLIC, anon, authenticated")
     # GET /health reads the revision over the app_api connection (0001).
     op.execute("GRANT SELECT ON public.alembic_version TO app_api")
 
     # Policies call current_user_id() as the authenticated role (0001).
-    op.execute(f"REVOKE ALL ON FUNCTION public.current_user_id() FROM {API_ROLES}")
-    op.execute("GRANT EXECUTE ON FUNCTION public.current_user_id() TO authenticated")
-
+    restrict_function("current_user_id()", execute=["authenticated"])
     # Only the webhook, on the app_api connection, may enqueue by item id (0006).
-    op.execute(f"REVOKE ALL ON FUNCTION public.enqueue_sync_for_plaid_item(text) FROM {API_ROLES}")
-    op.execute("GRANT EXECUTE ON FUNCTION public.enqueue_sync_for_plaid_item(text) TO app_api")
-
-    # updated_at triggers fire for the authenticated role's own writes (0002);
-    # the function cannot be called outside a trigger, so the grant is harmless.
-    op.execute(f"REVOKE ALL ON FUNCTION public.set_updated_at() FROM {API_ROLES}")
-    op.execute("GRANT EXECUTE ON FUNCTION public.set_updated_at() TO authenticated")
+    restrict_function("enqueue_sync_for_plaid_item(text)", execute=["app_api"])
+    # A trigger function (0002) needs no grant to fire; the grant is kept
+    # because it was already applied to the hosted project this way.
+    restrict_function("set_updated_at()", execute=["authenticated"])
 
 
 def downgrade() -> None:

@@ -129,7 +129,8 @@ Rules:
   and `record_user_label` for `PATCH /transactions/{id}` (spec 003).
 - Migration names follow spec 001: `0006_webhook_fn` revises `0002_core`, and
   the next revision (`0003_documents`) revises `0006_webhook_fn`;
-  `0007_lock_alembic_version` revises `0003_documents`.
+  `0007_lock_alembic_version` revises `0003_documents`, and `0004_decisions`
+  revises `0007_lock_alembic_version`.
 - Supabase grants every new table and function in `public` to `anon` and
   `authenticated` by default. `enable_rls` revokes that per table; a function
   needs its own `REVOKE ALL ... FROM PUBLIC, anon, authenticated` plus the

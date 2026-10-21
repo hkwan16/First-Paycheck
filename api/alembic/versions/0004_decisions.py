@@ -18,7 +18,7 @@ get their foreign keys in ``0005_checkins``. Enum values are literal so this
 revision never changes when ``db/enums.py`` grows.
 
 Revision ID: 0004_decisions
-Revises: 0003_documents
+Revises: 0007_lock_alembic_version
 Create Date: 2026-10-21
 """
 
@@ -28,10 +28,10 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from db.rls import enable_rls
+from db.rls import enable_rls, restrict_function
 
 revision: str = "0004_decisions"
-down_revision: str | None = "0003_documents"
+down_revision: str | None = "0007_lock_alembic_version"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -223,14 +223,14 @@ def _decisions() -> None:
         " FOR EACH ROW EXECUTE FUNCTION public.decisions_check_parent()"
     )
     op.execute(IMMUTABLE)
-    op.execute("REVOKE ALL ON FUNCTION public.decisions_immutable() FROM PUBLIC")
+    restrict_function("decisions_check_parent()")
+    restrict_function("decisions_immutable()")
     op.execute(
         "CREATE TRIGGER decisions_immutable BEFORE UPDATE OR DELETE ON public.decisions"
         " FOR EACH ROW EXECUTE FUNCTION public.decisions_immutable()"
     )
     op.execute(DECISION_IS_MINE)
-    op.execute("REVOKE ALL ON FUNCTION public.decision_is_mine(uuid) FROM PUBLIC")
-    op.execute("GRANT EXECUTE ON FUNCTION public.decision_is_mine(uuid) TO authenticated")
+    restrict_function("decision_is_mine(uuid)", execute=["authenticated"])
     op.execute("ALTER TABLE public.decisions ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE public.decisions FORCE ROW LEVEL SECURITY")
     op.execute("REVOKE ALL ON public.decisions FROM PUBLIC, anon, authenticated")

@@ -53,6 +53,32 @@ def rls_statements(
     ]
 
 
+def function_statements(signature: str, *, execute: Sequence[str] = ()) -> list[str]:
+    """The SQL that leaves ``public.signature`` callable only by ``execute``.
+
+    Supabase grants EXECUTE on every new function to ``anon`` and
+    ``authenticated`` by default, and ``REVOKE ... FROM PUBLIC`` alone leaves
+    those grants in place. A trigger function needs no grant at all: firing a
+    trigger never checks EXECUTE, so only functions called from SQL (policies,
+    routes) list a role.
+    """
+    if not re.fullmatch(r"[a-z_][a-z0-9_]*\([a-z0-9_, ]*\)", signature):
+        raise ValueError(f"{signature!r} is not a plain function signature")
+    for role in execute:
+        _identifier(role)
+    statements = [f"REVOKE ALL ON FUNCTION public.{signature} FROM PUBLIC, anon, authenticated"]
+    statements.extend(f"GRANT EXECUTE ON FUNCTION public.{signature} TO {role}" for role in execute)
+    return statements
+
+
+def restrict_function(signature: str, *, execute: Sequence[str] = ()) -> None:
+    """Apply ``function_statements`` inside the running Alembic migration."""
+    from alembic import op
+
+    for statement in function_statements(signature, execute=execute):
+        op.execute(statement)
+
+
 def enable_rls(
     table: str,
     *,

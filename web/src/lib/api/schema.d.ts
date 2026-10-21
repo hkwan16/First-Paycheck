@@ -45,6 +45,112 @@ export interface paths {
     patch: operations['update_account'];
     trace?: never;
   };
+  '/calc/401k-match': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Calc 401K Match
+     * @description The 401(k) match calculator (spec 006): full-match percentage, the match
+     *     at the current and full-match percentages, dollars missed and the
+     *     per-paycheck cost before and after federal income tax.
+     */
+    post: operations['calc_401k_match'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/calendar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Calendar
+     * @description Upcoming events, soonest first; done and dismissed ones stay for the plan export.
+     */
+    get: operations['list_calendar'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/decisions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Decisions
+     * @description The current decision and the version history of every calculator.
+     */
+    get: operations['list_decisions'];
+    put?: never;
+    /**
+     * Save Decision
+     * @description Save the result the user picked as a new decision version.
+     */
+    post: operations['save_decision'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/decisions/{decision_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Decision
+     * @description One decision version; another user's id is 404.
+     */
+    get: operations['get_decision'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/decisions/{decision_id}/explanation': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Explanation
+     * @description The decision's latest explanation; 404 when it has none.
+     */
+    get: operations['get_explanation'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/docs': {
     parameters: {
       query?: never;
@@ -129,6 +235,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/explain': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Explain
+     * @description Explain a decision; returns the existing verified explanation unless ``force``.
+     */
+    post: operations['explain'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/health': {
     parameters: {
       query?: never;
@@ -206,6 +332,26 @@ export interface paths {
      * @description Replace the profile.
      */
     put: operations['put_profile'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/spending/summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Spending Summary
+     * @description Income, spending by bucket and what is left over; the last full UTC month by default.
+     */
+    get: operations['spending_summary'];
+    put?: never;
     post?: never;
     delete?: never;
     options?: never;
@@ -428,6 +574,48 @@ export interface components {
       file: string;
       type: components['schemas']['DocumentType'];
     };
+    /** CalculatorDecisions */
+    CalculatorDecisions: {
+      calculator: components['schemas']['CalculatorKind'];
+      current: components['schemas']['DecisionOut'];
+      /** Versions */
+      versions: components['schemas']['DecisionVersion'][];
+    };
+    /**
+     * CalculatorKind
+     * @enum {string}
+     */
+    CalculatorKind: 'emergency_fund' | 'k401_match' | 'health_plans' | 'w4';
+    /** CalendarEventOut */
+    CalendarEventOut: {
+      /** Decision Id */
+      decision_id: string | null;
+      /**
+       * Due At
+       * Format: date
+       */
+      due_at: string;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      kind: components['schemas']['CalendarKind'];
+      status: components['schemas']['CalendarStatus'];
+      /** Title */
+      title: string;
+    };
+    /**
+     * CalendarKind
+     * @enum {string}
+     */
+    CalendarKind:
+      'enrollment_deadline' | 'tax_season' | 'open_enrollment' | 'goal_target' | 'election_check';
+    /**
+     * CalendarStatus
+     * @enum {string}
+     */
+    CalendarStatus: 'upcoming' | 'done' | 'dismissed';
     /** CategoryFix */
     CategoryFix: {
       /** Relabeled */
@@ -470,6 +658,33 @@ export interface components {
      * @enum {string}
      */
     CategorySource: 'rule' | 'user' | 'llm';
+    /** CategoryTotal */
+    CategoryTotal: {
+      /**
+       * Bucket
+       * @enum {string}
+       */
+      bucket: 'income' | 'essentials' | 'flexible' | 'savings' | 'other' | 'transfer';
+      /** Category */
+      category: string;
+      /** Count */
+      count: number;
+      /** Total Cents */
+      total_cents: number;
+    };
+    /** CitationOut */
+    CitationOut: {
+      /** Key */
+      key: string;
+      /** Passage */
+      passage: string;
+      /** Source */
+      source: string;
+      /** Title */
+      title: string;
+      /** Url */
+      url: string;
+    };
     /**
      * ConfirmIn
      * @description Exactly one of ``pay_stub`` or ``benefits``, matching the document's type.
@@ -484,6 +699,94 @@ export interface components {
       pay_stub: components['schemas']['PayStubOut'] | null;
       /** Plans */
       plans: components['schemas']['BenefitsPlanOut'][];
+    };
+    /** DecisionIn */
+    DecisionIn: {
+      calculator: components['schemas']['CalculatorKind'];
+      /** Inputs */
+      inputs: {
+        [key: string]: unknown;
+      };
+      /** Result */
+      result: {
+        [key: string]: unknown;
+      };
+      /** Supersedes Id */
+      supersedes_id?: string | null;
+    };
+    /** DecisionList */
+    DecisionList: {
+      /** Items */
+      items: components['schemas']['CalculatorDecisions'][];
+    };
+    /** DecisionOut */
+    DecisionOut: {
+      calculator: components['schemas']['CalculatorKind'];
+      /** Check In Id */
+      check_in_id: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Inputs */
+      inputs: {
+        [key: string]: unknown;
+      };
+      /** Is Current */
+      is_current: boolean;
+      /** Result */
+      result: {
+        [key: string]: unknown;
+      };
+      /** Supersedes Id */
+      supersedes_id: string | null;
+      /** Version */
+      version: number;
+    };
+    /** DecisionSaved */
+    DecisionSaved: {
+      calculator: components['schemas']['CalculatorKind'];
+      /** Calendar Event Id */
+      calendar_event_id: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Decision Id
+       * Format: uuid
+       */
+      decision_id: string;
+      /** Goal Id */
+      goal_id: string | null;
+      /** Supersedes Id */
+      supersedes_id: string | null;
+      /** Version */
+      version: number;
+    };
+    /** DecisionVersion */
+    DecisionVersion: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Supersedes Id */
+      supersedes_id: string | null;
+      /** Version */
+      version: number;
     };
     /** DocumentCreated */
     DocumentCreated: {
@@ -580,6 +883,58 @@ export interface components {
     ErrorResponse: {
       error: components['schemas']['ErrorDetail'];
     };
+    /** ExplainIn */
+    ExplainIn: {
+      /**
+       * Decision Id
+       * Format: uuid
+       */
+      decision_id: string;
+      /**
+       * Force
+       * @default false
+       */
+      force: boolean;
+    };
+    /** ExplanationOut */
+    ExplanationOut: {
+      /** Attempt */
+      attempt: number;
+      /** Citations */
+      citations: components['schemas']['CitationOut'][];
+      /** Concept */
+      concept: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Decision Id
+       * Format: uuid
+       */
+      decision_id: string;
+      /** Fallback */
+      fallback: boolean;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Numbers */
+      numbers: components['schemas']['NumberClaim'][];
+      /** Prompt Version */
+      prompt_version: string;
+      /** Retries */
+      retries: number;
+      /** Text */
+      text: string;
+      verification: components['schemas']['VerificationOut'];
+      /** Verified */
+      verified: boolean;
+      /** What Ifs */
+      what_ifs: string[];
+    };
     /** ExtractionQueued */
     ExtractionQueued: {
       /**
@@ -657,6 +1012,82 @@ export interface components {
      * @enum {string}
      */
     JobStatus: 'queued' | 'running' | 'succeeded' | 'dead';
+    /**
+     * K401MatchInput
+     * @description The calculator's inputs, exactly as spec 006 lists them.
+     */
+    K401MatchInput: {
+      /**
+       * Age
+       * @description Age reached by December 31 of tax_year
+       */
+      age: number;
+      /**
+       * Contribution Pct
+       * @description Pre-tax deferral rate in percent of salary
+       */
+      contribution_pct: number | string;
+      /**
+       * Filing Status
+       * @enum {string}
+       */
+      filing_status: 'single' | 'married_filing_jointly' | 'head_of_household';
+      /**
+       * Match Tiers
+       * @description The employer formula; cumulative bounds in percent of salary, ascending
+       */
+      match_tiers: components['schemas']['MatchTier-Input'][];
+      /**
+       * Pay Periods Per Year
+       * @enum {integer}
+       */
+      pay_periods_per_year: 12 | 24 | 26 | 52;
+      /**
+       * Salary Cents
+       * @description Annual base salary in cents
+       */
+      salary_cents: number;
+      /**
+       * Tax Year
+       * @description The pay stub's tax year
+       */
+      tax_year: number;
+    };
+    /** K401MatchResult */
+    K401MatchResult: {
+      /** Capped */
+      capped: boolean;
+      /** Citation Keys */
+      citation_keys: string[];
+      /** Compensation Capped */
+      compensation_capped: boolean;
+      /** Deferral Limit Cents */
+      deferral_limit_cents: number;
+      /** Employee Annual Cents Current */
+      employee_annual_cents_current: number;
+      /** Employee Annual Cents Full */
+      employee_annual_cents_full: number;
+      /** Employer Match Cents Current */
+      employer_match_cents_current: number;
+      /** Employer Match Cents Full */
+      employer_match_cents_full: number;
+      /**
+       * Full Match Pct
+       * @description Lowest contribution percentage that earns the whole match
+       */
+      full_match_pct: string;
+      /**
+       * Marginal Rate Used
+       * @description Federal bracket rate, in percent points, at the current contribution
+       */
+      marginal_rate_used: string;
+      /** Missed Cents */
+      missed_cents: number;
+      /** Per Paycheck After Tax Cost Cents */
+      per_paycheck_after_tax_cost_cents: number;
+      /** Per Paycheck Cost Delta Cents */
+      per_paycheck_cost_delta_cents: number;
+    };
     /**
      * LineItem
      * @description One printed line of the stub's current-period column (spec 005 rule 3).
@@ -746,6 +1177,22 @@ export interface components {
       employee_pct_upto: string;
       /** Employer Pct */
       employer_pct: string;
+    };
+    /**
+     * NumberClaim
+     * @description A figure the explanation states, for the UI to show beside the text.
+     */
+    NumberClaim: {
+      /**
+       * Label
+       * @description What the number is, in a few words
+       */
+      label: string;
+      /**
+       * Value
+       * @description The number exactly as written in the text, e.g. $2,400.00
+       */
+      value: string;
     };
     /**
      * OtherJob
@@ -1034,6 +1481,53 @@ export interface components {
       /** Text */
       text: string;
     };
+    /** SpendingSummary */
+    SpendingSummary: {
+      /** Categories */
+      categories: components['schemas']['CategoryTotal'][];
+      /** Category Buckets */
+      category_buckets: {
+        [key: string]: 'income' | 'essentials' | 'flexible' | 'savings' | 'other' | 'transfer';
+      };
+      /**
+       * End
+       * Format: date
+       */
+      end: string;
+      /** Essentials Cents */
+      essentials_cents: number;
+      /** Essentials Pct */
+      essentials_pct: string | null;
+      /** Flexible Cents */
+      flexible_cents: number;
+      /** Flexible Pct */
+      flexible_pct: string | null;
+      /** Income Cents */
+      income_cents: number;
+      /** Left Over Cents */
+      left_over_cents: number;
+      /** Other Cents */
+      other_cents: number;
+      /** Paycheck Count */
+      paycheck_count: number;
+      /** Savings Cents */
+      savings_cents: number;
+      /** Savings Rate Pct */
+      savings_rate_pct: string | null;
+      /**
+       * Start
+       * Format: date
+       */
+      start: string;
+      /** Transaction Count */
+      transaction_count: number;
+      /** Transfers Ignored Cents */
+      transfers_ignored_cents: number;
+      /** Uncategorized Cents */
+      uncategorized_cents: number;
+      /** Uncategorized Count */
+      uncategorized_count: number;
+    };
     /** SyncItemOut */
     SyncItemOut: {
       /**
@@ -1141,6 +1635,19 @@ export interface components {
       /** Error Type */
       type: string;
     };
+    /** VerificationOut */
+    VerificationOut: {
+      /** Citations Checked */
+      citations_checked: number;
+      /** Citations Unknown */
+      citations_unknown: string[];
+      /** Has Citation */
+      has_citation: boolean;
+      /** Numbers Checked */
+      numbers_checked: number;
+      /** Numbers Unmatched */
+      numbers_unmatched: string[];
+    };
   };
   responses: never;
   parameters: never;
@@ -1228,6 +1735,264 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  calc_401k_match: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['K401MatchInput'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['K401MatchResult'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  list_calendar: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CalendarEventOut'][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  list_decisions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DecisionList'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  save_decision: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DecisionIn'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DecisionSaved'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  get_decision: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        decision_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DecisionOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_explanation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        decision_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExplanationOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -1499,6 +2264,66 @@ export interface operations {
       };
     };
   };
+  explain: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ExplainIn'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExplanationOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
   health: {
     parameters: {
       query?: never;
@@ -1655,6 +2480,49 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ProfileOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  spending_summary: {
+    parameters: {
+      query?: {
+        /** @description First day, inclusive */
+        start?: string | null;
+        /** @description Last day, inclusive */
+        end?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SpendingSummary'];
         };
       };
       /** @description Unauthorized */

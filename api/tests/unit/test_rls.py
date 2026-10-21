@@ -1,10 +1,10 @@
-"""The SQL that ``db.rls.enable_rls`` applies to a table."""
+"""The SQL that ``db.rls`` applies to a table and to a function."""
 
 from __future__ import annotations
 
 import pytest
 
-from db.rls import rls_statements
+from db.rls import function_statements, rls_statements
 
 
 def test_default_statements() -> None:
@@ -40,3 +40,29 @@ def test_owner_column_is_validated() -> None:
 def test_privileges_are_validated(privileges: tuple[str, ...]) -> None:
     with pytest.raises(ValueError, match="privilege"):
         rls_statements("notes", privileges=privileges)
+
+
+def test_function_statements_revoke_the_supabase_defaults_then_grant_back() -> None:
+    assert function_statements("decision_is_mine(uuid)", execute=["authenticated"]) == [
+        "REVOKE ALL ON FUNCTION public.decision_is_mine(uuid) FROM PUBLIC, anon, authenticated",
+        "GRANT EXECUTE ON FUNCTION public.decision_is_mine(uuid) TO authenticated",
+    ]
+
+
+def test_trigger_functions_get_no_grant() -> None:
+    assert function_statements("decisions_immutable()") == [
+        "REVOKE ALL ON FUNCTION public.decisions_immutable() FROM PUBLIC, anon, authenticated",
+    ]
+
+
+@pytest.mark.parametrize(
+    "signature", ["decision_is_mine", "Mine(uuid)", "f(uuid); DROP TABLE x", "public.f()", ""]
+)
+def test_function_signatures_are_validated(signature: str) -> None:
+    with pytest.raises(ValueError, match="signature"):
+        function_statements(signature)
+
+
+def test_function_grantees_are_validated() -> None:
+    with pytest.raises(ValueError, match="identifier"):
+        function_statements("f()", execute=["authenticated; DROP ROLE x"])

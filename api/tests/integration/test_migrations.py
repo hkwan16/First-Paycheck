@@ -105,6 +105,7 @@ def test_supabase_api_roles_hold_only_the_grants_migrations_intend(
     assert "alembic_version" in tables_granted_to(engine, "app_api")
     assert functions_executable_by(engine, "authenticated") == [
         "current_user_id()",
+        "decision_is_mine(uuid)",
         "set_updated_at()",
     ]
 
