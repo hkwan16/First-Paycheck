@@ -329,7 +329,12 @@ export function layoutCashFlow(flow: CashFlow, containerWidth: number): FlowLayo
       y += node.h + NODE_GAP;
     }
   };
-  const columns = [[gross], [...lineNodes, takeHome], bucketNodes, categoryNodes] as const;
+  const columns: FlowLayout['columns'] = [
+    [gross],
+    [...lineNodes, takeHome],
+    bucketNodes,
+    categoryNodes,
+  ];
   stack(columns[0], TOP);
   stack(columns[1], TOP);
   stack(columns[2], takeHome.y);
@@ -364,7 +369,7 @@ export function layoutCashFlow(flow: CashFlow, containerWidth: number): FlowLayo
     nodeW: NODE_W,
     columnX,
     nodes: columns.flat(),
-    columns: [columns[0], columns[1], columns[2], columns[3]],
+    columns,
     links,
     scale,
   };
