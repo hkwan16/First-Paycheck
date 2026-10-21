@@ -12,8 +12,9 @@ import { AuthGate } from './auth-gate';
  * Every runtime read sits behind Suspense so the shell prerenders: the URL
  * (for the nav's current item; the fallback is the same nav without it, so
  * nothing shifts), the user (header account chips, empty until they stream
- * in) and the session guard (the screen streams in after it). Profile chips
- * and done marks come from the API once the data layer lands.
+ * in) and the session guard (the screen streams in after it). The nav's
+ * done marks come from the API (AppSideNav, useSetupProgress); profile chips
+ * arrive with GET /profile.
  */
 export default function AppLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
