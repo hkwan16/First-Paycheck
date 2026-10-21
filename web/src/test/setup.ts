@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll } from 'vitest';
 import { resetDb } from './msw/db';
 import { resetJobScripts } from './msw/handlers';
 import { server } from './msw/server';
+import { resetSpendingDb } from './msw/spending-handlers';
 
 // Any request without a handler is a test bug, not a network call.
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -12,5 +13,6 @@ afterEach(() => {
   server.resetHandlers();
   resetDb();
   resetJobScripts();
+  resetSpendingDb();
 });
 afterAll(() => server.close());

@@ -5,6 +5,9 @@ import {
   invalidateAfterConfirm,
   invalidateDocuments,
   invalidateForJob,
+  invalidateLinkedData,
+  invalidateRecurring,
+  invalidateSpending,
   JOB_INVALIDATES,
   queryKeys,
 } from './keys';
@@ -123,5 +126,55 @@ describe('document keys', () => {
     expect(invalidated(keys.detail)).toBe(true);
     expect(invalidated(keys.payStubs)).toBe(true);
     expect(invalidated(keys.accounts)).toBe(false);
+  });
+});
+
+describe('spending and recurring keys', () => {
+  function seededSpending() {
+    const client = new QueryClient();
+    const keys = {
+      cashflow: $api.queryOptions('get', '/cashflow').queryKey,
+      cashflowAugust: $api.queryOptions('get', '/cashflow', {
+        params: { query: { start: '2026-08-01', end: '2026-08-31' } },
+      }).queryKey,
+      summary: $api.queryOptions('get', '/spending/summary').queryKey,
+      recurring: $api.queryOptions('get', '/recurring').queryKey,
+      accounts: $api.queryOptions('get', '/accounts').queryKey,
+    };
+    for (const key of Object.values(keys)) client.setQueryData(key, {});
+    const invalidated = (key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
+    return { client, keys, invalidated };
+  }
+
+  it('prefix every period of a read', () => {
+    const { keys } = seededSpending();
+    expect(keys.cashflowAugust.slice(0, 2)).toEqual(queryKeys.cashflow());
+    expect(keys.summary.slice(0, 2)).toEqual(queryKeys.spendingSummary());
+    expect(keys.recurring.slice(0, 2)).toEqual(queryKeys.recurring());
+  });
+
+  it('a category fix refreshes the cash flow and summary of every period', async () => {
+    const { client, keys, invalidated } = seededSpending();
+    await invalidateSpending(client);
+    expect(invalidated(keys.cashflow)).toBe(true);
+    expect(invalidated(keys.cashflowAugust)).toBe(true);
+    expect(invalidated(keys.summary)).toBe(true);
+    expect(invalidated(keys.recurring)).toBe(false);
+  });
+
+  it('invalidateRecurring refreshes the recurring list only', async () => {
+    const { client, keys, invalidated } = seededSpending();
+    await invalidateRecurring(client);
+    expect(invalidated(keys.recurring)).toBe(true);
+    expect(invalidated(keys.cashflow)).toBe(false);
+  });
+
+  it('recurring detection refreshes the list; a CSV import refreshes accounts and spending', async () => {
+    expect(JOB_INVALIDATES['recurring.detect']).toEqual([queryKeys.recurring()]);
+    const { client, keys, invalidated } = seededSpending();
+    await invalidateLinkedData(client);
+    expect(invalidated(keys.accounts)).toBe(true);
+    expect(invalidated(keys.cashflow)).toBe(true);
+    expect(invalidated(keys.recurring)).toBe(false);
   });
 });

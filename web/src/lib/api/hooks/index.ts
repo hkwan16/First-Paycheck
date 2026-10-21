@@ -9,6 +9,8 @@ export * from './documents';
 export * from './health';
 export * from './jobs';
 export * from './profile';
+export * from './recurring';
 export * from './setup';
+export * from './spending';
 export * from './sync';
 export * from './transactions';
