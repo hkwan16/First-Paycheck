@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { CheckIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -13,6 +13,7 @@ import { useAccounts, useJob, useSandboxLink, useTriggerSync } from '@/lib/api/h
 import type { Job, LinkedItem } from '@/lib/api/types';
 import { formatNumber } from '@/lib/money';
 import { groupByInstitution } from './account-format';
+import { CsvImport } from './CsvImport';
 import { InstitutionGroup } from './InstitutionGroup';
 import { LinkBankButton } from './LinkBankButton';
 
@@ -82,6 +83,8 @@ export function AccountsCard({ showSandboxLink }: AccountsCardProps) {
   const trigger = useTriggerSync();
   const [active, setActive] = useState<ActiveSync | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
+  const [csvOpen, setCsvOpen] = useState(false);
+  const csvPanelId = useId();
   const job = useJob(active?.jobId);
 
   const list = accounts.data ?? [];
@@ -196,14 +199,18 @@ export function AccountsCard({ showSandboxLink }: AccountsCardProps) {
             Link sandbox bank (test)
           </Button>
         )}
-        <Button disabled>
-          Import a CSV instead
-          <Badge>After alpha</Badge>
+        <Button
+          aria-expanded={csvOpen}
+          aria-controls={csvOpen ? csvPanelId : undefined}
+          onClick={() => setCsvOpen((open) => !open)}
+        >
+          Import a CSV
         </Button>
         <span className="text-small text-ink-3">
           A CSV goes through the same pipeline as a linked account.
         </span>
       </div>
+      {csvOpen && <CsvImport id={csvPanelId} />}
     </Card>
   );
 }

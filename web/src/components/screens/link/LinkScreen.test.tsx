@@ -416,12 +416,27 @@ describe('LinkScreen linking a bank', () => {
     ).toBeInTheDocument();
   });
 
-  it('hides the sandbox button without the flag, and keeps CSV import for after alpha', async () => {
+  it('hides the sandbox button without the flag', async () => {
     renderLink();
     await screen.findByRole('group', { name: 'Chase Total Checking' });
     expect(screen.queryByRole('button', { name: 'Link sandbox bank (test)' })).toBeNull();
-    expect(screen.getByRole('button', { name: /Import a CSV instead/ })).toBeDisabled();
-    expect(within(accountsCard()).getByText('After alpha')).toBeInTheDocument();
+  });
+
+  it('opens and closes the CSV import next to the bank link', async () => {
+    const { user } = renderLink();
+    await screen.findByRole('group', { name: 'Chase Total Checking' });
+    const toggle = within(accountsCard()).getByRole('button', { name: 'Import a CSV' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('region', { name: 'Import a CSV' })).toBeNull();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const panel = screen.getByRole('region', { name: 'Import a CSV' });
+    expect(toggle).toHaveAttribute('aria-controls', panel.id);
+    expect(within(panel).getByLabelText(/Choose a CSV file/)).toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(screen.queryByRole('region', { name: 'Import a CSV' })).toBeNull();
   });
 
   it('syncs an institution on demand', async () => {
