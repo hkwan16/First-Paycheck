@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { $api } from './client';
 import {
   invalidateAfterConfirm,
+  invalidateAfterDecision,
+  invalidateDecisions,
   invalidateDocuments,
   invalidateForJob,
   JOB_INVALIDATES,
@@ -123,5 +125,72 @@ describe('document keys', () => {
     expect(invalidated(keys.detail)).toBe(true);
     expect(invalidated(keys.payStubs)).toBe(true);
     expect(invalidated(keys.accounts)).toBe(false);
+  });
+});
+
+describe('decision keys', () => {
+  const body = { contribution_pct: '4.00' };
+
+  function seededDecisions() {
+    const client = new QueryClient();
+    const keys = {
+      list: $api.queryOptions('get', '/decisions').queryKey,
+      one: $api.queryOptions('get', '/decisions/{decision_id}', {
+        params: { path: { decision_id: 'dec1' } },
+      }).queryKey,
+      explanation: $api.queryOptions('get', '/decisions/{decision_id}/explanation', {
+        params: { path: { decision_id: 'dec1' } },
+      }).queryKey,
+      calendar: $api.queryOptions('get', '/calendar').queryKey,
+      plan: queryKeys.plan(),
+      goals: queryKeys.goals(),
+      calc: queryKeys.calc('/calc/401k-match', body),
+      profile: $api.queryOptions('get', '/profile').queryKey,
+    };
+    for (const key of Object.values(keys)) client.setQueryData(key, {});
+    const invalidated = (key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
+    return { client, keys, invalidated };
+  }
+
+  it("match the keys $api's hooks cache under", () => {
+    expect(queryKeys.decisions()).toEqual($api.queryOptions('get', '/decisions').queryKey);
+    expect(queryKeys.decision('dec1')).toEqual(
+      $api.queryOptions('get', '/decisions/{decision_id}', {
+        params: { path: { decision_id: 'dec1' } },
+      }).queryKey,
+    );
+    expect(queryKeys.explanation('dec1')).toEqual(
+      $api.queryOptions('get', '/decisions/{decision_id}/explanation', {
+        params: { path: { decision_id: 'dec1' } },
+      }).queryKey,
+    );
+    expect(queryKeys.calendar()).toEqual($api.queryOptions('get', '/calendar').queryKey);
+    expect(queryKeys.calc('/calc/401k-match', body)).toEqual(
+      $api.queryOptions('post', '/calc/401k-match', { body: body as never }).queryKey,
+    );
+    expect(queryKeys.calc('/calc/401k-match', body).slice(0, 2)).toEqual(
+      queryKeys.calc('/calc/401k-match'),
+    );
+  });
+
+  it('a saved decision refreshes decisions, the calendar, the plan and goals', async () => {
+    const { client, keys, invalidated } = seededDecisions();
+    await invalidateAfterDecision(client);
+    expect(invalidated(keys.list)).toBe(true);
+    expect(invalidated(keys.one)).toBe(true);
+    expect(invalidated(keys.calendar)).toBe(true);
+    expect(invalidated(keys.plan)).toBe(true);
+    expect(invalidated(keys.goals)).toBe(true);
+    expect(invalidated(keys.explanation)).toBe(false);
+    expect(invalidated(keys.calc)).toBe(false);
+    expect(invalidated(keys.profile)).toBe(false);
+  });
+
+  it('invalidateDecisions refreshes only the decision reads', async () => {
+    const { client, keys, invalidated } = seededDecisions();
+    await invalidateDecisions(client);
+    expect(invalidated(keys.list)).toBe(true);
+    expect(invalidated(keys.one)).toBe(true);
+    expect(invalidated(keys.calendar)).toBe(false);
   });
 });

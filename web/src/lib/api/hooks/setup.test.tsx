@@ -1,7 +1,7 @@
 import { waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { samplePayStub } from '@/test/fixtures/documents';
-import { db, emptyDb, emptyDocuments } from '@/test/msw/db';
+import { db, emptyDb, emptyDocuments, savedDecision } from '@/test/msw/db';
 import { renderHookWithClient } from '@/test/render';
 import { useSetupFacts, useSetupProgress } from './setup';
 
@@ -57,5 +57,13 @@ describe('useSetupProgress with documents', () => {
     db.payStubs = [samplePayStub()];
     const { result } = renderHookWithClient(() => useSetupProgress());
     await waitFor(() => expect(result.current.confirm).toBe(true));
+  });
+});
+
+describe('useSetupFacts with decisions', () => {
+  it('names the calculators with a saved decision by their feature flag ids', async () => {
+    savedDecision();
+    const { result } = renderHookWithClient(() => useSetupFacts());
+    await waitFor(() => expect(result.current.savedDecisionCalculators).toEqual(['401k_match']));
   });
 });

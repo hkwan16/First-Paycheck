@@ -1,13 +1,22 @@
 import type {
   Account,
+  CalendarEvent,
+  Decision,
   DocumentSummary,
+  Explanation,
   Job,
   PayStub,
   Profile,
   Proposal,
   Transaction,
 } from '@/lib/api/types';
-import { emptyProfile, sampleDocument, sampleProposal } from '../fixtures/documents';
+import {
+  sampleCalendarEvent,
+  sampleDecision,
+  sampleExplanation,
+  sampleProfile,
+} from '../fixtures/decisions';
+import { emptyProfile, sampleDocument, samplePayStub, sampleProposal } from '../fixtures/documents';
 import { sampleAccounts, sampleTransactions } from '../fixtures/sample';
 
 /**
@@ -29,6 +38,15 @@ export interface TestDb {
   nextProposal: Proposal;
   payStubs: PayStub[];
   profile: Profile;
+  /** Every saved version, oldest first; `is_current` is worked out when read. */
+  decisions: Decision[];
+  /** Each decision's explanation rows, oldest first. */
+  explanations: Map<string, Explanation[]>;
+  calendar: CalendarEvent[];
+  /** False: `POST /explain` answers 503 `llm_unavailable` when it needs the model. */
+  llmConfigured: boolean;
+  /** How the next explain runs end, one per run; a run with none left verifies. */
+  explainOutcomes: ('verified' | 'fallback')[];
 }
 
 export const db: TestDb = {
@@ -41,6 +59,11 @@ export const db: TestDb = {
   nextProposal: sampleProposal,
   payStubs: [],
   profile: emptyProfile,
+  decisions: [],
+  explanations: new Map(),
+  calendar: [],
+  llmConfigured: true,
+  explainOutcomes: [],
 };
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -60,6 +83,29 @@ export function resetDb() {
   db.nextProposal = clone(sampleProposal);
   db.payStubs = [];
   db.profile = clone(emptyProfile);
+  db.decisions = [];
+  db.explanations = new Map();
+  db.calendar = [];
+  db.llmConfigured = true;
+  db.explainOutcomes = [];
+}
+
+/**
+ * Ready for decisions: the sample stub confirmed and the profile holding the
+ * salary, pay schedule, filing status and match formula the 401(k) card reads.
+ */
+export function decisionsReady() {
+  db.payStubs = [samplePayStub()];
+  db.profile = clone(sampleProfile);
+}
+
+/** `decisionsReady`, plus the 401(k) decision v1 at 4%, its explanation and its check. */
+export function savedDecision() {
+  decisionsReady();
+  const decision = sampleDecision();
+  db.decisions = [decision];
+  db.explanations = new Map([[decision.id, [sampleExplanation()]]]);
+  db.calendar = [sampleCalendarEvent()];
 }
 
 /** A user who has linked and uploaded nothing yet. */

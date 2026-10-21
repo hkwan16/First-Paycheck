@@ -4,8 +4,11 @@
  * Conventions are in web/CLAUDE.md ("Data layer").
  */
 export * from './accounts';
+export * from './calc';
 export * from './debounce';
+export * from './decisions';
 export * from './documents';
+export * from './explain';
 export * from './health';
 export * from './jobs';
 export * from './profile';

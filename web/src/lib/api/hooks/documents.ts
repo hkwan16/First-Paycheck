@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { $api, fetchClient } from '../client';
+import { apiErrorCode } from '../errors';
 import { invalidateAfterConfirm, invalidateDocuments } from '../keys';
 import type {
   Confirmed,
@@ -147,9 +148,6 @@ export class PayStubUnbalanced extends Error {
 /** Codes that mean the document changed state under the screen: re-read it. */
 const STATE_CONFLICTS = new Set(['document_confirmed', 'document_deleted', 'document_not_ready']);
 
-const errorCode = (error: unknown): string | undefined =>
-  (error as Partial<ApiErrorBody> | null)?.error?.code;
-
 export interface ConfirmDocumentVariables {
   documentId: string;
   values: PayStubValues;
@@ -171,14 +169,14 @@ export function useConfirmDocument() {
       if (error !== undefined) {
         const body = error as ApiErrorBody;
         const balance =
-          errorCode(body) === 'pay_stub_unbalanced' ? readBalance(body.error.details) : null;
+          apiErrorCode(body) === 'pay_stub_unbalanced' ? readBalance(body.error.details) : null;
         throw balance ? new PayStubUnbalanced(body, balance) : error;
       }
       return data;
     },
     onSuccess: () => invalidateAfterConfirm(queryClient),
     onError: (error) => {
-      const code = errorCode(error);
+      const code = apiErrorCode(error);
       if (code && STATE_CONFLICTS.has(code)) void invalidateDocuments(queryClient);
     },
   });
