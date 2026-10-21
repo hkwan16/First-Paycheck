@@ -214,6 +214,8 @@ explanation, `GET /calendar` shows the check it implies.
   (a factory, `app/deps.py`): read in one session, call the gateway with none
   open, write in a second. `LlmGateway` is lazy, so a 404 or a stored verified
   explanation needs no model; an unconfigured model is 503 `llm_unavailable`.
+  A run that reaches the model counts against `ratelimit.EXPLAIN_RUNS` (30 per
+  clock hour, 429 with `Retry-After`); stored answers, 404s and 503s are free.
 - **IRS passages** are curated in `db/seed/irs_citations/<prefix>.yaml`,
   quoted exactly from irs.gov (under 80 words, `...` for omissions, every part
   verified against the live page; `verified: false` entries are not loaded).

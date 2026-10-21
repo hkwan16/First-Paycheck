@@ -16,8 +16,9 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import ratelimit
 from app.auth import CurrentUser
-from app.deps import LlmGateway, UserSession, UserSessions
+from app.deps import LlmGateway, Now, UserSession, UserSessions
 from app.errors import NotFound, error_responses
 from app.types import UtcDateTime
 from db.enums import CalculatorKind
@@ -145,9 +146,9 @@ def _row(user_id: uuid.UUID, decision_id: uuid.UUID, attempt: Attempt) -> Explan
     )
 
 
-@router.post("/explain", responses=error_responses(401, 404, 503))
+@router.post("/explain", responses=error_responses(401, 404, 429, 503))
 def explain(
-    body: ExplainIn, user: CurrentUser, sessions: UserSessions, gateway: LlmGateway
+    body: ExplainIn, user: CurrentUser, sessions: UserSessions, gateway: LlmGateway, now: Now
 ) -> ExplanationOut:
     """Explain a decision; returns the existing verified explanation unless ``force``."""
     with sessions() as session:
@@ -157,6 +158,10 @@ def explain(
             existing = _latest(session, decision.id, verified=True)
             if existing is not None:
                 return _out(existing, decision.id, citations)
+        # A run is about to start: a missing model is 503 before it counts, and
+        # a refused run rolls its increment back with this session (rule 22).
+        model = gateway()
+        ratelimit.consume(session, user.id, ratelimit.EXPLAIN_RUNS, now=now)
         passages = benefits_search.search(
             session,
             user.id,
@@ -168,7 +173,7 @@ def explain(
     keys = {citation.key for citation in citations}
     # The model call runs with no session open (rule 21).
     attempts = run_explain(
-        gateway(),
+        model,
         user.id,
         explain_context(decision.calculator, inputs, result, citations, passages),
         AllowedNumbers.from_decision(inputs, result),
