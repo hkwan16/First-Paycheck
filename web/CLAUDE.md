@@ -128,8 +128,9 @@ disabled button, never a dead link).
 ## Auth
 
 Supabase Auth with `@supabase/ssr` cookies. Without `NEXT_PUBLIC_SUPABASE_URL` and
-`NEXT_PUBLIC_SUPABASE_ANON_KEY` auth is off: the guard lets every screen render and the API client
-sends no token (unit tests, CI e2e, previews without secrets).
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (the `sb_publishable_...` key, never the secret key) auth is
+off: the guard lets every screen render and the API client sends no token (unit tests, CI e2e,
+previews without secrets).
 
 - **Sign-in** (`/sign-in`, `AuthForm`): password (`signInWithPassword`), account creation
   (`?mode=sign-up`, `signUp`), magic link (`signInWithOtp`). Email links return through
@@ -160,11 +161,11 @@ sends no token (unit tests, CI e2e, previews without secrets).
 (git-ignored) for the `authenticated` project, which runs `e2e/auth.spec.ts`. Set these in
 `web/.env.local` or the environment:
 
-| Variable                                                    | Needed for                                                                       |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)               |
-| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                       | the signed-in tests (sign in, return to `next`, sign out, saved session)         |
-| `NEXT_PUBLIC_E2E_USER_EMAIL`                                | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip |
+| Variable                                                           | Needed for                                                                       |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)               |
+| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)         |
+| `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip |
 
 Missing variables skip those tests with a message saying which to set. The e2e user must be a
 confirmed user: the hosted project requires email confirmation, so create it in the Supabase

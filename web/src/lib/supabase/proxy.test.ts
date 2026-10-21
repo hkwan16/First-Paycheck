@@ -40,7 +40,7 @@ function refreshDuringGetClaims() {
 describe('updateSession', () => {
   beforeEach(() => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://x.supabase.co');
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'sb_publishable_test');
     mocks.getClaims.mockResolvedValue({ data: null, error: null });
   });
 

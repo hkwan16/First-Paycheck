@@ -8,7 +8,7 @@ export const STORAGE_STATE = path.join(__dirname, '..', '.auth', 'user.json');
 export const SIGNED_OUT = { cookies: [], origins: [] };
 
 export const NO_SUPABASE =
-  'Skipped: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY (web/.env.local) to run the auth e2e tests against a Supabase project.';
+  'Skipped: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (web/.env.local) to run the auth e2e tests against a Supabase project.';
 
 export const NO_E2E_USER =
   'Skipped: set E2E_USER_EMAIL and E2E_USER_PASSWORD (a confirmed user in that Supabase project, see web/CLAUDE.md) to run the signed-in e2e tests.';
@@ -16,7 +16,7 @@ export const NO_E2E_USER =
 export function supabaseConfigured(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim(),
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim(),
   );
 }
 

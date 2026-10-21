@@ -9,6 +9,6 @@ export function getSupabaseBrowserClient(): SupabaseClient | null {
   if (client) return client;
   const env = readSupabaseEnv();
   if (!env) return null;
-  client = createBrowserClient(env.url, env.anonKey);
+  client = createBrowserClient(env.url, env.publishableKey);
   return client;
 }

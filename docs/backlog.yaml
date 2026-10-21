@@ -132,7 +132,7 @@ issues:
   - title: "Vercel project on web/ with env vars and preview deploys"
     body: >-
       Create the Vercel project rooted at web/ with NEXT_PUBLIC_API_URL, the
-      Supabase URL and anon key, and NEXT_PUBLIC_FEATURES, with a preview per
+      Supabase URL and publishable key, and NEXT_PUBLIC_FEATURES, with a preview per
       pull request. Done when production serves the sign-in page with the
       correct tokens.
     labels: ["area:infra", "area:web"]

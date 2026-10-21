@@ -17,7 +17,7 @@ const forwarded = (response: Response, name: string) =>
 describe('proxy', () => {
   beforeEach(() => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://x.supabase.co');
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'sb_publishable_test');
   });
 
   it('passes the request through untouched when Supabase is not configured', async () => {
@@ -44,7 +44,7 @@ describe('proxy', () => {
   });
 
   it('forwards the path even when Supabase is not configured', async () => {
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', '');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '');
     const response = await proxy(new NextRequest('http://localhost:3000/setup/link'));
     expect(forwarded(response, 'x-first-paycheck-path')).toBe('/setup/link');
   });

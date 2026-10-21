@@ -23,7 +23,7 @@ describe('getSupabaseServerClient', () => {
   beforeEach(() => {
     mocks.cookies.mockClear();
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://x.supabase.co');
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'sb_publishable_test');
   });
 
   it('returns null without env vars and never touches cookies', async () => {
@@ -53,7 +53,7 @@ describe('getSupabaseServerClient', () => {
 describe('getCurrentUser', () => {
   beforeEach(() => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://x.supabase.co');
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'sb_publishable_test');
   });
 
   it('returns the verified user', async () => {
