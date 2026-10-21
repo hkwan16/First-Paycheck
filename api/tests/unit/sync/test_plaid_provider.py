@@ -213,3 +213,53 @@ def test_other_errors_pass_through() -> None:
     error = plaid_error("INTERNAL_SERVER_ERROR", "API_ERROR")
     with pytest.raises(PlaidError, match="INTERNAL_SERVER_ERROR"):
         provider(FakeClient(transactions_sync=error)).fetch_transactions(None)
+
+
+# Responses recorded from the Plaid sandbox (scripts/record_plaid_fixtures.py) with ids and
+# tokens scrubbed. The hand-written fixtures above cover scenarios the sandbox does not return
+# (pagination, modified and removed rows, a pending row); these check the real shapes.
+RECORDED = FIXTURES / "recorded"
+
+
+def recorded(name: str) -> dict[str, Any]:
+    data: dict[str, Any] = json.loads((RECORDED / f"{name}.json").read_text(), parse_float=Decimal)
+    return data
+
+
+def test_recorded_sandbox_accounts_map_to_every_kind_we_support() -> None:
+    client = FakeClient(accounts_get=recorded("accounts_get"))
+    accounts = provider(client).fetch_accounts()
+    assert len(accounts) == 14
+    kinds = {account.name: account.kind for account in accounts}
+    assert kinds["Plaid Checking"] is AccountKind.CHECKING
+    assert kinds["Plaid Saving"] is AccountKind.SAVINGS
+    assert kinds["Plaid Credit Card"] is AccountKind.CREDIT
+    assert kinds["Plaid 401k"] is AccountKind.RETIREMENT
+    assert kinds["Plaid Mortgage"] is AccountKind.CREDIT  # loans map to credit (spec 002)
+    assert all(account.mask is None or account.mask.isdigit() for account in accounts)
+    balances = provider(client).fetch_balances()
+    assert {b.provider_account_id for b in balances} <= {a.provider_account_id for a in accounts}
+
+
+def test_recorded_sandbox_transactions_parse_as_one_complete_page() -> None:
+    page = recorded("transactions_sync_page1")
+    client = FakeClient(transactions_sync=page)
+    first = provider(client).fetch_transactions(None)
+    assert first.has_more is False
+    assert first.next_cursor == page["next_cursor"]
+    assert len(first.added) == 49
+    assert first.modified == [] and first.removed == []
+    assert all(isinstance(t.amount_cents, int) for t in first.added)
+    assert all(t.merchant_raw for t in first.added)
+    assert all(isinstance(t.posted_at, dt.date) for t in first.added)
+    assert {t.provider_account_id for t in first.added} <= {
+        account["account_id"] for account in page["accounts"]
+    }
+
+
+def test_recorded_sandbox_holdings_parse() -> None:
+    client = FakeClient(investments_holdings_get=recorded("investments_holdings_get"))
+    holdings = provider(client).fetch_holdings()
+    assert len(holdings) == 13
+    assert all(isinstance(h.value_cents, int) for h in holdings)
+    assert all(h.quantity > 0 for h in holdings)

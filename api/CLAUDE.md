@@ -190,7 +190,7 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   `tests/support/factories.py` (written as the owning user, under RLS).
 - `tests/rls/test_cross_user.py`: every new route needs a `ROUTE_CASES` entry
   (user B against user A's data); a meta-test fails on any uncovered route.
-- Plaid fixtures in `tests/fixtures/plaid/` are hand-written in Plaid's
+- Plaid fixtures in `tests/fixtures/plaid/` are hand-written scenarios (pagination, modified and removed rows); `tests/fixtures/plaid/recorded/` holds real sandbox responses, scrubbed, for shape tests. The hand-written ones are in Plaid's
   response shapes; `scripts/record_plaid_fixtures.py` re-records them from the
   sandbox when keys are available. `tests/unit/test_fixture_secrets.py` fails
   on any token, key or configured live credential in a committed fixture.
