@@ -29,18 +29,20 @@ export const newestReviewable = (documents: readonly DocumentSummary[] | undefin
 export interface UseDocumentsOptions {
   /**
    * Re-read every 1.5 s while a document is `extracting`, for documents
-   * whose job this page did not start (after a reload, say).
+   * whose job this page did not start (after a reload, say). A function
+   * picks which extracting documents count, so a screen already following a
+   * document's job does not poll the list for it too.
    */
-  pollWhileExtracting?: boolean;
+  pollWhileExtracting?: boolean | ((document: DocumentSummary) => boolean);
 }
 
 /** `GET /docs`: the person's documents, newest first. */
 export function useDocuments({ pollWhileExtracting = false }: UseDocumentsOptions = {}) {
+  const counts =
+    typeof pollWhileExtracting === 'function' ? pollWhileExtracting : () => pollWhileExtracting;
   return $api.useQuery('get', '/docs', undefined, {
     refetchInterval: (query) =>
-      pollWhileExtracting && query.state.data?.some((d) => d.status === 'extracting')
-        ? JOB_POLL_MS
-        : false,
+      query.state.data?.some((d) => d.status === 'extracting' && counts(d)) ? JOB_POLL_MS : false,
   });
 }
 

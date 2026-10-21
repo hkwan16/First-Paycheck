@@ -2,11 +2,13 @@ import { http, HttpResponse } from 'msw';
 import type { PlaidLinkOptionsWithLinkToken } from 'react-plaid-link';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JOB_POLL_MS } from '@/lib/api/hooks';
+import { installFakeXhr } from '@/test/fake-xhr';
+import { PAY_STUB_DOC_ID, sampleBenefitsDocument, sampleDocument } from '@/test/fixtures/documents';
 import { CHASE_ITEM_ID, CHECKING_ID, SAMPLE_NOW, sampleJob } from '@/test/fixtures/sample';
 import { db, emptyDb, emptyDocuments } from '@/test/msw/db';
-import { apiUrl, scriptJob } from '@/test/msw/handlers';
+import { apiUrl, createDocument, scriptJob } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
-import { act, renderWithProviders, screen, waitFor, within } from '@/test/render';
+import { act, renderWithProviders, screen, userEvent, waitFor, within } from '@/test/render';
 import { LinkScreen } from './LinkScreen';
 
 // Plaid Link is a third-party iframe: the test stands in for it and calls
@@ -73,6 +75,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
   server.events.removeAllListeners();
 });
 
@@ -370,15 +373,286 @@ describe('LinkScreen linking a bank', () => {
   });
 });
 
+const docsCard = () => screen.getByRole('region', { name: 'Documents' });
+const pdf = (name = 'acme.pdf') =>
+  new File(['%PDF-1.7 synthetic'], name, { type: 'application/pdf' });
+const dropZone = () => within(docsCard()).getByLabelText(/Add (another|a) document/);
+const firstStubRow = () => within(docsCard()).findAllByRole('group', { name: /^Pay stub/ });
+
 describe('LinkScreen documents', () => {
-  it('shows the empty state, the redaction notice and a disabled upload until uploads land', async () => {
+  it('lists each document with its status, pages, upload time and redactions', async () => {
+    db.documents = [
+      sampleDocument(),
+      sampleDocument({
+        id: 'doc-reading',
+        status: 'extracting',
+        page_count: null,
+        redaction_count: 0,
+      }),
+      sampleDocument({ id: 'doc-up', status: 'uploaded', page_count: null, redaction_count: 0 }),
+      sampleDocument({
+        id: 'doc-manual',
+        status: 'manual_entry_required',
+        status_reason: 'refused',
+        redaction_count: 1,
+      }),
+      sampleDocument({ id: 'doc-done', status: 'confirmed', redaction_count: 0 }),
+      sampleDocument({
+        id: 'doc-failed',
+        status: 'failed',
+        status_reason: 'unreadable_file',
+        page_count: null,
+        redaction_count: 0,
+      }),
+      sampleBenefitsDocument,
+    ];
     renderLink();
-    const docs = screen.getByRole('region', { name: 'Documents' });
-    expect(within(docs).getByText(/No documents yet/)).toBeInTheDocument();
-    expect(within(docs).getByText('Coming next')).toBeInTheDocument();
-    expect(within(docs).getByLabelText(/Add a pay stub or benefits summary/)).toBeDisabled();
-    expect(docs).toHaveTextContent(
+    const rows = await firstStubRow();
+    expect(rows).toHaveLength(6);
+    const [proposed, reading, uploaded, manual, confirmed, failedRow] = rows as [
+      HTMLElement,
+      HTMLElement,
+      HTMLElement,
+      HTMLElement,
+      HTMLElement,
+      HTMLElement,
+    ];
+
+    expect(proposed).toHaveTextContent('Review needed');
+    expect(proposed).toHaveTextContent('1 page · uploaded 2 minutes ago');
+    expect(within(proposed).getByText('2 items redacted')).toBeInTheDocument();
+    expect(within(proposed).getByRole('link', { name: 'Review pay stub' })).toHaveAttribute(
+      'href',
+      `/setup/confirm/${PAY_STUB_DOC_ID}`,
+    );
+
+    expect(reading).toHaveTextContent('Reading');
+    expect(
+      within(reading).getByRole('progressbar', { name: 'Reading pay stub' }),
+    ).toBeInTheDocument();
+    expect(within(reading).queryByText(/redacted/)).not.toBeInTheDocument();
+    expect(within(reading).getByRole('button', { name: 'Replace pay stub' })).toBeDisabled();
+
+    expect(uploaded).toHaveTextContent('Uploaded');
+    expect(within(uploaded).getByRole('button', { name: 'Read pay stub' })).toBeEnabled();
+
+    expect(manual).toHaveTextContent('Manual entry needed');
+    expect(manual).toHaveTextContent('The AI declined to read this document');
+    expect(within(manual).getByText('1 item redacted')).toBeInTheDocument();
+    expect(within(manual).getByRole('link', { name: 'Enter pay stub fields' })).toHaveAttribute(
+      'href',
+      '/setup/confirm/doc-manual',
+    );
+
+    expect(confirmed).toHaveTextContent('Confirmed');
+    expect(within(confirmed).getByText('0 items redacted')).toBeInTheDocument();
+    expect(within(confirmed).queryByRole('link')).not.toBeInTheDocument();
+
+    expect(failedRow).toHaveTextContent('Failed');
+    expect(failedRow).toHaveTextContent('This file could not be opened.');
+
+    const benefits = within(docsCard()).getByRole('group', { name: /^Benefits summary/ });
+    expect(benefits).toHaveTextContent('Review needed');
+    expect(benefits).toHaveTextContent('Benefits are reviewed with your health plan decision');
+    expect(within(benefits).queryByRole('link')).not.toBeInTheDocument();
+
+    expect(screen.getByRole('link', { name: /Review extracted fields/ })).toHaveAttribute(
+      'href',
+      `/setup/confirm/${PAY_STUB_DOC_ID}`,
+    );
+  });
+
+  it('shows the empty state and the redaction notice for a new user', async () => {
+    emptyDocuments();
+    renderLink();
+    expect(await within(docsCard()).findByText(/No documents yet/)).toBeInTheDocument();
+    expect(docsCard()).toHaveTextContent(
       'Before any AI sees a page, SSNs and account numbers are blacked out.',
     );
+    expect(dropZone()).toBeEnabled();
+  });
+
+  it('uploads with a progress bar, reads the file automatically and follows the job to review', async () => {
+    const xhr = installFakeXhr();
+    emptyDocuments();
+    const extracts: string[] = [];
+    server.events.on('request:start', ({ request }) => {
+      const path = new URL(request.url).pathname;
+      if (request.method === 'POST' && path.endsWith('/extract')) extracts.push(path);
+    });
+    const { user } = renderLink();
+    await within(docsCard()).findByText(/No documents yet/);
+
+    await user.upload(dropZone(), pdf());
+    await waitFor(() => expect(xhr.requests).toHaveLength(1));
+    expect(xhr.last().field('type')).toBe('pay_stub');
+    const bar = within(docsCard()).getByRole('progressbar', { name: 'Uploading acme.pdf' });
+    expect(bar).toHaveAttribute('aria-valuenow', '0');
+
+    act(() => xhr.last().progress(40, 100));
+    expect(bar).toHaveAttribute('aria-valuenow', '40');
+    expect(within(docsCard()).getByText('40%')).toBeInTheDocument();
+
+    const created = createDocument('pay_stub');
+    act(() => xhr.last().respond(201, { document_id: created.id }));
+    const reading = await within(docsCard()).findByRole('progressbar', {
+      name: 'Reading pay stub',
+    });
+    await waitFor(() => expect(extracts).toHaveLength(1));
+    expect(
+      within(docsCard()).queryByRole('progressbar', { name: 'Uploading acme.pdf' }),
+    ).toBeNull();
+
+    await poll();
+    await waitFor(() => expect(reading).toHaveAttribute('aria-valuenow', '50'));
+    await poll();
+    const [row] = await firstStubRow();
+    await waitFor(() => expect(row).toHaveTextContent('Review needed'));
+    expect(within(row!).getByText('2 items redacted')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Review extracted fields/ })).toHaveAttribute(
+      'href',
+      `/setup/confirm/${created.id}`,
+    );
+  });
+
+  it('uploads as the chosen type', async () => {
+    const xhr = installFakeXhr();
+    const { user } = renderLink();
+    await firstStubRow();
+    await user.selectOptions(within(docsCard()).getByLabelText('Document type'), [
+      'Benefits summary',
+    ]);
+    await user.upload(dropZone(), pdf('benefits.pdf'));
+    await waitFor(() => expect(xhr.requests).toHaveLength(1));
+    expect(xhr.last().field('type')).toBe('benefits');
+  });
+
+  it('says when to try again after too many uploads', async () => {
+    const xhr = installFakeXhr();
+    const { user } = renderLink();
+    await firstStubRow();
+    await user.upload(dropZone(), pdf());
+    await waitFor(() => expect(xhr.requests).toHaveLength(1));
+    act(() =>
+      xhr.last().respond(
+        429,
+        {
+          error: { code: 'rate_limited', message: 'Too many requests; try again in 1200 seconds' },
+        },
+        { 'Retry-After': '1200' },
+      ),
+    );
+    const alert = await within(docsCard()).findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'acme.pdf was not uploaded. You have reached the upload limit for now. Try again in about 20 minutes.',
+    );
+    expect(within(docsCard()).queryByRole('progressbar')).toBeNull();
+    await user.click(within(alert).getByRole('button', { name: 'Dismiss' }));
+    expect(within(docsCard()).queryByRole('alert')).toBeNull();
+  });
+
+  it.each([
+    [
+      413,
+      'file_too_large',
+      'The file is larger than 10 MB',
+      'The file is larger than 10 MB. Try a smaller scan.',
+    ],
+    [415, 'unsupported_media_type', 'Upload a PDF, PNG or JPEG', 'Upload a PDF, PNG or JPEG.'],
+  ])('explains a %i in plain words', async (status, code, message, expected) => {
+    const xhr = installFakeXhr();
+    const { user } = renderLink();
+    await firstStubRow();
+    await user.upload(dropZone(), pdf('scan.pdf'));
+    await waitFor(() => expect(xhr.requests).toHaveLength(1));
+    act(() => xhr.last().respond(status, { error: { code, message } }));
+    expect(await within(docsCard()).findByRole('alert')).toHaveTextContent(
+      `scan.pdf was not uploaded. ${expected}`,
+    );
+  });
+
+  it('refuses a dropped file of another type without uploading it', async () => {
+    const xhr = installFakeXhr();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime, applyAccept: false });
+    renderLink();
+    await firstStubRow();
+    await user.upload(dropZone(), new File(['x'], 'notes.docx', { type: 'application/msword' }));
+    expect(await within(docsCard()).findByRole('alert')).toHaveTextContent(
+      'notes.docx was not uploaded. Upload a PDF, PNG or JPEG.',
+    );
+    expect(xhr.requests).toHaveLength(0);
+  });
+
+  it('replaces a document with a new upload of the same type', async () => {
+    const xhr = installFakeXhr();
+    db.documents = [sampleBenefitsDocument];
+    const { user } = renderLink();
+    const row = await within(docsCard()).findByRole('group', { name: /^Benefits summary/ });
+    await user.click(within(row).getByRole('button', { name: 'Replace benefits summary' }));
+    await user.upload(within(row).getByLabelText('New benefits summary file'), pdf('new.pdf'));
+    await waitFor(() => expect(xhr.requests).toHaveLength(1));
+    expect(xhr.last().field('type')).toBe('benefits');
+    expect((xhr.last().field('file') as File).name).toBe('new.pdf');
+  });
+
+  it('starts reading an uploaded document on request', async () => {
+    db.documents = [sampleDocument({ status: 'uploaded', page_count: null, redaction_count: 0 })];
+    const extracts = requests('POST', `/docs/${PAY_STUB_DOC_ID}/extract`);
+    const { user } = renderLink();
+    const [row] = await firstStubRow();
+    await user.click(within(row!).getByRole('button', { name: 'Read pay stub' }));
+    await waitFor(() => expect(extracts).toHaveLength(1));
+    expect(
+      await within(docsCard()).findByRole('progressbar', { name: 'Reading pay stub' }),
+    ).toBeInTheDocument();
+  });
+
+  it('says so when reading cannot start, and keeps the upload', async () => {
+    db.documents = [sampleDocument({ status: 'uploaded', page_count: null, redaction_count: 0 })];
+    server.use(
+      http.post(apiUrl('/docs/:id/extract'), () =>
+        HttpResponse.json({ error: { code: 'x', message: 'Database is busy' } }, { status: 503 }),
+      ),
+    );
+    const { user } = renderLink();
+    const [row] = await firstStubRow();
+    await user.click(within(row!).getByRole('button', { name: 'Read pay stub' }));
+    expect(await within(docsCard()).findByRole('alert')).toHaveTextContent(
+      'Could not start reading the pay stub. Database is busy',
+    );
+    expect(row).toHaveTextContent('Uploaded');
+  });
+
+  it('offers a retry when reading dies', async () => {
+    db.documents = [sampleDocument({ status: 'uploaded', page_count: null, redaction_count: 0 })];
+    server.use(
+      http.post(apiUrl('/docs/:id/extract'), () => {
+        const jobId = scriptJob([
+          sampleJob({
+            id: '5a000000-0000-4000-8000-0000000000df',
+            kind: 'ingest.extract',
+            status: 'dead',
+          }),
+        ]);
+        db.documents[0]!.status = 'extracting';
+        return HttpResponse.json({ job_id: jobId }, { status: 202 });
+      }),
+    );
+    const { user } = renderLink();
+    const [row] = await firstStubRow();
+    await user.click(within(row!).getByRole('button', { name: 'Read pay stub' }));
+    const alert = await within(docsCard()).findByRole('alert');
+    expect(alert).toHaveTextContent('Reading pay stub did not finish.');
+    expect(within(alert).getByRole('button', { name: 'Try again' })).toBeEnabled();
+  });
+
+  it('follows a document that was already being read, by polling the list', async () => {
+    db.documents = [sampleDocument({ status: 'extracting', page_count: null, redaction_count: 0 })];
+    renderLink();
+    const [row] = await firstStubRow();
+    expect(within(row!).getByRole('progressbar', { name: 'Reading pay stub' })).toBeInTheDocument();
+    db.documents = [sampleDocument()];
+    await poll();
+    await waitFor(() => expect(row).toHaveTextContent('Review needed'));
   });
 });

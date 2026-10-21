@@ -64,6 +64,19 @@ describe('useDocuments', () => {
     expect(requests.count).toBe(settled);
   });
 
+  it('polls only for extracting documents the predicate picks', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    db.documents = [sampleDocument({ status: 'extracting' })];
+    const requests = countRequests('/docs');
+    const tracked = new Set([PAY_STUB_DOC_ID]);
+    const { result } = renderHookWithClient(() =>
+      useDocuments({ pollWhileExtracting: (d) => !tracked.has(d.id) }),
+    );
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS * 3));
+    expect(requests.count).toBe(1);
+  });
+
   it('does not poll unless asked', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     db.documents = [sampleDocument({ status: 'extracting' })];
