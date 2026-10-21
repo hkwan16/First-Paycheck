@@ -1,0 +1,186 @@
+[
+  {
+    "id": "spec-011-zero-balance",
+    "route": "/calc/emergency-fund",
+    "request": {
+      "monthly_essentials_cents": 250000,
+      "target_months": 3,
+      "current_balance_cents": 0,
+      "monthly_contribution_cents": 50000,
+      "pay_periods_per_year": 26
+    },
+    "expected": {
+      "target_cents": 750000,
+      "three_month_target_cents": 750000,
+      "six_month_target_cents": 1500000,
+      "shortfall_cents": 750000,
+      "funded": false,
+      "funded_pct": "0.00",
+      "months_to_target": 15,
+      "reachable": true,
+      "per_paycheck_contribution_cents": 23077,
+      "horizon_months": 120
+    }
+  },
+  {
+    "id": "spec-011-partly-funded-semimonthly",
+    "route": "/calc/emergency-fund",
+    "request": {
+      "monthly_essentials_cents": 320000,
+      "target_months": 6,
+      "current_balance_cents": 450000,
+      "monthly_contribution_cents": 40000,
+      "pay_periods_per_year": 24
+    },
+    "expected": {
+      "target_cents": 1920000,
+      "three_month_target_cents": 960000,
+      "six_month_target_cents": 1920000,
+      "shortfall_cents": 1470000,
+      "funded": false,
+      "funded_pct": "23.44",
+      "months_to_target": 37,
+      "reachable": true,
+      "per_paycheck_contribution_cents": 20000,
+      "horizon_months": 120
+    }
+  },
+  {
+    "id": "spec-011-already-funded",
+    "route": "/calc/emergency-fund",
+    "request": {
+      "monthly_essentials_cents": 200000,
+      "target_months": 3,
+      "current_balance_cents": 700000,
+      "monthly_contribution_cents": 30000,
+      "pay_periods_per_year": 26
+    },
+    "expected": {
+      "target_cents": 600000,
+      "three_month_target_cents": 600000,
+      "six_month_target_cents": 1200000,
+      "shortfall_cents": 0,
+      "funded": true,
+      "funded_pct": "100.00",
+      "months_to_target": 0,
+      "reachable": true,
+      "per_paycheck_contribution_cents": 13846,
+      "horizon_months": 120
+    }
+  },
+  {
+    "id": "spec-011-exactly-at-target",
+    "route": "/calc/emergency-fund",
+    "request": {
+      "monthly_essentials_cents": 200000,
+      "target_months": 3,
+      "current_balance_cents": 600000,
+      "monthly_contribution_cents": 0,
+      "pay_periods_per_year": 12
+    },
+    "expected": {
+      "target_cents": 600000,
+      "three_month_target_cents": 600000,
+      "six_month_target_cents": 1200000,
+      "shortfall_cents": 0,
+      "funded": true,
+      "funded_pct": "100.00",
+      "months_to_target": 0,
+      "reachable": true,
+      "per_paycheck_contribution_cents": 0,
+      "horizon_months": 120
+    }
+  },
+  {
+    "id": "spec-011-never-within-ten-years",
+    "route": "/calc/emergency-fund",
+    "request": {
+      "monthly_essentials_cents": 300000,
+      "target_months": 6,
+      "current_balance_cents": 10000,
+      "monthly_contribution_cents": 10000,
+      "pay_periods_per_year": 26
+    },
+    "expected": {
+      "target_cents": 1800000,
+      "three_month_target_cents": 900000,
+      "six_month_target_cents": 1800000,
+      "shortfall_cents": 1790000,
+      "funded": false,
+      "funded_pct": "0.56",
+      "months_to_target": null,
+      "reachable": false,
+      "per_paycheck_contribution_cents": 4615,
+      "horizon_months": 120
+    }
+  },
+  {
+    "id": "spec-011-zero-contribution-not-funded",
+    "route": "/calc/emergency-fund",
+    "request": {
+      "monthly_essentials_cents": 150000,
+      "target_months": 3,
+      "current_balance_cents": 100000,
+      "monthly_contribution_cents": 0,
+      "pay_periods_per_year": 52
+    },
+    "expected": {
+      "target_cents": 450000,
+      "three_month_target_cents": 450000,
+      "six_month_target_cents": 900000,
+      "shortfall_cents": 350000,
+      "funded": false,
+      "funded_pct": "22.22",
+      "months_to_target": null,
+      "reachable": false,
+      "per_paycheck_contribution_cents": 0,
+      "horizon_months": 120
+    }
+  },
+  {
+    "id": "spec-011-exactly-ten-years",
+    "route": "/calc/emergency-fund",
+    "request": {
+      "monthly_essentials_cents": 100000,
+      "target_months": 6,
+      "current_balance_cents": 0,
+      "monthly_contribution_cents": 5000,
+      "pay_periods_per_year": 12
+    },
+    "expected": {
+      "target_cents": 600000,
+      "three_month_target_cents": 300000,
+      "six_month_target_cents": 600000,
+      "shortfall_cents": 600000,
+      "funded": false,
+      "funded_pct": "0.00",
+      "months_to_target": 120,
+      "reachable": true,
+      "per_paycheck_contribution_cents": 5000,
+      "horizon_months": 120
+    }
+  },
+  {
+    "id": "spec-011-half-cent-per-paycheck-rounds-up",
+    "route": "/calc/emergency-fund",
+    "request": {
+      "monthly_essentials_cents": 180000,
+      "target_months": 4,
+      "current_balance_cents": 360000,
+      "monthly_contribution_cents": 25001,
+      "pay_periods_per_year": 24
+    },
+    "expected": {
+      "target_cents": 720000,
+      "three_month_target_cents": 540000,
+      "six_month_target_cents": 1080000,
+      "shortfall_cents": 360000,
+      "funded": false,
+      "funded_pct": "50.00",
+      "months_to_target": 15,
+      "reachable": true,
+      "per_paycheck_contribution_cents": 12501,
+      "horizon_months": 120
+    }
+  }
+]

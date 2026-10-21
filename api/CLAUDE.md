@@ -292,6 +292,51 @@ Specs 009 and 010. Migration `0005_checkins` adds `recurring_charges`,
 - `tests/support/spending_month.py` holds spec 007's September month, shared by
   the spending and cash-flow tests.
 
+## Emergency fund, health plans and benefits (from M6)
+
+Specs 011, 012 and 013. Migration `0008_goals_and_birth_year` revises
+`0005_checkins`: `goal_status` and `goals.status`/`reached_at`, one
+emergency-fund goal per user (`uq_goals_user_emergency_fund`), the calendar
+kinds `goal_contribution` and `goal_review`, `profiles.birth_year` and
+`benefits_plans.position`. No new table or function.
+
+- **Calculators.** `calc/emergency_fund.py` (`POST /calc/emergency-fund`) and
+  `calc/health_plans.py` (`POST /calc/health-plans`), both in
+  `calc/registry.py` as `emergency_fund` and `health_plans`. Essentials come
+  in as an input; `calc/` never reads the database. HSA and HDHP constants
+  live in `calc/data/2026.json` (`hsa`, Rev. Proc. 2025-19);
+  `calc/brackets.py:marginal_rate` is shared with the 401(k) calculator.
+  `calc/pay_dates.py:add_months` clamps to the month's end.
+- **Decision side effects** live in `app/decision_effects.py`:
+  `check_saveable` (a health-plan decision needs `selected_plan_index`, else
+  422 `plan_not_selected`) runs before the version check, `apply` after the
+  insert, in the same transaction. The 401(k) election check moved there; an
+  emergency-fund decision upserts the goal and its `goal_contribution` and
+  `goal_review` events; a health-plan decision with an `enrollment_deadline`
+  creates that event. A superseded decision's events are dismissed.
+- **Goals.** `GET /goals` (progress from the latest balance of the linked
+  account) and `PATCH /goals/{id}` (status, contribution, linked account; an
+  account the user cannot see is 404).
+- **Benefits** (spec 013). `extract_benefits/v2` returns
+  `BenefitsSummaryExtraction` (plans, match tiers as printed, vesting); v1 and
+  `BenefitsExtraction` stay for the ledger. `ingest/proposal.py` turns the
+  bands into cumulative tiers with `calc.k401.cumulative_bounds`, so the model
+  never adds. Every proposal carries `kind`; read stored ones with
+  `Proposal.stored(data, document_type)`. Confirm writes plans with their list
+  `position` and, when the body has `retirement`, only the profile's
+  `match_tiers` and `vesting_years`. `GET /benefits-plans`
+  (`app/routers/benefits.py`) lists the most recently confirmed summary first.
+- **Explain for health plans.** Facts are numbers only; plan names and usage
+  go in `retrieval/context.py:health_notes`. `name_numbers` lets digits in a
+  plan's name pass the verifier, and `AllowedNumbers` matches money by
+  magnitude (a negative expected cost is printed as `-$403.00`). Citations:
+  `db/seed/irs_citations/health_plans.yaml`. An emergency-fund decision has no
+  IRS citation to give, so explaining one is 422 `explanation_unavailable`.
+- **Birth year.** `profiles.birth_year` (1900 to the current year, the upper
+  bound checked in `PUT /profile`) settles spec 006 open question 2; the
+  401(k) calculator still takes `age`, which the client derives as
+  `tax_year - birth_year`.
+
 ## Testing
 
 - `make test-api`. Unit tests need nothing; integration tests need

@@ -70,6 +70,24 @@ def test_extraction_prompts_v1(name: str, schema: type[BaseModel], nested: type[
     assert "YYYY-MM-DD" in prompt.system
 
 
+def test_extract_benefits_v2() -> None:
+    """Spec 013 rule 5: v2 adds the match and vesting to v1's plans."""
+    prompt = load_prompt("extract_benefits", "v2")
+    assert prompt.version == "extract_benefits/v2"
+    assert prompt.purpose is LlmPurpose.EXTRACT
+    assert prompt.effort == "low"
+    assert prompt.schema is schemas.BenefitsSummaryExtraction
+    for model in (
+        schemas.BenefitsSummaryExtraction,
+        schemas.PlanExtraction,
+        schemas.MatchTierExtraction,
+    ):
+        for field in model.model_fields:
+            assert f"`{field}`" in prompt.system, field
+    assert "[REDACTED]" in prompt.system
+    assert "YYYY-MM-DD" in prompt.system
+
+
 def test_pay_stub_prompt_names_every_line_kind_and_field() -> None:
     prompt = load_prompt("extract_pay_stub", "v1")
     for kind in get_args(schemas.LineItemKind):

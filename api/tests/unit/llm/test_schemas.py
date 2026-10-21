@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from llm.schemas import (
     SCHEMAS,
     BenefitsExtraction,
+    BenefitsSummaryExtraction,
     CategoryBatch,
     ExplanationDraft,
     ExtractedField,
@@ -146,6 +147,33 @@ def test_benefits_extraction_lists_plans() -> None:
         )
 
 
+def test_benefits_summary_adds_the_match_and_vesting() -> None:
+    """Spec 013 rules 1-3: bands as printed, each with its own confidence."""
+    tier = {"band_pct": field(3), "employer_pct": field(100)}
+    summary = BenefitsSummaryExtraction.model_validate(
+        {"plans": [], "match_tiers": [tier], "vesting_years": field(3), "notes": None}
+    )
+    assert summary.match_tiers[0].band_pct.value == 3
+    assert summary.match_tiers[0].employer_pct.confidence == 0.9
+    assert summary.vesting_years.value == 3
+    for bad in (
+        {"vesting_years": field(11)},
+        {"vesting_years": field(2.5)},
+        {"match_tiers": [{**tier, "employer_pct": field(101)}]},
+        {"match_tiers": [{**tier, "cumulative": field(5)}]},
+    ):
+        with pytest.raises(ValidationError):
+            BenefitsSummaryExtraction.model_validate(
+                {
+                    "plans": [],
+                    "match_tiers": [tier],
+                    "vesting_years": field(3),
+                    "notes": None,
+                    **bad,
+                }
+            )
+
+
 def test_explanation_draft_shape() -> None:
     draft = ExplanationDraft.model_validate(
         {
@@ -169,5 +197,6 @@ def test_registry_names_every_schema() -> None:
         "CategoryBatch": CategoryBatch,
         "PayStubExtraction": PayStubExtraction,
         "BenefitsExtraction": BenefitsExtraction,
+        "BenefitsSummaryExtraction": BenefitsSummaryExtraction,
         "ExplanationDraft": ExplanationDraft,
     } == SCHEMAS

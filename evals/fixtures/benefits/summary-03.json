@@ -1,0 +1,48 @@
+{
+  "account_number": "493836529168",
+  "content_type": "application/pdf",
+  "employer": "Harbor Light Studios",
+  "file": "summary-03.pdf",
+  "id": "summary-03",
+  "layout": "table",
+  "match_tiers": [
+    {
+      "employee_pct_upto": "4.00",
+      "employer_pct": "100.00"
+    }
+  ],
+  "plans": [
+    {
+      "coinsurance_pct": "20.00",
+      "deductible_cents": 275000,
+      "employer_hsa_cents": 125000,
+      "enrollment_deadline": "2026-11-27",
+      "kind": "hdhp",
+      "name": "Choice HSA Plan",
+      "oop_max_cents": 400000,
+      "premium_per_period_cents": 1300
+    },
+    {
+      "coinsurance_pct": "20.00",
+      "deductible_cents": 75000,
+      "employer_hsa_cents": null,
+      "enrollment_deadline": "2026-11-27",
+      "kind": "ppo",
+      "name": "Open Access PPO",
+      "oop_max_cents": 550000,
+      "premium_per_period_cents": 8250
+    },
+    {
+      "coinsurance_pct": "10.00",
+      "deductible_cents": 45000,
+      "employer_hsa_cents": null,
+      "enrollment_deadline": "2026-11-27",
+      "kind": "hmo",
+      "name": "Silver HMO",
+      "oop_max_cents": 250000,
+      "premium_per_period_cents": 4975
+    }
+  ],
+  "ssn": "983-95-1611",
+  "vesting_years": 0
+}

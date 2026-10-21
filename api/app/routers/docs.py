@@ -7,19 +7,19 @@ confirms is validated here and is the only thing stored.
 
 from __future__ import annotations
 
-import datetime as dt
 import uuid
-from decimal import Decimal
 from typing import Annotated, Self
 
 from fastapi import APIRouter, File, Form, UploadFile, status
 from pydantic import BaseModel, ConfigDict, model_validator
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 
 from app import ratelimit
 from app.auth import CurrentUser
 from app.deps import Now, UserSession
 from app.errors import AppError, NotFound, error_responses
+from app.routers.benefits import BenefitsPlanOut
 from app.routers.pay_stubs import PayStubOut
 from app.types import UtcDateTime
 from calc.pay_stub import balance
@@ -32,10 +32,16 @@ from db.enums import (
     PayFrequency,
     PlanKind,
 )
-from db.models import BenefitsChunk, BenefitsPlan, Document, Job, PayStub
+from db.models import BenefitsChunk, BenefitsPlan, Document, Job, PayStub, Profile
 from ingest import store
 from ingest.chunk import chunk_words
-from ingest.proposal import BenefitsValues, PayStubValues, Proposal, benefits_text
+from ingest.proposal import (
+    BenefitsValues,
+    PayStubValues,
+    Proposal,
+    RetirementValues,
+    benefits_text,
+)
 from jobs import queue
 
 router = APIRouter(prefix="/docs", tags=["docs"])
@@ -99,22 +105,12 @@ class ConfirmIn(BaseModel):
         return self
 
 
-class BenefitsPlanOut(BaseModel):
-    id: uuid.UUID
-    name: str
-    kind: PlanKind
-    premium_per_period_cents: int
-    deductible_cents: int
-    oop_max_cents: int
-    coinsurance_pct: Decimal
-    employer_hsa_cents: int
-    enrollment_deadline: dt.date | None
-
-
 class Confirmed(BaseModel):
     document: DocumentOut
     pay_stub: PayStubOut | None
     plans: list[BenefitsPlanOut]
+    # True when a benefits confirm wrote the 401(k) match and vesting to the profile.
+    profile_updated: bool
 
 
 def _out(document: Document) -> DocumentOut:
@@ -204,7 +200,7 @@ def get_document(document_id: uuid.UUID, session: UserSession) -> DocumentDetail
     if document is None:
         raise NotFound("Document not found")
     proposal = (
-        Proposal.model_validate(document.proposal)
+        Proposal.stored(document.proposal, document.type.value)
         if document.status in REVIEWABLE and document.proposal is not None
         else None
     )
@@ -255,6 +251,7 @@ def confirm_document(
         )
     stub: PayStub | None = None
     plans: list[BenefitsPlan] = []
+    profile_updated = False
     if document.type is DocumentType.PAY_STUB and body.pay_stub is not None:
         stub = _pay_stub(document, body.pay_stub)
         session.add(stub)
@@ -262,6 +259,9 @@ def confirm_document(
         plans = _plans(document, body.benefits)
         session.add_all(plans)
         session.add_all(_chunks(document))
+        if body.benefits.retirement is not None:
+            _save_retirement(session, document.user_id, body.benefits.retirement)
+            profile_updated = True
     else:
         raise AppError(
             f"This is a {document.type.value} document; send its values under"
@@ -280,7 +280,8 @@ def confirm_document(
     return Confirmed(
         document=_out(document),
         pay_stub=PayStubOut.of(stub) if stub is not None else None,
-        plans=[_plan_out(plan) for plan in plans],
+        plans=[BenefitsPlanOut.of(plan) for plan in plans],
+        profile_updated=profile_updated,
     )
 
 
@@ -306,27 +307,44 @@ def _pay_stub(document: Document, values: PayStubValues) -> PayStub:
 
 def _plans(document: Document, values: BenefitsValues) -> list[BenefitsPlan]:
     plans = []
-    for plan in values.plans:
+    for position, plan in enumerate(values.plans):
         fields = plan.model_dump()
         kind = PlanKind(fields.pop("kind"))
         plans.append(
-            BenefitsPlan(user_id=document.user_id, document_id=document.id, kind=kind, **fields)
+            BenefitsPlan(
+                user_id=document.user_id,
+                document_id=document.id,
+                position=position,
+                kind=kind,
+                **fields,
+            )
         )
     return plans
+
+
+def _save_retirement(session: UserSession, user_id: uuid.UUID, values: RetirementValues) -> None:
+    """Write the confirmed match and vesting; every other profile field is kept
+    (spec 013 rule 13)."""
+    columns = {
+        # jsonb holds JSON: percentages as two-place strings, as PUT /profile writes them.
+        "match_tiers": [tier.model_dump(mode="json") for tier in values.match_tiers],
+        "vesting_years": values.vesting_years,
+    }
+    session.execute(
+        insert(Profile)
+        .values(user_id=user_id, **columns)
+        .on_conflict_do_update(index_elements=[Profile.user_id], set_=columns)
+    )
 
 
 def _chunks(document: Document) -> list[BenefitsChunk]:
     """Retrieval chunks of the redacted text the user reviewed (spec 005 rule 22)."""
     if document.proposal is None:
         return []
-    text = benefits_text(Proposal.model_validate(document.proposal))
+    text = benefits_text(Proposal.stored(document.proposal, document.type.value))
     return [
         BenefitsChunk(
             user_id=document.user_id, document_id=document.id, chunk_index=index, text=chunk
         )
         for index, chunk in enumerate(chunk_words(text))
     ]
-
-
-def _plan_out(plan: BenefitsPlan) -> BenefitsPlanOut:
-    return BenefitsPlanOut.model_validate(plan, from_attributes=True)

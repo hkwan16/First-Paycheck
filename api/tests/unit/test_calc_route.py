@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 from tests.support.tokens import make_token
+from tests.unit.calc.test_health_plans_examples import A, B, payload
 
 USER = uuid.UUID("00000000-0000-4000-8000-0000000ca1c0")
 
@@ -83,3 +84,59 @@ def test_invalid_input_is_422(client: TestClient, change: dict[str, Any], fragme
 def test_requires_a_signed_in_user() -> None:
     response = TestClient(create_app()).post("/calc/401k-match", json=EXAMPLE_1)
     assert response.status_code == 401
+
+
+EMERGENCY_FUND: dict[str, Any] = {
+    "monthly_essentials_cents": 250_000,
+    "target_months": 3,
+    "current_balance_cents": 0,
+    "monthly_contribution_cents": 50_000,
+    "pay_periods_per_year": 26,
+}
+
+
+def test_emergency_fund_over_http(client: TestClient) -> None:
+    response = client.post("/calc/emergency-fund", json=EMERGENCY_FUND)
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "target_cents": 750_000,
+        "three_month_target_cents": 750_000,
+        "six_month_target_cents": 1_500_000,
+        "shortfall_cents": 750_000,
+        "funded": False,
+        "funded_pct": "0.00",
+        "months_to_target": 15,
+        "reachable": True,
+        "per_paycheck_contribution_cents": 23_077,
+        "horizon_months": 120,
+    }
+
+
+def test_emergency_fund_rejects_a_zero_month_target(client: TestClient) -> None:
+    response = client.post("/calc/emergency-fund", json={**EMERGENCY_FUND, "target_months": 0})
+    assert response.status_code == 422
+    assert "target_months" in response.json()["error"]["message"]
+
+
+def test_health_plans_over_http(client: TestClient) -> None:
+    response = client.post("/calc/health-plans", json=payload([A, B], 6_500_000, 100_000))
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["marginal_rate_used"] == "12.00"
+    assert body["plans"][0]["medium_cost_cents"] == 174_000
+    assert body["pairs"] == [
+        {
+            "plan_a_index": 0,
+            "plan_b_index": 1,
+            "cheaper_at_zero_index": 0,
+            "break_even_spends_cents": [940_000, 1_710_000],
+            "cheaper_at_end_index": 0,
+        }
+    ]
+
+
+def test_health_plans_refuses_employer_hsa_on_a_ppo(client: TestClient) -> None:
+    plan = {**B, "employer_hsa_cents": 100}
+    response = client.post("/calc/health-plans", json=payload([plan], 6_500_000, 0))
+    assert response.status_code == 422
+    assert "employer_hsa_cents" in response.json()["error"]["message"]

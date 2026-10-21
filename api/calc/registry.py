@@ -13,6 +13,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from calc.emergency_fund import EmergencyFundInput, EmergencyFundResult, emergency_fund
+from calc.health_plans import HealthPlansInput, HealthPlansResult, health_plans
 from calc.k401 import K401MatchInput, K401MatchResult, k401_match
 
 __all__ = ["CALCULATORS", "Calculator", "UnknownCalculator", "calculator"]
@@ -32,6 +34,12 @@ class Calculator:
 CALCULATORS: Mapping[str, Calculator] = {
     "k401_match": Calculator(
         input_model=K401MatchInput, result_model=K401MatchResult, run=k401_match
+    ),
+    "emergency_fund": Calculator(
+        input_model=EmergencyFundInput, result_model=EmergencyFundResult, run=emergency_fund
+    ),
+    "health_plans": Calculator(
+        input_model=HealthPlansInput, result_model=HealthPlansResult, run=health_plans
     ),
 }
 

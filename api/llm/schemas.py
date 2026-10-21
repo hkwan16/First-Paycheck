@@ -21,6 +21,7 @@ __all__ = [
     "CATEGORIES",
     "SCHEMAS",
     "BenefitsExtraction",
+    "BenefitsSummaryExtraction",
     "CategoryAssignment",
     "CategoryBatch",
     "Cents",
@@ -32,6 +33,7 @@ __all__ = [
     "ExtractedField",
     "LineItem",
     "LineItemKind",
+    "MatchTierExtraction",
     "MoneyField",
     "NumberClaim",
     "PayFrequencyField",
@@ -43,6 +45,7 @@ __all__ = [
     "PlanKindField",
     "PlanKindValue",
     "TextField",
+    "YearsField",
 ]
 
 
@@ -68,6 +71,7 @@ class CategoryBatch(_Strict):
 # the field (spec 001 rule 23). Strict, so 2708.0 or "2,708.33" never pass.
 Cents = Annotated[int, Field(strict=True, ge=0)]
 Percent = Annotated[float, Field(ge=0, le=100)]
+Years = Annotated[int, Field(strict=True, ge=0, le=10)]
 PayFrequencyValue = Literal["weekly", "biweekly", "semimonthly", "monthly"]
 PlanKindValue = Literal["hdhp", "ppo", "hmo"]
 LineItemKind = Literal["earning", "tax", "pre_tax_deduction", "post_tax_deduction", "net", "info"]
@@ -109,6 +113,10 @@ class MoneyField(ExtractedField[Cents]):
 
 class PercentField(ExtractedField[Percent]):
     """A percentage from 0 to 100."""
+
+
+class YearsField(ExtractedField[Years]):
+    """A whole number of years from 0 to 10."""
 
 
 class PayFrequencyField(ExtractedField[PayFrequencyValue]):
@@ -165,9 +173,37 @@ class PlanExtraction(_Strict):
 
 
 class BenefitsExtraction(_Strict):
-    """``extract_benefits`` output: every medical plan option the summary describes."""
+    """``extract_benefits/v1`` output: every medical plan option the summary describes.
+
+    Kept unchanged because the released v1 prompt names it; ``extract_benefits/v2``
+    uses ``BenefitsSummaryExtraction`` (spec 013 rule 5)."""
 
     plans: list[PlanExtraction]
+    notes: str | None = Field(description="Anything the reviewer should check, or null")
+
+
+class MatchTierExtraction(_Strict):
+    """One tier of the employer's 401(k) match as printed (spec 013 rule 2)."""
+
+    band_pct: PercentField = Field(
+        description="The tier's width in percent of pay, as printed: 'the next 2%' is 2"
+    )
+    employer_pct: PercentField = Field(
+        description="The share of the employee's contribution the employer adds: '50%' is 50"
+    )
+
+
+class BenefitsSummaryExtraction(_Strict):
+    """``extract_benefits/v2`` output: the medical plans, the 401(k) match and
+    vesting (spec 013 rules 1-3)."""
+
+    plans: list[PlanExtraction]
+    match_tiers: list[MatchTierExtraction] = Field(
+        description="The match tiers in the order the summary states them; empty for no match"
+    )
+    vesting_years: YearsField = Field(
+        description="Years of service until the match is fully vested"
+    )
     notes: str | None = Field(description="Anything the reviewer should check, or null")
 
 
@@ -221,5 +257,6 @@ SCHEMAS: dict[str, type[BaseModel]] = {
     "CategoryBatch": CategoryBatch,
     "PayStubExtraction": PayStubExtraction,
     "BenefitsExtraction": BenefitsExtraction,
+    "BenefitsSummaryExtraction": BenefitsSummaryExtraction,
     "ExplanationDraft": ExplanationDraft,
 }

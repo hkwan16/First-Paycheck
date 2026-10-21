@@ -1,0 +1,32 @@
+{
+  "account_number": null,
+  "content_type": "application/pdf",
+  "employer": "Northwind Analytics LLC",
+  "file": "summary-05.pdf",
+  "id": "summary-05",
+  "layout": "table",
+  "match_tiers": [
+    {
+      "employee_pct_upto": "1.00",
+      "employer_pct": "100.00"
+    },
+    {
+      "employee_pct_upto": "6.00",
+      "employer_pct": "50.00"
+    }
+  ],
+  "plans": [
+    {
+      "coinsurance_pct": "30.00",
+      "deductible_cents": 260000,
+      "employer_hsa_cents": 140000,
+      "enrollment_deadline": "2026-11-28",
+      "kind": "hdhp",
+      "name": "Bronze HSA",
+      "oop_max_cents": 600000,
+      "premium_per_period_cents": 2600
+    }
+  ],
+  "ssn": null,
+  "vesting_years": 2
+}

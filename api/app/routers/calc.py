@@ -7,6 +7,8 @@ from fastapi import APIRouter
 
 from app.auth import CurrentUser
 from app.errors import error_responses
+from calc.emergency_fund import EmergencyFundInput, EmergencyFundResult, emergency_fund
+from calc.health_plans import HealthPlansInput, HealthPlansResult, health_plans
 from calc.k401 import K401MatchInput, K401MatchResult, k401_match
 
 router = APIRouter(prefix="/calc", tags=["calc"])
@@ -19,3 +21,22 @@ def calc_401k_match(body: K401MatchInput, user: CurrentUser) -> K401MatchResult:
     per-paycheck cost before and after federal income tax."""
     del user  # signed-in users only; the calculator reads nothing of theirs
     return k401_match(body)
+
+
+@router.post("/emergency-fund", responses=error_responses(401, 422))
+def calc_emergency_fund(body: EmergencyFundInput, user: CurrentUser) -> EmergencyFundResult:
+    """The emergency fund calculator (spec 011): the target from monthly
+    essentials, the shortfall, months to the target at the monthly
+    contribution and that contribution per paycheck."""
+    del user  # signed-in users only; the calculator reads nothing of theirs
+    return emergency_fund(body)
+
+
+@router.post("/health-plans", responses=error_responses(401, 422))
+def calc_health_plans(body: HealthPlansInput, user: CurrentUser) -> HealthPlansResult:
+    """The health plan comparison (spec 012): each plan's expected annual net
+    cost at low, medium and high usage, the HSA tax effect, the break-even
+    spending between each pair of plans and the cheapest plan at the user's
+    expected usage."""
+    del user  # signed-in users only; the calculator reads nothing of theirs
+    return health_plans(body)

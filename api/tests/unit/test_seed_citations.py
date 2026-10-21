@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from calc.health_plans import BASE_CITATION_KEYS as HEALTH_BASE_KEYS
+from calc.health_plans import HDHP_CITATION_KEYS
 from calc.k401 import BASE_CITATION_KEYS, CATCH_UP_KEY, COMPENSATION_LIMIT_KEY
 from db.seed.load import SeedError, read_seed_citations
 
@@ -25,6 +27,12 @@ def test_k401_seed_covers_every_key_the_calculator_emits() -> None:
     assert emitted <= keys
     assert keys == emitted | {"k401.vesting"}
     assert {c.tax_year for c in read_seed_citations()} == {2026}
+
+
+def test_health_seed_covers_every_key_the_calculator_emits() -> None:
+    """Spec 012 rule 11."""
+    keys = {c.key for c in read_seed_citations() if c.calculator == "health_plans"}
+    assert keys == {*HDHP_CITATION_KEYS, *HEALTH_BASE_KEYS}
 
 
 def write(directory: Path, body: str) -> Path:

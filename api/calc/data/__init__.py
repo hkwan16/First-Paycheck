@@ -1,6 +1,6 @@
 """Yearly federal constants: ``calc/data/<year>.json`` (spec amendment 13).
 
-Each file holds one tax year's retirement limits, standard deductions and
+Each file holds one tax year's retirement limits, HSA limits, standard deductions and
 income tax brackets, each group with the IRS document it comes from. A
 calculator receives ``tax_year`` explicitly and reads its constants through
 ``tax_year(year)``; a year with no file is an ``UnknownTaxYear``, never a silent
@@ -22,6 +22,7 @@ __all__ = [
     "Bracket",
     "Brackets",
     "FilingStatus",
+    "HsaLimits",
     "K401Limits",
     "StandardDeduction",
     "TaxYearData",
@@ -55,6 +56,19 @@ class K401Limits(_Frozen):
     catch_up_50_cents: _Cents
     catch_up_60_63_cents: _Cents
     compensation_limit_cents: _Cents
+    source: str
+    url: str
+
+
+class HsaLimits(_Frozen):
+    """HSA contribution limits and the high deductible health plan thresholds (spec 012)."""
+
+    self_only_limit_cents: _Cents
+    family_limit_cents: _Cents
+    hdhp_min_deductible_self_cents: _Cents
+    hdhp_min_deductible_family_cents: _Cents
+    hdhp_max_oop_self_cents: _Cents
+    hdhp_max_oop_family_cents: _Cents
     source: str
     url: str
 
@@ -101,6 +115,7 @@ class Brackets(_Frozen):
 class TaxYearData(_Frozen):
     tax_year: int
     k401: K401Limits
+    hsa: HsaLimits
     standard_deduction: StandardDeduction
     brackets: Brackets
 

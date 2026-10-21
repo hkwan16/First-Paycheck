@@ -19,7 +19,10 @@ from app.deps import get_llm_gateway, get_now
 from llm.gateway import REFUSAL_REPLY, Gateway, ScriptedGateway, ScriptStep, reply_with
 from llm.schemas import ExplanationDraft
 from tests.conftest import FixtureUser
+from tests.rls.test_cross_user import EMERGENCY_FUND_INPUTS
 from tests.support.factories import make_document
+from tests.unit.calc.test_health_plans_examples import B_TWIN, A, B
+from tests.unit.calc.test_health_plans_examples import payload as health_payload
 
 Client = Callable[[FixtureUser], TestClient]
 
@@ -371,3 +374,76 @@ def test_configured_gateway_is_built_from_settings(
     )
     out = explain(client_as(user_a), decision)
     assert out["verified"] is True
+
+
+# ---------------------------------------------------------------- M6 calculators
+
+
+def save_other(client: TestClient, calculator: str, route: str, inputs: dict[str, Any]) -> str:
+    result = client.post(route, json=inputs)
+    assert result.status_code == 200, result.text
+    saved = client.post(
+        "/decisions", json={"calculator": calculator, "inputs": inputs, "result": result.json()}
+    )
+    assert saved.status_code == 201, saved.text
+    decision_id: str = saved.json()["decision_id"]
+    return decision_id
+
+
+def test_health_plan_decision_is_explained_with_benefits_text(
+    script: Script, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    """Spec 012 rule 16: plan facts, HSA citations and the benefits passages."""
+    client = client_as(user_a)
+    inputs = health_payload([A, B_TWIN], 6_500_000, 100_000, selected_plan_index=0)
+    decision_id = save_other(client, "health_plans", "/calc/health-plans", inputs)
+    document = make_document(db_connection, user_a.id, type="benefits", with_blob=False)
+    with user_session_for(user_a.id, bind=db_connection) as session:
+        session.execute(
+            text(
+                "INSERT INTO benefits_chunks (user_id, document_id, chunk_index, text)"
+                " VALUES (:u, :d, 0, :t)"
+            ),
+            {"u": user_a.id, "d": document, "t": "Bronze HSA deductible and coinsurance."},
+        )
+    script(GOOD)
+    out = explain(client, decision_id)
+    assert (out["verified"], out["fallback"]) == (True, False)
+    assert out["citations"][0]["key"] == "health.hdhp_definition"
+    context = script.sent[0]["context"]
+    assert context["calculator"] == "health_plans"
+    assert context["benefits_passages"] == ["Bronze HSA deductible and coinsurance."]
+
+
+def test_health_plan_fallback_is_cited(
+    script: Script, client_as: Client, user_a: FixtureUser
+) -> None:
+    client = client_as(user_a)
+    inputs = health_payload([A, B], 6_500_000, 100_000, selected_plan_index=1)
+    decision_id = save_other(client, "health_plans", "/calc/health-plans", inputs)
+    script(BAD, BAD)
+    out = explain(client, decision_id)
+    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v1")
+    assert [c["key"] for c in out["citations"]] == [
+        "health.hdhp_definition",
+        "health.hsa_limit",
+        "health.federal_brackets",
+    ]
+    assert "Gold PPO" in out["text"]
+
+
+def test_emergency_fund_decision_is_not_explained_yet(
+    script: Script, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    """Spec 011, out of scope: no IRS passage applies, so no run starts."""
+    client = client_as(user_a)
+    decision_id = save_other(
+        client, "emergency_fund", "/calc/emergency-fund", EMERGENCY_FUND_INPUTS
+    )
+    script(GOOD)
+    response = client.post("/explain", json={"decision_id": decision_id})
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "explanation_unavailable"
+    assert script.sent == []
+    assert rows(db_connection, decision_id) == []
+    assert client.get(f"/decisions/{decision_id}/explanation").status_code == 404

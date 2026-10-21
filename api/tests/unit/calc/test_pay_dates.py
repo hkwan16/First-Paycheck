@@ -6,7 +6,7 @@ import datetime as dt
 
 import pytest
 
-from calc.pay_dates import PayFrequency, frequency_for_periods, next_pay_date
+from calc.pay_dates import PayFrequency, add_months, frequency_for_periods, next_pay_date
 
 D = dt.date
 
@@ -63,3 +63,23 @@ def test_always_strictly_after_today(frequency: PayFrequency) -> None:
         result = next_pay_date(frequency, anchor, day)
         assert day < result <= day + dt.timedelta(days=31)
         day += dt.timedelta(days=1)
+
+
+@pytest.mark.parametrize(
+    ("start", "months", "expected"),
+    [
+        (D(2026, 10, 30), 0, D(2026, 10, 30)),
+        (D(2026, 10, 30), 3, D(2027, 1, 30)),
+        (D(2026, 10, 30), 14, D(2027, 12, 30)),
+        (D(2026, 11, 30), 3, D(2027, 2, 28)),
+        (D(2027, 11, 30), 3, D(2028, 2, 29)),
+        (D(2026, 1, 31), 1, D(2026, 2, 28)),
+    ],
+)
+def test_add_months_clamps_to_the_month_end(start: dt.date, months: int, expected: dt.date) -> None:
+    assert add_months(start, months) == expected
+
+
+def test_add_months_refuses_negative_counts() -> None:
+    with pytest.raises(ValueError, match="-1"):
+        add_months(D(2026, 1, 1), -1)

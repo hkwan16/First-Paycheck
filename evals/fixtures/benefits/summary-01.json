@@ -1,0 +1,42 @@
+{
+  "account_number": null,
+  "content_type": "application/pdf",
+  "employer": "Bluebird Robotics Inc",
+  "file": "summary-01.pdf",
+  "id": "summary-01",
+  "layout": "table",
+  "match_tiers": [
+    {
+      "employee_pct_upto": "3.00",
+      "employer_pct": "100.00"
+    },
+    {
+      "employee_pct_upto": "5.00",
+      "employer_pct": "50.00"
+    }
+  ],
+  "plans": [
+    {
+      "coinsurance_pct": "30.00",
+      "deductible_cents": 205000,
+      "employer_hsa_cents": 120000,
+      "enrollment_deadline": "2026-11-25",
+      "kind": "hdhp",
+      "name": "Saver HDHP",
+      "oop_max_cents": 700000,
+      "premium_per_period_cents": 400
+    },
+    {
+      "coinsurance_pct": "20.00",
+      "deductible_cents": 50000,
+      "employer_hsa_cents": null,
+      "enrollment_deadline": "2026-11-25",
+      "kind": "ppo",
+      "name": "Premier PPO",
+      "oop_max_cents": 325000,
+      "premium_per_period_cents": 8000
+    }
+  ],
+  "ssn": null,
+  "vesting_years": 3
+}

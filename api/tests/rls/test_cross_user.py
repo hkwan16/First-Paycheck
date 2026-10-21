@@ -36,7 +36,13 @@ from tests.support.factories import (
 
 # Routes with no user data behind them, or no user at all. The calculators
 # are stateless: they read and write nothing (spec 007 rule 6).
-EXEMPT = {("GET", "/health"), ("POST", "/sync/webhook"), ("POST", "/calc/401k-match")}
+EXEMPT = {
+    ("GET", "/health"),
+    ("POST", "/sync/webhook"),
+    ("POST", "/calc/401k-match"),
+    ("POST", "/calc/emergency-fund"),
+    ("POST", "/calc/health-plans"),
+}
 
 
 @dataclass
@@ -292,6 +298,25 @@ def confirm_document(
     return Case("POST", f"/docs/{document}/confirm", 404, json={"pay_stub": values}, after=after)
 
 
+def list_benefits_plans(
+    connection: Connection, client_as: Callable[[FixtureUser], TestClient]
+) -> Case:
+    document = a_document(connection, type="benefits", with_blob=False)
+    connection.execute(
+        text(
+            "INSERT INTO benefits_plans (user_id, document_id, name, kind,"
+            " premium_per_period_cents, deductible_cents, oop_max_cents, coinsurance_pct)"
+            " VALUES (:u, :d, 'Gold PPO', 'ppo', 6250, 50000, 300000, 10)"
+        ),
+        {"u": USER_A.id, "d": document},
+    )
+
+    def body(data: Any) -> None:
+        assert data == []
+
+    return Case("GET", "/benefits-plans", 200, body=body)
+
+
 def list_pay_stubs(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
     make_pay_stub(connection, USER_A.id, a_document(connection, with_blob=False))
 
@@ -391,6 +416,78 @@ def explain(connection: Connection, client_as: Callable[[FixtureUser], TestClien
     return Case("POST", "/explain", 404, json={"decision_id": decision, "force": True}, after=after)
 
 
+EMERGENCY_FUND_INPUTS: dict[str, Any] = {
+    "monthly_essentials_cents": 250_000,
+    "target_months": 3,
+    "current_balance_cents": 0,
+    "monthly_contribution_cents": 50_000,
+    "pay_periods_per_year": 26,
+}
+
+
+def a_goal(client_as: Callable[[FixtureUser], TestClient]) -> str:
+    """A's emergency-fund goal, created by saving a decision through the API."""
+    client = client_as(USER_A)
+    result = client.post("/calc/emergency-fund", json=EMERGENCY_FUND_INPUTS).json()
+    saved = client.post(
+        "/decisions",
+        json={"calculator": "emergency_fund", "inputs": EMERGENCY_FUND_INPUTS, "result": result},
+    )
+    assert saved.status_code == 201, saved.text
+    goal_id: str = saved.json()["goal_id"]
+    return goal_id
+
+
+def list_goals(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    a_goal(client_as)
+
+    def body(data: Any) -> None:
+        assert data == []
+
+    return Case("GET", "/goals", 200, body=body)
+
+
+def update_goal(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    goal = a_goal(client_as)
+
+    def after(conn: Connection) -> None:
+        row = conn.execute(
+            text("SELECT status::text, monthly_contribution_cents FROM goals WHERE id = :id"),
+            {"id": goal},
+        ).one()
+        assert tuple(row) == ("active", 50_000)
+
+    return Case(
+        "PATCH",
+        f"/goals/{goal}",
+        404,
+        json={"status": "paused", "monthly_contribution_cents": 1},
+        after=after,
+    )
+
+
+def update_own_goal_with_other_account(
+    connection: Connection, client_as: Callable[[FixtureUser], TestClient]
+) -> Case:
+    """B's own goal pointed at A's account: the account is invisible, so 404."""
+    account = a_account(connection)
+    client = client_as(USER_B)
+    result = client.post("/calc/emergency-fund", json=EMERGENCY_FUND_INPUTS).json()
+    saved = client.post(
+        "/decisions",
+        json={"calculator": "emergency_fund", "inputs": EMERGENCY_FUND_INPUTS, "result": result},
+    )
+    goal = saved.json()["goal_id"]
+
+    def after(conn: Connection) -> None:
+        linked = conn.execute(
+            text("SELECT account_id FROM goals WHERE id = :id"), {"id": goal}
+        ).scalar_one()
+        assert linked is None
+
+    return Case("PATCH", f"/goals/{goal}", 404, json={"account_id": str(account)}, after=after)
+
+
 def list_calendar(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
     a_decision(client_as)
 
@@ -476,6 +573,8 @@ ROUTE_CASES: dict[tuple[str, str], Builder] = {
     ("GET", "/decisions/{decision_id}/explanation"): get_explanation,
     ("POST", "/explain"): explain,
     ("GET", "/calendar"): list_calendar,
+    ("GET", "/goals"): list_goals,
+    ("PATCH", "/goals/{goal_id}"): update_goal,
     ("GET", "/spending/summary"): spending_summary,
     ("POST", "/docs"): upload_document,
     ("GET", "/docs"): list_documents,
@@ -483,6 +582,7 @@ ROUTE_CASES: dict[tuple[str, str], Builder] = {
     ("POST", "/docs/{document_id}/extract"): extract_document,
     ("POST", "/docs/{document_id}/confirm"): confirm_document,
     ("GET", "/pay-stubs"): list_pay_stubs,
+    ("GET", "/benefits-plans"): list_benefits_plans,
     ("GET", "/profile"): get_profile,
     ("PUT", "/profile"): put_profile,
     ("POST", "/sync/link-token"): link_token,
@@ -496,6 +596,20 @@ ROUTE_CASES: dict[tuple[str, str], Builder] = {
     ("PATCH", "/transactions/{transaction_id}"): update_transaction,
     ("GET", "/jobs/{job_id}"): get_job,
 }
+
+
+def test_user_b_cannot_link_user_a_account_to_a_goal(
+    db_connection: Connection,
+    client_as: Callable[[FixtureUser], TestClient],
+    user_a: FixtureUser,
+    user_b: FixtureUser,
+) -> None:
+    case = update_own_goal_with_other_account(db_connection, client_as)
+    response = client_as(user_b).request(case.method, case.path, json=case.json)
+    assert response.status_code == 404, response.text
+    assert response.json()["error"]["code"] == "not_found"
+    assert case.after is not None
+    case.after(db_connection)
 
 
 def app_routes(app: FastAPI) -> set[tuple[str, str]]:

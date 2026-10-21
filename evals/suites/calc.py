@@ -7,7 +7,8 @@ the "Hand-worked examples" section of a ``docs/specs/`` file::
       "request": {...}, "expected": {...}}]
 
 A case passes when the route returns 200 and every key in ``expected``
-matches the response (nested objects compare as subsets). Deterministic: the
+matches the response (nested objects compare as subsets; lists compare item by
+item, so a list of objects lists a subset of each item). Deterministic: the
 baseline is 100% and no drop is tolerated.
 """
 
@@ -57,7 +58,8 @@ def load_cases(directory: Path = FIXTURES) -> list[CalcCase]:
 
 
 def mismatches(expected: Any, actual: Any, path: str = "") -> list[str]:
-    """Differences between ``expected`` and ``actual``; dicts compare as subsets."""
+    """Differences between ``expected`` and ``actual``; dicts compare as subsets and
+    lists item by item."""
     if isinstance(expected, dict):
         if not isinstance(actual, dict):
             return [f"{path or 'response'} expected an object, got {actual!r}"]
@@ -69,6 +71,16 @@ def mismatches(expected: Any, actual: Any, path: str = "") -> list[str]:
             else:
                 found.extend(mismatches(value, actual[key], where))
         return found
+    if isinstance(expected, list):
+        if not isinstance(actual, list):
+            return [f"{path or 'response'} expected a list, got {actual!r}"]
+        if len(expected) != len(actual):
+            return [f"{path or 'response'} expected {len(expected)} items, got {len(actual)}"]
+        return [
+            problem
+            for index, (want, got) in enumerate(zip(expected, actual, strict=True))
+            for problem in mismatches(want, got, f"{path}[{index}]")
+        ]
     if expected != actual:
         return [f"{path} expected {expected!r}, got {actual!r}"]
     return []

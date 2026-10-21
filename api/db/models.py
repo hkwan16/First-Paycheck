@@ -56,6 +56,7 @@ from db.enums import (
     FindingKind,
     FindingSeverity,
     GoalKind,
+    GoalStatus,
     HealthcareUsage,
     JobKind,
     JobStatus,
@@ -126,6 +127,8 @@ class Profile(Base):
         CheckConstraint("dependents >= 0", name="dependents_non_negative"),
         CheckConstraint("jsonb_typeof(match_tiers) = 'array'", name="match_tiers_array"),
         CheckConstraint("vesting_years >= 0", name="vesting_years_non_negative"),
+        # The upper bound (the current year) is the route's: a CHECK cannot read the clock.
+        CheckConstraint("birth_year >= 1900", name="birth_year_after_1900"),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -146,6 +149,8 @@ class Profile(Base):
     start_date: Mapped[dt.date | None] = mapped_column(Date)
     match_tiers: Mapped[list[Any]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
     vesting_years: Mapped[int | None] = mapped_column(SmallInteger)
+    # Spec 006 open question 2: the client derives age as tax_year - birth_year.
+    birth_year: Mapped[int | None] = mapped_column(SmallInteger)
     created_at: Mapped[dt.datetime] = _created_at()
     updated_at: Mapped[dt.datetime] = _updated_at()
 
@@ -561,13 +566,23 @@ class BenefitsPlan(Base):
         CheckConstraint("deductible_cents <= oop_max_cents", name="deductible_within_oop_max"),
         CheckConstraint("coinsurance_pct BETWEEN 0 AND 100", name="coinsurance_range"),
         CheckConstraint("employer_hsa_cents >= 0", name="employer_hsa_non_negative"),
+        CheckConstraint("position >= 0", name="position_non_negative"),
         Index("ix_benefits_plans_user_id", "user_id"),
+        Index(
+            "uq_benefits_plans_document_position",
+            "document_id",
+            "position",
+            unique=True,
+            postgresql_where=text("document_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = _id()
     user_id: Mapped[uuid.UUID] = _owner()
     # Null when the plan was entered by hand.
     document_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    # The plan's place in its summary's list, from 0 (spec 013 rule 14).
+    position: Mapped[int] = mapped_column(SmallInteger, server_default=text("0"))
     name: Mapped[str] = mapped_column(Text)
     kind: Mapped[PlanKind] = mapped_column(pg_enum(PlanKind, "plan_kind"))
     premium_per_period_cents: Mapped[int] = mapped_column(BigInteger)
@@ -694,7 +709,15 @@ class Goal(Base):
         ),
         CheckConstraint("target_amount_cents > 0", name="target_positive"),
         CheckConstraint("monthly_contribution_cents >= 0", name="contribution_non_negative"),
+        CheckConstraint("(status = 'reached') = (reached_at IS NOT NULL)", name="reached_has_time"),
         Index("ix_goals_user_id", "user_id"),
+        # One emergency fund per user (spec 011 rule 9).
+        Index(
+            "uq_goals_user_emergency_fund",
+            "user_id",
+            unique=True,
+            postgresql_where=text("kind = 'emergency_fund'"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = _id()
@@ -705,6 +728,10 @@ class Goal(Base):
     account_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     decision_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     target_date: Mapped[dt.date | None] = mapped_column(Date)
+    status: Mapped[GoalStatus] = mapped_column(
+        pg_enum(GoalStatus, "goal_status"), server_default=text("'active'")
+    )
+    reached_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[dt.datetime] = _created_at()
     updated_at: Mapped[dt.datetime] = _updated_at()
 

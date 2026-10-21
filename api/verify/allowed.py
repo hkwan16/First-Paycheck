@@ -62,7 +62,8 @@ class AllowedNumbers:
             elif _MONEY_KEY.search(key):
                 number = _decimal(value)
                 if number is not None:
-                    money.add(number)
+                    # Tokens are matched by magnitude (rule 13), so values are too.
+                    money.add(abs(number))
             elif _PERCENT_KEY.search(key):
                 number = _decimal(value)
                 if number is not None:

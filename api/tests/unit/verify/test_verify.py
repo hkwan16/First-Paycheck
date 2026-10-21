@@ -143,3 +143,14 @@ def test_passing_verification_has_no_feedback_and_serializes() -> None:
         "citations_unknown": [],
         "has_citation": True,
     }
+
+
+def test_a_negative_money_value_is_allowed_by_its_magnitude() -> None:
+    """Rule 13 ignores a money token's sign, so a negative result value (a net
+    cost below zero, spec 012) is allowed written either way."""
+    allowed = AllowedNumbers.from_decision({}, {"low_cost_cents": -40_300})
+    for text in ("It costs -$403.00 a year.", "You come out $403.00 ahead.", "About $403."):
+        draft = ExplanationDraft(
+            concept="c", text=text, numbers=[], what_ifs=[], citation_keys=["k"]
+        )
+        assert verify_explanation(draft, allowed, {"k"}).passed, text

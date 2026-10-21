@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app import ratelimit
 from app.auth import CurrentUser
 from app.deps import LlmGateway, Now, UserSession, UserSessions
-from app.errors import NotFound, error_responses
+from app.errors import AppError, NotFound, error_responses
 from app.types import UtcDateTime
 from db.enums import CalculatorKind
 from db.models import Decision, Explanation
@@ -28,7 +28,7 @@ from llm.prompts import load_prompt
 from llm.schemas import NumberClaim
 from retrieval import benefits_search
 from retrieval.citations import Citation, by_key, for_calculator
-from retrieval.context import BENEFITS_PASSAGES, BENEFITS_QUERIES, explain_context
+from retrieval.context import BENEFITS_PASSAGES, BENEFITS_QUERIES, explain_context, name_numbers
 from verify.allowed import AllowedNumbers
 from verify.fallback import FALLBACK_VERSION, fallback_draft
 from verify.flow import Attempt, run_explain
@@ -82,6 +82,18 @@ def _decision(session: Session, decision_id: uuid.UUID) -> Decision:
     if decision is None:
         raise NotFound("Decision not found")
     return decision
+
+
+def _benefits_query(decision: Decision) -> str:
+    """The calculator's benefits query; a calculator without one has no explanation yet."""
+    query = BENEFITS_QUERIES.get(CalculatorKind(decision.calculator))
+    if query is None:
+        raise AppError(
+            f"{decision.calculator} decisions cannot be explained yet",
+            code="explanation_unavailable",
+            status_code=422,
+        )
+    return query
 
 
 def _tax_year(decision: Decision) -> int:
@@ -146,13 +158,14 @@ def _row(user_id: uuid.UUID, decision_id: uuid.UUID, attempt: Attempt) -> Explan
     )
 
 
-@router.post("/explain", responses=error_responses(401, 404, 429, 503))
+@router.post("/explain", responses=error_responses(401, 404, 422, 429, 503))
 def explain(
     body: ExplainIn, user: CurrentUser, sessions: UserSessions, gateway: LlmGateway, now: Now
 ) -> ExplanationOut:
     """Explain a decision; returns the existing verified explanation unless ``force``."""
     with sessions() as session:
         decision = _decision(session, body.decision_id)
+        query = _benefits_query(decision)
         citations = for_calculator(session, decision.calculator, _tax_year(decision))
         if not body.force:
             existing = _latest(session, decision.id, verified=True)
@@ -162,12 +175,7 @@ def explain(
         # a refused run rolls its increment back with this session (rule 22).
         model = gateway()
         ratelimit.consume(session, user.id, ratelimit.EXPLAIN_RUNS, now=now)
-        passages = benefits_search.search(
-            session,
-            user.id,
-            BENEFITS_QUERIES[CalculatorKind(decision.calculator)],
-            BENEFITS_PASSAGES,
-        )
+        passages = benefits_search.search(session, user.id, query, BENEFITS_PASSAGES)
     inputs: dict[str, Any] = decision.inputs
     result: dict[str, Any] = decision.result
     keys = {citation.key for citation in citations}
@@ -176,7 +184,7 @@ def explain(
         model,
         user.id,
         explain_context(decision.calculator, inputs, result, citations, passages),
-        AllowedNumbers.from_decision(inputs, result),
+        AllowedNumbers.from_decision(inputs, result, name_numbers(decision.calculator, inputs)),
         keys,
         fallback_draft(decision.calculator, inputs, result, keys),
     )

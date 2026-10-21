@@ -1,0 +1,28 @@
+{
+  "account_number": null,
+  "content_type": "application/pdf",
+  "employer": "Lumen Data Co",
+  "file": "summary-02.pdf",
+  "id": "summary-02",
+  "layout": "prose",
+  "match_tiers": [
+    {
+      "employee_pct_upto": "6.00",
+      "employer_pct": "50.00"
+    }
+  ],
+  "plans": [
+    {
+      "coinsurance_pct": "10.00",
+      "deductible_cents": 115000,
+      "employer_hsa_cents": null,
+      "enrollment_deadline": "2026-11-23",
+      "kind": "ppo",
+      "name": "Gold PPO",
+      "oop_max_cents": 525000,
+      "premium_per_period_cents": 8750
+    }
+  ],
+  "ssn": null,
+  "vesting_years": 5
+}

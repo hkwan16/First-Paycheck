@@ -43,3 +43,6 @@ Specs may add an **Open questions** section for decisions not yet made. A spec w
 | [008 Explain, verify, citations and retrieval](008-explain-and-verify.md) | Implemented, M3 |
 | [009 Recurring charges](009-recurring-charges.md) | Implemented, M5 |
 | [010 Cash flow and CSV import](010-cash-flow-and-csv-import.md) | Implemented, M5 |
+| [011 Emergency fund calculator, goals and their calendar](011-emergency-fund.md) | Implemented, M6 |
+| [012 Health plan comparison calculator](012-health-plans.md) | Implemented, M6 |
+| [013 Benefits extraction: health plans, the 401(k) match and vesting](013-benefits-extraction.md) | Implemented, M6 |

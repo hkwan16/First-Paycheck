@@ -12,13 +12,21 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal, localcontext
 from itertools import pairwise
-from typing import Annotated, Literal, Self
+from typing import Self
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from calc.data import FilingStatus, K401Limits, TaxYearData, UnknownTaxYear, tax_year
+from calc.brackets import marginal_rate
+from calc.data import FilingStatus, K401Limits, UnknownTaxYear, tax_year
 from calc.money import CONTEXT, pct_of, per_period, round_half_up
-from calc.types import Cents, Percent, PositiveCents, PositivePercent
+from calc.types import (
+    Cents,
+    PayPeriods,
+    Percent,
+    PositiveCents,
+    PositivePercent,
+    ResultPercent,
+)
 
 __all__ = [
     "BASE_CITATION_KEYS",
@@ -29,12 +37,13 @@ __all__ = [
     "K401MatchResult",
     "MatchTier",
     "PayPeriods",
+    "cumulative_bounds",
     "deferral_limit_cents",
     "k401_match",
     "tiers_ascending",
+    "tiers_from_bands",
 ]
 
-PayPeriods = Literal[12, 24, 26, 52]
 MAX_TIERS = 5
 
 # Spec 006 rule 11, in this order.
@@ -68,6 +77,30 @@ def tiers_ascending(tiers: Sequence[MatchTier]) -> None:
         raise ValueError("match_tiers must have strictly ascending employee_pct_upto")
 
 
+def cumulative_bounds(bands: Sequence[Decimal]) -> list[Decimal]:
+    """Each tier's upper bound: its band plus every band before it (spec 013 rule 8).
+    Exact ``Decimal`` sums; a band must be positive."""
+    bounds: list[Decimal] = []
+    upto = _ZERO
+    for band in bands:
+        if band <= 0:
+            raise ValueError(f"a match band must be positive, not {band}")
+        upto += band
+        bounds.append(upto)
+    return bounds
+
+
+def tiers_from_bands(bands: Sequence[tuple[Decimal, Decimal]]) -> list[MatchTier]:
+    """``(band, share)`` pairs as a summary prints them ("100% of the first 3%,
+    50% of the next 2%") become cumulative tiers (3@100, 5@50). Raises
+    ``ValueError`` when the result is not a valid formula."""
+    bounds = cumulative_bounds([band for band, _ in bands])
+    return [
+        MatchTier(employee_pct_upto=upto, employer_pct=share)
+        for upto, (_, share) in zip(bounds, bands, strict=True)
+    ]
+
+
 class K401MatchInput(BaseModel):
     """The calculator's inputs, exactly as spec 006 lists them."""
 
@@ -99,14 +132,6 @@ class K401MatchInput(BaseModel):
     def _tiers_ascending(self) -> Self:
         tiers_ascending(self.match_tiers)
         return self
-
-
-def _two_places(value: Decimal) -> Decimal:
-    return value.quantize(Decimal("0.01"))
-
-
-# A rate the calculator reports, with exactly two places ("5.00").
-ResultPercent = Annotated[Decimal, AfterValidator(_two_places)]
 
 
 class K401MatchResult(BaseModel):
@@ -154,16 +179,6 @@ def _match(tiers: Sequence[MatchTier], match_base: Decimal, deferral: Decimal) -
     return total
 
 
-def _marginal_rate(data: TaxYearData, status: FilingStatus, taxable: Decimal) -> Decimal:
-    """Rule 9: the rate of the bracket holding ``taxable``; a bound is "not over"."""
-    if taxable <= 0:
-        return _ZERO
-    for bracket in data.brackets.by_status[status]:
-        if bracket.up_to_cents is None or taxable <= bracket.up_to_cents:
-            return bracket.rate_pct
-    raise AssertionError("the top bracket is open-ended")  # pragma: no cover
-
-
 def k401_match(data: K401MatchInput) -> K401MatchResult:
     year = tax_year(data.tax_year)
     with localcontext(CONTEXT):
@@ -184,7 +199,7 @@ def k401_match(data: K401MatchInput) -> K401MatchResult:
 
         delta = max(_ZERO, full - current)
         taxable = salary - current - year.standard_deduction.cents[data.filing_status]
-        rate = _marginal_rate(year, data.filing_status, taxable)
+        rate = marginal_rate(year, data.filing_status, taxable)
         periods = data.pay_periods_per_year
         after_tax = per_period(delta * (1 - rate / _HUNDRED), periods)
 

@@ -24,6 +24,19 @@ def test_2026_retirement_limits() -> None:
     assert data.k401.url == "https://www.irs.gov/pub/irs-drop/n-25-67.pdf"
 
 
+def test_2026_hsa_and_hdhp_limits() -> None:
+    """Spec 012: Rev. Proc. 2025-19, section 2.01."""
+    hsa = tax_year(2026).hsa
+    assert (hsa.self_only_limit_cents, hsa.family_limit_cents) == (440_000, 875_000)
+    assert (hsa.hdhp_min_deductible_self_cents, hsa.hdhp_min_deductible_family_cents) == (
+        170_000,
+        340_000,
+    )
+    assert (hsa.hdhp_max_oop_self_cents, hsa.hdhp_max_oop_family_cents) == (850_000, 1_700_000)
+    assert "Rev. Proc. 2025-19" in hsa.source
+    assert hsa.url == "https://www.irs.gov/pub/irs-drop/rp-25-19.pdf"
+
+
 def test_2026_standard_deductions() -> None:
     data = tax_year(2026)
     assert data.standard_deduction.cents == {

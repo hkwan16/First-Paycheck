@@ -7,29 +7,26 @@ any difference from the client's result and stores the server's own values.
 
 from __future__ import annotations
 
-import datetime as dt
 import uuid
 from typing import Any
 
 from fastapi import APIRouter, status
 from pydantic import BaseModel, ConfigDict, ValidationError
-from sqlalchemy import column, exists, func, select, table, update
+from sqlalchemy import column, exists, select, table
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app import decision_effects
 from app.auth import CurrentUser
 from app.deps import Now, UserSession
 from app.errors import AppError, NotFound, error_responses
 from app.types import UtcDateTime
-from calc.k401 import K401MatchInput
-from calc.pay_dates import PERIODS, PayFrequency, frequency_for_periods, next_pay_date
 from calc.registry import Calculator, UnknownCalculator, calculator
-from db.enums import CalculatorKind, CalendarKind, CalendarStatus
-from db.models import CalendarEvent, Decision, PayStub, Profile
+from db.enums import CalculatorKind
+from db.models import Decision
 
 router = APIRouter(prefix="/decisions", tags=["decisions"])
 
-ELECTION_CHECK_TITLE = "Check that your next pay stub shows your new 401(k) contribution"
 # The unique constraints a concurrent or repeated save runs into (rule 5).
 _CONFLICT_CONSTRAINTS = frozenset(
     {"uq_decisions_user_id_calculator_version", "uq_decisions_supersedes_id"}
@@ -155,45 +152,6 @@ def _next_version(session: Session, body: DecisionIn) -> int:
     return parent.version + 1
 
 
-def _pay_frequency(session: Session, user_id: uuid.UUID, periods: int) -> PayFrequency:
-    """The profile's pay frequency, else the one the decision's pay periods imply."""
-    profile = session.get(Profile, user_id)
-    if profile is not None and profile.pay_frequency is not None:
-        for frequency in PERIODS:
-            if frequency == profile.pay_frequency:
-                return frequency
-    return frequency_for_periods(periods)
-
-
-def _election_check(
-    session: Session, decision: Decision, inputs: K401MatchInput, today: dt.date
-) -> CalendarEvent:
-    """Rule 14: one check per calculator, dated the next expected pay date."""
-    anchor = session.scalar(select(func.max(PayStub.pay_date)))
-    frequency = _pay_frequency(session, decision.user_id, inputs.pay_periods_per_year)
-    if decision.supersedes_id is not None:
-        session.execute(
-            update(CalendarEvent)
-            .where(
-                CalendarEvent.decision_id == decision.supersedes_id,
-                CalendarEvent.kind == CalendarKind.ELECTION_CHECK,
-                CalendarEvent.status == CalendarStatus.UPCOMING,
-            )
-            .values(status=CalendarStatus.DISMISSED)
-        )
-    event = CalendarEvent(
-        user_id=decision.user_id,
-        kind=CalendarKind.ELECTION_CHECK,
-        title=ELECTION_CHECK_TITLE,
-        due_at=next_pay_date(frequency, anchor, today),
-        decision_id=decision.id,
-        status=CalendarStatus.UPCOMING,
-    )
-    session.add(event)
-    session.flush()
-    return event
-
-
 @router.post("", status_code=status.HTTP_201_CREATED, responses=error_responses(401, 404, 409, 422))
 def save_decision(
     body: DecisionIn, session: UserSession, user: CurrentUser, now: Now
@@ -208,6 +166,7 @@ def save_decision(
             status_code=422,
         ) from exc
     inputs, computed = _recompute(spec, body)
+    decision_effects.check_saveable(inputs)
     version = _next_version(session, body)
     decision = Decision(
         user_id=user.id,
@@ -225,17 +184,15 @@ def save_decision(
         if constraint in _CONFLICT_CONSTRAINTS:
             raise _conflict() from exc
         raise
-    event = None
-    if isinstance(inputs, K401MatchInput):
-        event = _election_check(session, decision, inputs, now.date())
+    effects = decision_effects.apply(session, decision, inputs, computed, now.date())
     return DecisionSaved(
         decision_id=decision.id,
         calculator=decision.calculator,
         version=decision.version,
         supersedes_id=decision.supersedes_id,
         created_at=decision.created_at,
-        calendar_event_id=event.id if event is not None else None,
-        goal_id=None,
+        calendar_event_id=effects.calendar_event_id,
+        goal_id=effects.goal_id,
     )
 
 
