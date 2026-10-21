@@ -114,7 +114,7 @@ The November user: semimonthly at Acme, a 4% 401(k) election and the "HDHP + HSA
 
 | # | Test | Facts | Expected |
 |---|---|---|---|
-| 1 | `test_election_not_applied` | 401(k) 4%, stubs S2, S1 | `election_mismatch`, `alert`: expected 10,833, actual 5,417, difference -5,416, elected 4, actual 2.00 |
+| 1 | `test_election_not_applied` | 401(k) 4%, stub S2 alone | `election_mismatch`, `alert`: expected 10,833, actual 5,417, difference -5,416, elected 4, actual 2.00 |
 | 2 | `test_election_applied_within_a_cent` | S2 with 401(k) 10,834 | none |
 | 3 | `test_election_not_yet_due` | 401(k) 4%, stubs S1 only | none |
 | 4 | `test_health_premium_mismatch` | HDHP 3,125; S2 with medical 6,250 | `election_mismatch`, `warning`: expected 3,125, actual 6,250, difference 3,125, plan "HDHP + HSA" |

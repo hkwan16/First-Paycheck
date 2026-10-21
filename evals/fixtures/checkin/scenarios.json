@@ -1,0 +1,633 @@
+[
+  {
+    "expected": [
+      {
+        "key": "election_mismatch:k401_match:d94924f2-45c6-553c-8d7a-7d0ddfb16ea6:9d230b47-3cee-5583-b27b-fbe66e2f40a6",
+        "kind": "election_mismatch",
+        "payload": {
+          "actual_cents": 5417,
+          "actual_pct": "2.00",
+          "difference_cents": -5416,
+          "elected_pct": "4.00",
+          "expected_cents": 10833
+        },
+        "severity": "alert"
+      }
+    ],
+    "facts": {
+      "k401": {
+        "contribution_pct": "4",
+        "decided_on": "2026-10-20",
+        "decision_id": "d94924f2-45c6-553c-8d7a-7d0ddfb16ea6"
+      },
+      "pay_stubs": [
+        {
+          "federal_withholding_cents": 21196,
+          "gross_cents": 270833,
+          "id": "9d230b47-3cee-5583-b27b-fbe66e2f40a6",
+          "medical_premium_cents": 3125,
+          "medicare_cents": 3927,
+          "net_cents": 205892,
+          "other_deductions_cents": 4670,
+          "pay_date": "2026-11-15",
+          "period_end": "2026-11-15",
+          "period_start": "2026-11-01",
+          "retirement_contribution_cents": 5417,
+          "social_security_cents": 16792,
+          "state_tax_cents": 9814
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_election_not_applied"
+  },
+  {
+    "expected": [],
+    "facts": {
+      "k401": {
+        "contribution_pct": "4",
+        "decided_on": "2026-10-20",
+        "decision_id": "d94924f2-45c6-553c-8d7a-7d0ddfb16ea6"
+      },
+      "pay_stubs": [
+        {
+          "federal_withholding_cents": 21196,
+          "gross_cents": 270833,
+          "id": "9d230b47-3cee-5583-b27b-fbe66e2f40a6",
+          "medical_premium_cents": 3125,
+          "medicare_cents": 3927,
+          "net_cents": 205892,
+          "other_deductions_cents": 4670,
+          "pay_date": "2026-11-15",
+          "period_end": "2026-11-15",
+          "period_start": "2026-11-01",
+          "retirement_contribution_cents": 10834,
+          "social_security_cents": 16792,
+          "state_tax_cents": 9814
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_election_applied_within_a_cent"
+  },
+  {
+    "expected": [],
+    "facts": {
+      "k401": {
+        "contribution_pct": "4",
+        "decided_on": "2026-10-20",
+        "decision_id": "d94924f2-45c6-553c-8d7a-7d0ddfb16ea6"
+      },
+      "pay_stubs": [
+        {
+          "federal_withholding_cents": 29776,
+          "gross_cents": 270833,
+          "id": "869a5f56-0b5b-5805-8112-37f778c36deb",
+          "medical_premium_cents": 6250,
+          "medicare_cents": 3927,
+          "net_cents": 199604,
+          "other_deductions_cents": 4670,
+          "pay_date": "2026-10-31",
+          "period_end": "2026-10-31",
+          "period_start": "2026-10-16",
+          "retirement_contribution_cents": 0,
+          "social_security_cents": 16792,
+          "state_tax_cents": 9814
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_election_not_yet_due"
+  },
+  {
+    "expected": [
+      {
+        "key": "election_mismatch:health_plans:ec340541-8ce2-5d2f-9254-ed4217f9fde5:9d230b47-3cee-5583-b27b-fbe66e2f40a6",
+        "kind": "election_mismatch",
+        "payload": {
+          "actual_cents": 6250,
+          "difference_cents": 3125,
+          "expected_cents": 3125,
+          "plan_name": "HDHP + HSA"
+        },
+        "severity": "warning"
+      }
+    ],
+    "facts": {
+      "health": {
+        "decided_on": "2026-10-20",
+        "decision_id": "ec340541-8ce2-5d2f-9254-ed4217f9fde5",
+        "plan_name": "HDHP + HSA",
+        "premium_per_period_cents": 3125
+      },
+      "pay_stubs": [
+        {
+          "federal_withholding_cents": 21196,
+          "gross_cents": 270833,
+          "id": "9d230b47-3cee-5583-b27b-fbe66e2f40a6",
+          "medical_premium_cents": 6250,
+          "medicare_cents": 3927,
+          "net_cents": 205892,
+          "other_deductions_cents": 4670,
+          "pay_date": "2026-11-15",
+          "period_end": "2026-11-15",
+          "period_start": "2026-11-01",
+          "retirement_contribution_cents": 5417,
+          "social_security_cents": 16792,
+          "state_tax_cents": 9814
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_health_premium_mismatch"
+  },
+  {
+    "expected": [
+      {
+        "key": "goal_off_pace:c4025f49-8036-5ea7-bae8-f80c227fd0ea:2026-11-01",
+        "kind": "goal_off_pace",
+        "payload": {
+          "expected_cents": 290000,
+          "months_elapsed": 3,
+          "shortfall_cents": 16000
+        },
+        "severity": "warning"
+      }
+    ],
+    "facts": {
+      "goals": [
+        {
+          "balances": [
+            {
+              "as_of": "2026-07-31",
+              "balance_cents": 200000
+            },
+            {
+              "as_of": "2026-11-15",
+              "balance_cents": 274000
+            }
+          ],
+          "decision_id": "d89b06c6-2726-518f-842e-d46bc35dfc7d",
+          "id": "c4025f49-8036-5ea7-bae8-f80c227fd0ea",
+          "kind": "emergency_fund",
+          "monthly_contribution_cents": 30000,
+          "started_on": "2026-08-01",
+          "target_amount_cents": 547000
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_goal_off_pace"
+  },
+  {
+    "expected": [],
+    "facts": {
+      "goals": [
+        {
+          "balances": [
+            {
+              "as_of": "2026-07-31",
+              "balance_cents": 200000
+            },
+            {
+              "as_of": "2026-11-15",
+              "balance_cents": 290000
+            }
+          ],
+          "decision_id": "d89b06c6-2726-518f-842e-d46bc35dfc7d",
+          "id": "c4025f49-8036-5ea7-bae8-f80c227fd0ea",
+          "kind": "emergency_fund",
+          "monthly_contribution_cents": 30000,
+          "started_on": "2026-08-01",
+          "target_amount_cents": 547000
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_goal_on_pace"
+  },
+  {
+    "expected": [],
+    "facts": {
+      "goals": [
+        {
+          "balances": [
+            {
+              "as_of": "2026-07-31",
+              "balance_cents": 200000
+            },
+            {
+              "as_of": "2026-11-15",
+              "balance_cents": 274000
+            }
+          ],
+          "decision_id": "d89b06c6-2726-518f-842e-d46bc35dfc7d",
+          "id": "c4025f49-8036-5ea7-bae8-f80c227fd0ea",
+          "kind": "emergency_fund",
+          "monthly_contribution_cents": 30000,
+          "started_on": "2026-08-01",
+          "target_amount_cents": 274000
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_goal_at_target_is_not_behind"
+  },
+  {
+    "expected": [
+      {
+        "key": "recurring_new:0bd8ba04-3dae-5736-9a50-b5b1603fc6d7:2026-11-03",
+        "kind": "recurring_new",
+        "payload": {
+          "typical_amount_cents": 18500
+        },
+        "severity": "warning"
+      }
+    ],
+    "facts": {
+      "period": "2026-11-01",
+      "recurring": [
+        {
+          "cadence": "monthly",
+          "first_seen": "2026-09-03",
+          "id": "0bd8ba04-3dae-5736-9a50-b5b1603fc6d7",
+          "last_reported_amount_cents": null,
+          "last_seen": "2026-11-03",
+          "merchant": "Equinox",
+          "status": "new",
+          "typical_amount_cents": 18500,
+          "user_status": null
+        }
+      ],
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_recurring_new"
+  },
+  {
+    "expected": [
+      {
+        "key": "recurring_changed:5c0fb47a-f041-54e8-a332-8d2e16146b80:2026-11-03",
+        "kind": "recurring_changed",
+        "payload": {
+          "change_cents": 150,
+          "previous_amount_cents": 1549
+        },
+        "severity": "warning"
+      }
+    ],
+    "facts": {
+      "period": "2026-11-01",
+      "recurring": [
+        {
+          "cadence": "monthly",
+          "first_seen": "2026-09-03",
+          "id": "5c0fb47a-f041-54e8-a332-8d2e16146b80",
+          "last_reported_amount_cents": 1549,
+          "last_seen": "2026-11-03",
+          "merchant": "Netflix",
+          "status": "changed",
+          "typical_amount_cents": 1699,
+          "user_status": null
+        }
+      ],
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_recurring_price_rise"
+  },
+  {
+    "expected": [
+      {
+        "key": "recurring_changed:d1db3a0c-00e6-5c9f-81a4-0cae06f3ddf1:2026-11-03",
+        "kind": "recurring_changed",
+        "payload": {
+          "change_cents": -200
+        },
+        "severity": "info"
+      }
+    ],
+    "facts": {
+      "period": "2026-11-01",
+      "recurring": [
+        {
+          "cadence": "monthly",
+          "first_seen": "2026-09-03",
+          "id": "d1db3a0c-00e6-5c9f-81a4-0cae06f3ddf1",
+          "last_reported_amount_cents": 1199,
+          "last_seen": "2026-11-03",
+          "merchant": "Spotify",
+          "status": "changed",
+          "typical_amount_cents": 999,
+          "user_status": null
+        }
+      ],
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_recurring_price_drop"
+  },
+  {
+    "expected": [
+      {
+        "key": "recurring_changed:5c0fb47a-f041-54e8-a332-8d2e16146b80:2026-11-03",
+        "kind": "recurring_changed",
+        "payload": {
+          "change_cents": null,
+          "previous_amount_cents": null
+        },
+        "severity": "warning"
+      }
+    ],
+    "facts": {
+      "period": "2026-11-01",
+      "recurring": [
+        {
+          "cadence": "monthly",
+          "first_seen": "2026-09-03",
+          "id": "5c0fb47a-f041-54e8-a332-8d2e16146b80",
+          "last_reported_amount_cents": null,
+          "last_seen": "2026-11-03",
+          "merchant": "Netflix",
+          "status": "changed",
+          "typical_amount_cents": 1699,
+          "user_status": null
+        }
+      ],
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_recurring_change_without_history"
+  },
+  {
+    "expected": [
+      {
+        "key": "recurring_stopped:18fe6f18-976e-5718-8e8f-9917a87cf00c:2026-09-03",
+        "kind": "recurring_stopped",
+        "payload": {
+          "user_status": "cancelled"
+        },
+        "severity": "info"
+      }
+    ],
+    "facts": {
+      "period": "2026-11-01",
+      "recurring": [
+        {
+          "cadence": "monthly",
+          "first_seen": "2026-06-03",
+          "id": "18fe6f18-976e-5718-8e8f-9917a87cf00c",
+          "last_reported_amount_cents": null,
+          "last_seen": "2026-09-03",
+          "merchant": "Hulu",
+          "status": "stopped",
+          "typical_amount_cents": 1799,
+          "user_status": "cancelled"
+        }
+      ],
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_recurring_stopped_after_cancel"
+  },
+  {
+    "expected": [],
+    "facts": {
+      "period": "2026-11-01",
+      "recurring": [
+        {
+          "cadence": "monthly",
+          "first_seen": "2026-09-03",
+          "id": "0bd8ba04-3dae-5736-9a50-b5b1603fc6d7",
+          "last_reported_amount_cents": null,
+          "last_seen": "2026-11-03",
+          "merchant": "Equinox",
+          "status": "new",
+          "typical_amount_cents": 18500,
+          "user_status": "ignored"
+        }
+      ],
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_ignored_charge_is_not_reported"
+  },
+  {
+    "expected": [
+      {
+        "key": "pay_change:fc312d0b-59a2-5a8a-af4a-5c866ed8f97d",
+        "kind": "pay_change",
+        "payload": {
+          "gross_change_cents": 20834,
+          "net_change_cents": 19241
+        },
+        "severity": "info"
+      }
+    ],
+    "facts": {
+      "pay_stubs": [
+        {
+          "federal_withholding_cents": 29776,
+          "gross_cents": 291667,
+          "id": "fc312d0b-59a2-5a8a-af4a-5c866ed8f97d",
+          "medical_premium_cents": 6250,
+          "medicare_cents": 4229,
+          "net_cents": 218845,
+          "other_deductions_cents": 4670,
+          "pay_date": "2026-10-31",
+          "period_end": "2026-10-31",
+          "period_start": "2026-10-16",
+          "retirement_contribution_cents": 0,
+          "social_security_cents": 18083,
+          "state_tax_cents": 9814
+        },
+        {
+          "federal_withholding_cents": 29776,
+          "gross_cents": 270833,
+          "id": "869a5f56-0b5b-5805-8112-37f778c36deb",
+          "medical_premium_cents": 6250,
+          "medicare_cents": 3927,
+          "net_cents": 199604,
+          "other_deductions_cents": 4670,
+          "pay_date": "2026-10-31",
+          "period_end": "2026-10-31",
+          "period_start": "2026-10-16",
+          "retirement_contribution_cents": 0,
+          "social_security_cents": 16792,
+          "state_tax_cents": 9814
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_raise"
+  },
+  {
+    "expected": [
+      {
+        "key": "pay_change:869a5f56-0b5b-5805-8112-37f778c36deb",
+        "kind": "pay_change",
+        "payload": {
+          "gross_change_cents": -20834,
+          "net_change_cents": -19241
+        },
+        "severity": "warning"
+      }
+    ],
+    "facts": {
+      "pay_stubs": [
+        {
+          "federal_withholding_cents": 29776,
+          "gross_cents": 270833,
+          "id": "869a5f56-0b5b-5805-8112-37f778c36deb",
+          "medical_premium_cents": 6250,
+          "medicare_cents": 3927,
+          "net_cents": 199604,
+          "other_deductions_cents": 4670,
+          "pay_date": "2026-10-31",
+          "period_end": "2026-10-31",
+          "period_start": "2026-10-16",
+          "retirement_contribution_cents": 0,
+          "social_security_cents": 16792,
+          "state_tax_cents": 9814
+        },
+        {
+          "federal_withholding_cents": 29776,
+          "gross_cents": 291667,
+          "id": "fc312d0b-59a2-5a8a-af4a-5c866ed8f97d",
+          "medical_premium_cents": 6250,
+          "medicare_cents": 4229,
+          "net_cents": 218845,
+          "other_deductions_cents": 4670,
+          "pay_date": "2026-10-31",
+          "period_end": "2026-10-31",
+          "period_start": "2026-10-16",
+          "retirement_contribution_cents": 0,
+          "social_security_cents": 18083,
+          "state_tax_cents": 9814
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_pay_cut"
+  },
+  {
+    "expected": [
+      {
+        "key": "deduction_change:9d230b47-3cee-5583-b27b-fbe66e2f40a6:federal_withholding",
+        "kind": "deduction_change",
+        "payload": {
+          "affects": "w4",
+          "change_cents": -8580
+        },
+        "severity": "info"
+      },
+      {
+        "key": "deduction_change:9d230b47-3cee-5583-b27b-fbe66e2f40a6:retirement_contribution",
+        "kind": "deduction_change",
+        "payload": {
+          "affects": "k401_match",
+          "change_cents": 5417
+        },
+        "severity": "info"
+      },
+      {
+        "key": "deduction_change:9d230b47-3cee-5583-b27b-fbe66e2f40a6:medical_premium",
+        "kind": "deduction_change",
+        "payload": {
+          "affects": "health_plans",
+          "change_cents": -3125
+        },
+        "severity": "info"
+      }
+    ],
+    "facts": {
+      "pay_stubs": [
+        {
+          "federal_withholding_cents": 21196,
+          "gross_cents": 270833,
+          "id": "9d230b47-3cee-5583-b27b-fbe66e2f40a6",
+          "medical_premium_cents": 3125,
+          "medicare_cents": 3927,
+          "net_cents": 205892,
+          "other_deductions_cents": 4670,
+          "pay_date": "2026-11-15",
+          "period_end": "2026-11-15",
+          "period_start": "2026-11-01",
+          "retirement_contribution_cents": 5417,
+          "social_security_cents": 16792,
+          "state_tax_cents": 9814
+        },
+        {
+          "federal_withholding_cents": 29776,
+          "gross_cents": 270833,
+          "id": "869a5f56-0b5b-5805-8112-37f778c36deb",
+          "medical_premium_cents": 6250,
+          "medicare_cents": 3927,
+          "net_cents": 199604,
+          "other_deductions_cents": 4670,
+          "pay_date": "2026-10-31",
+          "period_end": "2026-10-31",
+          "period_start": "2026-10-16",
+          "retirement_contribution_cents": 0,
+          "social_security_cents": 16792,
+          "state_tax_cents": 9814
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_deduction_changes"
+  },
+  {
+    "expected": [
+      {
+        "key": "upcoming_deadline:5773f49a-fea3-5d30-b93d-df702d11c902",
+        "kind": "upcoming_deadline",
+        "payload": {
+          "days_until": 4
+        },
+        "severity": "warning"
+      },
+      {
+        "key": "upcoming_deadline:16c638bb-5d4c-58ce-ba43-819645cd78f5",
+        "kind": "upcoming_deadline",
+        "payload": {
+          "days_until": 30
+        },
+        "severity": "info"
+      }
+    ],
+    "facts": {
+      "events": [
+        {
+          "decision_id": null,
+          "due_at": "2026-11-20",
+          "id": "5773f49a-fea3-5d30-b93d-df702d11c902",
+          "kind": "goal_contribution",
+          "title": "Make your first emergency fund contribution"
+        },
+        {
+          "decision_id": null,
+          "due_at": "2026-12-16",
+          "id": "16c638bb-5d4c-58ce-ba43-819645cd78f5",
+          "kind": "enrollment_deadline",
+          "title": "Health plan enrollment deadline"
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_upcoming_deadlines"
+  },
+  {
+    "expected": [],
+    "facts": {
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_nothing_to_report"
+  }
+]

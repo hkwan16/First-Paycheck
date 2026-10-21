@@ -64,7 +64,7 @@ def only(found: list[Finding]) -> Finding:
 
 
 def test_election_not_applied() -> None:
-    found = only(election_mismatch(facts(k401=K401, pay_stubs=[stub(S2), stub(S1)])))
+    found = only(election_mismatch(facts(k401=K401, pay_stubs=[stub(S2)])))
     assert found.kind is FindingKind.ELECTION_MISMATCH
     assert found.severity is FindingSeverity.ALERT
     assert found.decision_id == K401_DECISION
