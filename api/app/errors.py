@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 class ErrorDetail(BaseModel):
     code: str
     message: str
+    # Machine-readable specifics for errors the client acts on (for example
+    # the arithmetic of ``pay_stub_unbalanced``); omitted when there are none.
+    details: dict[str, Any] | None = None
 
 
 class ErrorResponse(BaseModel):
@@ -37,14 +40,23 @@ class AppError(Exception):
     headers: dict[str, str] | None = None
 
     def __init__(
-        self, message: str, *, code: str | None = None, status_code: int | None = None
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        status_code: int | None = None,
+        details: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
+        self.details = details
         if code is not None:
             self.code = code
         if status_code is not None:
             self.status_code = status_code
+        if headers is not None:
+            self.headers = headers
 
 
 class Unauthorized(AppError):
@@ -68,8 +80,9 @@ def error_responses(*status_codes: int) -> dict[int | str, dict[str, Any]]:
     }
 
 
-def _body(code: str, message: str) -> dict[str, Any]:
-    return ErrorResponse(error=ErrorDetail(code=code, message=message)).model_dump()
+def error_body(code: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
+    error = ErrorDetail(code=code, message=message, details=details)
+    return ErrorResponse(error=error).model_dump(exclude_none=True)
 
 
 def _status_code_name(status_code: int) -> str:
@@ -86,7 +99,9 @@ def _status_code_name(status_code: int) -> str:
 async def _app_error(_: Request, error: Exception) -> JSONResponse:
     exc = cast(AppError, error)
     return JSONResponse(
-        _body(exc.code, exc.message), status_code=exc.status_code, headers=exc.headers
+        error_body(exc.code, exc.message, exc.details),
+        status_code=exc.status_code,
+        headers=exc.headers,
     )
 
 
@@ -94,7 +109,7 @@ async def _http_error(_: Request, error: Exception) -> JSONResponse:
     exc = cast(StarletteHTTPException, error)
     message = exc.detail if isinstance(exc.detail, str) else HTTPStatus(exc.status_code).phrase
     return JSONResponse(
-        _body(_status_code_name(exc.status_code), message),
+        error_body(_status_code_name(exc.status_code), message),
         status_code=exc.status_code,
         headers=exc.headers,
     )
@@ -107,13 +122,13 @@ async def _validation_error(_: Request, error: Exception) -> JSONResponse:
         location = ".".join(str(part) for part in item.get("loc", ()))
         parts.append(f"{location}: {item.get('msg', 'invalid')}")
     return JSONResponse(
-        _body("validation_error", "; ".join(parts) or "Invalid request"), status_code=422
+        error_body("validation_error", "; ".join(parts) or "Invalid request"), status_code=422
     )
 
 
 async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
     logger.exception("unhandled error on %s %s", request.method, request.url.path, exc_info=exc)
-    return JSONResponse(_body("internal_error", "Internal server error"), status_code=500)
+    return JSONResponse(error_body("internal_error", "Internal server error"), status_code=500)
 
 
 def install_error_handlers(app: FastAPI) -> None:

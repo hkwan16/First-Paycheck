@@ -12,7 +12,6 @@ import pytest
 from PIL import Image
 from sqlalchemy import Connection, text, update
 
-from app.config import Settings
 from app.db import user_session_for
 from db.enums import DocumentStatus, JobKind
 from db.models import Document
@@ -23,7 +22,6 @@ from jobs.context import Services
 from jobs.registry import default_handlers
 from jobs.worker import Worker
 from llm.gateway import Content, FakeGateway, LLMUnavailable, Reply, Usage
-from llm.prompts import Prompt
 from tests.conftest import FixtureUser
 from tests.support.documents import (
     ACME_ACCOUNT,
@@ -35,33 +33,9 @@ from tests.support.documents import (
     text_pdf,
 )
 from tests.support.factories import make_document
+from tests.support.spy_gateway import SpyGateway
 
 STUB_PDF = text_pdf([ACME_STUB_LINES])
-
-
-class SpyGateway(FakeGateway):
-    """``FakeGateway`` that keeps every request's content and can misbehave."""
-
-    def __init__(
-        self,
-        connection: Connection,
-        *,
-        reply: Reply | None = None,
-        error: Exception | None = None,
-        **settings: Any,
-    ) -> None:
-        super().__init__(Settings(_env_file=None, llm_fake=True, **settings), bind=connection)
-        self.contents: list[Content] = []
-        self._reply = reply
-        self._error = error
-
-    def _send(self, prompt: Prompt, model: str, content: Content) -> Reply:
-        self.contents.append(content)
-        if self._error is not None:
-            raise self._error
-        if self._reply is not None:
-            return self._reply
-        return super()._send(prompt, model, content)
 
 
 @pytest.fixture

@@ -84,6 +84,32 @@ def test_validation_error_names_the_field() -> None:
     assert "body.amount_cents" in body["error"]["message"]
 
 
+def test_details_and_headers_travel_with_the_error() -> None:
+    app = FastAPI()
+    install_error_handlers(app)
+
+    @app.get("/unbalanced")
+    def unbalanced() -> None:
+        raise AppError(
+            "Off by two cents",
+            code="pay_stub_unbalanced",
+            status_code=422,
+            details={"difference_cents": -2},
+            headers={"X-Example": "1"},
+        )
+
+    response = TestClient(app).get("/unbalanced")
+    assert response.status_code == 422
+    assert response.headers["x-example"] == "1"
+    assert response.json() == {
+        "error": {
+            "code": "pay_stub_unbalanced",
+            "message": "Off by two cents",
+            "details": {"difference_cents": -2},
+        }
+    }
+
+
 def test_unhandled_exception_hides_internals() -> None:
     response = client.get("/boom")
     assert response.status_code == 500

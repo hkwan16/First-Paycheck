@@ -138,6 +138,105 @@
         "title": "AccountRole",
         "type": "string"
       },
+      "BenefitsPlanOut": {
+        "properties": {
+          "coinsurance_pct": {
+            "title": "Coinsurance Pct",
+            "type": "string"
+          },
+          "deductible_cents": {
+            "title": "Deductible Cents",
+            "type": "integer"
+          },
+          "employer_hsa_cents": {
+            "title": "Employer Hsa Cents",
+            "type": "integer"
+          },
+          "enrollment_deadline": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enrollment Deadline"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PlanKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "oop_max_cents": {
+            "title": "Oop Max Cents",
+            "type": "integer"
+          },
+          "premium_per_period_cents": {
+            "title": "Premium Per Period Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "premium_per_period_cents",
+          "deductible_cents",
+          "oop_max_cents",
+          "coinsurance_pct",
+          "employer_hsa_cents",
+          "enrollment_deadline"
+        ],
+        "title": "BenefitsPlanOut",
+        "type": "object"
+      },
+      "BenefitsValues": {
+        "additionalProperties": false,
+        "properties": {
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/PlanValues"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Plans",
+            "type": "array"
+          }
+        },
+        "required": [
+          "plans"
+        ],
+        "title": "BenefitsValues",
+        "type": "object"
+      },
+      "Body_upload_document": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "A PDF, PNG or JPEG of at most 10 MB",
+            "title": "File",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/DocumentType"
+          }
+        },
+        "required": [
+          "file",
+          "type"
+        ],
+        "title": "Body_upload_document",
+        "type": "object"
+      },
       "CategoryFix": {
         "properties": {
           "relabeled": {
@@ -213,11 +312,305 @@
         "title": "CategorySource",
         "type": "string"
       },
+      "ConfirmIn": {
+        "additionalProperties": false,
+        "description": "Exactly one of ``pay_stub`` or ``benefits``, matching the document's type.",
+        "properties": {
+          "benefits": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BenefitsValues"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pay_stub": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PayStubValues"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ConfirmIn",
+        "type": "object"
+      },
+      "Confirmed": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/DocumentOut"
+          },
+          "pay_stub": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PayStubOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/BenefitsPlanOut"
+            },
+            "title": "Plans",
+            "type": "array"
+          }
+        },
+        "required": [
+          "document",
+          "pay_stub",
+          "plans"
+        ],
+        "title": "Confirmed",
+        "type": "object"
+      },
+      "DocumentCreated": {
+        "properties": {
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id"
+        ],
+        "title": "DocumentCreated",
+        "type": "object"
+      },
+      "DocumentDetail": {
+        "properties": {
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Count"
+          },
+          "proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Proposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "redaction_count": {
+            "title": "Redaction Count",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DocumentStatus"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentStatusReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "$ref": "#/components/schemas/DocumentType"
+          },
+          "uploaded_at": {
+            "format": "date-time",
+            "title": "Uploaded At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "status",
+          "status_reason",
+          "redaction_count",
+          "page_count",
+          "uploaded_at",
+          "confirmed_at",
+          "deleted_at",
+          "proposal"
+        ],
+        "title": "DocumentDetail",
+        "type": "object"
+      },
+      "DocumentOut": {
+        "properties": {
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Count"
+          },
+          "redaction_count": {
+            "title": "Redaction Count",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DocumentStatus"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentStatusReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "$ref": "#/components/schemas/DocumentType"
+          },
+          "uploaded_at": {
+            "format": "date-time",
+            "title": "Uploaded At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "status",
+          "status_reason",
+          "redaction_count",
+          "page_count",
+          "uploaded_at",
+          "confirmed_at",
+          "deleted_at"
+        ],
+        "title": "DocumentOut",
+        "type": "object"
+      },
+      "DocumentStatus": {
+        "enum": [
+          "uploaded",
+          "extracting",
+          "proposed",
+          "confirmed",
+          "manual_entry_required",
+          "failed"
+        ],
+        "title": "DocumentStatus",
+        "type": "string"
+      },
+      "DocumentStatusReason": {
+        "description": "Why a document is ``manual_entry_required`` or ``failed`` (spec 004 rule 22).",
+        "enum": [
+          "refused",
+          "no_readable_page",
+          "budget",
+          "extraction_failed",
+          "unreadable_file",
+          "expired"
+        ],
+        "title": "DocumentStatusReason",
+        "type": "string"
+      },
+      "DocumentType": {
+        "enum": [
+          "pay_stub",
+          "offer_letter",
+          "benefits"
+        ],
+        "title": "DocumentType",
+        "type": "string"
+      },
       "ErrorDetail": {
         "properties": {
           "code": {
             "title": "Code",
             "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
           },
           "message": {
             "title": "Message",
@@ -242,6 +635,29 @@
         ],
         "title": "ErrorResponse",
         "type": "object"
+      },
+      "ExtractionQueued": {
+        "properties": {
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "ExtractionQueued",
+        "type": "object"
+      },
+      "FilingStatus": {
+        "enum": [
+          "single",
+          "married_filing_jointly",
+          "head_of_household"
+        ],
+        "title": "FilingStatus",
+        "type": "string"
       },
       "HTTPValidationError": {
         "properties": {
@@ -286,6 +702,15 @@
         ],
         "title": "Health",
         "type": "object"
+      },
+      "HealthcareUsage": {
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "title": "HealthcareUsage",
+        "type": "string"
       },
       "JobKind": {
         "enum": [
@@ -381,6 +806,65 @@
         "title": "JobStatus",
         "type": "string"
       },
+      "LineItem": {
+        "additionalProperties": false,
+        "description": "One printed line of the stub's current-period column (spec 005 rule 3).",
+        "properties": {
+          "amount_cents": {
+            "description": "This period's amount in cents, never negative",
+            "minimum": 0.0,
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "enum": [
+                  "gross_cents",
+                  "federal_withholding_cents",
+                  "social_security_cents",
+                  "medicare_cents",
+                  "state_tax_cents",
+                  "retirement_contribution_cents",
+                  "medical_premium_cents",
+                  "net_cents"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The field above this line is already counted in, or null when it has no field of its own",
+            "title": "Field"
+          },
+          "kind": {
+            "enum": [
+              "earning",
+              "tax",
+              "pre_tax_deduction",
+              "post_tax_deduction",
+              "net",
+              "info"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "description": "The line's label as printed",
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "amount_cents",
+          "kind",
+          "field"
+        ],
+        "title": "LineItem",
+        "type": "object"
+      },
       "LinkItemRequest": {
         "additionalProperties": false,
         "description": "Exactly one of ``public_token`` (from Plaid Link) or ``sandbox_institution_id``.",
@@ -467,6 +951,785 @@
         "title": "LinkedItem",
         "type": "object"
       },
+      "MatchTier-Input": {
+        "additionalProperties": false,
+        "description": "The employer puts in ``employer_pct`` of each dollar the employee\ncontributes, up to ``employee_pct_upto`` percent of pay (spec 006).",
+        "properties": {
+          "employee_pct_upto": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 100.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Employee Pct Upto"
+          },
+          "employer_pct": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 100.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Employer Pct"
+          }
+        },
+        "required": [
+          "employee_pct_upto",
+          "employer_pct"
+        ],
+        "title": "MatchTier",
+        "type": "object"
+      },
+      "MatchTier-Output": {
+        "additionalProperties": false,
+        "description": "The employer puts in ``employer_pct`` of each dollar the employee\ncontributes, up to ``employee_pct_upto`` percent of pay (spec 006).",
+        "properties": {
+          "employee_pct_upto": {
+            "title": "Employee Pct Upto",
+            "type": "string"
+          },
+          "employer_pct": {
+            "title": "Employer Pct",
+            "type": "string"
+          }
+        },
+        "required": [
+          "employee_pct_upto",
+          "employer_pct"
+        ],
+        "title": "MatchTier",
+        "type": "object"
+      },
+      "OtherJob": {
+        "additionalProperties": false,
+        "description": "Another job's wages, for withholding (the W-4 multiple-jobs step).",
+        "properties": {
+          "annual_wages_cents": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100000000000.0,
+            "title": "Annual Wages Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "annual_wages_cents"
+        ],
+        "title": "OtherJob",
+        "type": "object"
+      },
+      "PayFrequency": {
+        "enum": [
+          "weekly",
+          "biweekly",
+          "semimonthly",
+          "monthly"
+        ],
+        "title": "PayFrequency",
+        "type": "string"
+      },
+      "PayStubOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "employer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employer Name"
+          },
+          "federal_withholding_cents": {
+            "title": "Federal Withholding Cents",
+            "type": "integer"
+          },
+          "gross_cents": {
+            "title": "Gross Cents",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "medical_premium_cents": {
+            "title": "Medical Premium Cents",
+            "type": "integer"
+          },
+          "medicare_cents": {
+            "title": "Medicare Cents",
+            "type": "integer"
+          },
+          "net_cents": {
+            "title": "Net Cents",
+            "type": "integer"
+          },
+          "other_deductions_cents": {
+            "title": "Other Deductions Cents",
+            "type": "integer"
+          },
+          "pay_date": {
+            "format": "date",
+            "title": "Pay Date",
+            "type": "string"
+          },
+          "pay_frequency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PayFrequency"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "period_end": {
+            "format": "date",
+            "title": "Period End",
+            "type": "string"
+          },
+          "period_start": {
+            "format": "date",
+            "title": "Period Start",
+            "type": "string"
+          },
+          "retirement_contribution_cents": {
+            "title": "Retirement Contribution Cents",
+            "type": "integer"
+          },
+          "social_security_cents": {
+            "title": "Social Security Cents",
+            "type": "integer"
+          },
+          "state_tax_cents": {
+            "title": "State Tax Cents",
+            "type": "integer"
+          },
+          "tax_year": {
+            "title": "Tax Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "document_id",
+          "employer_name",
+          "pay_frequency",
+          "pay_date",
+          "tax_year",
+          "period_start",
+          "period_end",
+          "gross_cents",
+          "federal_withholding_cents",
+          "social_security_cents",
+          "medicare_cents",
+          "state_tax_cents",
+          "retirement_contribution_cents",
+          "medical_premium_cents",
+          "other_deductions_cents",
+          "net_cents",
+          "created_at"
+        ],
+        "title": "PayStubOut",
+        "type": "object"
+      },
+      "PayStubValues": {
+        "additionalProperties": false,
+        "description": "What the user confirmed for a pay stub (rule 20): the extraction's keys\nwith plain values, plus ``other_deductions_cents``.",
+        "properties": {
+          "employer_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employer Name"
+          },
+          "federal_withholding_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Federal Withholding Cents",
+            "type": "integer"
+          },
+          "gross_cents": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100000000000.0,
+            "title": "Gross Cents",
+            "type": "integer"
+          },
+          "medical_premium_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Medical Premium Cents",
+            "type": "integer"
+          },
+          "medicare_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Medicare Cents",
+            "type": "integer"
+          },
+          "net_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Net Cents",
+            "type": "integer"
+          },
+          "other_deductions_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Other Deductions Cents",
+            "type": "integer"
+          },
+          "pay_date": {
+            "format": "date",
+            "title": "Pay Date",
+            "type": "string"
+          },
+          "pay_frequency": {
+            "anyOf": [
+              {
+                "enum": [
+                  "weekly",
+                  "biweekly",
+                  "semimonthly",
+                  "monthly"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pay Frequency"
+          },
+          "period_end": {
+            "format": "date",
+            "title": "Period End",
+            "type": "string"
+          },
+          "period_start": {
+            "format": "date",
+            "title": "Period Start",
+            "type": "string"
+          },
+          "retirement_contribution_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Retirement Contribution Cents",
+            "type": "integer"
+          },
+          "social_security_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Social Security Cents",
+            "type": "integer"
+          },
+          "state_tax_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "State Tax Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "employer_name",
+          "pay_frequency",
+          "pay_date",
+          "period_start",
+          "period_end",
+          "gross_cents",
+          "federal_withholding_cents",
+          "social_security_cents",
+          "medicare_cents",
+          "state_tax_cents",
+          "retirement_contribution_cents",
+          "medical_premium_cents",
+          "other_deductions_cents",
+          "net_cents"
+        ],
+        "title": "PayStubValues",
+        "type": "object"
+      },
+      "PlanKind": {
+        "enum": [
+          "hdhp",
+          "ppo",
+          "hmo"
+        ],
+        "title": "PlanKind",
+        "type": "string"
+      },
+      "PlanProposal": {
+        "additionalProperties": false,
+        "properties": {
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedField"
+            },
+            "title": "Fields",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "title": "PlanProposal",
+        "type": "object"
+      },
+      "PlanValues": {
+        "additionalProperties": false,
+        "description": "One confirmed health plan (``benefits_plans`` row).",
+        "properties": {
+          "coinsurance_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Coinsurance Pct"
+          },
+          "deductible_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Deductible Cents",
+            "type": "integer"
+          },
+          "employer_hsa_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Employer Hsa Cents",
+            "type": "integer"
+          },
+          "enrollment_deadline": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enrollment Deadline"
+          },
+          "kind": {
+            "enum": [
+              "hdhp",
+              "ppo",
+              "hmo"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "oop_max_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Oop Max Cents",
+            "type": "integer"
+          },
+          "premium_per_period_cents": {
+            "maximum": 100000000000.0,
+            "minimum": 0.0,
+            "title": "Premium Per Period Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "premium_per_period_cents",
+          "deductible_cents",
+          "oop_max_cents",
+          "coinsurance_pct",
+          "employer_hsa_cents",
+          "enrollment_deadline"
+        ],
+        "title": "PlanValues",
+        "type": "object"
+      },
+      "ProfileIn": {
+        "additionalProperties": false,
+        "description": "The whole profile; a field left out is reset to its default.",
+        "properties": {
+          "dependents": {
+            "default": 0,
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Dependents",
+            "type": "integer"
+          },
+          "expected_healthcare_usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HealthcareUsage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "filing_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FilingStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "match_tiers": {
+            "items": {
+              "$ref": "#/components/schemas/MatchTier-Input"
+            },
+            "maxItems": 5,
+            "title": "Match Tiers",
+            "type": "array"
+          },
+          "other_jobs": {
+            "items": {
+              "$ref": "#/components/schemas/OtherJob"
+            },
+            "maxItems": 5,
+            "title": "Other Jobs",
+            "type": "array"
+          },
+          "pay_frequency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PayFrequency"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "salary_cents": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 100000000000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Cents"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "vesting_years": {
+            "anyOf": [
+              {
+                "maximum": 10.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vesting Years"
+          }
+        },
+        "title": "ProfileIn",
+        "type": "object"
+      },
+      "ProfileOut": {
+        "additionalProperties": false,
+        "properties": {
+          "dependents": {
+            "default": 0,
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Dependents",
+            "type": "integer"
+          },
+          "expected_healthcare_usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HealthcareUsage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "filing_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FilingStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "match_tiers": {
+            "items": {
+              "$ref": "#/components/schemas/MatchTier-Output"
+            },
+            "maxItems": 5,
+            "title": "Match Tiers",
+            "type": "array"
+          },
+          "other_jobs": {
+            "items": {
+              "$ref": "#/components/schemas/OtherJob"
+            },
+            "maxItems": 5,
+            "title": "Other Jobs",
+            "type": "array"
+          },
+          "pay_frequency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PayFrequency"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "salary_cents": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 100000000000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Cents"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "vesting_years": {
+            "anyOf": [
+              {
+                "maximum": 10.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vesting Years"
+          }
+        },
+        "required": [
+          "updated_at"
+        ],
+        "title": "ProfileOut",
+        "type": "object"
+      },
+      "Proposal": {
+        "additionalProperties": false,
+        "description": "``documents.proposal`` (spec 005 outputs).",
+        "properties": {
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedField"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "line_items": {
+            "items": {
+              "$ref": "#/components/schemas/LineItem"
+            },
+            "title": "Line Items",
+            "type": "array"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/PlanProposal"
+            },
+            "title": "Plans",
+            "type": "array"
+          },
+          "source_lines": {
+            "items": {
+              "$ref": "#/components/schemas/SourceLine"
+            },
+            "title": "Source Lines",
+            "type": "array"
+          },
+          "withheld_pages": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Withheld Pages",
+            "type": "array"
+          }
+        },
+        "title": "Proposal",
+        "type": "object"
+      },
+      "ProposedField": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "money",
+              "date",
+              "text",
+              "percent"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "role": {
+            "enum": [
+              "gross",
+              "deduction",
+              "net",
+              "info"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "value",
+          "confidence",
+          "note",
+          "kind",
+          "role"
+        ],
+        "title": "ProposedField",
+        "type": "object"
+      },
       "QueuedJob": {
         "properties": {
           "job_id": {
@@ -521,6 +1784,42 @@
           "category"
         ],
         "title": "RuleOut",
+        "type": "object"
+      },
+      "SourceLine": {
+        "additionalProperties": false,
+        "properties": {
+          "field_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Key"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "redacted": {
+            "title": "Redacted",
+            "type": "boolean"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "page",
+          "text",
+          "field_key",
+          "redacted"
+        ],
+        "title": "SourceLine",
         "type": "object"
       },
       "SyncItemOut": {
@@ -913,6 +2212,369 @@
         ]
       }
     },
+    "/docs": {
+      "get": {
+        "description": "The user's documents, newest first.",
+        "operationId": "list_documents",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentOut"
+                  },
+                  "title": "Response List Documents",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Documents",
+        "tags": [
+          "docs"
+        ]
+      },
+      "post": {
+        "description": "Store an uploaded document for extraction.",
+        "operationId": "upload_document",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_document"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Upload Document",
+        "tags": [
+          "docs"
+        ]
+      }
+    },
+    "/docs/{document_id}": {
+      "get": {
+        "description": "One document, with its proposal while it is being reviewed.",
+        "operationId": "get_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Document",
+        "tags": [
+          "docs"
+        ]
+      }
+    },
+    "/docs/{document_id}/confirm": {
+      "post": {
+        "description": "Store the values the user checked, then delete the uploaded file.",
+        "operationId": "confirm_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Confirmed"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Confirm Document",
+        "tags": [
+          "docs"
+        ]
+      }
+    },
+    "/docs/{document_id}/extract": {
+      "post": {
+        "description": "Queue reading the document; returns the running job while one is in flight.",
+        "operationId": "extract_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractionQueued"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Extract Document",
+        "tags": [
+          "docs"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "description": "The running commit and the database's migration revision. No auth.",
@@ -1011,6 +2673,139 @@
         "summary": "Get Job",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/pay-stubs": {
+      "get": {
+        "description": "The user's confirmed pay stubs, newest pay date first.",
+        "operationId": "list_pay_stubs",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PayStubOut"
+                  },
+                  "title": "Response List Pay Stubs",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Pay Stubs",
+        "tags": [
+          "pay-stubs"
+        ]
+      }
+    },
+    "/profile": {
+      "get": {
+        "description": "The saved profile, or the defaults when nothing is saved yet.",
+        "operationId": "get_profile",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Profile",
+        "tags": [
+          "profile"
+        ]
+      },
+      "put": {
+        "description": "Replace the profile.",
+        "operationId": "put_profile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Put Profile",
+        "tags": [
+          "profile"
         ]
       }
     },

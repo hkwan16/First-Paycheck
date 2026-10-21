@@ -18,9 +18,9 @@ Turn the redacted pages of spec 004 into a proposal the user reviews field by fi
 ## Outputs
 
 - `PayStubExtraction` and `BenefitsExtraction` (model output, never stored as confirmed data).
-- `documents.proposal` (jsonb): `{fields, line_items, plans, source_lines, withheld_pages, notes}`, returned by `GET /docs/{id}` when the status is `proposed`.
+- `documents.proposal` (jsonb): `{fields, line_items, plans, source_lines, withheld_pages, notes}`, returned by `GET /docs/{id}` when the status is `proposed` or `manual_entry_required` (the redacted lines to type from), and null otherwise.
 - `jobs.result` for `ingest.extract`: `{document_id, status, page_count, redaction_count, withheld_pages}`. Ids and counts only, never extracted text (spec 001 rule 28).
-- On confirm: one `pay_stubs` row, or `benefits_plans` rows plus `benefits_chunks`; the blob deleted; `documents.status = confirmed`, `confirmed_at` and `deleted_at` set.
+- On confirm (200): one `pay_stubs` row, or `benefits_plans` rows plus `benefits_chunks`; the blob deleted; `documents.status = confirmed`, `confirmed_at` and `deleted_at` set. The response is `{document, pay_stub, plans}`: the document as `GET /docs` lists it and what was stored.
 - `GET /pay-stubs`: confirmed stubs, newest pay date first. `GET /profile`, `PUT /profile`: the profile.
 
 ## Rules
@@ -61,7 +61,7 @@ Turn the redacted pages of spec 004 into a proposal the user reviews field by fi
 20. The body is validated by `PayStubValues` (or `PlanValues`), the value-typed twin of the extraction schema: dates are dates, money is strict integer cents (`gross_cents > 0`, the rest `>= 0`), `period_start <= period_end`, `pay_frequency` an enum or null, `employer_name` at most 200 characters. A unit test keeps its keys equal to the extraction's keys plus `other_deductions_cents`.
 21. **Arithmetic gate.** `calc/pay_stub.py:balance` computes `deductions = federal + social security + medicare + state + retirement + medical premium + other deductions` and `difference = gross - deductions - net`. A non-zero difference is 422 `pay_stub_unbalanced` with `details = {gross_cents, deductions_cents, net_cents, expected_net_cents, difference_cents}`. The `pay_stubs` check constraint is the database backstop.
 22. Confirm is allowed from `proposed` and `manual_entry_required` (manual entry is a confirm with every field typed). The values stored are the ones in the body, never the proposal's. In one transaction: insert `pay_stubs` (or `benefits_plans`, plus `benefits_chunks` from `chunk_words` over the proposal's redacted source lines joined by newlines), delete the blob, set `status = confirmed`, `confirmed_at = deleted_at = now()`, clear `status_reason`.
-23. Confirming twice is 409 (`document_confirmed`). A body for the wrong type (`benefits` for a pay stub) is 422.
+23. Confirming twice is 409 (`document_confirmed`); a document whose file was deleted is 409 (`document_deleted`); one not yet read (`uploaded`, `extracting`, `failed`) is 409 (`document_not_ready`). A body for the wrong type (`benefits` for a pay stub) is 422 (`wrong_document_type`), and a body with neither or both keys is 422.
 
 ### Reads and profile
 

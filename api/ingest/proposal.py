@@ -19,6 +19,7 @@ from typing import Annotated, Literal, Protocol, Self
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from calc.pay_stub import PayStubAmounts, total_cents
+from calc.types import Cents, Percent, PositiveCents
 from llm.schemas import (
     BenefitsExtraction,
     ExtractedField,
@@ -34,15 +35,12 @@ NOT_FOUND = "Not found on the document"
 NO_OTHER_DEDUCTIONS = "No other deductions listed"
 OTHER_DEDUCTIONS = "other_deductions_cents"
 DEDUCTION_KINDS = frozenset({"tax", "pre_tax_deduction", "post_tax_deduction"})
-# A sanity bound well inside bigint: $1 billion. Larger is a typo, not a stub.
-MAX_CENTS = 100_000_000_000
 
 FieldKind = Literal["money", "date", "text", "percent"]
 FieldRole = Literal["gross", "deduction", "net", "info"]
 FieldValue = int | str | None
 
 __all__ = [
-    "MAX_CENTS",
     "PAY_STUB_FIELDS",
     "PLAN_FIELDS",
     "BenefitsValues",
@@ -318,10 +316,7 @@ def _link(
 
 # ---------------------------------------------------------------- confirmed values
 
-Cents = Annotated[int, Field(strict=True, ge=0, le=MAX_CENTS)]
-PositiveCents = Annotated[int, Field(strict=True, gt=0, le=MAX_CENTS)]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
-ConfirmedPercent = Annotated[Decimal, Field(ge=0, le=100, max_digits=5, decimal_places=2)]
 
 
 class PayStubValues(BaseModel):
@@ -367,7 +362,7 @@ class PlanValues(BaseModel):
     premium_per_period_cents: Cents
     deductible_cents: Cents
     oop_max_cents: Cents
-    coinsurance_pct: ConfirmedPercent
+    coinsurance_pct: Percent
     employer_hsa_cents: Cents
     enrollment_deadline: dt.date | None
 

@@ -9,10 +9,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 
+from app.body_limit import BodySizeLimit
 from app.config import Settings, get_settings
 from app.db import dispose_engines
 from app.errors import install_error_handlers
-from app.routers import accounts, health, jobs, sync, transactions
+from app.routers import accounts, docs, health, jobs, pay_stubs, profile, sync, transactions
 from app.version import resolve_git_sha
 
 API_VERSION = "0.1.0"
@@ -40,9 +41,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         title="First Paycheck API",
         version=API_VERSION,
         generate_unique_id_function=operation_id,
+        # /docs is the documents API (spec 004); Swagger UI moves aside.
+        docs_url="/api-docs",
         lifespan=lifespan,
     )
     app.state.git_sha = resolve_git_sha(settings.git_sha)
+    # Added before CORS so CORS wraps it: a 413 still carries CORS headers.
+    app.add_middleware(
+        BodySizeLimit,
+        paths=["/docs"],
+        max_bytes=docs.MAX_UPLOAD_BYTES + docs.MULTIPART_OVERHEAD_BYTES,
+        message="The file is larger than 10 MB",
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -59,6 +69,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(accounts.router)
     app.include_router(transactions.router)
     app.include_router(jobs.router)
+    app.include_router(docs.router)
+    app.include_router(pay_stubs.router)
+    app.include_router(profile.router)
     return app
 
 

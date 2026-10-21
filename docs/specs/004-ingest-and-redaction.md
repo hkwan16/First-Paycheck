@@ -11,13 +11,13 @@ Take a document the user uploads (a pay stub, an offer letter or a benefits summ
 | Input | Type | Valid range |
 |---|---|---|
 | `POST /docs` `file` | multipart file part | 1 byte to 10 MB (10,485,760 bytes); a PDF, PNG or JPEG by its leading bytes |
-| `POST /docs` `type` | form field or query | `pay_stub`, `offer_letter`, `benefits` |
+| `POST /docs` `type` | multipart form field | `pay_stub`, `offer_letter`, `benefits` |
 | Stored bytes | `document_blobs.bytes` | As uploaded |
 | OCR settings | constants in `ingest/ocr.py` | Tesseract `--psm 6`, English |
 
 ## Outputs
 
-- `POST /docs` (201): `{document_id}`. The `documents` row starts `uploaded`.
+- `POST /docs` (201): `{document_id}`. The `documents` row starts `uploaded`. FastAPI's Swagger UI, which defaults to `/docs`, is served at `/api-docs` instead.
 - `GET /docs`: the user's documents, newest first: `{id, type, status, status_reason, redaction_count, page_count, uploaded_at, confirmed_at, deleted_at}`.
 - `prepare_document(bytes, content_type) -> PreparedDocument` (worker only): `page_count`, per page its number, `source` (`text` or `ocr`), redacted lines, redaction count, OCR mean confidence, and either the model input (`TextPage` with redacted text, or `ImagePage` with a redacted PNG) or a withheld reason.
 - `chunk_words(text) -> list[str]`: retrieval chunks for `benefits_chunks`.
