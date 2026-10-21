@@ -144,3 +144,25 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** In the subagent's branch: `useConfirmDocument({ onConfirmed })` navigates from the mutation's own success handler; `HydrationMarker` marks the page hydrated and `AppSideNav` waits for it; `Notice` adds the space only after a title; both dynamic pages await `params` inside Suspense; the spec matches the exact label; the link helper's budget covers two of the API's retries. The missing-key behavior is reported for the API owner.
 
 **Time saved or lost:** Not measured. The harness took most of the session; it turned the real-API specs, which needed a hosted stack and its credentials, into a check that runs on every pull request.
+
+## 2026-10-21: M7 W-4 calculator on the 2026 Pub 15-T percentage method
+
+**Task:** The backend of M7: spec 014, `calc/w4.py` and `POST /calc/w4`, the `w4_submit` calendar event (migration `0009_w4_calendar_kind`), W-4 citations and explain support, and the spec's examples as eval cases.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session, in parallel with another subagent building check-ins.
+
+**Prompt or skill:** Spec first, then failing tests, then code; every IRS figure fetched and verified, anything unverifiable marked pending with an `xfail` test.
+
+**What it produced:** `calc/data/pub15t_2026.json` (Worksheet 1A line 1g and the annual STANDARD and Step 2 checkbox tables, read from both the PDF and the web edition of Pub 15-T), ten hand-worked examples, the calculator with a whole-dollar Step 4(c) or 4(b) suggestion, `db/seed/irs_citations/w4.yaml` with every passage checked against the fetched pages, W-4 facts, notes and fallback text, and five explain-smoke scenarios.
+
+**What was wrong:**
+- Pub 15-T (2026) has no worked percentage-method example; its only example is a nonresident alien on the wage bracket tables. The spec's first example instead works Worksheet 1A for a wage at the midpoint of a biweekly wage bracket row and checks it against the printed $156.
+- The first draft of the spec claimed every Step 4(c) suggestion lands within $100. Hypothesis found the counterexample: lowering Step 4(c) to zero can leave a refund that only another job's withholding causes. The property and the test were corrected; the rule already described the behavior.
+- The edge case for the 401(k) catch-up first said a 15% rate at age 52 was no longer capped; 15% of $250,000 is still over $32,500. The cross-check script caught it and the case moved to 13%, exactly at the limit.
+- W-4 notes say "Step 2", which the verifier read as the number 2. Spec 008 rule 11 now skips Form W-4 step numbers the way it skips "Form 1040".
+
+**How it was caught:** A throwaway `Decimal` script recomputed every example independently of the implementation; a test rebuilds every Pub 15-T row from the Rev. Proc. 2025-32 brackets and standard deduction; Hypothesis properties over the suggestion.
+
+**Fix:** As above, in the subagent's branch.
+
+**Time saved or lost:** Not measured.

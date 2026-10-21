@@ -11,7 +11,8 @@ root (`uv sync --all-packages`). `api/` is the import root: `app`, `calc`, `db`,
 app/        main.py (create_app), config.py (Settings), auth.py (JWT), db.py (engines,
             user_session), deps.py (UserSession, DbBind), errors.py, openapi.py, routers/
 calc/       calculators: f(Input) -> Result, Pydantic models, integer cents, Decimal rates;
-            data/<year>.json (federal constants), registry.py, pay_dates.py, spending.py,
+            data/<year>.json (federal constants), data/pub15t_<year>.json (withholding
+            tables), registry.py, pay_dates.py, spending.py,
             cashflow.py, recurring.py (amount arithmetic for detection)
 db/         models.py (Base), rls.py (enable_rls), enums.py, seed/ (load.py, data files)
 alembic/    env.py, versions/NNNN_name.py
@@ -336,6 +337,33 @@ kinds `goal_contribution` and `goal_review`, `profiles.birth_year` and
   bound checked in `PUT /profile`) settles spec 006 open question 2; the
   401(k) calculator still takes `age`, which the client derives as
   `tax_year - birth_year`.
+
+## W-4 withholding (from M7)
+
+Spec 014. Migration `0009_w4_calendar_kind` revises `0011_no_model_reason` and
+adds the `calendar_kind` label `w4_submit`; no new table or function.
+
+- **Calculator.** `calc/w4.py` (`POST /calc/w4`, `w4` in `calc/registry.py`):
+  Pub 15-T Worksheet 1A per paycheck, the projected tax from
+  `calc/brackets.py:income_tax`, the refund (negative is a balance due) and a
+  whole-dollar Step 4(c) or 4(b) suggestion closest to zero. The 401(k) rate
+  and the health premium per paycheck are inputs the client copies from the
+  saved decisions; `calc/` never reads them. `expected_deductions_cents` keeps
+  the projection honest when a Step 4(b) entry is only a withholding
+  adjustment; `other_jobs_*` feed the projection, never this job's withholding.
+- **Constants.** `calc/data/pub15t_<year>.json` behind `calc.data.pub15t(year)`
+  (Worksheet 1A line 1g and the annual STANDARD and Step 2 checkbox tables,
+  column B implied by the next row). `tests/unit/calc/test_pub15t_data.py`
+  rebuilds every row from the year's brackets and standard deduction, so a
+  typo in either file fails. A year needs both files.
+- **Decision effect.** `decision_effects._w4`: one `w4_submit` event ("Give your
+  employer your updated Form W-4") due the next expected pay date; a new
+  version dismisses the old one.
+- **Explain.** `retrieval/context.py` has W-4 facts (numbers only) and
+  `w4_notes` (no digits); `verify/fallback.py` writes the W-4 fallback.
+  Citations: `db/seed/irs_citations/w4.yaml` (Pub 15-T web edition, the 2026
+  Form W-4, IR-2025-103, the 401(k) Resource Guide). The verifier skips Form
+  W-4 step numbers ("Step 2", "Steps 3") the way it skips "Form 1040".
 
 ## Testing
 
