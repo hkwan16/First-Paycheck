@@ -9,7 +9,7 @@ from db.enums import JobKind
 from jobs import scheduler
 from jobs.context import JobContext
 from jobs.errors import UnknownJobKind
-from jobs.handlers import recurring, sync
+from jobs.handlers import categorize, recurring, sync
 
 Handler = Callable[[JobContext], Mapping[str, Any]]
 
@@ -18,6 +18,7 @@ def default_handlers() -> dict[JobKind, Handler]:
     return {
         JobKind.SYNC_INITIAL: sync.run,
         JobKind.SYNC_INCREMENTAL: sync.run,
+        JobKind.CATEGORIZE_RUN: categorize.run,
         JobKind.RECURRING_DETECT: recurring.detect,
         JobKind.SCHEDULE_TICK: scheduler.run_tick,
     }

@@ -19,12 +19,14 @@ from collections.abc import Mapping
 
 from sqlalchemy import Connection, Engine
 
+from app.config import get_settings
 from app.logs import configure_logging
 from db.enums import JobKind
 from jobs import queue, scheduler
 from jobs.context import JobContext, Services
 from jobs.queue import QueueBind
 from jobs.registry import Handler, default_handlers, handler_for
+from jobs.services import default_services
 
 logger = logging.getLogger("jobs.worker")
 
@@ -137,7 +139,7 @@ def main() -> int:
     stop = threading.Event()
     for signum in (signal.SIGTERM, signal.SIGINT):
         signal.signal(signum, lambda *_: stop.set())
-    return Worker().run(stop)
+    return Worker(services=default_services(get_settings())).run(stop)
 
 
 if __name__ == "__main__":
