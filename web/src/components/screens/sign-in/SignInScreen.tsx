@@ -1,11 +1,11 @@
 'use client';
 
-import { Suspense, use, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { CalendarIcon, LinesIcon, ShieldIcon } from '@/components/icons';
 import { IconTile } from '@/components/ui/IconTile';
-import { safeNextPath } from '@/lib/auth/next-path';
 import type { Hue } from '@/lib/design/tone';
 import { AuthForm } from './AuthForm';
+import type { SignInParams } from './sign-in-params';
 
 function Point({
   tone,
@@ -30,33 +30,13 @@ function Point({
   );
 }
 
-export type SearchParams = Record<string, string | string[] | undefined>;
-
-/** A query parameter given exactly once; a repeated one is ignored. */
-const single = (value: string | string[] | undefined) => (typeof value === 'string' ? value : null);
-
-/** The form, configured by `?mode=sign-up`, `?next=<path>` and `?error=link`. */
-function AuthFormFromUrl({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const params = use(searchParams);
-  const mode = single(params.mode) === 'sign-up' ? 'sign-up' : 'sign-in';
-  return (
-    // A new mode starts clean: no stale notice or errors from the other form.
-    <AuthForm
-      key={mode}
-      mode={mode}
-      next={safeNextPath(single(params.next))}
-      linkError={single(params.error) === 'link'}
-    />
-  );
-}
+export type SignInScreenProps = SignInParams;
 
 /**
- * Screen 0 of the mockup (Main.dc.html). The pitch is static; the form depends
- * on the page's `searchParams`, so it sits in Suspense (Cache Components) and
- * streams in with the right mode, with the plain sign-in form as the static
- * shell's fallback.
+ * Screen 0 of the mockup (Main.dc.html): the pitch and the sign-in form, whose
+ * mode, return path and link error come from the URL (`parseSignInParams`).
  */
-export function SignInScreen({ searchParams }: { searchParams: Promise<SearchParams> }) {
+export function SignInScreen({ mode, next, linkError }: SignInScreenProps) {
   return (
     <div className="mx-auto flex w-full max-w-[1040px] flex-1 flex-wrap items-center justify-center gap-12 px-6 py-12">
       <div className="flex min-w-0 flex-[1_1_360px] flex-col gap-6">
@@ -85,9 +65,8 @@ export function SignInScreen({ searchParams }: { searchParams: Promise<SearchPar
         </div>
       </div>
 
-      <Suspense fallback={<AuthForm mode="sign-in" next={null} linkError={false} />}>
-        <AuthFormFromUrl searchParams={searchParams} />
-      </Suspense>
+      {/* A new mode starts clean: no stale notice or errors from the other form. */}
+      <AuthForm key={mode} mode={mode} next={next} linkError={linkError} />
     </div>
   );
 }

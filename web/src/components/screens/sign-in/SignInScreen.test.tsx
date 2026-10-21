@@ -1,25 +1,21 @@
-import { act, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { SignInScreen } from './SignInScreen';
+import { SignInScreen, type SignInScreenProps } from './SignInScreen';
 
-/** Render with the page's searchParams, letting the Suspense boundary resolve. */
-async function renderScreen(searchParams: Record<string, string | string[]> = {}) {
-  await act(async () => {
-    render(<SignInScreen searchParams={Promise.resolve(searchParams)} />);
-  });
-}
+const renderScreen = (props: Partial<SignInScreenProps> = {}) =>
+  render(<SignInScreen mode="sign-in" next={null} linkError={false} {...props} />);
 
 describe('SignInScreen', () => {
-  it('leads with the promise, highlighting "with your own numbers"', async () => {
-    await renderScreen();
+  it('leads with the promise, highlighting "with your own numbers"', () => {
+    renderScreen();
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveTextContent("Your first month's money decisions, with your own numbers.");
     expect(heading).toHaveClass('text-display');
     expect(screen.getByText('with your own numbers.')).toHaveClass('text-coral-text');
   });
 
-  it('explains the three guarantees', async () => {
-    await renderScreen();
+  it('explains the three guarantees', () => {
+    renderScreen();
     for (const title of [
       'Money math runs in tested code.',
       'AI reads, it does not decide.',
@@ -29,8 +25,8 @@ describe('SignInScreen', () => {
     }
   });
 
-  it('shows the sign-in form by default', async () => {
-    await renderScreen();
+  it('shows the sign-in form', () => {
+    renderScreen();
     expect(screen.getByRole('form', { name: 'Sign in' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Create an account' })).toHaveAttribute(
       'href',
@@ -38,8 +34,8 @@ describe('SignInScreen', () => {
     );
   });
 
-  it('creates an account with ?mode=sign-up and keeps a safe next path', async () => {
-    await renderScreen({ mode: 'sign-up', next: '/setup/link' });
+  it('shows the create-account form, keeping the next path', () => {
+    renderScreen({ mode: 'sign-up', next: '/setup/link' });
     expect(screen.getByRole('form', { name: 'Create an account' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
       'href',
@@ -47,24 +43,15 @@ describe('SignInScreen', () => {
     );
   });
 
-  it('ignores an unsafe or repeated next path', async () => {
-    await renderScreen({ next: ['/plan', 'https://evil.example'] });
-    expect(screen.getByRole('link', { name: 'Create an account' })).toHaveAttribute(
-      'href',
-      '/sign-in?mode=sign-up',
-    );
+  it('starts a fresh form when the mode changes', () => {
+    const { rerender } = renderScreen({ linkError: true });
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    rerender(<SignInScreen mode="sign-up" next={null} linkError={false} />);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('ignores an absolute next path', async () => {
-    await renderScreen({ next: 'https://evil.example' });
-    expect(screen.getByRole('link', { name: 'Create an account' })).toHaveAttribute(
-      'href',
-      '/sign-in?mode=sign-up',
-    );
-  });
-
-  it('shows the link error from /auth/callback', async () => {
-    await renderScreen({ error: 'link' });
+  it('shows the link error from /auth/callback', () => {
+    renderScreen({ linkError: true });
     expect(screen.getByRole('alert')).toHaveTextContent('That sign-in link is invalid');
   });
 });
