@@ -8,7 +8,9 @@ over a generated OpenAPI client, and Supabase Auth. The visual target is Mockup 
 
 - **No money math in the client.** Every number on screen comes from the API. Money arrives as
   integer cents and is only formatted (`lib/money.ts`, `<Money>`); never add, split, round for
-  logic, or compare amounts here. Arithmetic belongs in `api/calc/`.
+  logic, or compare amounts here. Arithmetic belongs in `api/calc/`. The one exception is the
+  Confirm screen's consistency check (`mathGate`, below): a display-side gate over the person's
+  own entries, with the server's 422 as the authority.
 - **Tokens only.** Colors, radii, shadows, type sizes and durations are the `@theme` tokens in
   `src/app/globals.css`. No raw hex anywhere else in `src/` (only `globals.css` and
   `components/sankey/palette.ts`); `src/lib/design/tokens.test.ts` and ESLint both enforce it.
@@ -54,26 +56,30 @@ baselines in that same image (mount `web/` read-only, copy it without `node_modu
 ## Layout
 
 ```
-src/app/            routes. (auth)/sign-in; (app)/setup/{link,confirm/[documentId],spending,decisions},
+src/app/            routes. (auth)/sign-in; (app)/setup/{link,confirm,confirm/[documentId],spending,decisions},
                     (app)/why/[decisionId], (app)/plan, (app)/check-in/[checkInId]; dev/kit
 src/app/auth/callback/route.ts  exchanges the email-link code for a session
-src/proxy.ts        Next 16 proxy (formerly middleware): refreshes the Supabase session and
-                    forwards the requested path to the (app) guard
+src/proxy.ts        Next 16 proxy (formerly middleware): refreshes the Supabase session, sends
+                    signed-out requests for (app) screens to /sign-in, forwards the requested path
 src/components/ui/  design system (below)
 src/components/chrome/  app frame (below)
 src/components/screens/<screen>/  one 'use client' screen component per page
 src/components/icons.tsx  the mockup's SVG glyphs, decorative, drawn in currentColor
 src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts, client.ts,
-                    keys.ts, errors.ts, pending.ts, hooks/), auth/ (next-path, validation,
-                    errors, account), supabase/ (env, client, server, proxy), design/ (tone.ts,
-                    tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts, features.ts,
-                    setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts
-src/app/dev/screens/{link,spending}  a screen on the sample data, no API (development only)
-src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx,
-                    fixtures/sample.ts (the Acme / J. Rivera dataset), msw/db.ts (in-memory API
-                    state), msw/handlers.ts (every route, stateful)
-e2e/                Playwright specs (smoke, auth.setup, auth, link, spending), support/auth.ts,
-                    support/api.ts, baselines
+                    upload.ts, keys.ts, errors.ts, pending.ts, hooks/), auth/ (next-path,
+                    protected, validation, errors, account), supabase/ (env, client, server,
+                    proxy), design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts,
+                    categories.ts, documents.ts, features.ts, setup-progress.ts, routes.ts,
+                    navigation.ts, query-client.ts, cn.ts
+src/app/dev/screens/{link,spending,confirm,confirm/manual}  a screen on the sample data, no API
+                    (development only)
+src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fake-xhr.ts,
+                    fixtures/sample.ts (the Acme / J. Rivera dataset), fixtures/documents.ts (the
+                    Acme pay stub as the API proposes it), msw/db.ts (in-memory API state),
+                    msw/handlers.ts (every route, stateful)
+e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending),
+                    support/auth.ts, support/api.ts, fixtures/ (synthetic acme-paystub.pdf and
+                    the script that makes it), baselines
 ```
 
 ## Component map
@@ -110,8 +116,8 @@ user chip as a disclosure button with "Sign out"), `NavStep`, `SideNav`
 (`current`, `done` from `lib/setup-progress.ts`, `hrefs` for id-bound screens; wraps into a chip
 row under 780px), `AppSideNav` (current item from the URL), `Shell` (header, nav column
 `1 1 200px` up to 240px, main `999 1 560px`, skip link), `PageTitle` (`title`, `lead`, `aside`,
-`eyebrow`), `StepFooter` (`back`, `next` with `primary` and `disabled`; a disabled next is a real
-disabled button, never a dead link).
+`eyebrow`), `StepFooter` (`back`, `next` with `primary`, `disabled` and `loading`; a disabled
+next is a real disabled button, never a dead link).
 
 ## Data layer
 
@@ -125,6 +131,8 @@ disabled button, never a dead link).
   `invalidateSpending`, `invalidateLinkedData`, `invalidateForJob`), not with keys spelled at call
   sites. `useTransactions` is an infinite query under `queryKeys.transactionPages(filters)`; the
   trailing `'pages'` keeps its `InfiniteData` apart from plain reads under the same prefix.
+  Documents: `invalidateDocuments` after an upload or extraction, `invalidateAfterConfirm`
+  (documents and pay stubs) after a confirm.
 - **Optimistic writes** cancel the affected reads, patch every cached copy (`setQueriesData` over
   the prefix, paged or not), keep a snapshot for rollback in `onError`, and invalidate in
   `onSettled`. Mirror what the server will write: `useFixCategory` also relabels the merchant's
@@ -141,9 +149,14 @@ disabled button, never a dead link).
   a `TODO(<route>)`. Screens render `undefined` as a skeleton (totals) or an empty state (lists),
   never a client-side substitute. Current: `useSpendingSummary` (`GET /spending/summary`: the
   Spending tiles, and the category-to-bucket map that replaces `lib/categories.ts`),
-  `useDocuments` (`GET /docs`: the Link documents card and nav marks), `useDecisions`
-  (`GET /decisions`: nav marks). To wire one: `make types`, delete its shape, return
+  `useDecisions` (`GET /decisions`: nav marks). To wire one: `make types`, delete its shape, return
   `$api.useQuery(...).data` under the key reserved in `keys.ts`, and add the MSW handler.
+- **Uploads** (`lib/api/upload.ts`): `POST /docs` goes over XMLHttpRequest, because fetch cannot
+  report upload progress. It shares `sessionTokens` with the fetch middleware (one refresh and one
+  resend on a 401), and fails with `UploadError` (`status`, `code`, `retryAfterSeconds`; `error`
+  reads like any API error). `useUploadDocument` wraps it; the Link documents card then calls
+  `useExtractDocument` and follows the job with `useJob`. `lib/documents.ts` maps a document's
+  status to its badge and reason text; `isReviewable`/`newestReviewable` pick what Confirm opens.
 - **Money** is formatted only. Transactions keep Plaid's sign (positive is money out):
   `formatTransactionAmount` and `transactionFlow` in `lib/money.ts` turn that into "-$84.12" and
   "+$1,996.04". Counting rows (the source badges) is fine; summing amounts is not.
@@ -159,12 +172,38 @@ disabled button, never a dead link).
   `vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) })` and
   `await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS))`, and render with
   `renderWithProviders(ui, { advanceTimers: vi.advanceTimersByTime })` so userEvent keeps up.
+- Uploads use XMLHttpRequest, which MSW does not see in jsdom: `installFakeXhr()`
+  (`src/test/fake-xhr.ts`) records each request so a test can report progress and respond;
+  restore with `vi.unstubAllGlobals()`. `extractJobStates(jobId, documentId)` scripts an extraction
+  that writes `db.nextProposal` when it succeeds; `emptyDocuments()` clears the documents.
 - Assert requests with `server.events.on('request:start', ...)` and remove the listeners in
   `afterEach`. For hooks, `renderHookWithClient(hook)` returns the `queryClient` for cache checks.
 - Third-party widgets are mocked at the module (`vi.mock('react-plaid-link', ...)`, see
   `LinkScreen.test.tsx`), and the test calls the callbacks the widget would.
 - Screen tests cannot name status colors (ESLint): test a tone through a pure helper
   (`sourceBadge`) or in the `components/ui` tests.
+
+## Confirm screen
+
+`/setup/confirm` opens the newest pay stub waiting for review; `/setup/confirm/[documentId]`
+reviews one (`ConfirmScreen`, which also covers the extracting, failed, confirmed, benefits and
+offer letter states).
+
+- **State** is `confirmReducer` (`screens/confirm/confirmReducer.ts`), ported from the mockup's
+  script: `select`, `toggle`, `edit`/`draft`/`save`/`cancel`, `confirmAll`. Every value is a
+  proposal until confirmed, and `payStubValues` sends only confirmed values. `parseDraft` reads
+  money with `parseMoney` (cents), dates as ISO, choices (pay frequency) from `FIELD_CHOICES`.
+- **Math gate**: `mathGate` checks gross minus deductions equals net over the confirmed or drafted
+  values (`ok`, `off` with the difference, `unknown` when a value is missing or invalid). Which
+  fields take part comes from each field's `role` (`gross`, `deduction`, `net`) in the API
+  response, never a list of keys. Continue needs every field confirmed and the gate `ok`. The
+  server checks again: a 422 `pay_stub_unbalanced` becomes `PayStubUnbalanced` from
+  `useConfirmDocument`, and the screen renders its diff (`MathNotice`).
+- **Manual entry**: a proposal with `manual_entry_required` starts every field empty and in edit;
+  the source pane shows the redacted lines to type from, Confirm all is off, and each row saves on
+  its own.
+- **Source pane**: the redacted lines the AI saw, with redactions drawn as labeled bars
+  (`role="img"`, "Redacted") and the selected field's line marked `aria-current`.
 
 ## Adding a screen
 
@@ -203,12 +242,20 @@ previews without secrets).
   survives from another session. Supabase errors become sentences in `lib/auth/errors.ts`.
 - **`next` paths** are untrusted: always pass them through `safeNextPath` (relative, same site, not
   an auth page) and build sign-in links with `signInRoute({ mode, next, error })`.
-- **Guard**: `(app)/auth-gate.tsx` verifies the user with `getUser()` (deduped per render by React
-  `cache`) and redirects to `/sign-in?next=<path>`; the path comes from the `x-first-paycheck-path`
-  header the proxy sets, because layouts cannot read the URL. `/` sends a signed-in person to
-  `/setup/link`.
+- **Guard**: the proxy redirects a signed-out request for a signed-in screen (`requiresSignIn` in
+  `lib/auth/protected.ts`, every page in `(app)`; a test fails when a new one is not covered) to
+  `/sign-in?next=<path>` before anything renders. `(app)/auth-gate.tsx` is the backstop: it
+  verifies the user with `getUser()` (deduped per render by React `cache`) and redirects; the path
+  comes from the `x-first-paycheck-path` header the proxy sets, because layouts cannot read the
+  URL. Redirect in the proxy, not while rendering: `next dev` validates each route's instant UI
+  and logs an error when a redirect stops the segment from rendering. `/` sends a signed-in person
+  to `/setup/link`.
 - **Proxy**: `src/proxy.ts` refreshes the session with `getClaims()` on every request except build
   assets, image optimization, the favicon and paths with a file extension.
+- **Server client**: `getSupabaseServerClient()` awaits `connection()` first. supabase-js checks
+  the session's expiry with `Date.now()`, which Cache Components rejects during a prerender, and
+  dev's instant validation prerenders with the request's cookies, so `cookies()` alone is not
+  enough.
 - **API calls**: `lib/api/client.ts` attaches `Authorization: Bearer <access_token>`; a 401 triggers
   one shared `refreshSession()` and a retry, and a second 401 signs out locally and goes to
   `/sign-in?next=<current path>`.
@@ -224,12 +271,12 @@ previews without secrets).
 (git-ignored) for the `authenticated` project, which runs `e2e/auth.spec.ts`. Set these in
 `web/.env.local` or the environment:
 
-| Variable                                                           | Needed for                                                                                                                                                           |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)                                                                                                   |
-| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                             |
-| `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                     |
-| `E2E_API_URL`                                                      | `link.spec.ts` and `spending.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it |
+| Variable                                                           | Needed for                                                                                                                                                                              |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)                                                                                                                      |
+| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                                                |
+| `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                                        |
+| `E2E_API_URL`                                                      | `link.spec.ts`, `confirm.spec.ts` and `spending.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it |
 
 Missing variables skip those tests with a message saying which to set. The e2e user must be a
 confirmed user: the hosted project requires email confirmation, so create it in the Supabase
@@ -241,7 +288,10 @@ tests share.
 the e2e-only button, follows the sync and sets roles; `spending.spec.ts` (project
 `authenticated-spending`, which depends on it) reads those transactions and saves a category fix.
 Both change the e2e user's data, so they are ordered projects with serial files rather than
-parallel tests.
+parallel tests. `confirm.spec.ts` (project `authenticated-confirm`) uploads
+`e2e/fixtures/acme-paystub.pdf`, a synthetic stub with an example SSN the API must redact and a
+masked account number (regenerate it with `node e2e/fixtures/make-acme-paystub.mjs`), waits for
+the read, confirms every field and continues to Spending. Never use a real document as a fixture.
 
 ## Feature flags
 
