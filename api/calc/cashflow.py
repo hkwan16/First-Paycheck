@@ -4,15 +4,20 @@
 Each confirmed pay stub becomes seven lines in a fixed order, grouped by role
 (tax, retirement, health, other), and the period's lines are summed here so
 the client never adds money. Amounts are the stubs' non-negative magnitudes.
+
+``against_plan`` sets a month's actuals beside the saved decisions' targets
+for the check-in screen (spec 015 rule 19).
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
+from decimal import Decimal
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from calc.money import pct_of, round_half_up
 from calc.pay_stub import PayStubAmounts, balance, total_cents
 
 __all__ = [
@@ -20,9 +25,14 @@ __all__ = [
     "CashFlowWithholding",
     "DeductionRole",
     "LineSpec",
+    "PlanLine",
+    "PlanLineKey",
+    "PlanTargets",
     "RoleTotals",
+    "SpendingActuals",
     "StubFlow",
     "WithholdingLine",
+    "against_plan",
     "withholding",
 ]
 
@@ -142,3 +152,101 @@ def withholding(stubs: Sequence[PayStubAmounts]) -> CashFlowWithholding:
         total_cents(flow.net_cents for flow in flows),
     )
     return CashFlowWithholding(stubs=flows, total=total, paycheck_count=len(flows))
+
+
+# ---------------------------------------------------------------- against the plan (spec 015)
+
+PlanLineKey = Literal[
+    "take_home", "essentials", "flexible", "other", "savings", "retirement", "health", "left_over"
+]
+
+
+class SpendingActuals(BaseModel):
+    """The month's spending-summary totals (spec 007 part B), as the route read them."""
+
+    model_config = ConfigDict(frozen=True)
+
+    take_home_cents: Cents
+    essentials_cents: Cents
+    flexible_cents: Cents
+    other_cents: Cents
+    savings_cents: Cents
+    left_over_cents: Cents
+
+
+class PlanTargets(BaseModel):
+    """What the saved decisions planned for a month; None where nothing was decided."""
+
+    model_config = ConfigDict(frozen=True)
+
+    # The current 401(k) decision's deferral rate.
+    contribution_pct: Decimal | None = None
+    # The selected health plan's premium per paycheck.
+    premium_per_period_cents: Cents | None = None
+    # The emergency-fund decision's essential spending per month.
+    monthly_essentials_cents: Cents | None = None
+    # The active emergency-fund goal's monthly contribution.
+    monthly_savings_cents: Cents | None = None
+
+
+class PlanLine(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    key: PlanLineKey
+    label: str
+    actual_cents: Cents
+    plan_cents: Cents | None
+    # Actual minus plan: positive when the month ran over the plan.
+    difference_cents: Cents | None
+
+
+def _line(key: PlanLineKey, label: str, actual: int, plan: int | None) -> PlanLine:
+    return PlanLine(
+        key=key,
+        label=label,
+        actual_cents=actual,
+        plan_cents=plan,
+        difference_cents=None if plan is None else actual - plan,
+    )
+
+
+def _amount(flow: StubFlow, key: LineKey) -> int:
+    return next(line.amount_cents for line in flow.lines if line.key == key)
+
+
+def against_plan(
+    total: StubFlow, paycheck_count: int, spending: SpendingActuals, targets: PlanTargets
+) -> list[PlanLine]:
+    """Spec 015 rule 19: each line's actual, its monthly plan and the difference.
+
+    ``total`` is the period's summed stub flow (``withholding(...).total``).
+    The retirement plan is the elected rate on the period's actual gross; the
+    health plan is the premium times the paychecks in the period.
+    """
+    retirement_plan = (
+        None
+        if targets.contribution_pct is None
+        else round_half_up(pct_of(total.gross_cents, targets.contribution_pct))
+    )
+    health_plan = (
+        None
+        if targets.premium_per_period_cents is None
+        else targets.premium_per_period_cents * paycheck_count
+    )
+    return [
+        _line("take_home", "Take-home pay", spending.take_home_cents, None),
+        _line(
+            "essentials", "Essentials", spending.essentials_cents, targets.monthly_essentials_cents
+        ),
+        _line("flexible", "Flexible", spending.flexible_cents, None),
+        _line("other", "Other spending", spending.other_cents, None),
+        _line("savings", "Savings", spending.savings_cents, targets.monthly_savings_cents),
+        _line(
+            "retirement",
+            "401(k) from pay stubs",
+            _amount(total, "retirement_contribution"),
+            retirement_plan,
+        ),
+        _line("health", "Health premiums", _amount(total, "medical_premium"), health_plan),
+        _line("left_over", "Left over", spending.left_over_cents, None),
+    ]

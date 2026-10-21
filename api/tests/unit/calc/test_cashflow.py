@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from calc.cashflow import LINES, RoleTotals, withholding
+from calc.cashflow import (
+    LINES,
+    PlanTargets,
+    RoleTotals,
+    SpendingActuals,
+    against_plan,
+    withholding,
+)
 from calc.pay_stub import PayStubAmounts
 
 MOCKUP: dict[str, int] = {
@@ -129,3 +137,60 @@ def test_totals_are_sums_and_every_stub_balances(deductions: list[list[int]]) ->
         == flow.total.deductions_cents
     )
     assert flow.total.gross_cents - flow.total.deductions_cents == flow.total.net_cents
+
+
+# ---------------------------------------------------------------- against the plan (spec 015)
+
+SEPTEMBER_SPENDING = SpendingActuals(
+    take_home_cents=399_208,
+    essentials_cents=180_000,
+    flexible_cents=8_500,
+    other_cents=3_900,
+    savings_cents=40_000,
+    left_over_cents=166_808,
+)
+
+
+def plan_lines(targets: PlanTargets) -> dict[str, tuple[int, int | None, int | None]]:
+    september = withholding(
+        [PayStubAmounts.model_validate(MOCKUP), PayStubAmounts.model_validate(MOCKUP)]
+    )
+    lines = against_plan(september.total, september.paycheck_count, SEPTEMBER_SPENDING, targets)
+    return {line.key: (line.actual_cents, line.plan_cents, line.difference_cents) for line in lines}
+
+
+def test_cash_flow_against_the_plan() -> None:
+    # Spec 015 route row 2.
+    lines = plan_lines(
+        PlanTargets(
+            contribution_pct=Decimal("4"),
+            premium_per_period_cents=6_250,
+            monthly_essentials_cents=250_000,
+            monthly_savings_cents=50_000,
+        )
+    )
+    assert lines == {
+        "take_home": (399_208, None, None),
+        "essentials": (180_000, 250_000, -70_000),
+        "flexible": (8_500, None, None),
+        "other": (3_900, None, None),
+        "savings": (40_000, 50_000, -10_000),
+        "retirement": (0, 21_667, -21_667),
+        "health": (12_500, 12_500, 0),
+        "left_over": (166_808, None, None),
+    }
+
+
+def test_without_decisions_every_plan_is_null() -> None:
+    lines = plan_lines(PlanTargets())
+    assert all(plan is None and difference is None for _, plan, difference in lines.values())
+    assert list(lines) == [
+        "take_home",
+        "essentials",
+        "flexible",
+        "other",
+        "savings",
+        "retirement",
+        "health",
+        "left_over",
+    ]
