@@ -10,6 +10,10 @@ class CostCapExceeded(RuntimeError):
     """A suite tried to spend more than ``--max-cost-cents`` allows."""
 
 
+class SuiteUnavailable(RuntimeError):
+    """A suite cannot run here (for example, no API key); nothing was spent."""
+
+
 class Budget:
     """The run's spending cap. LLM suites charge every call before reading its result."""
 

@@ -12,6 +12,8 @@
 from __future__ import annotations
 
 import ast
+import os
+import subprocess
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -201,6 +203,99 @@ def test_privileged_engine_stays_in_its_allowed_modules() -> None:
         and (found := privileged_violations(path.read_text()))
     }
     assert not problems, f"get_privileged_engine is for the queue, scheduler and seeds: {problems}"
+
+
+BLOB_ALLOWED = {"ingest/store.py", "db/models.py"}
+WORKER_ONLY_MODULES = {
+    "ingest.reader",
+    "ingest.ocr",
+    "ingest.redact",
+    "ingest.pipeline",
+    "pdfplumber",
+    "pypdfium2",
+    "pytesseract",
+    "PIL",
+}
+
+
+def blob_violations(source: str) -> list[str]:
+    found = [
+        f"line {line}: uses {name}"
+        for name, line in referenced_names(ast.parse(source))
+        if name == "DocumentBlob"
+    ]
+    found += [
+        f"line {node.lineno}: names document_blobs"
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and "document_blobs" in node.value
+    ]
+    return found
+
+
+def worker_only_violations(source: str) -> list[str]:
+    return [
+        f"line {line}: imports {module}"
+        for module, line in imported_modules(ast.parse(source))
+        if module in WORKER_ONLY_MODULES or module.split(".")[0] in WORKER_ONLY_MODULES
+    ]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from db.models import DocumentBlob",
+        "session.execute(text('DELETE FROM document_blobs'))",
+    ],
+)
+def test_blob_check_flags_direct_access(source: str) -> None:
+    assert blob_violations(source)
+
+
+@pytest.mark.parametrize(
+    "source", ["from ingest.ocr import ocr_image", "import pytesseract", "from PIL import Image"]
+)
+def test_worker_only_check_flags_heavy_imports(source: str) -> None:
+    assert worker_only_violations(source)
+
+
+def test_only_the_store_touches_document_blobs() -> None:
+    problems = {
+        relative(path): found
+        for path in python_files(API)
+        if not path.is_relative_to(API / "tests")
+        and not path.is_relative_to(API / "alembic")
+        and relative(path) not in BLOB_ALLOWED
+        and (found := blob_violations(path.read_text()))
+    }
+    assert not problems, f"only ingest/store.py may touch document_blobs: {problems}"
+
+
+def test_routers_never_import_ocr_or_parsers() -> None:
+    problems = {
+        relative(path): found
+        for path in python_files(API / "app")
+        if (found := worker_only_violations(path.read_text()))
+    }
+    assert not problems, f"OCR and parsing run only in the worker: {problems}"
+
+
+def test_the_api_process_does_not_load_ocr_or_parsers() -> None:
+    probe = (
+        "import sys, app.main; "
+        "print(','.join(sorted(m for m in ('pytesseract', 'pdfplumber', 'pypdfium2', 'PIL',"
+        " 'ingest.ocr', 'ingest.reader', 'ingest.pipeline') if m in sys.modules)))"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=API,
+        capture_output=True,
+        text=True,
+        check=True,
+        env={**os.environ, "APP_ENV": "test"},
+    )
+    assert result.stdout.strip() == ""
 
 
 def test_the_walk_sees_the_source_tree() -> None:

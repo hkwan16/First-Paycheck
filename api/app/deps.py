@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import threading
 import weakref
@@ -58,6 +59,14 @@ def get_user_session(user: CurrentUser, bind: DbBind) -> Iterator[Session]:
 # scope="function": the transaction commits before the response is sent, so a
 # failed commit becomes an error response instead of a lost write.
 UserSession = Annotated[Session, Depends(get_user_session, scope="function")]
+
+
+def get_now() -> dt.datetime:
+    """The request's clock (UTC); tests override it to freeze time."""
+    return dt.datetime.now(dt.UTC)
+
+
+Now = Annotated[dt.datetime, Depends(get_now)]
 
 
 def alembic_revision(bind: DbBind) -> str | None:

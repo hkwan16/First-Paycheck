@@ -18,6 +18,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    Computed,
     Date,
     DateTime,
     ForeignKey,
@@ -35,13 +36,16 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from db.enums import (
     AccountKind,
     AccountRole,
     CategorySource,
+    DocumentStatus,
+    DocumentStatusReason,
+    DocumentType,
     FilingStatus,
     HealthcareUsage,
     JobKind,
@@ -49,6 +53,7 @@ from db.enums import (
     LlmPurpose,
     LlmStatus,
     PayFrequency,
+    PlanKind,
     RuleMatch,
     RuleSource,
     SyncProvider,
@@ -387,4 +392,219 @@ class LlmCall(Base):
     job_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("jobs.id", ondelete="SET NULL")
     )
+    created_at: Mapped[dt.datetime] = _created_at()
+
+
+# ---------------------------------------------------------------- documents (0003)
+
+_CONTENT_TYPES = "content_type IN ('application/pdf', 'image/png', 'image/jpeg')"
+
+
+class Document(Base):
+    """One upload, kept after its bytes are deleted (specs 001, 004)."""
+
+    __tablename__ = "documents"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id"),
+        CheckConstraint(_CONTENT_TYPES, name="content_type_allowed"),
+        CheckConstraint("size_bytes > 0", name="size_positive"),
+        CheckConstraint("redaction_count >= 0", name="redaction_count_non_negative"),
+        CheckConstraint("page_count > 0", name="page_count_positive"),
+        CheckConstraint(
+            "(status = 'confirmed') = (confirmed_at IS NOT NULL)",
+            name="confirmed_at_when_confirmed",
+        ),
+        CheckConstraint(
+            "(status IN ('failed', 'manual_entry_required')) = (status_reason IS NOT NULL)",
+            name="status_reason_when_stuck",
+        ),
+        CheckConstraint("jsonb_typeof(proposal) = 'object'", name="proposal_object"),
+        # GET /docs reads (user_id, created_at DESC) by scanning this index backwards.
+        Index("ix_documents_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _id()
+    user_id: Mapped[uuid.UUID] = _owner()
+    type: Mapped[DocumentType] = mapped_column(pg_enum(DocumentType, "document_type"))
+    status: Mapped[DocumentStatus] = mapped_column(
+        pg_enum(DocumentStatus, "document_status"), server_default=text("'uploaded'")
+    )
+    status_reason: Mapped[DocumentStatusReason | None] = mapped_column(
+        pg_enum(DocumentStatusReason, "document_status_reason")
+    )
+    content_type: Mapped[str] = mapped_column(Text)
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    page_count: Mapped[int | None] = mapped_column(Integer)
+    # The reviewable proposal (ingest/proposal.py); redacted text only.
+    proposal: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    extract_job_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("jobs.id", ondelete="SET NULL")
+    )
+    redaction_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    confirmed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set when the blob is deleted (on confirm or by retention).
+    deleted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[dt.datetime] = _created_at()
+    updated_at: Mapped[dt.datetime] = _updated_at()
+
+
+class DocumentBlob(Base):
+    """Raw upload bytes until confirmation. Only ``ingest/store.py`` touches it."""
+
+    __tablename__ = "document_blobs"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["document_id", "user_id"],
+            ["documents.id", "documents.user_id"],
+            ondelete="CASCADE",
+        ),
+        CheckConstraint(_CONTENT_TYPES, name="content_type_allowed"),
+        CheckConstraint("size_bytes = octet_length(bytes)", name="size_matches_bytes"),
+        CheckConstraint("size_bytes > 0", name="size_positive"),
+    )
+
+    document_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[uuid.UUID] = _owner()
+    # Named ``data`` in Python so the attribute does not shadow the builtin.
+    data: Mapped[bytes] = mapped_column("bytes", LargeBinary)
+    content_type: Mapped[str] = mapped_column(Text)
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[dt.datetime] = _created_at()
+
+
+PAY_STUB_DEDUCTIONS = (
+    "federal_withholding_cents",
+    "social_security_cents",
+    "medicare_cents",
+    "state_tax_cents",
+    "retirement_contribution_cents",
+    "medical_premium_cents",
+    "other_deductions_cents",
+)
+
+
+def _deduction() -> Mapped[int]:
+    return mapped_column(BigInteger, server_default=text("0"))
+
+
+class PayStub(Base):
+    """Confirmed fields from one pay stub; written only by POST /docs/{id}/confirm."""
+
+    __tablename__ = "pay_stubs"
+    __table_args__ = (
+        UniqueConstraint("document_id"),
+        ForeignKeyConstraint(["document_id", "user_id"], ["documents.id", "documents.user_id"]),
+        CheckConstraint("period_start <= period_end", name="period_ordered"),
+        CheckConstraint("gross_cents > 0", name="gross_positive"),
+        CheckConstraint("net_cents >= 0", name="net_non_negative"),
+        *(
+            CheckConstraint(f"{column} >= 0", name=f"{column.removesuffix('_cents')}_non_negative")
+            for column in PAY_STUB_DEDUCTIONS
+        ),
+        # The database backstop for the confirm gate (spec amendment 17).
+        CheckConstraint(
+            "gross_cents - " + " - ".join(PAY_STUB_DEDUCTIONS) + " = net_cents",
+            name="pay_stub_balances",
+        ),
+        # GET /pay-stubs reads (user_id, pay_date DESC) by scanning this index backwards.
+        Index("ix_pay_stubs_user_pay_date", "user_id", "pay_date"),
+    )
+
+    id: Mapped[uuid.UUID] = _id()
+    user_id: Mapped[uuid.UUID] = _owner()
+    document_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    employer_name: Mapped[str | None] = mapped_column(Text)
+    pay_frequency: Mapped[PayFrequency | None] = mapped_column(
+        pg_enum(PayFrequency, "pay_frequency")
+    )
+    pay_date: Mapped[dt.date] = mapped_column(Date)
+    # Spec amendment 13: the tax year follows the pay date.
+    tax_year: Mapped[int] = mapped_column(
+        SmallInteger, Computed("(EXTRACT(year FROM pay_date))::smallint", persisted=True)
+    )
+    period_start: Mapped[dt.date] = mapped_column(Date)
+    period_end: Mapped[dt.date] = mapped_column(Date)
+    gross_cents: Mapped[int] = mapped_column(BigInteger)
+    federal_withholding_cents: Mapped[int] = _deduction()
+    social_security_cents: Mapped[int] = _deduction()
+    medicare_cents: Mapped[int] = _deduction()
+    state_tax_cents: Mapped[int] = _deduction()
+    retirement_contribution_cents: Mapped[int] = _deduction()
+    medical_premium_cents: Mapped[int] = _deduction()
+    other_deductions_cents: Mapped[int] = _deduction()
+    net_cents: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[dt.datetime] = _created_at()
+
+
+class BenefitsPlan(Base):
+    """A confirmed health plan option (from a benefits summary, or typed by hand)."""
+
+    __tablename__ = "benefits_plans"
+    __table_args__ = (
+        ForeignKeyConstraint(["document_id", "user_id"], ["documents.id", "documents.user_id"]),
+        CheckConstraint("name <> ''", name="name_not_empty"),
+        CheckConstraint("premium_per_period_cents >= 0", name="premium_non_negative"),
+        CheckConstraint("deductible_cents >= 0", name="deductible_non_negative"),
+        CheckConstraint("oop_max_cents >= 0", name="oop_max_non_negative"),
+        CheckConstraint("deductible_cents <= oop_max_cents", name="deductible_within_oop_max"),
+        CheckConstraint("coinsurance_pct BETWEEN 0 AND 100", name="coinsurance_range"),
+        CheckConstraint("employer_hsa_cents >= 0", name="employer_hsa_non_negative"),
+        Index("ix_benefits_plans_user_id", "user_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _id()
+    user_id: Mapped[uuid.UUID] = _owner()
+    # Null when the plan was entered by hand.
+    document_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    name: Mapped[str] = mapped_column(Text)
+    kind: Mapped[PlanKind] = mapped_column(pg_enum(PlanKind, "plan_kind"))
+    premium_per_period_cents: Mapped[int] = mapped_column(BigInteger)
+    deductible_cents: Mapped[int] = mapped_column(BigInteger)
+    oop_max_cents: Mapped[int] = mapped_column(BigInteger)
+    # The member's share after the deductible, in percent.
+    coinsurance_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2))
+    employer_hsa_cents: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
+    enrollment_deadline: Mapped[dt.date | None] = mapped_column(Date)
+    created_at: Mapped[dt.datetime] = _created_at()
+    updated_at: Mapped[dt.datetime] = _updated_at()
+
+
+class BenefitsChunk(Base):
+    """Redacted benefits text in 400-word chunks, searchable by Postgres full text."""
+
+    __tablename__ = "benefits_chunks"
+    __table_args__ = (
+        UniqueConstraint("document_id", "chunk_index"),
+        ForeignKeyConstraint(
+            ["document_id", "user_id"],
+            ["documents.id", "documents.user_id"],
+            ondelete="CASCADE",
+        ),
+        CheckConstraint("chunk_index >= 0", name="chunk_index_non_negative"),
+        Index("ix_benefits_chunks_search", "search", postgresql_using="gin"),
+    )
+
+    id: Mapped[uuid.UUID] = _id()
+    user_id: Mapped[uuid.UUID] = _owner()
+    document_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    chunk_index: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+    search: Mapped[str] = mapped_column(
+        TSVECTOR, Computed("to_tsvector('english'::regconfig, text)", persisted=True)
+    )
+    created_at: Mapped[dt.datetime] = _created_at()
+
+
+class RateLimitCounter(Base):
+    """Requests per user, bucket and fixed window (``app/ratelimit.py``)."""
+
+    __tablename__ = "rate_limit_counters"
+    __table_args__ = (CheckConstraint("count > 0", name="count_positive"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("auth.users.id", ondelete="CASCADE"), primary_key=True
+    )
+    bucket: Mapped[str] = mapped_column(Text, primary_key=True)
+    window_start: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[dt.datetime] = _created_at()

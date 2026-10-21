@@ -8,6 +8,7 @@ response parsing, the ledger and the budget check) is the real code.
 
 from __future__ import annotations
 
+import base64
 import datetime as dt
 import json
 from collections.abc import Callable
@@ -19,9 +20,12 @@ from pydantic import SecretStr
 from sqlalchemy import Connection, text
 
 from app.config import Settings
+from db.enums import JobKind, LlmStatus
 from llm.gateway import (
+    FAKE_FIXTURES,
     CategorizeItem,
     FakeGateway,
+    ImagePage,
     LLMBudgetExceeded,
     LLMError,
     LLMGateway,
@@ -29,9 +33,12 @@ from llm.gateway import (
     LLMRefused,
     LLMSchemaError,
     LLMUnavailable,
+    MemoryLedger,
+    ModelPage,
+    TextPage,
     get_gateway,
 )
-from llm.schemas import CategoryBatch
+from llm.schemas import BenefitsExtraction, CategoryBatch, PayStubExtraction
 from tests.conftest import FixtureUser
 from tests.support.factories import make_job
 
@@ -342,3 +349,122 @@ def test_get_gateway_selects_by_settings(db_connection: Connection) -> None:
     assert type(real) is LLMGateway
     with pytest.raises(LLMNotConfigured, match="ANTHROPIC_API_KEY"):
         get_gateway(settings(anthropic_api_key=None), bind=db_connection)
+
+
+# Extraction (spec 005 rules 6-8) ---------------------------------------------
+
+PNG_1 = b"\x89PNG\r\n\x1a\n page one"
+PNG_3 = b"\x89PNG\r\n\x1a\n page three"
+PAGES: list[ModelPage] = [
+    ImagePage(number=1, png=PNG_1),
+    TextPage(number=2, text="Gross Pay 2,708.33\nSSN [REDACTED]"),
+    ImagePage(number=3, png=PNG_3),
+]
+STUB_ANSWER = json.loads((FAKE_FIXTURES / "extract_pay_stub.json").read_text())
+SONNET_USAGE = {
+    "input_tokens": 3_000,
+    "output_tokens": 900,
+    "cache_read_input_tokens": 0,
+    "cache_creation_input_tokens": 0,
+}
+
+
+def test_extract_sends_images_before_one_text_block(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    api = Api(ok(STUB_ANSWER, usage=SONNET_USAGE))
+    job_id = make_job(db_connection, user_a.id, kind=JobKind.INGEST_EXTRACT)
+    stub = gateway(db_connection, api).extract_pay_stub(user_a.id, PAGES, job_id=job_id)
+
+    assert stub == PayStubExtraction.model_validate(STUB_ANSWER)
+    sent = api.requests[0]
+    assert sent["model"] == "claude-sonnet-5-5"
+    assert sent["output_config"]["effort"] == "low"
+    assert "gross_cents" in sent["output_config"]["format"]["schema"]["properties"]
+    assert sent["system"][0]["cache_control"] == {"type": "ephemeral"}
+    assert "temperature" not in sent
+    [message_sent] = sent["messages"]
+    assert message_sent["role"] == "user"
+    blocks = message_sent["content"]
+    assert [block["type"] for block in blocks] == ["image", "image", "text"]
+    assert blocks[0]["source"] == {
+        "type": "base64",
+        "media_type": "image/png",
+        "data": base64.b64encode(PNG_1).decode(),
+    }
+    assert base64.b64decode(blocks[1]["source"]["data"]) == PNG_3
+    body = blocks[2]["text"]
+    assert "pages 1, 3" in body
+    assert "Page 2 (text layer):\nGross Pay 2,708.33\nSSN [REDACTED]" in body
+
+    [row] = ledger(db_connection, user_a)
+    # Sonnet: (3000 * 2.00 + 900 * 10.00) * 100 = 1,500,000 microcents.
+    assert (row["purpose"], row["prompt_version"], row["cost_microcents"], row["job_id"]) == (
+        "extract",
+        "extract_pay_stub/v1",
+        1_500_000,
+        job_id,
+    )
+
+
+def test_text_only_extraction_has_no_image_preamble(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    api = Api(ok(STUB_ANSWER))
+    gateway(db_connection, api).extract_pay_stub(user_a.id, [PAGES[1]])
+    [block] = api.requests[0]["messages"][0]["content"]
+    assert block["type"] == "text"
+    assert "Images above" not in block["text"]
+
+
+def test_extract_benefits_uses_its_own_prompt(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    answer = json.loads((FAKE_FIXTURES / "extract_benefits.json").read_text())
+    api = Api(ok(answer))
+    benefits = gateway(db_connection, api).extract_benefits(user_a.id, [PAGES[1]])
+    assert benefits == BenefitsExtraction.model_validate(answer)
+    assert "plans" in api.requests[0]["output_config"]["format"]["schema"]["properties"]
+    assert ledger(db_connection, user_a)[0]["prompt_version"] == "extract_benefits/v1"
+
+
+def test_extract_with_no_pages_sends_and_records_nothing(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    api = Api()
+    with pytest.raises(ValueError, match="no pages"):
+        gateway(db_connection, api).extract_pay_stub(user_a.id, [])
+    assert api.requests == []
+    assert ledger(db_connection, user_a) == []
+
+
+def test_extract_refusal_raises(db_connection: Connection, user_a: FixtureUser) -> None:
+    api = Api(ok("I can't read this document.", stop_reason="refusal"))
+    with pytest.raises(LLMRefused):
+        gateway(db_connection, api).extract_pay_stub(user_a.id, PAGES)
+    assert [row["status"] for row in ledger(db_connection, user_a)] == ["refusal"]
+
+
+def test_fake_extracts_from_fixtures(db_connection: Connection, user_a: FixtureUser) -> None:
+    stub = fake(db_connection).extract_pay_stub(user_a.id, PAGES)
+    assert stub.net_cents.value == 199_604
+    benefits = fake(db_connection).extract_benefits(user_a.id, PAGES)
+    assert [plan.kind.value for plan in benefits.plans] == ["hdhp", "ppo"]
+    # Both rows carry the same frozen timestamp, so compare without order.
+    assert sorted(row["prompt_version"] for row in ledger(db_connection, user_a)) == [
+        "extract_benefits/v1",
+        "extract_pay_stub/v1",
+    ]
+
+
+def test_a_memory_ledger_needs_no_database(user_a: FixtureUser) -> None:
+    memory = MemoryLedger(clock=lambda: NOW)
+    gateway_without_db = FakeGateway(settings(llm_fake=True), ledger=memory, clock=lambda: NOW)
+    gateway_without_db.extract_pay_stub(user_a.id, PAGES)
+    [entry] = memory.entries
+    assert (entry.status, entry.prompt_version, entry.cost_microcents) == (
+        LlmStatus.OK,
+        "extract_pay_stub/v1",
+        0,
+    )
+    assert memory.spent_today(user_a.id) == 0

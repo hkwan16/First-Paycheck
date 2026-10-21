@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from evals import run
-from evals.suites.base import Budget, CostCapExceeded, Suite, SuiteResult
+from evals.suites.base import Budget, CostCapExceeded, Suite, SuiteResult, SuiteUnavailable
 
 
 def fixed(name: str, *, llm: bool = False, **metrics: float) -> Suite:
@@ -107,6 +107,19 @@ def test_cli_stops_at_the_cost_cap(tmp_path: Path) -> None:
     registry = {"pricey": spending("pricey", cents=50)}
     argv = ["--suite", "pricey", "--max-cost-cents", "10", "--baseline", str(baseline)]
     assert run.main(argv, registry=registry) == 2
+
+
+def test_cli_reports_an_unavailable_suite(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def execute(budget: Budget) -> SuiteResult:
+        raise SuiteUnavailable("ANTHROPIC_API_KEY is not set")
+
+    baseline = write_baseline(tmp_path / "baseline.json", {"keyed": {"accuracy": 1.0}})
+    registry = {"keyed": Suite(name="keyed", llm=True, run=execute)}
+    argv = ["--suite", "keyed", "--max-cost-cents", "10", "--baseline", str(baseline)]
+    assert run.main(argv, registry=registry) == 2
+    assert "keyed: unavailable, ANTHROPIC_API_KEY is not set" in capsys.readouterr().out
 
 
 def test_cli_with_no_matching_suites_is_a_no_op(tmp_path: Path) -> None:

@@ -1,0 +1,25 @@
+{
+  "account_number": null,
+  "content_type": "application/pdf",
+  "fields": {
+    "employer_name": "Acme Corp",
+    "federal_withholding_cents": 27244,
+    "gross_cents": 365385,
+    "medical_premium_cents": 2500,
+    "medicare_cents": 5298,
+    "net_cents": 275086,
+    "other_deductions_cents": 5199,
+    "pay_date": "2026-04-10",
+    "pay_frequency": "biweekly",
+    "period_end": "2026-04-05",
+    "period_start": "2026-03-23",
+    "retirement_contribution_cents": 10962,
+    "social_security_cents": 22654,
+    "state_tax_cents": 16442
+  },
+  "file": "stub-01.pdf",
+  "id": "stub-01",
+  "layout": "ledger",
+  "output": "text_pdf",
+  "ssn": "990-64-3531"
+}

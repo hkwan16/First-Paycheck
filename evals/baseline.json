@@ -5,5 +5,15 @@
   "categorization-rules": {
     "rules_coverage": 0.808,
     "rules_precision": 0.9702970297029703
+  },
+  "extraction": {
+    "document_accuracy": 0.7,
+    "field_accuracy": 0.9,
+    "redaction_recall": 1.0
+  },
+  "extraction-smoke": {
+    "pipeline_ok": 1.0,
+    "redaction_recall": 1.0,
+    "ssn_free": 1.0
   }
 }

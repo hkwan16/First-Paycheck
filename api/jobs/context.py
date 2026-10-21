@@ -15,6 +15,7 @@ from jobs import queue
 from jobs.queue import ClaimedJob, QueueBind
 
 if TYPE_CHECKING:
+    from jobs.handlers.ingest_extract import DocumentExtractor
     from sync.categorize import CategoryLabeler
     from sync.pipeline import ProviderFactory
 
@@ -28,6 +29,7 @@ class Services:
 
     provider_for: ProviderFactory | None = None
     labeler: CategoryLabeler | None = None
+    extractor: DocumentExtractor | None = None
 
 
 @dataclass

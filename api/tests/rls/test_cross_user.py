@@ -8,6 +8,7 @@ meta-test fails when a route is added without a case here.
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -22,7 +23,15 @@ from sqlalchemy.sql import column, func, table
 
 from db.enums import AccountRole, JobKind
 from tests.conftest import USER_A, USER_B, FixtureUser
-from tests.support.factories import make_account, make_item, make_job, make_transaction
+from tests.support.factories import (
+    MOCKUP_STUB,
+    make_account,
+    make_document,
+    make_item,
+    make_job,
+    make_pay_stub,
+    make_transaction,
+)
 
 # Routes with no user data behind them, or no user at all.
 EXEMPT = {("GET", "/health"), ("POST", "/sync/webhook")}
@@ -36,6 +45,9 @@ class Case:
     path: str
     status: int
     json: dict[str, Any] | None = None
+    # A multipart body: form fields and files.
+    form: dict[str, str] | None = None
+    files: dict[str, tuple[str, bytes, str]] | None = None
     # Extra checks on B's response body.
     body: Callable[[Any], None] | None = None
     # Checks that A's data is untouched, run against the test connection.
@@ -158,7 +170,135 @@ def get_job(connection: Connection, client_as: Callable[[FixtureUser], TestClien
     return Case("GET", f"/jobs/{job}", 404)
 
 
+def a_document(connection: Connection, **fields: Any) -> uuid.UUID:
+    return make_document(connection, USER_A.id, **fields)
+
+
+def a_profile(connection: Connection) -> None:
+    connection.execute(
+        text("INSERT INTO profiles (user_id, salary_cents, dependents) VALUES (:u, 6500000, 2)"),
+        {"u": USER_A.id},
+    )
+
+
+def a_profile_unchanged(connection: Connection) -> None:
+    salary, dependents = connection.execute(
+        text("SELECT salary_cents, dependents FROM profiles WHERE user_id = :u"), {"u": USER_A.id}
+    ).one()
+    assert (salary, dependents) == (6_500_000, 2)
+
+
+def upload_document(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    a_document(connection)
+    created: list[str] = []
+
+    def body(data: Any) -> None:
+        created.append(data["document_id"])
+
+    def after(conn: Connection) -> None:
+        assert count(conn, "documents", USER_A) == 1
+        assert count(conn, "documents", USER_B) == 1
+        owner = conn.execute(
+            text("SELECT user_id FROM documents WHERE id = :id"), {"id": created[0]}
+        ).scalar_one()
+        assert owner == USER_B.id
+
+    return Case(
+        "POST",
+        "/docs",
+        201,
+        form={"type": "pay_stub"},
+        files={"file": ("b.pdf", b"%PDF-1.4 b", "application/pdf")},
+        body=body,
+        after=after,
+    )
+
+
+def list_documents(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    a_document(connection)
+
+    def body(data: Any) -> None:
+        assert data == []
+
+    return Case("GET", "/docs", 200, body=body)
+
+
+def get_document(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    document = a_document(connection, status="proposed", proposal={"fields": []})
+    return Case("GET", f"/docs/{document}", 404)
+
+
+def extract_document(
+    connection: Connection, client_as: Callable[[FixtureUser], TestClient]
+) -> Case:
+    document = a_document(connection)
+    connection.execute(text("DELETE FROM jobs"))
+
+    def after(conn: Connection) -> None:
+        assert conn.execute(text("SELECT count(*) FROM jobs")).scalar_one() == 0
+        status = conn.execute(
+            text("SELECT status::text FROM documents WHERE id = :id"), {"id": document}
+        ).scalar_one()
+        assert status == "uploaded"
+
+    return Case("POST", f"/docs/{document}/extract", 404, after=after)
+
+
+def confirm_document(
+    connection: Connection, client_as: Callable[[FixtureUser], TestClient]
+) -> Case:
+    document = a_document(connection, status="proposed", proposal={"fields": []})
+    values = {
+        **{key: value for key, value in MOCKUP_STUB.items() if not isinstance(value, dt.date)},
+        "pay_frequency": "semimonthly",
+        "pay_date": "2026-10-15",
+        "period_start": "2026-10-01",
+        "period_end": "2026-10-15",
+    }
+
+    def after(conn: Connection) -> None:
+        assert conn.execute(text("SELECT count(*) FROM pay_stubs")).scalar_one() == 0
+        blobs = conn.execute(
+            text("SELECT count(*) FROM document_blobs WHERE document_id = :id"), {"id": document}
+        ).scalar_one()
+        assert blobs == 1
+
+    return Case("POST", f"/docs/{document}/confirm", 404, json={"pay_stub": values}, after=after)
+
+
+def list_pay_stubs(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    make_pay_stub(connection, USER_A.id, a_document(connection, with_blob=False))
+
+    def body(data: Any) -> None:
+        assert data == []
+
+    return Case("GET", "/pay-stubs", 200, body=body)
+
+
+def get_profile(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    a_profile(connection)
+
+    def body(data: Any) -> None:
+        assert data["salary_cents"] is None
+        assert data["updated_at"] is None
+
+    return Case("GET", "/profile", 200, body=body)
+
+
+def put_profile(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    a_profile(connection)
+    return Case("PUT", "/profile", 200, json={"salary_cents": 1}, after=a_profile_unchanged)
+
+
 ROUTE_CASES: dict[tuple[str, str], Builder] = {
+    ("POST", "/docs"): upload_document,
+    ("GET", "/docs"): list_documents,
+    ("GET", "/docs/{document_id}"): get_document,
+    ("POST", "/docs/{document_id}/extract"): extract_document,
+    ("POST", "/docs/{document_id}/confirm"): confirm_document,
+    ("GET", "/pay-stubs"): list_pay_stubs,
+    ("GET", "/profile"): get_profile,
+    ("PUT", "/profile"): put_profile,
     ("POST", "/sync/link-token"): link_token,
     ("POST", "/sync/items"): link_item,
     ("DELETE", "/sync/items/{item_id}"): delete_item,
@@ -206,7 +346,9 @@ def test_user_b_cannot_reach_user_a_data(
     route: tuple[str, str],
 ) -> None:
     case = ROUTE_CASES[route](db_connection, client_as)
-    response = client_as(user_b).request(case.method, case.path, json=case.json)
+    response = client_as(user_b).request(
+        case.method, case.path, json=case.json, data=case.form, files=case.files
+    )
     assert response.status_code == case.status, response.text
     if case.status == 404:
         assert response.json()["error"]["code"] == "not_found"

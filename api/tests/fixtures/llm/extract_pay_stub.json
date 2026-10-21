@@ -1,0 +1,27 @@
+{
+  "employer_name": {"value": "Acme Corp", "confidence": 0.99, "source_text": "ACME CORP EARNINGS STATEMENT"},
+  "pay_frequency": {"value": "semimonthly", "confidence": 0.97, "source_text": "Pay Frequency Semi-monthly"},
+  "pay_date": {"value": "2026-10-15", "confidence": 0.98, "source_text": "Pay Date 10/15/2026"},
+  "period_start": {"value": "2026-10-01", "confidence": 0.97, "source_text": "Period 10/01/2026 - 10/15/2026"},
+  "period_end": {"value": "2026-10-15", "confidence": 0.97, "source_text": "Period 10/01/2026 - 10/15/2026"},
+  "gross_cents": {"value": 270833, "confidence": 0.99, "source_text": "Gross Pay 2,708.33"},
+  "federal_withholding_cents": {"value": 29776, "confidence": 0.96, "source_text": "Federal Income Tax 297.76"},
+  "social_security_cents": {"value": 16792, "confidence": 0.99, "source_text": "Social Security 167.92"},
+  "medicare_cents": {"value": 3927, "confidence": 0.99, "source_text": "Medicare 39.27"},
+  "state_tax_cents": {"value": 9814, "confidence": 0.91, "source_text": "CA State Tax 98.14"},
+  "retirement_contribution_cents": {"value": null, "confidence": 0.74, "source_text": null},
+  "medical_premium_cents": {"value": 6250, "confidence": 0.88, "source_text": "Medical Pretax 62.50"},
+  "net_cents": {"value": 199604, "confidence": 0.99, "source_text": "Net Pay 1,996.04"},
+  "line_items": [
+    {"label": "Gross Pay", "amount_cents": 270833, "kind": "earning", "field": "gross_cents"},
+    {"label": "Federal Income Tax", "amount_cents": 29776, "kind": "tax", "field": "federal_withholding_cents"},
+    {"label": "Social Security", "amount_cents": 16792, "kind": "tax", "field": "social_security_cents"},
+    {"label": "Medicare", "amount_cents": 3927, "kind": "tax", "field": "medicare_cents"},
+    {"label": "CA State Tax", "amount_cents": 9814, "kind": "tax", "field": "state_tax_cents"},
+    {"label": "CA SDI", "amount_cents": 3250, "kind": "tax", "field": null},
+    {"label": "Medical Pretax", "amount_cents": 6250, "kind": "pre_tax_deduction", "field": "medical_premium_cents"},
+    {"label": "Dental/Vision", "amount_cents": 1420, "kind": "pre_tax_deduction", "field": null},
+    {"label": "Net Pay", "amount_cents": 199604, "kind": "net", "field": "net_cents"}
+  ],
+  "notes": "No 401(k) line is printed; check whether you contribute."
+}

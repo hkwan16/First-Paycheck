@@ -12,15 +12,18 @@ from typing import Any
 from sqlalchemy import Connection
 
 from app.db import user_session_for
-from db.enums import AccountKind, CategorySource, JobKind, SyncProvider
+from db.enums import AccountKind, CategorySource, DocumentType, JobKind, PayFrequency, SyncProvider
 from db.models import (
     Account,
     BalanceSnapshot,
+    Document,
     Holding,
     Job,
+    PayStub,
     SyncItem,
     Transaction,
 )
+from ingest import store
 from sync.categorize import normalize_merchant
 
 
@@ -140,6 +143,71 @@ def make_holding(connection: Connection, user_id: uuid.UUID, account_id: uuid.UU
         session.add(holding)
         session.flush()
         return holding.id
+
+
+SAMPLE_PDF = b"%PDF-1.4\n% a stand-in body; factories never parse it\n"
+
+
+def make_document(
+    connection: Connection,
+    user_id: uuid.UUID,
+    *,
+    type: str = "pay_stub",
+    data: bytes = SAMPLE_PDF,
+    content_type: str = "application/pdf",
+    with_blob: bool = True,
+    **fields: Any,
+) -> uuid.UUID:
+    """A ``documents`` row (status ``uploaded`` unless ``fields`` say otherwise),
+    with its blob stored through ``ingest.store`` unless ``with_blob`` is False."""
+    with user_session_for(user_id, bind=connection) as session:
+        document = Document(
+            user_id=user_id,
+            type=DocumentType(type),
+            content_type=content_type,
+            size_bytes=len(data),
+            **fields,
+        )
+        session.add(document)
+        session.flush()
+        if with_blob:
+            store.put(
+                session,
+                document_id=document.id,
+                user_id=user_id,
+                data=data,
+                content_type=content_type,
+            )
+        return document.id
+
+
+# The Confirm mockup's stub (spec 005, hand-worked example 1).
+MOCKUP_STUB: dict[str, Any] = {
+    "employer_name": "Acme Corp",
+    "pay_frequency": PayFrequency.SEMIMONTHLY,
+    "pay_date": dt.date(2026, 10, 15),
+    "period_start": dt.date(2026, 10, 1),
+    "period_end": dt.date(2026, 10, 15),
+    "gross_cents": 270_833,
+    "federal_withholding_cents": 29_776,
+    "social_security_cents": 16_792,
+    "medicare_cents": 3_927,
+    "state_tax_cents": 9_814,
+    "retirement_contribution_cents": 0,
+    "medical_premium_cents": 6_250,
+    "other_deductions_cents": 4_670,
+    "net_cents": 199_604,
+}
+
+
+def make_pay_stub(
+    connection: Connection, user_id: uuid.UUID, document_id: uuid.UUID, **fields: Any
+) -> uuid.UUID:
+    with user_session_for(user_id, bind=connection) as session:
+        stub = PayStub(user_id=user_id, document_id=document_id, **{**MOCKUP_STUB, **fields})
+        session.add(stub)
+        session.flush()
+        return stub.id
 
 
 def make_job(

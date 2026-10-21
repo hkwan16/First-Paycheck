@@ -5,17 +5,22 @@ scheduler acts at a time even with several workers, and the lock goes away
 with the transaction if the worker dies. A tick requeues running jobs whose
 heartbeat is more than 10 minutes old (as a failed attempt, so the usual
 backoff and the 5-attempt limit apply), prunes finished ticks older than an
-hour, and queues the next tick 60 seconds out. This module may use the
-privileged connection: it changes jobs across users.
+hour, expires uploads left unconfirmed for 7 days and deletes day-old
+rate-limit counters (spec 004 rule 21), and queues the next tick 60 seconds
+out. This module may use the privileged connection: it changes rows across
+users.
 """
 
 from __future__ import annotations
 
+import datetime as dt
 from typing import Any
 
 from sqlalchemy import Connection, text
 
+from app.ratelimit import prune_counters
 from db.enums import JobKind, JobStatus
+from ingest import store
 from jobs import queue
 from jobs.context import JobContext
 from jobs.queue import ClaimedJob, QueueBind, privileged_connection
@@ -67,10 +72,11 @@ def _requeue_stale(connection: Connection) -> tuple[int, int]:
     return requeued, dead
 
 
-def tick(*, bind: QueueBind | None = None) -> dict[str, Any]:
+def tick(*, bind: QueueBind | None = None, now: dt.datetime | None = None) -> dict[str, Any]:
+    now = now or dt.datetime.now(dt.UTC)
     with privileged_connection(bind) as connection:
         if not _locked(connection):
-            return {"requeued": 0, "dead": 0, "pruned": 0, "skipped": True}
+            return {"requeued": 0, "dead": 0, "pruned": 0, "expired": 0, "skipped": True}
         requeued, dead = _requeue_stale(connection)
         pruned = connection.execute(
             text(
@@ -79,6 +85,9 @@ def tick(*, bind: QueueBind | None = None) -> dict[str, Any]:
             ),
             {"age": PRUNE_TICKS_AFTER_SECONDS},
         ).rowcount
+        # Retention (spec 004 rule 21): unconfirmed uploads go after 7 days.
+        expired = store.expire_unconfirmed(connection, now=now)
+        prune_counters(connection, now=now)
         connection.execute(
             text(
                 "INSERT INTO jobs (kind, run_after)"
@@ -88,7 +97,13 @@ def tick(*, bind: QueueBind | None = None) -> dict[str, Any]:
             ),
             {"interval": TICK_INTERVAL_SECONDS},
         )
-    return {"requeued": requeued, "dead": dead, "pruned": pruned, "skipped": False}
+    return {
+        "requeued": requeued,
+        "dead": dead,
+        "pruned": pruned,
+        "expired": expired,
+        "skipped": False,
+    }
 
 
 def ensure_tick(*, bind: QueueBind | None = None) -> bool:

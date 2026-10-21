@@ -15,12 +15,13 @@ db/         models.py (Base), rls.py (enable_rls), enums.py, seed/ (load.py, dat
 alembic/    env.py, versions/NNNN_name.py
 sync/       provider.py (protocol), pipeline.py, crypto.py, categorize.py, categories.py,
             plaid/ (client, provider, webhook); CSV provider and recurring later
-ingest/     store (document_blobs), reader, OCR, redaction, chunking
+ingest/     store (document_blobs), chunk, proposal (API-safe); reader, ocr, redact,
+            layout, pipeline (worker only)
 llm/        gateway.py (the only anthropic import), schemas.py, cost.py, prompts/<name>/vN.md
 retrieval/  IRS citations, benefits full-text search
 verify/     number and citation checks for explanations
 jobs/       queue.py, worker.py, scheduler.py, registry.py, services.py, context.py,
-            handlers/ (sync, categorize, recurring)
+            handlers/ (sync, categorize, recurring, ingest_extract)
 checkin/    engine and one pure function per finding kind
 export/     plan PDF (WeasyPrint, worker only), calendar
 tests/      unit/ (no DB, no network), integration/ (real Postgres), rls/ (cross-user
@@ -128,6 +129,44 @@ Rules:
 - Migration names follow spec 001: `0006_webhook_fn` revises `0002_core`, and
   the next revision (`0003_documents`) revises `0006_webhook_fn`.
 
+## Documents, extraction and confirm (from M2)
+
+Specs 004 and 005. The flow: `POST /docs` stores the bytes, `POST
+/docs/{id}/extract` queues `ingest.extract`, the worker reads, OCRs, redacts
+and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
+/docs/{id}/confirm` stores what the user sent and deletes the bytes.
+
+- **The API process never parses a document.** `app/` must not import
+  `ingest.reader`, `ingest.ocr`, `ingest.redact`, `ingest.pipeline`,
+  pdfplumber, pypdfium2, pytesseract or PIL; `tests/unit/test_boundaries.py`
+  enforces it and checks `import app.main` loads none of them. The upload
+  route sniffs magic bytes only.
+- `ingest/store.py` is the only module that touches `document_blobs` (also
+  enforced). Retention is `store.expire_unconfirmed(now)` in the scheduler tick
+  (7 days), which also prunes `rate_limit_counters` (`app/ratelimit.py`).
+- **Everything the model reads is redacted first** (`ingest/pipeline.py`):
+  text-layer pages through `redact_text`, other pages as images through OCR and
+  `redact_image` (black boxes), pages under OCR mean confidence 60 withheld.
+  `tests/integration/ingest/test_extract_job.py` asserts the gateway never
+  receives the SSN, re-OCR'ing the image it was sent.
+- **The model's answer is a proposal.** `ingest/proposal.py` turns it into
+  reviewable fields (kind, role, note), computes `other_deductions_cents` in
+  code from line items with no column, and links fields to redacted source
+  lines. `documents.proposal` holds it; `jobs.result` holds ids and counts only.
+  Confirm validates the body with `PayStubValues` / `PlanValues`, runs the
+  arithmetic gate in `calc/pay_stub.py` (422 `pay_stub_unbalanced` with
+  `details`), and stores the body's values, never the proposal's.
+- Refusal, a spent budget or no readable page make the document
+  `manual_entry_required`; schema and API errors retry and the last attempt
+  falls back to manual entry. The handler writes its outcome only while the
+  document is still `extracting` under its job.
+- `AppError` takes `details` (machine-readable, e.g. the confirm diff) and
+  `headers` (e.g. `Retry-After`). Money types and two-place percentages shared
+  by calculators and request models live in `calc/types.py`.
+- Swagger UI is at `/api-docs`: `/docs` is the documents API.
+- The request clock is the `Now` dependency (`app/deps.py:get_now`); tests
+  override it to freeze time (the upload rate limit is per clock hour, UTC).
+
 ## Testing
 
 - `make test-api`. Unit tests need nothing; integration tests need
@@ -153,7 +192,16 @@ Rules:
   (user B against user A's data); a meta-test fails on any uncovered route.
 - Plaid fixtures in `tests/fixtures/plaid/` are hand-written in Plaid's
   response shapes; `scripts/record_plaid_fixtures.py` re-records them from the
-  sandbox when keys are available.
+  sandbox when keys are available. `tests/unit/test_fixture_secrets.py` fails
+  on any token, key or configured live credential in a committed fixture.
+- OCR tests take the `tesseract` fixture (`tests/conftest.py`): they skip on a
+  laptop without the binary and fail when `CI` is set. The `ingest-in-docker`
+  CI job runs `tests/unit/ingest` and `tests/integration/ingest` inside the
+  image against its pinned Debian tesseract (`api/Dockerfile`, target `test`).
+- Documents for ingest tests are built in memory by `tests/support/documents.py`
+  (a hand-written text PDF, Pillow-rendered pages, a scanned-PDF wrapper);
+  `tests/support/spy_gateway.py` is a `FakeGateway` that records what it was
+  sent and can refuse or fail.
 - Coverage gate in CI: 85%.
 
 ## Running

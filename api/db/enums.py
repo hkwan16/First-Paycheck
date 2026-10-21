@@ -103,6 +103,38 @@ class LlmStatus(StrEnum):
     BUDGET_BLOCKED = "budget_blocked"
 
 
+class DocumentType(StrEnum):
+    PAY_STUB = "pay_stub"
+    OFFER_LETTER = "offer_letter"
+    BENEFITS = "benefits"
+
+
+class DocumentStatus(StrEnum):
+    UPLOADED = "uploaded"
+    EXTRACTING = "extracting"
+    PROPOSED = "proposed"
+    CONFIRMED = "confirmed"
+    MANUAL_ENTRY_REQUIRED = "manual_entry_required"
+    FAILED = "failed"
+
+
+class DocumentStatusReason(StrEnum):
+    """Why a document is ``manual_entry_required`` or ``failed`` (spec 004 rule 22)."""
+
+    REFUSED = "refused"
+    NO_READABLE_PAGE = "no_readable_page"
+    BUDGET = "budget"
+    EXTRACTION_FAILED = "extraction_failed"
+    UNREADABLE_FILE = "unreadable_file"
+    EXPIRED = "expired"
+
+
+class PlanKind(StrEnum):
+    HDHP = "hdhp"
+    PPO = "ppo"
+    HMO = "hmo"
+
+
 # Postgres type name for each enum created by 0002_core, in creation order.
 CORE_ENUMS: dict[str, type[StrEnum]] = {
     "pay_frequency": PayFrequency,
@@ -119,6 +151,15 @@ CORE_ENUMS: dict[str, type[StrEnum]] = {
     "job_status": JobStatus,
     "llm_purpose": LlmPurpose,
     "llm_status": LlmStatus,
+}
+
+
+# Enums created by 0003_documents, in creation order.
+DOCUMENT_ENUMS: dict[str, type[StrEnum]] = {
+    "document_type": DocumentType,
+    "document_status": DocumentStatus,
+    "document_status_reason": DocumentStatusReason,
+    "plan_kind": PlanKind,
 }
 
 

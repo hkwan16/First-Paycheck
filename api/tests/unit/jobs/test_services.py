@@ -73,7 +73,9 @@ def test_items_without_a_token_or_from_another_provider_are_refused() -> None:
 
 
 def test_the_gateway_follows_llm_fake() -> None:
-    assert isinstance(default_services(settings()).labeler, FakeGateway)
+    fake = default_services(settings())
+    assert isinstance(fake.labeler, FakeGateway)
+    assert fake.extractor is fake.labeler
     real = default_services(
         settings(llm_fake=False, anthropic_api_key=SecretStr("sk-ant-test"))
     ).labeler
@@ -84,4 +86,5 @@ def test_no_gateway_without_a_key(caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level(logging.WARNING):
         services = default_services(settings(llm_fake=False, anthropic_api_key=None))
     assert services.labeler is None
+    assert services.extractor is None
     assert "ANTHROPIC_API_KEY" in caplog.text

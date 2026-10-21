@@ -6,7 +6,10 @@ import json
 import subprocess
 import sys
 
-from app.config import REPO_ROOT
+from fastapi.testclient import TestClient
+
+from app.config import REPO_ROOT, Settings
+from app.main import create_app
 from app.openapi import render_openapi
 
 COMMITTED = REPO_ROOT / "api" / "openapi.json"
@@ -41,7 +44,15 @@ def test_render_is_deterministic_json_with_a_trailing_newline() -> None:
 def test_error_shape_is_documented() -> None:
     schemas = json.loads(render_openapi())["components"]["schemas"]
     assert set(schemas["ErrorResponse"]["properties"]) == {"error"}
-    assert set(schemas["ErrorDetail"]["properties"]) == {"code", "message"}
+    assert set(schemas["ErrorDetail"]["properties"]) == {"code", "message", "details"}
+    assert set(schemas["ErrorDetail"]["required"]) == {"code", "message"}
+
+
+def test_interactive_docs_do_not_shadow_the_documents_routes() -> None:
+    """``/docs`` is the documents API, so Swagger UI lives at ``/api-docs``."""
+    client = TestClient(create_app(Settings(_env_file=None)))
+    assert "swagger-ui" in client.get("/api-docs").text
+    assert client.get("/docs").status_code == 401
 
 
 def test_module_entrypoint_prints_the_document() -> None:

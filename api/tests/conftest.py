@@ -38,6 +38,7 @@ from tests.support.database import (
     sibling_database_url,
     upgrade,
 )
+from tests.support.documents import tesseract_available
 from tests.support.fake_plaid import FakePlaidClient
 from tests.support.tokens import make_token
 
@@ -57,6 +58,18 @@ class FixtureUser:
 
 USER_A = FixtureUser(uuid.UUID("00000000-0000-4000-8000-00000000000a"), "a@example.test")
 USER_B = FixtureUser(uuid.UUID("00000000-0000-4000-8000-00000000000b"), "b@example.test")
+
+
+@pytest.fixture
+def tesseract() -> None:
+    """For tests that OCR: they skip on a laptop without the tesseract binary
+    and fail in CI, where the ``ingest-in-docker`` job runs them against the
+    pinned Debian build."""
+    if tesseract_available():
+        return
+    if os.environ.get("CI"):
+        pytest.fail("tesseract must be installed in CI")
+    pytest.skip("tesseract is not installed; OCR tests run in the ingest-in-docker job")
 
 
 @pytest.fixture(scope="session", autouse=True)
