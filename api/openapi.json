@@ -432,7 +432,8 @@
           "goal_target",
           "election_check",
           "goal_contribution",
-          "goal_review"
+          "goal_review",
+          "w4_submit"
         ],
         "title": "CalendarKind",
         "type": "string"
