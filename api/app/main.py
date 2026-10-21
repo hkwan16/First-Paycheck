@@ -75,6 +75,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
+        # The upload UI tells the user how long to wait after a 429.
+        expose_headers=["Retry-After"],
         max_age=600,
     )
     install_error_handlers(app)
