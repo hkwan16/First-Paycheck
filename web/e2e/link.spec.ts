@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { e2eApiUrl, linkSandboxBank, NO_E2E_API, openLink, unlinkAll } from './support/api';
+import {
+  e2eApiUrl,
+  linkSandboxBank,
+  NO_E2E_API,
+  NO_PLAID_SANDBOX,
+  openLink,
+  plaidSandboxAvailable,
+  unlinkAll,
+} from './support/api';
 import { e2eUser, NO_E2E_USER } from './support/auth';
 
 /*
@@ -12,6 +20,7 @@ import { e2eUser, NO_E2E_USER } from './support/auth';
 test.describe.configure({ mode: 'serial' });
 test.skip(!e2eUser(), NO_E2E_USER);
 test.skip(!e2eApiUrl(), NO_E2E_API);
+test.skip(!plaidSandboxAvailable(), NO_PLAID_SANDBOX);
 
 test('links the sandbox bank and follows the sync until its accounts appear', async ({ page }) => {
   await openLink(page);

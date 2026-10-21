@@ -19,6 +19,9 @@ dist/
 coverage.xml
 htmlcov/
 
+# Logs from the local e2e stack (scripts/e2e_stack.py)
+.e2e-stack/
+
 # Eval outputs (baselines live in evals/baseline.json and are committed)
 evals/results/
 

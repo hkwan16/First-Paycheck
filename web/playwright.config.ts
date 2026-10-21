@@ -11,6 +11,8 @@ const PORT = Number(process.env.E2E_PORT ?? 3100);
 const CI = Boolean(process.env.CI);
 
 const desktop = { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 820 } };
+// The local stack (scripts/e2e_stack.py) says when its API has no Plaid sandbox keys.
+const plaidSandbox = process.env.E2E_PLAID_SANDBOX?.trim() !== '0';
 
 /**
  * Smoke and visual checks at the two widths the mockup targets, plus the auth
@@ -81,12 +83,17 @@ export default defineConfig({
       dependencies: ['authenticated-confirm'],
       use: { ...desktop, storageState: STORAGE_STATE },
     },
-    {
-      name: 'authenticated-spending',
-      testMatch: 'spending.spec.ts',
-      dependencies: ['authenticated-link'],
-      use: { ...desktop, storageState: STORAGE_STATE },
-    },
+    // Spending reads the bank Link linked, so it needs Plaid's sandbox.
+    ...(plaidSandbox
+      ? [
+          {
+            name: 'authenticated-spending',
+            testMatch: 'spending.spec.ts',
+            dependencies: ['authenticated-link'],
+            use: { ...desktop, storageState: STORAGE_STATE },
+          },
+        ]
+      : []),
   ],
   webServer: {
     command: `next dev --port ${PORT}`,

@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { waitForHydration } from './auth';
 
 /*
@@ -14,6 +14,18 @@ export const NO_E2E_API =
 
 export function e2eApiUrl(): string | null {
   return process.env.E2E_API_URL?.trim() || null;
+}
+
+export const NO_PLAID_SANDBOX =
+  'Skipped: the API has no Plaid sandbox keys (E2E_PLAID_SANDBOX=0). Set PLAID_CLIENT_ID and PLAID_SECRET for scripts/e2e_stack.py to link a bank.';
+
+/**
+ * Whether the API can link Plaid's sandbox bank. The local stack
+ * (scripts/e2e_stack.py) sets E2E_PLAID_SANDBOX to 1 or 0; a hosted API is
+ * assumed to have its keys.
+ */
+export function plaidSandboxAvailable(): boolean {
+  return process.env.E2E_PLAID_SANDBOX?.trim() !== '0';
 }
 
 /** The first setup step, hydrated and done loading accounts. */
@@ -41,10 +53,25 @@ export async function unlinkAll(page: Page) {
   }
 }
 
+/*
+ * When Plaid has not pulled a new sandbox item's transactions yet, the API's
+ * sync job waits 120 s before trying again (NOT_READY_RETRY_SECONDS in
+ * api/sync/plaid/provider.py), and the screen shows the queued job meanwhile.
+ * A link may take two such waits before its first sync runs.
+ */
+const SYNC_BUDGET_MS = 300_000;
+
 /** Link Plaid's sandbox bank with the e2e-only button and wait for its accounts. */
 export async function linkSandboxBank(page: Page) {
+  test.info().setTimeout(test.info().timeout + SYNC_BUDGET_MS);
   await page.getByRole('button', { name: 'Link sandbox bank (test)' }).click();
-  await expect(page.getByRole('progressbar', { name: /^Syncing / })).toBeVisible();
-  await expect(page.getByText(/^Linked .+\./)).toBeVisible({ timeout: 120_000 });
+  // Plaid's sandbox takes seconds to make and exchange the token before the
+  // sync starts, and a short sync can finish between two looks at the bar, so
+  // the sync shows either as its progress bar or as already done.
+  const done = page.getByText(/^Linked .+\./);
+  await expect(page.getByRole('progressbar', { name: /^Syncing / }).or(done)).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(done).toBeVisible({ timeout: SYNC_BUDGET_MS });
   await expect(page.getByRole('group', { name: 'Plaid Checking' })).toBeVisible();
 }
