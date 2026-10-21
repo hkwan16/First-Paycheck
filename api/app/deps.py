@@ -26,6 +26,7 @@ from app.db import (
     user_session,
 )
 from app.errors import AppError
+from jobs import scheduler
 from llm.gateway import Gateway, LLMNotConfigured, get_gateway
 from sync.crypto import TokenCipher, TokenCipherNotConfigured, cipher_from_settings
 from sync.plaid.client import PlaidClient, PlaidLinking, PlaidNotConfigured
@@ -136,6 +137,23 @@ def alembic_revision(bind: DbBind) -> str | None:
     except SQLAlchemyError as exc:
         logger.warning("health check could not read the alembic revision: %s", exc)
         raise _unavailable() from exc
+
+
+def get_queue_bind() -> Engine | Connection | None:
+    """What the worker check reads on: None is the privileged engine
+    (``jobs/queue.py``); tests override it with their transaction's connection."""
+    return None
+
+
+def worker_state(
+    bind: Annotated[Engine | Connection | None, Depends(get_queue_bind)],
+) -> scheduler.WorkerStatus:
+    """``ok`` or ``stale`` (spec 002 rule 38); never an error, so /health stays 200."""
+    try:
+        return scheduler.worker_status(bind=bind)
+    except (SQLAlchemyError, DatabaseNotConfigured) as exc:
+        logger.warning("health check could not read the worker's activity: %s", exc)
+        return "stale"
 
 
 def get_service_session(bind: DbBind) -> Iterator[Session]:

@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from app.auth import AuthUser, get_current_user
 from app.config import Settings
-from app.deps import alembic_revision
+from app.deps import alembic_revision, worker_state
 from app.logs import JsonFormatter
 from app.main import create_app
 from tests.support.tokens import make_token
@@ -24,6 +24,7 @@ ORIGIN = "https://first-paycheck.example"
 def build_app() -> FastAPI:
     app = create_app(Settings(_env_file=None, cors_origins=[ORIGIN]))
     app.dependency_overrides[alembic_revision] = lambda: "0001_roles"
+    app.dependency_overrides[worker_state] = lambda: "ok"
     router = APIRouter()
 
     @router.post("/whoami")

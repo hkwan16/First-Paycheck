@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import os
 import signal
-import socket
 import subprocess
 import sys
 import time
@@ -22,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from app import logs, serve
+from tests.support.net import free_port
 
 # Child commands that behave like the real processes: run until SIGTERM, exit 0.
 SLEEP_UNTIL_TERM = [
@@ -85,13 +85,6 @@ def test_the_api_runs_uvicorn_with_the_process_logging_config(
 
 def test_an_unknown_role_is_a_usage_error() -> None:
     assert serve.main(["web"]) == 2
-
-
-def free_port() -> int:
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        port: int = sock.getsockname()[1]
-        return port
 
 
 def probe(port: int, request_id: str) -> str | None:

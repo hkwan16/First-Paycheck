@@ -8,6 +8,9 @@ import pytest
 from sqlalchemy import Connection, Engine, text
 
 from jobs import scheduler
+from jobs.context import Services
+from jobs.registry import default_handlers
+from jobs.worker import Worker
 from tests.conftest import FixtureUser
 from tests.support.database import upgrade
 
@@ -73,6 +76,66 @@ def test_tick_prunes_old_finished_ticks(empty_queue: Connection) -> None:
         )
     )
     assert scheduler.tick(bind=empty_queue)["pruned"] == 1
+
+
+def test_worker_is_stale_without_any_activity(empty_queue: Connection) -> None:
+    assert scheduler.worker_status(bind=empty_queue) == "stale"
+
+
+@pytest.mark.parametrize(("minutes", "expected"), [(0, "ok"), (4, "ok"), (6, "stale")])
+def test_worker_status_follows_the_newest_heartbeat(
+    empty_queue: Connection, user_a: FixtureUser, minutes: int, expected: str
+) -> None:
+    running_job(empty_queue, user_a, stale_minutes=30)
+    running_job(empty_queue, user_a, stale_minutes=minutes)
+    assert scheduler.worker_status(bind=empty_queue) == expected
+
+
+def finished(
+    connection: Connection,
+    kind: str,
+    status: str,
+    minutes_ago: int,
+    user: FixtureUser | None = None,
+) -> None:
+    connection.execute(
+        text(
+            "INSERT INTO jobs (user_id, kind, status, finished_at) VALUES (:u,"
+            " CAST(:kind AS job_kind), CAST(:status AS job_status),"
+            " now() - make_interval(mins => :ago))"
+        ),
+        {"u": user.id if user else None, "kind": kind, "status": status, "ago": minutes_ago},
+    )
+
+
+@pytest.mark.parametrize(("minutes", "expected"), [(1, "ok"), (6, "stale")])
+def test_worker_status_follows_the_last_tick(
+    empty_queue: Connection, minutes: int, expected: str
+) -> None:
+    finished(empty_queue, "schedule.tick", "succeeded", 30)
+    finished(empty_queue, "schedule.tick", "succeeded", minutes)
+    assert scheduler.worker_status(bind=empty_queue) == expected
+
+
+def test_only_a_succeeded_tick_or_a_heartbeat_counts(
+    empty_queue: Connection, user_a: FixtureUser
+) -> None:
+    # A user job's finish time and a dead tick are not the scheduler running.
+    finished(empty_queue, "categorize.run", "succeeded", 1, user_a)
+    finished(empty_queue, "schedule.tick", "dead", 1)
+    assert scheduler.worker_status(bind=empty_queue) == "stale"
+
+
+def test_a_ticking_worker_is_ok(empty_queue: Connection) -> None:
+    """End to end: the worker claims and completes the tick the way it does in production."""
+    scheduler.ensure_tick(bind=empty_queue)
+    Worker(
+        handlers=default_handlers(),
+        services=Services(),
+        queue_bind=empty_queue,
+        user_bind=empty_queue,
+    ).run_once()
+    assert scheduler.worker_status(bind=empty_queue) == "ok"
 
 
 def test_ensure_tick_starts_the_chain_only_once(empty_queue: Connection) -> None:

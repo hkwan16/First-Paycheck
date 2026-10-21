@@ -250,6 +250,11 @@ explanation, `GET /calendar` shows the check it implies.
   `jobs.worker.main`, tagged `component=api|worker`. No PII, no request
   bodies, no frame locals; `before_send` drops bodies, cookies and
   `Authorization`. Without a DSN `sentry_sdk` is never imported.
+- `GET /health` adds `worker: ok | stale` from `jobs/scheduler.py:worker_status`
+  (a running job's heartbeat or a succeeded tick in the last 5 minutes, read on
+  the privileged connection; spec 002 rule 38). It stays 200 when the worker is
+  stale or the read fails. Tests point `get_queue_bind` at their connection
+  (the `app` fixture does) or override `worker_state`.
 
 ## Testing
 
