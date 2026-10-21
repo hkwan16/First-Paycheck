@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { emptyCashflow, sampleCashflow } from '@/test/fixtures/cashflow';
 import {
+  flowScale,
   layoutCashFlow,
+  placePopover,
+  POPOVER_W,
   MIN_HOST_W,
   MIN_NODE_H,
   NODE_GAP,
@@ -260,5 +263,39 @@ describe('layoutCashFlow', () => {
     expect(empty.scale).toBeNull();
     expect(empty.links).toEqual([]);
     expect(empty.nodes.every((n) => n.h === MIN_NODE_H)).toBe(true);
+  });
+});
+
+describe('flowScale', () => {
+  it('is the layout scale, whatever the width', () => {
+    expect(flowScale(sampleCashflow())).toEqual(layoutCashFlow(sampleCashflow(), 1200).scale);
+    expect(flowScale(emptyCashflow('2026-09-01', '2026-09-30'))).toBeNull();
+  });
+});
+
+describe('placePopover', () => {
+  const layout = layoutCashFlow(sampleCashflow(), 928);
+
+  it('opens to the right of a node, level with its top', () => {
+    const gross = node(layout, 'gross');
+    expect(placePopover(gross, layout, 120)).toEqual({
+      left: gross.x + NODE_W + 10,
+      top: gross.y,
+      side: 'right',
+    });
+  });
+
+  it('opens to the left when the right would leave the host', () => {
+    const housing = node(layout, 'category:housing');
+    expect(placePopover(housing, layout, 120)).toMatchObject({
+      left: housing.x - 10 - POPOVER_W,
+      side: 'left',
+    });
+  });
+
+  it('moves up to stay inside the host, never above its top edge', () => {
+    const last = node(layout, 'category:savings_investment');
+    expect(placePopover(last, layout, 200).top).toBe(layout.hostH - 4 - 200);
+    expect(placePopover(last, layout, 5_000).top).toBe(4);
   });
 });

@@ -170,6 +170,48 @@ function bandPath(x1: number, ya: number, x2: number, yb: number, t: number): st
 
 const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
 
+/**
+ * Pixels per cent, from a target height for the first column's amount:
+ * gross pay, or the deposits when no pay stub is confirmed for the period.
+ * Null when there is nothing to draw.
+ */
+export function flowScale(flow: CashFlow): FlowScale | null {
+  const reference =
+    flow.withholding.paycheck_count > 0 ? flow.withholding.gross_cents : flow.spending.income_cents;
+  if (reference <= 0) return null;
+  return {
+    pxPerCent: TARGET_GROSS_PX / reference,
+    centsPerPx: Math.round(reference / TARGET_GROSS_PX),
+  };
+}
+
+/** The popover's width; its height is measured. */
+export const POPOVER_W = 300;
+const POPOVER_OFFSET = 10;
+const POPOVER_INSET = 4;
+
+export interface PopoverPlacement {
+  left: number;
+  top: number;
+  /** Which side of the node it opens on (its transform origin). */
+  side: 'left' | 'right';
+}
+
+/** Beside the node, right unless that leaves the host, and inside the host vertically. */
+export function placePopover(node: FlowNode, layout: FlowLayout, height: number): PopoverPlacement {
+  let left = node.x + layout.nodeW + POPOVER_OFFSET;
+  let side: PopoverPlacement['side'] = 'right';
+  if (left + POPOVER_W > layout.hostW) {
+    left = node.x - POPOVER_OFFSET - POPOVER_W;
+    side = 'left';
+  }
+  let top = node.y;
+  if (top + height > layout.hostH - POPOVER_INSET) {
+    top = Math.max(POPOVER_INSET, layout.hostH - POPOVER_INSET - height);
+  }
+  return { left, top, side };
+}
+
 /** Lay out the `GET /cashflow` response for a container `containerWidth` px wide. */
 export function layoutCashFlow(flow: CashFlow, containerWidth: number): FlowLayout {
   const hostW = Math.max(MIN_HOST_W, Math.floor(containerWidth || 0));
@@ -182,16 +224,7 @@ export function layoutCashFlow(flow: CashFlow, containerWidth: number): FlowLayo
   ];
 
   const stubs = flow.withholding.paycheck_count;
-  // The first column's amount sets the scale: gross pay, or the deposits
-  // when no pay stub is confirmed for the period.
-  const reference = stubs > 0 ? flow.withholding.gross_cents : flow.spending.income_cents;
-  const scale: FlowScale | null =
-    reference > 0
-      ? {
-          pxPerCent: TARGET_GROSS_PX / reference,
-          centsPerPx: Math.round(reference / TARGET_GROSS_PX),
-        }
-      : null;
+  const scale = flowScale(flow);
   const px = (cents: number) => (scale && cents > 0 ? cents * scale.pxPerCent : 0);
 
   const nodes: FlowNode[] = [];
