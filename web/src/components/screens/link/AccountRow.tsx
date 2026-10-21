@@ -4,13 +4,13 @@ import { useId } from 'react';
 import { IconTile } from '@/components/ui/IconTile';
 import { Label } from '@/components/ui/Label';
 import { Money } from '@/components/ui/Money';
+import { RelativeTime } from '@/components/ui/RelativeTime';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAccountTransactionCount, useUpdateAccount } from '@/lib/api/hooks';
 import { apiErrorMessage } from '@/lib/api/errors';
 import type { Account } from '@/lib/api/types';
 import { maskLabel } from '@/lib/accounts';
-import { formatRelative } from '@/lib/dates';
 import {
   institutionInitials,
   patchForRole,
@@ -66,9 +66,13 @@ export function AccountRow({ account }: { account: Account }) {
               {mask && <span className="font-medium text-ink-3 tabular-nums"> {mask}</span>}
             </div>
             <div className="text-small text-ink-3">
-              {account.balance_as_of
-                ? `Synced ${formatRelative(account.balance_as_of)}`
-                : 'Not synced yet'}{' '}
+              {account.balance_as_of ? (
+                <>
+                  Synced <RelativeTime value={account.balance_as_of} />
+                </>
+              ) : (
+                'Not synced yet'
+              )}{' '}
               &middot; <Activity account={account} />
             </div>
           </div>

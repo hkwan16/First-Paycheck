@@ -67,7 +67,7 @@ export function InstitutionGroup({
           <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
-              aria-label={`Sync ${name} now`}
+              aria-label={`Sync now for ${name}`}
               onClick={onSync}
               loading={syncPending}
               disabled={syncDisabled}

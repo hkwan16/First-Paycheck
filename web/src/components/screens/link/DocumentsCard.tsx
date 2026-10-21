@@ -7,8 +7,8 @@ import { DropZone } from '@/components/ui/DropZone';
 import { IconTile } from '@/components/ui/IconTile';
 import { ListRows } from '@/components/ui/ListRows';
 import { Notice } from '@/components/ui/Notice';
+import { RelativeTime } from '@/components/ui/RelativeTime';
 import { type DocumentSummary, useDocuments } from '@/lib/api/pending';
-import { formatRelative } from '@/lib/dates';
 import { formatNumber } from '@/lib/money';
 
 const KIND_LABEL: Record<DocumentSummary['kind'], string> = {
@@ -32,9 +32,10 @@ function DocumentRow({ doc }: { doc: DocumentSummary }) {
         <div className="min-w-0">
           <div className="font-semibold">{KIND_LABEL[doc.kind]}</div>
           <div className="text-small break-all text-ink-3">
-            {[doc.filename, pages, `uploaded ${formatRelative(doc.created_at)}`]
-              .filter(Boolean)
-              .join(' · ')}
+            {doc.filename}
+            {pages && ` \u00b7 ${pages}`}
+            {' \u00b7 uploaded '}
+            <RelativeTime value={doc.created_at} />
           </div>
         </div>
       </div>

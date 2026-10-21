@@ -82,7 +82,9 @@ describe('LinkScreen accounts', () => {
     const checking = await screen.findByRole('group', { name: 'Chase Total Checking' });
     expect(within(checking).getByText('··4821')).toBeInTheDocument();
     expect(within(checking).getByText('CH')).toBeInTheDocument();
-    await within(checking).findByText('Synced 4 minutes ago · 16 transactions since Oct 2026');
+    await waitFor(() =>
+      expect(checking).toHaveTextContent('Synced 4 minutes ago · 16 transactions since Oct 2026'),
+    );
     expect(within(checking).getByRole('combobox', { name: 'Role' })).toHaveValue('spending');
 
     const savings = screen.getByRole('group', { name: 'Chase Savings' });
@@ -360,7 +362,7 @@ describe('LinkScreen linking a bank', () => {
     const syncs = requests('POST', `/sync/items/${CHASE_ITEM_ID}/sync`);
     const { user } = renderLink();
     await screen.findByRole('group', { name: 'Chase Total Checking' });
-    await user.click(screen.getByRole('button', { name: 'Sync Chase now' }));
+    await user.click(screen.getByRole('button', { name: 'Sync now for Chase' }));
     await waitFor(() => expect(syncs).toHaveLength(1));
     expect(await screen.findByRole('progressbar', { name: 'Syncing Chase' })).toBeInTheDocument();
     expect(db.accounts).toHaveLength(2);
