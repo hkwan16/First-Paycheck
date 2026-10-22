@@ -59,9 +59,14 @@ export async function submitSignIn(page: Page, email: string, password: string) 
   await form.getByRole('button', { name: 'Sign in' }).click();
 }
 
-/** Sign in through the form from /sign-in and wait for the first setup step. */
+/**
+ * Sign in through the form from /sign-in and wait for the first setup step.
+ * Success is a full navigation to `/`, which the server answers with a
+ * redirect once it has verified the session: on a deployed app that is a cold
+ * function plus a round trip to Supabase, so it gets more than the 5 s default.
+ */
 export async function signIn(page: Page, user: E2EUser) {
   await page.goto('/sign-in');
   await submitSignIn(page, user.email, user.password);
-  await expect(page).toHaveURL('/setup/link');
+  await expect(page).toHaveURL('/setup/link', { timeout: 30_000 });
 }
