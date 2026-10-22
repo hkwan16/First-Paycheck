@@ -66,6 +66,10 @@ RUN uv sync --frozen --package first-paycheck-api --no-install-workspace
 COPY api/ api/
 RUN uv sync --frozen --package first-paycheck-api
 WORKDIR /app/api
+# The app user's home (/app) is read-only to it; without a writable cache
+# directory fontconfig prints an error on every WeasyPrint import. Set here,
+# after the build steps, so uv's build-time cache never lands in it as root.
+ENV XDG_CACHE_HOME=/tmp/app-cache
 USER app
 ENV CI=true
 CMD ["pytest", "-p", "no:cacheprovider", "tests/unit/ingest", "tests/integration/ingest", "tests/unit/export", "tests/integration/export"]
@@ -77,6 +81,8 @@ COPY api/ api/
 RUN uv sync --frozen --no-dev --package first-paycheck-api \
  && rm -rf /app/api/tests
 WORKDIR /app/api
+# As in the test stage: a writable fontconfig cache for the app user.
+ENV XDG_CACHE_HOME=/tmp/app-cache
 USER app
 EXPOSE 8000
 # What Render runs (render.yaml): the API on $PORT and the job worker, supervised
