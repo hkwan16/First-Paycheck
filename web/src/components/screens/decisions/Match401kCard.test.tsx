@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CALC_DEBOUNCE_MS } from '@/lib/api/hooks';
+import { parseMoney } from '@/lib/money';
 import { cappedK401, DECISION_V1_ID, sampleDecision, sampleK401 } from '@/test/fixtures/decisions';
 import { emptyProfile } from '@/test/fixtures/documents';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
@@ -322,6 +323,30 @@ describe('Match401kCard plan details', () => {
     expect(db.profile).toMatchObject({ birth_year: 1996, salary_cents: 6_500_000 });
     await settle();
     await waitFor(() => expect(result()).toHaveTextContent('You leave the whole $2,600 match'));
+  });
+
+  it("leaves a new user's salary and birth year empty, with examples that read as examples", async () => {
+    // A confirmed stub and no salary in the profile. The API reports no yearly
+    // salary for a stub (gross times pay periods is calculator work), so the
+    // field starts empty, and its placeholder must not look like a value.
+    decisionsReady();
+    db.profile = { ...emptyProfile };
+    const { user } = renderCard();
+    const form = await within(
+      await screen.findByRole('region', { name: '401(k) match' }),
+    ).findByRole('form', { name: 'Your plan details' });
+    const salary = within(form).getByLabelText('Yearly salary');
+    const birthYear = within(form).getByLabelText('Year you were born');
+    expect(salary).toHaveValue('');
+    expect(salary).toHaveAttribute('placeholder', 'for example 65,000.00');
+    expect(parseMoney(salary.getAttribute('placeholder') ?? '')).toBeNull();
+    expect(birthYear).toHaveValue('');
+    expect(birthYear).toHaveAttribute('placeholder', 'for example 1996');
+
+    await user.click(within(form).getByRole('button', { name: 'Save plan details' }));
+    expect(salary).toHaveAccessibleDescription('Enter your yearly salary, like 65,000.00.');
+    expect(birthYear).toHaveAccessibleDescription('Enter the year you were born, like 1996.');
+    expect(db.profile.salary_cents).toBeNull();
   });
 
   it('says what to fix before sending anything', async () => {

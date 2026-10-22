@@ -40,6 +40,14 @@ export function readAmount(
   };
 }
 
+/**
+ * A placeholder for a field nothing on hand can fill: "for example 300.00".
+ * A bare figure reads as a value already entered, and the person then wonders
+ * why the card asks for it; the words say it is only an example. A field the
+ * API can fill takes the API's value instead, never a placeholder.
+ */
+export const examplePlaceholder = (example: string) => `for example ${example}`;
+
 /** Cents as a person types them in an amount field: `182325` is `"1,823.25"`; null is empty. */
 export const amountText = (cents: number | null | undefined) =>
   cents == null ? '' : formatMoney(cents).replace('$', '');

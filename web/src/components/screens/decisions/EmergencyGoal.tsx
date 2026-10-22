@@ -14,7 +14,7 @@ import { formatDate } from '@/lib/dates';
 import { formatRate } from '@/lib/money';
 import { AmountField } from './AmountField';
 import { amountText, readAmount } from './decision-format';
-import { accountName, goalStatusBadge } from './emergency-fund-format';
+import { accountName, CONTRIBUTION_EXAMPLE, goalStatusBadge } from './emergency-fund-format';
 
 export interface EmergencyGoalProps {
   goal: Goal;
@@ -44,9 +44,9 @@ export function EmergencyGoal({ goal, accounts, funded }: EmergencyGoalProps) {
 
   const saveContribution = (event: FormEvent) => {
     event.preventDefault();
-    const read = readAmount(draft ?? '', { example: '300.00' });
+    const read = readAmount(draft ?? '', { example: CONTRIBUTION_EXAMPLE });
     if (read.cents === null) {
-      setDraftError(read.error ?? 'Enter an amount, like 300.00.');
+      setDraftError(read.error ?? `Enter an amount, like ${CONTRIBUTION_EXAMPLE}.`);
       return;
     }
     change({ monthly_contribution_cents: read.cents }, () => setDraft(null));

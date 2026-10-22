@@ -48,6 +48,15 @@ export const MAX_TIERS = 5;
 /** The earliest birth year `PUT /profile` accepts. */
 export const MIN_BIRTH_YEAR = 1900;
 
+/**
+ * The examples the salary and birth year fields show, in their placeholders
+ * and in what to fix. Only examples: the API reports no yearly salary for a
+ * pay stub (gross times pay periods would be arithmetic, which belongs in
+ * `api/calc/`), and nothing knows the birth year until the person says it.
+ */
+export const SALARY_EXAMPLE = '65,000.00';
+export const BIRTH_YEAR_EXAMPLE = '1996';
+
 /** The pay schedule: the profile's, else the confirmed pay stub's. */
 export const payFrequencyOf = (profile: Profile, payStub: PayStub | undefined) =>
   profile.pay_frequency ?? payStub?.pay_frequency ?? null;
@@ -96,7 +105,9 @@ const YEAR = /^\d{4}$/;
 export function readPlanDetails(draft: PlanDetailsDraft, taxYear?: number): PlanDetailsResult {
   const errors: Partial<Record<PlanDetailsField, string>> = {};
   const salary = parseMoney(draft.salary);
-  if (salary === null || salary <= 0) errors.salary = 'Enter your yearly salary, like 65,000.00.';
+  if (salary === null || salary <= 0) {
+    errors.salary = `Enter your yearly salary, like ${SALARY_EXAMPLE}.`;
+  }
   if (!draft.filingStatus) errors.filingStatus = 'Choose your filing status.';
   if (!draft.payFrequency) errors.payFrequency = 'Choose how often you are paid.';
 
@@ -115,7 +126,7 @@ export function readPlanDetails(draft: PlanDetailsDraft, taxYear?: number): Plan
   const birthText = draft.birthYear.trim();
   const birthYear = Number(birthText);
   if (!YEAR.test(birthText) || birthYear < MIN_BIRTH_YEAR) {
-    errors.birthYear = 'Enter the year you were born, like 1996.';
+    errors.birthYear = `Enter the year you were born, like ${BIRTH_YEAR_EXAMPLE}.`;
   } else if (taxYear !== undefined && birthYear > taxYear) {
     errors.birthYear = `Enter a year no later than ${taxYear}.`;
   }

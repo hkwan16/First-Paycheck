@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CALC_DEBOUNCE_MS } from '@/lib/api/hooks';
+import { parseMoney } from '@/lib/money';
 import {
   EMERGENCY_DECISION_ID,
   GOAL_ID,
@@ -91,7 +92,12 @@ describe('EmergencyFundCard before a decision', () => {
     expect(field('Saved so far')).toHaveAccessibleDescription(
       'The balance of Chase Savings ··7730, your emergency fund account.',
     );
-    expect(field('Monthly transfer to savings')).toHaveValue('');
+    // Nothing on hand says what the person will move each month, so the field
+    // starts empty, and its placeholder reads as an example, not a value.
+    const transfer = field('Monthly transfer to savings');
+    expect(transfer).toHaveValue('');
+    expect(transfer).toHaveAttribute('placeholder', 'for example 300.00');
+    expect(parseMoney(transfer.getAttribute('placeholder') ?? '')).toBeNull();
     expect(result()).toHaveTextContent('Enter a monthly transfer to see your numbers.');
     expect(within(card()).getByText('Not saved')).toBeInTheDocument();
     expect(saveButton()).toBeDisabled();
