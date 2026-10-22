@@ -322,3 +322,24 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** In the subagent's branch: the badge is expected only when gross pay or income is drawn; alerts are looked for inside `<main>`; the emergency fund test types $1,800 of essentials, $2,000 saved and 3 months, expects "Target $5,400, reached in 12 months" (or 14 at $250), and checks the saved goal's transfer and target. No API or web code changed.
 
 **Time saved or lost:** Not measured.
+
+## 2026-10-21: a rejected model key retried for half an hour
+
+**Task:** On production the Render `ANTHROPIC_API_KEY` is rejected (the account has no funding yet), so every model call failed with `LLMError: Anthropic API returned HTTP 401 (AuthenticationError)`. An uploaded pay stub sat in `extracting` ("Reading pay stub, Waiting to start") while `ingest.extract` retried with backoff, attempts at 60 s, 120 s, 240 s and on.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Reproduce it end to end with the worker and a gateway whose API answers 401, then make an authentication, permission or unknown-model error end both the extract and the categorize job on the first attempt as "no model", keep transient errors retrying and keep every ledger row; spec first, and the gate `make lint` and `make test-api`.
+
+**What it produced:** `LLMMisconfigured` in `api/llm/gateway.py` (401, 403 and 404, logged at ERROR with the status only); the extract handler maps it to `manual_entry_required` with the existing `no_model` reason and `categorize_user` to `stopped: "no_model"`; `tests/support/anthropic_api.py`, the real `LLMGateway` over `httpx2.MockTransport`; specs 003 (rules 12a and 24), 004 (rule 22) and 005 (rules 12 and 13) and `api/CLAUDE.md`.
+
+**What was wrong:**
+- The gateway sorted HTTP errors into `LLMUnavailable` (429 and 5xx) and a plain `LLMError` for every other 4xx, and the extract handler retried every `LLMError` that was not a refusal or a spent budget. Configuration errors fell in the retry bucket, so the user waited out five attempts for the manual entry screen the no-key path gives at once.
+- The categorize job had the same gap: a 401 failed the job and the queue retried it, where a missing key succeeds with `stopped: "no_model"`.
+- `jobs/services.py` still said categorize and extract jobs "fail" without a key, which spec 003 rule 12a and spec 004 rule 22 had changed; the docstring and the startup warning now say what happens.
+
+**How it was caught:** Production's jobs row (`queued`, attempt 3, `last_error` the 401). The reproduction ran the worker over the real gateway with a transport answering 401: the job went back to `queued` with `attempts` 1 and the document stayed `extracting`.
+
+**Fix:** In the subagent's branch: the new exception and the two handlers, with tests that run the worker on 401, 403 and 404 (job succeeded on attempt 1, document `no_model`, one request, one `api_error` row) and on 429, 500 and 529 (still `queued` for a retry). A new `status_reason` was not added: from the user's side a rejected key is the same as no key, and `web/src/lib/documents.ts` already says "Automatic reading is off right now". The ERROR log, which Sentry's logging integration turns into an event, is the operator's signal. `GET /health` was left alone: a "key is set" field would have read fine during this very incident.
+
+**Time saved or lost:** Not measured.
