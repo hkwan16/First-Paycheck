@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ResultMismatch } from '@/lib/api/hooks';
+import { parseMoney } from '@/lib/money';
 import { cappedK401, sampleK401 } from '@/test/fixtures/decisions';
 import {
   amountText,
+  examplePlaceholder,
   matchHeadline,
   readAmount,
   saveBadgeTone,
@@ -39,6 +41,14 @@ describe('readAmount and amountText', () => {
     expect(amountText(182_325)).toBe('1,823.25');
     expect(amountText(0)).toBe('0.00');
     expect(amountText(null)).toBe('');
+  });
+});
+
+describe('examplePlaceholder', () => {
+  it('reads as an example, never as a value a person could take for theirs', () => {
+    expect(examplePlaceholder('65,000.00')).toBe('for example 65,000.00');
+    expect(examplePlaceholder('1996')).toBe('for example 1996');
+    expect(parseMoney(examplePlaceholder('300.00'))).toBeNull();
   });
 });
 

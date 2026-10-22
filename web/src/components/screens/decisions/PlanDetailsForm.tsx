@@ -11,11 +11,16 @@ import { Select } from '@/components/ui/Select';
 import { useUpdateProfile } from '@/lib/api/hooks';
 import { apiErrorMessage } from '@/lib/api/errors';
 import type { FilingStatus, PayFrequency, PayStub, Profile } from '@/lib/api/types';
+import { formatDate } from '@/lib/dates';
+import { examplePlaceholder } from './decision-format';
 import {
+  BIRTH_YEAR_EXAMPLE,
   draftFromProfile,
   MAX_TIERS,
   profileInput,
   readPlanDetails,
+  SALARY_EXAMPLE,
+  salaryFromStub,
   type PlanDetailsDraft,
   type PlanDetailsField,
   type TierDraft,
@@ -54,6 +59,12 @@ export function PlanDetailsForm({ profile, payStub, onSaved, onCancel }: PlanDet
   const [draft, setDraft] = useState<PlanDetailsDraft>(() => draftFromProfile(profile, payStub));
   const [errors, setErrors] = useState<Partial<Record<PlanDetailsField, string>>>({});
   const [askFrequency] = useState(() => draft.payFrequency === null);
+  // Where the starting salary came from, while it is still the stub's.
+  const [stubSalary] = useState(() => (salaryFromStub(profile, payStub) ? draft.salary : null));
+  const salaryHint =
+    payStub && stubSalary !== null && draft.salary === stubSalary
+      ? `From your pay stub of ${formatDate(payStub.pay_date)}, as a year of paychecks like it. Change it if that paycheck had overtime or a bonus.`
+      : null;
   const update = useUpdateProfile();
 
   const change = (next: Partial<PlanDetailsDraft>) => setDraft((d) => ({ ...d, ...next }));
@@ -94,13 +105,24 @@ export function PlanDetailsForm({ profile, payStub, onSaved, onCancel }: PlanDet
           id={fieldId('salary')}
           inputMode="decimal"
           autoComplete="off"
-          placeholder="65,000.00"
+          placeholder={examplePlaceholder(SALARY_EXAMPLE)}
           value={draft.salary}
           invalid={Boolean(errors.salary)}
-          aria-describedby={errors.salary ? fieldId('salary-error') : undefined}
+          aria-describedby={
+            errors.salary
+              ? fieldId('salary-error')
+              : salaryHint
+                ? fieldId('salary-hint')
+                : undefined
+          }
           onChange={(event) => change({ salary: event.currentTarget.value })}
           className="tabular-nums"
         />
+        {salaryHint && !errors.salary && (
+          <p id={fieldId('salary-hint')} className="mt-1.5 mb-0 text-tiny text-ink-3">
+            {salaryHint}
+          </p>
+        )}
         <FieldError id={fieldId('salary-error')}>{errors.salary}</FieldError>
       </div>
 
@@ -206,13 +228,13 @@ export function PlanDetailsForm({ profile, payStub, onSaved, onCancel }: PlanDet
           id={fieldId('birth-year')}
           inputMode="numeric"
           autoComplete="bday-year"
-          placeholder="1996"
+          placeholder={examplePlaceholder(BIRTH_YEAR_EXAMPLE)}
           maxLength={4}
           value={draft.birthYear}
           invalid={Boolean(errors.birthYear)}
           aria-describedby={fieldId(errors.birthYear ? 'birth-year-error' : 'birth-year-hint')}
           onChange={(event) => change({ birthYear: event.currentTarget.value })}
-          className="w-28 tabular-nums"
+          className="w-44 tabular-nums"
         />
         <p id={fieldId('birth-year-hint')} className="mt-1.5 mb-0 text-tiny text-ink-3">
           Only used for the extra amount the IRS allows at 50 and over.

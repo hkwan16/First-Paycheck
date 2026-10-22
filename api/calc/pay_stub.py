@@ -1,4 +1,5 @@
-"""Pay stub arithmetic: the confirm gate (spec 005 rule 21, spec amendment 17).
+"""Pay stub arithmetic: the confirm gate (spec 005 rule 21, spec amendment 17)
+and the yearly salary a stub implies (spec 005 rule 24a).
 
 Gross minus every deduction must equal net, to the cent. The server checks it
 on ``POST /docs/{id}/confirm`` (a 422 with this diff), the client checks it as
@@ -12,9 +13,11 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from calc.pay_dates import PERIODS, PayFrequency
+
 Cents = Annotated[int, Field(strict=True)]
 
-__all__ = ["Balance", "PayStubAmounts", "balance", "total_cents"]
+__all__ = ["Balance", "PayStubAmounts", "annual_salary_cents", "balance", "total_cents"]
 
 
 class PayStubAmounts(BaseModel):
@@ -49,6 +52,17 @@ class Balance(BaseModel):
 
 def total_cents(amounts: Iterable[int]) -> int:
     return sum(amounts, 0)
+
+
+def annual_salary_cents(gross_cents: int, pay_frequency: PayFrequency | None) -> int | None:
+    """Gross pay times the pay periods a year (spec 005 rule 24a).
+
+    An integer product, so nothing is rounded: 270,833 twice a month is
+    6,499,992, not 6,500,000. None without a pay frequency.
+    """
+    if pay_frequency is None:
+        return None
+    return gross_cents * PERIODS[pay_frequency]
 
 
 def balance(amounts: PayStubAmounts) -> Balance:

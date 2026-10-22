@@ -48,6 +48,15 @@ export const MAX_TIERS = 5;
 /** The earliest birth year `PUT /profile` accepts. */
 export const MIN_BIRTH_YEAR = 1900;
 
+/**
+ * The examples the salary and birth year fields show, in their placeholders
+ * and in what to fix, when nothing fills them: a stub the API reports no
+ * yearly salary for (no pay schedule), and a birth year nothing knows until
+ * the person says it.
+ */
+export const SALARY_EXAMPLE = '65,000.00';
+export const BIRTH_YEAR_EXAMPLE = '1996';
+
 /** The pay schedule: the profile's, else the confirmed pay stub's. */
 export const payFrequencyOf = (profile: Profile, payStub: PayStub | undefined) =>
   profile.pay_frequency ?? payStub?.pay_frequency ?? null;
@@ -66,10 +75,19 @@ export function needsPlanDetails(profile: Profile, payStub: PayStub | undefined)
 /** "4.00" as a person types it: "4". */
 const typedPercent = (stored: string) => String(Number(stored));
 
+/**
+ * Whether the salary starts from the confirmed stub: the profile has none and
+ * the API reports the yearly salary the stub implies (`annual_salary_cents`,
+ * spec 005 rule 24a; gross times pay periods, worked out by the API).
+ */
+export const salaryFromStub = (profile: Profile, payStub: PayStub | undefined) =>
+  profile.salary_cents == null && payStub?.annual_salary_cents != null;
+
 export function draftFromProfile(profile: Profile, payStub: PayStub | undefined): PlanDetailsDraft {
   const tiers = profile.match_tiers ?? [];
+  const salary = profile.salary_cents ?? payStub?.annual_salary_cents ?? null;
   return {
-    salary: profile.salary_cents == null ? '' : formatMoney(profile.salary_cents).slice(1),
+    salary: salary == null ? '' : formatMoney(salary).slice(1),
     filingStatus: profile.filing_status ?? null,
     payFrequency: payFrequencyOf(profile, payStub),
     tiers:
@@ -96,7 +114,9 @@ const YEAR = /^\d{4}$/;
 export function readPlanDetails(draft: PlanDetailsDraft, taxYear?: number): PlanDetailsResult {
   const errors: Partial<Record<PlanDetailsField, string>> = {};
   const salary = parseMoney(draft.salary);
-  if (salary === null || salary <= 0) errors.salary = 'Enter your yearly salary, like 65,000.00.';
+  if (salary === null || salary <= 0) {
+    errors.salary = `Enter your yearly salary, like ${SALARY_EXAMPLE}.`;
+  }
   if (!draft.filingStatus) errors.filingStatus = 'Choose your filing status.';
   if (!draft.payFrequency) errors.payFrequency = 'Choose how often you are paid.';
 
@@ -115,7 +135,7 @@ export function readPlanDetails(draft: PlanDetailsDraft, taxYear?: number): Plan
   const birthText = draft.birthYear.trim();
   const birthYear = Number(birthText);
   if (!YEAR.test(birthText) || birthYear < MIN_BIRTH_YEAR) {
-    errors.birthYear = 'Enter the year you were born, like 1996.';
+    errors.birthYear = `Enter the year you were born, like ${BIRTH_YEAR_EXAMPLE}.`;
   } else if (taxYear !== undefined && birthYear > taxYear) {
     errors.birthYear = `Enter a year no later than ${taxYear}.`;
   }

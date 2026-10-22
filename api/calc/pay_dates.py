@@ -16,13 +16,28 @@ import calendar
 import datetime as dt
 from typing import Literal
 
-__all__ = ["PERIODS", "PayFrequency", "add_months", "frequency_for_periods", "next_pay_date"]
+__all__ = [
+    "PERIODS",
+    "PayFrequency",
+    "add_months",
+    "frequency_for_periods",
+    "frequency_named",
+    "next_pay_date",
+]
 
 PayFrequency = Literal["weekly", "biweekly", "semimonthly", "monthly"]
 PERIODS: dict[PayFrequency, int] = {"weekly": 52, "biweekly": 26, "semimonthly": 24, "monthly": 12}
 _STEP_DAYS: dict[PayFrequency, int] = {"weekly": 7, "biweekly": 14}
 # Enough months ahead to always find a semimonthly or monthly date.
 _MONTHS_AHEAD = 3
+
+
+def frequency_named(name: str) -> PayFrequency:
+    """The schedule a stored pay frequency names (``db.enums.PayFrequency``'s value)."""
+    for frequency in PERIODS:
+        if frequency == name:
+            return frequency
+    raise ValueError(f"no pay frequency is named {name!r}")
 
 
 def frequency_for_periods(periods: int) -> PayFrequency:

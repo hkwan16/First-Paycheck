@@ -400,5 +400,25 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **How it was caught:** The walkthrough's screenshots. The reproduction synced the recorded sandbox responses through the real pipeline and seed rules and asked the route for October: income -584,578 and left over -753,541, the production figures to the cent. The diagram's scale came out of writing the screen test for the fixed numbers.
 
 **Fix:** In the subagent's branch. The sandbox October now reads income 422, `income_outflows_ignored_cents` 585,000, `transfers_ignored_cents` 210,350 and left over -168,541; "Spent beyond income" still shows because that month really did spend 1,689.63 against 4.22 deposited.
+## 2026-10-22: example figures that read as values on the decision cards
+
+**Task:** The walkthrough's bug "Prefilled figures are values, not placeholders, on the decision cards": a new user's 401(k) plan details form showed "65,000.00" in Yearly salary and the emergency fund card "300.00" in Monthly transfer to savings, both as placeholders, so saving said to enter the number already on screen.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Fill each field with the API's value where confirmed data gives it without client arithmetic, else make the placeholder read as an example; failing tests first in the cards' tests; web only.
+
+**What it produced:** `examplePlaceholder` ("for example 65,000.00") in `decision-format.ts`; `SALARY_EXAMPLE` and `BIRTH_YEAR_EXAMPLE` in `plan-details.ts` and `CONTRIBUTION_EXAMPLE` in `emergency-fund-format.ts`, each shared by its placeholder and its "like ..." error so the two cannot drift; the birth year field widened to fit its example. Tests: a new user with a confirmed stub and no profile salary (both fields empty, placeholders that `parseMoney` cannot read, the errors on save), and the emergency fund with no transfer typed.
+
+**What was wrong:**
+- The salary placeholder was a bare figure, and the e2e Acme stub (2,708.33 twice a month) implies almost exactly $65,000 a year, so on the walkthrough it looked like the stub's own salary already filled in.
+- No field could be filled instead: `PayStubOut` has `gross_cents` and `pay_frequency` but no yearly salary, and `ProfileOut.salary_cents` is empty for a new user. Gross times pay periods is money math, which belongs in `api/calc/`, so the backlog's "save without retyping the salary" needs an API field first and was left for an API change. The monthly transfer has nothing to come from before the first save.
+- The birth year's "1996" placeholder had the same fault and was fixed with them. The HSA field's "0.00" was kept: an empty HSA amount is read as $0, so that placeholder shows what empty means.
+
+**How it was caught:** The production walkthrough; reproduced in the card tests with MSW, which failed on the bare placeholders before the change.
+
+**Fix:** As above, then the API piece the first pass named, in a second round on the same branch: spec 005 rule 24a gives `PayStubOut` the computed field `annual_salary_cents` (`calc/pay_stub.py:annual_salary_cents`, gross times `calc.pay_dates.PERIODS`, exact, null without a frequency; `calc.pay_dates.frequency_named` reads the stored enum as the calculator's literal). The spec's example says 270,833 twice a month is 6,499,992 cents, not 65,000.00: nothing rounds it. The plan details form now starts a new user's salary from the newest stub's figure, as a value described by where it came from, so the Acme user saves without retyping; the "for example" placeholder stays for a stub with no pay schedule. A new `k401-results.json` case (made by the API's calculator) covers the card's first result on that salary.
+
+**What was wrong in the second round:** Two concurrent worktrees shared `TEST_DATABASE_URL`, and another branch had already migrated it to a revision this branch does not have (`0015_loan_account_kind`), so every integration test failed in Alembic. This worktree's `.env` now points at its own database, `first_paycheck_test_salary`. Pydantic's `@computed_field` over `@property` fails mypy (`prop-decorator`); the decorator alone (pydantic applies the property) passes without a `type: ignore`.
 
 **Time saved or lost:** Not measured.

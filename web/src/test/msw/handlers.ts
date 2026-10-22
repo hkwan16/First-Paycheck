@@ -31,7 +31,7 @@ import {
   sampleExplanation,
   sampleFallbackExplanation,
 } from '../fixtures/decisions';
-import { samplePayStub } from '../fixtures/documents';
+import { samplePayStub, sampleValues } from '../fixtures/documents';
 import { sampleJob, SAMPLE_NOW, SAMPLE_SYNCED_AT } from '../fixtures/sample';
 import { checkinHandlers } from './checkin-handlers';
 import { db, emptyDb } from './db';
@@ -578,7 +578,17 @@ export const handlers = [
         result,
       );
     }
-    const stub = samplePayStub({ ...values, id: nextId('6e000000'), document_id: document.id });
+    // The yearly salary is the API's figure (spec 005 rule 24a); the fake knows
+    // it only for the sample stub's gross and frequency, never works one out.
+    const sampleSalary =
+      values.gross_cents === sampleValues.gross_cents &&
+      values.pay_frequency === sampleValues.pay_frequency;
+    const stub = samplePayStub({
+      ...values,
+      id: nextId('6e000000'),
+      document_id: document.id,
+      ...(sampleSalary ? {} : { annual_salary_cents: null }),
+    });
     db.payStubs.unshift(stub);
     db.proposals.delete(document.id);
     Object.assign(document, {

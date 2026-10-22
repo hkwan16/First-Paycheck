@@ -12,6 +12,13 @@ import { formatMoney } from '@/lib/money';
 const dollars = (cents: number) => formatMoney(cents, { decimals: 0 });
 
 /**
+ * The example monthly transfer, in the empty field's placeholder and in what
+ * to fix. Only an example: nothing the person has confirmed says what they
+ * will move each month until they save a decision, which then fills it.
+ */
+export const CONTRIBUTION_EXAMPLE = '300.00';
+
+/**
  * A count of months as words. With `years`, a whole number of years reads as
  * years ("10 years" for the calculator's 120-month horizon): a duration, not
  * money.

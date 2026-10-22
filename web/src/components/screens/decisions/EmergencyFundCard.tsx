@@ -35,9 +35,16 @@ import { toneText } from '@/lib/design/tone';
 import { formatRate } from '@/lib/money';
 import { AmountField } from './AmountField';
 import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
-import { amountText, readAmount, saveBadgeTone, saveErrorText } from './decision-format';
+import {
+  amountText,
+  examplePlaceholder,
+  readAmount,
+  saveBadgeTone,
+  saveErrorText,
+} from './decision-format';
 import {
   accountName,
+  CONTRIBUTION_EXAMPLE,
   emergencyAccount,
   essentialsPrefill,
   fundBarTone,
@@ -95,7 +102,7 @@ export function EmergencyFundCard() {
 
   const essentialsRead = readAmount(essentialsValue, { example: '1,823.25', positive: true });
   const balanceRead = readAmount(balanceValue, { example: '2,140.00' });
-  const contributionRead = readAmount(contributionValue, { example: '300.00' });
+  const contributionRead = readAmount(contributionValue, { example: CONTRIBUTION_EXAMPLE });
 
   // The spending summary and accounts only fill in starting values; the card waits for them.
   const loaded =
@@ -204,7 +211,7 @@ export function EmergencyFundCard() {
           value={contributionValue}
           error={contributionRead.error}
           hint="What you will move into savings each month."
-          placeholder="300.00"
+          placeholder={examplePlaceholder(CONTRIBUTION_EXAMPLE)}
           onChange={(text) => edit(() => setContribution(text))}
         />
 

@@ -3672,6 +3672,19 @@
       },
       "PayStubOut": {
         "properties": {
+          "annual_salary_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Gross pay times the pay periods a year for pay_frequency, exact (spec 005 rule 24a); null without a pay frequency. Computed on read, never stored.",
+            "readOnly": true,
+            "title": "Annual Salary Cents"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -3782,7 +3795,8 @@
           "medical_premium_cents",
           "other_deductions_cents",
           "net_cents",
-          "created_at"
+          "created_at",
+          "annual_salary_cents"
         ],
         "title": "PayStubOut",
         "type": "object"

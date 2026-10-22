@@ -6,12 +6,14 @@ import datetime as dt
 import uuid
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 from sqlalchemy import select
 
 from app.deps import UserSession
 from app.errors import error_responses
 from app.types import UtcDateTime
+from calc import pay_stub as pay_stub_calc
+from calc.pay_dates import frequency_named
 from db.enums import PayFrequency
 from db.models import PayStub
 
@@ -38,6 +40,18 @@ class PayStubOut(BaseModel):
     other_deductions_cents: int
     net_cents: int
     created_at: UtcDateTime
+
+    # Pydantic wraps the method in a property itself; an explicit @property
+    # under the decorator is one mypy refuses (prop-decorator).
+    @computed_field(
+        description=(
+            "Gross pay times the pay periods a year for pay_frequency, exact (spec 005 "
+            "rule 24a); null without a pay frequency. Computed on read, never stored."
+        )
+    )
+    def annual_salary_cents(self) -> int | None:
+        frequency = None if self.pay_frequency is None else frequency_named(self.pay_frequency)
+        return pay_stub_calc.annual_salary_cents(self.gross_cents, frequency)
 
     @classmethod
     def of(cls, stub: PayStub) -> PayStubOut:

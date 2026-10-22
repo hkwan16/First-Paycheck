@@ -6,7 +6,13 @@ import datetime as dt
 
 import pytest
 
-from calc.pay_dates import PayFrequency, add_months, frequency_for_periods, next_pay_date
+from calc.pay_dates import (
+    PayFrequency,
+    add_months,
+    frequency_for_periods,
+    frequency_named,
+    next_pay_date,
+)
 
 D = dt.date
 
@@ -53,6 +59,16 @@ def test_frequency_for_periods(periods: int, frequency: str) -> None:
 def test_frequency_for_unknown_periods_fails() -> None:
     with pytest.raises(ValueError, match="13"):
         frequency_for_periods(13)
+
+
+@pytest.mark.parametrize("name", ["weekly", "biweekly", "semimonthly", "monthly"])
+def test_frequency_named(name: str) -> None:
+    assert frequency_named(name) == name
+
+
+def test_frequency_named_refuses_an_unknown_name() -> None:
+    with pytest.raises(ValueError, match="fortnightly"):
+        frequency_named("fortnightly")
 
 
 @pytest.mark.parametrize("frequency", ["weekly", "biweekly", "semimonthly", "monthly"])

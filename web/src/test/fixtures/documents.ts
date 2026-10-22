@@ -186,6 +186,12 @@ export const sampleValues: PayStubValues = {
   net_cents: 199_604,
 };
 
+/**
+ * What the API reports as the sample stub's yearly salary (spec 005 rule 24a,
+ * row 1: `calc/pay_stub.py:annual_salary_cents`), copied, never computed here.
+ */
+export const SAMPLE_ANNUAL_SALARY_CENTS = 6_499_992;
+
 export function samplePayStub(overrides: Partial<PayStub> = {}): PayStub {
   return {
     id: '6e000000-0000-4000-8000-000000000001',
@@ -193,6 +199,7 @@ export function samplePayStub(overrides: Partial<PayStub> = {}): PayStub {
     tax_year: 2026,
     created_at: SAMPLE_SYNCED_AT,
     ...sampleValues,
+    annual_salary_cents: SAMPLE_ANNUAL_SALARY_CENTS,
     ...overrides,
   };
 }
