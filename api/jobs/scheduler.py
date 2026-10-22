@@ -21,6 +21,7 @@ from sqlalchemy import Connection, text
 
 from app.ratelimit import prune_counters
 from db.enums import JobKind, JobStatus
+from export import store as export_store
 from ingest import store
 from jobs import queue
 from jobs.context import JobContext
@@ -88,6 +89,8 @@ def tick(*, bind: QueueBind | None = None, now: dt.datetime | None = None) -> di
         ).rowcount
         # Retention (spec 004 rule 21): unconfirmed uploads go after 7 days.
         expired = store.expire_unconfirmed(connection, now=now)
+        # Retention (spec 016 rule 15): plan PDFs go after 7 days.
+        export_store.expire_old(connection, now=now)
         prune_counters(connection, now=now)
         connection.execute(
             text(

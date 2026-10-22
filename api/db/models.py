@@ -357,6 +357,8 @@ class Job(Base):
             "heartbeat_at",
             postgresql_where=text("status = 'running'"),
         ),
+        # The parent key of plan_exports' same-user foreign key (0013_plan_export_job).
+        UniqueConstraint("id", "user_id"),
     )
 
     id: Mapped[uuid.UUID] = _id()
@@ -409,6 +411,27 @@ class LlmCall(Base):
     job_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("jobs.id", ondelete="SET NULL")
     )
+    created_at: Mapped[dt.datetime] = _created_at()
+
+
+class PlanExport(Base):
+    """A rendered plan PDF, kept 7 days (spec 016). Only ``export/store.py`` touches it."""
+
+    __tablename__ = "plan_exports"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["job_id", "user_id"], ["jobs.id", "jobs.user_id"], ondelete="CASCADE"
+        ),
+        CheckConstraint("octet_length(bytes) > 0", name="bytes_not_empty"),
+        CheckConstraint("content_type = 'application/pdf'", name="content_type_pdf"),
+        Index("ix_plan_exports_created_at", "created_at"),
+    )
+
+    job_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[uuid.UUID] = _owner()
+    # Named ``data`` in Python so the attribute does not shadow the builtin.
+    data: Mapped[bytes] = mapped_column("bytes", LargeBinary)
+    content_type: Mapped[str] = mapped_column(Text)
     created_at: Mapped[dt.datetime] = _created_at()
 
 

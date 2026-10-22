@@ -272,6 +272,42 @@ def test_only_the_store_touches_document_blobs() -> None:
     assert not problems, f"only ingest/store.py may touch document_blobs: {problems}"
 
 
+EXPORTS_ALLOWED = {"export/store.py", "db/models.py"}
+
+
+def export_violations(source: str) -> list[str]:
+    tree = ast.parse(source)
+    found = [
+        f"line {line}: uses {name}" for name, line in referenced_names(tree) if name == "PlanExport"
+    ]
+    found += [
+        f"line {node.lineno}: names plan_exports"
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and "plan_exports" in node.value
+    ]
+    return found
+
+
+def test_export_check_flags_direct_access() -> None:
+    assert export_violations("from db.models import PlanExport")
+    assert export_violations("session.execute(text('SELECT bytes FROM plan_exports'))")
+
+
+def test_only_the_export_store_touches_plan_exports() -> None:
+    """Spec 016 rule 14."""
+    problems = {
+        relative(path): found
+        for path in python_files(API)
+        if not path.is_relative_to(API / "tests")
+        and not path.is_relative_to(API / "alembic")
+        and relative(path) not in EXPORTS_ALLOWED
+        and (found := export_violations(path.read_text()))
+    }
+    assert not problems, f"only export/store.py may touch plan_exports: {problems}"
+
+
 def test_routers_never_import_ocr_or_parsers() -> None:
     problems = {
         relative(path): found
