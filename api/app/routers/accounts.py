@@ -48,6 +48,8 @@ class AccountOut(BaseModel):
     mask: str | None
     role: AccountRole | None
     is_active: bool
+    # The account's sync item's provider: only a Plaid item syncs on demand.
+    provider: SyncProvider
     # The latest balance snapshot; null before the first sync.
     balance_cents: int | None
     balance_as_of: UtcDateTime | None
@@ -62,7 +64,7 @@ class AccountPatch(BaseModel):
     is_active: bool = True
 
 
-def _accounts_query() -> Select[Account, str | None, int | None, dt.datetime | None]:
+def _accounts_query() -> Select[Account, str | None, SyncProvider, int | None, dt.datetime | None]:
     latest = (
         select(BalanceSnapshot.balance_cents, BalanceSnapshot.as_of)
         .where(BalanceSnapshot.account_id == Account.id)
@@ -71,7 +73,13 @@ def _accounts_query() -> Select[Account, str | None, int | None, dt.datetime | N
         .lateral("latest")
     )
     return (
-        select(Account, SyncItem.institution_name, latest.c.balance_cents, latest.c.as_of)
+        select(
+            Account,
+            SyncItem.institution_name,
+            SyncItem.provider,
+            latest.c.balance_cents,
+            latest.c.as_of,
+        )
         .join(SyncItem, SyncItem.id == Account.sync_item_id)
         .outerjoin(latest, true())
         .order_by(SyncItem.institution_name.nulls_last(), Account.name, Account.id)
@@ -81,6 +89,7 @@ def _accounts_query() -> Select[Account, str | None, int | None, dt.datetime | N
 def _out(
     account: Account,
     institution_name: str | None,
+    provider: SyncProvider,
     balance_cents: int | None,
     balance_as_of: dt.datetime | None,
 ) -> AccountOut:
@@ -93,6 +102,7 @@ def _out(
         mask=account.mask,
         role=account.role,
         is_active=account.is_active,
+        provider=provider,
         balance_cents=balance_cents,
         balance_as_of=balance_as_of,
     )

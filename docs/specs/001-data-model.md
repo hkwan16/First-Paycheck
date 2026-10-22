@@ -206,7 +206,7 @@ One per linked institution or CSV source.
 
 | Column | Type | Constraints |
 |---|---|---|
-| `provider` | `sync_provider` | `NOT NULL` |
+| `provider` | `sync_provider` | `NOT NULL`; returned on each of the item's accounts by `GET /accounts` (spec 002 rule 30) |
 | `provider_item_id` | `text` | Null for CSV; partial `UNIQUE (provider, provider_item_id) WHERE provider_item_id IS NOT NULL` (the webhook lookup key) |
 | `institution_name` | `text` | Nullable |
 | `access_token_enc` | `bytea` | Fernet ciphertext under `PLAID_TOKEN_KEY`; `CHECK ((provider = 'plaid') = (access_token_enc IS NOT NULL))`; never returned by any route |

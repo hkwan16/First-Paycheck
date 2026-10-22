@@ -70,6 +70,19 @@ def make_item(
         return item.id
 
 
+def make_csv_item(
+    connection: Connection, user_id: uuid.UUID, *, institution_name: str | None = None
+) -> uuid.UUID:
+    """A CSV import's item: no provider item id and no access token (spec 001)."""
+    with user_session_for(user_id, bind=connection) as session:
+        item = SyncItem(
+            user_id=user_id, provider=SyncProvider.CSV, institution_name=institution_name
+        )
+        session.add(item)
+        session.flush()
+        return item.id
+
+
 def make_account(
     connection: Connection,
     user_id: uuid.UUID,

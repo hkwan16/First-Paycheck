@@ -165,7 +165,7 @@ The API's OpenAPI document is committed as `api/openapi.json` (exported by `pyth
 | `DELETE /sync/items/{id}` | Unlinks the institution and deletes its accounts, transactions, balances and holdings | No |
 | `POST /sync/webhook` | Plaid webhook (signature-verified) → queues an incremental sync through `enqueue_sync_for_plaid_item` | No |
 | `POST /accounts/import` | CSV + account kind → job_id; same pipeline as a Plaid sync | No |
-| `GET /accounts` | → accounts with latest balance and role | No |
+| `GET /accounts` | → accounts with latest balance, role and provider (`plaid` or `csv`) | No |
 | `PATCH /accounts/{id}` | role or is_active → updated account | No |
 | `GET /jobs/{id}` | job_id → status, progress, result when done | No |
 

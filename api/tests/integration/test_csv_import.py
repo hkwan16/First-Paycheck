@@ -74,7 +74,7 @@ def test_import_creates_an_account(
         "checking",
         297605,
     )
-    assert account["mask"] is None
+    assert (account["mask"], account["provider"]) == (None, "csv")
     assert client.get("/accounts").json() == [account]
     assert transactions(empty_queue, user_a) == [
         ("2026-10-01", 1549, "netflix.com"),

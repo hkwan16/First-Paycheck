@@ -231,6 +231,9 @@
             "title": "Name",
             "type": "string"
           },
+          "provider": {
+            "$ref": "#/components/schemas/SyncProvider"
+          },
           "role": {
             "anyOf": [
               {
@@ -256,6 +259,7 @@
           "mask",
           "role",
           "is_active",
+          "provider",
           "balance_cents",
           "balance_as_of"
         ],
