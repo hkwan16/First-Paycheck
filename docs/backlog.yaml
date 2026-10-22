@@ -2,8 +2,12 @@
 #
 # Source: the build plan (docs/plan.md). scripts/sync_backlog.py creates these
 # as GitHub issues idempotently with `gh`, keyed by title, assigns the repo
-# owner, sets the milestone and labels, and sets the Priority field on the
-# GitHub Project.
+# owner, sets the milestone and labels, sets the Priority and Status fields on
+# the GitHub Project, and closes an issue whose status is done.
+#
+# `status` is todo (the default), in_progress or done. An issue is done only
+# when its work is on main and tested. A comment under an issue explains a
+# status that is not obvious from its body.
 #
 # Priorities for M0-M4 come from the plan. The plan gives none for M5-M10, so
 # those default to Medium (Low for the stretch item) and are groomed in M4.
@@ -11,37 +15,37 @@
 milestones:
   M0:
     title: "Scaffold, spec amendments, CI, deployed hello world"
-    due: "2026-10-22"
+    due_on: 2026-10-22
   M1:
     title: "Data model, auth, Plaid sandbox sync, categorization, design system"
-    due: "2026-10-26"
+    due_on: 2026-10-26
   M2:
     title: "Upload, ingest, redact, extract, confirm"
-    due: "2026-10-30"
+    due_on: 2026-10-30
   M3:
     title: "401(k) calculator, decisions, citations, explain, verify"
-    due: "2026-11-02"
+    due_on: 2026-11-02
   M4:
     title: "Alpha hardening and deliverable"
-    due: "2026-11-05"
+    due_on: 2026-11-05
   M5:
     title: "Sankey, CSV import, spending summary, recurring detection"
-    due: "2026-11-12"
+    due_on: 2026-11-12
   M6:
     title: "Emergency fund, goals, health plans, benefits extraction"
-    due: "2026-11-19"
+    due_on: 2026-11-19
   M7:
     title: "W-4"
-    due: "2026-11-26"
+    due_on: 2026-11-26
   M8:
     title: "Check-ins, calendar, cash flow, net worth, holdings"
-    due: "2026-12-03"
+    due_on: 2026-12-03
   M9:
     title: "Plan export"
-    due: "2026-12-07"
+    due_on: 2026-12-07
   M10:
     title: "Hardening"
-    due: "2026-12-11"
+    due_on: 2026-12-11
 
 issues:
   # M0: scaffold, spec amendments, CI, deployed hello world
