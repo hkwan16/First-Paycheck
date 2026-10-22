@@ -2812,6 +2812,30 @@
         "title": "PayStubValues",
         "type": "object"
       },
+      "PlanCompleteness": {
+        "properties": {
+          "missing": {
+            "items": {
+              "$ref": "#/components/schemas/CalculatorKind"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "saved": {
+            "items": {
+              "$ref": "#/components/schemas/CalculatorKind"
+            },
+            "title": "Saved",
+            "type": "array"
+          }
+        },
+        "required": [
+          "saved",
+          "missing"
+        ],
+        "title": "PlanCompleteness",
+        "type": "object"
+      },
       "PlanCost": {
         "properties": {
           "annual_premium_cents": {
@@ -2901,6 +2925,179 @@
         "title": "PlanCost",
         "type": "object"
       },
+      "PlanDecision": {
+        "properties": {
+          "calculator": {
+            "$ref": "#/components/schemas/CalculatorKind"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/PlanExplanation"
+          },
+          "figures": {
+            "items": {
+              "$ref": "#/components/schemas/PlanFigure"
+            },
+            "title": "Figures",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "title": "Inputs",
+            "type": "object"
+          },
+          "result": {
+            "additionalProperties": true,
+            "title": "Result",
+            "type": "object"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "calculator",
+          "version",
+          "created_at",
+          "inputs",
+          "result",
+          "figures",
+          "explanation"
+        ],
+        "title": "PlanDecision",
+        "type": "object"
+      },
+      "PlanExplanation": {
+        "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/CitationOut"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "concept": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "status": {
+            "enum": [
+              "verified",
+              "fallback",
+              "none"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "required": [
+          "status",
+          "id",
+          "concept",
+          "text",
+          "created_at",
+          "citations"
+        ],
+        "title": "PlanExplanation",
+        "type": "object"
+      },
+      "PlanFigure": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "money",
+              "percent",
+              "count",
+              "text"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "kind",
+          "value"
+        ],
+        "title": "PlanFigure",
+        "type": "object"
+      },
       "PlanKind": {
         "enum": [
           "hdhp",
@@ -2909,6 +3106,65 @@
         ],
         "title": "PlanKind",
         "type": "string"
+      },
+      "PlanOut": {
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "calendar": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarEventOut"
+            },
+            "title": "Calendar",
+            "type": "array"
+          },
+          "calendar_through": {
+            "format": "date",
+            "title": "Calendar Through",
+            "type": "string"
+          },
+          "completeness": {
+            "$ref": "#/components/schemas/PlanCompleteness"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/PlanDecision"
+            },
+            "title": "Decisions",
+            "type": "array"
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/GoalOut"
+            },
+            "title": "Goals",
+            "type": "array"
+          },
+          "pay_stub": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanPayStub"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "as_of",
+          "calendar_through",
+          "completeness",
+          "decisions",
+          "goals",
+          "calendar",
+          "pay_stub"
+        ],
+        "title": "PlanOut",
+        "type": "object"
       },
       "PlanPair": {
         "properties": {
@@ -2961,6 +3217,94 @@
           "cheaper_at_end_index"
         ],
         "title": "PlanPair",
+        "type": "object"
+      },
+      "PlanPayStub": {
+        "properties": {
+          "employer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employer Name"
+          },
+          "federal_withholding_cents": {
+            "title": "Federal Withholding Cents",
+            "type": "integer"
+          },
+          "gross_cents": {
+            "title": "Gross Cents",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "medical_premium_cents": {
+            "title": "Medical Premium Cents",
+            "type": "integer"
+          },
+          "medicare_cents": {
+            "title": "Medicare Cents",
+            "type": "integer"
+          },
+          "net_cents": {
+            "title": "Net Cents",
+            "type": "integer"
+          },
+          "other_deductions_cents": {
+            "title": "Other Deductions Cents",
+            "type": "integer"
+          },
+          "pay_date": {
+            "format": "date",
+            "title": "Pay Date",
+            "type": "string"
+          },
+          "pay_frequency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PayFrequency"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retirement_contribution_cents": {
+            "title": "Retirement Contribution Cents",
+            "type": "integer"
+          },
+          "social_security_cents": {
+            "title": "Social Security Cents",
+            "type": "integer"
+          },
+          "state_tax_cents": {
+            "title": "State Tax Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "employer_name",
+          "pay_frequency",
+          "pay_date",
+          "gross_cents",
+          "federal_withholding_cents",
+          "social_security_cents",
+          "medicare_cents",
+          "state_tax_cents",
+          "retirement_contribution_cents",
+          "medical_premium_cents",
+          "other_deductions_cents",
+          "net_cents"
+        ],
+        "title": "PlanPayStub",
         "type": "object"
       },
       "PlanProposal": {
@@ -6144,6 +6488,43 @@
         "summary": "List Pay Stubs",
         "tags": [
           "pay-stubs"
+        ]
+      }
+    },
+    "/plan": {
+      "get": {
+        "description": "Every current decision with its figures, the goals, the next 90 days and the pay stub.",
+        "operationId": "get_plan",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Plan",
+        "tags": [
+          "plan"
         ]
       }
     },

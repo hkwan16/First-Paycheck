@@ -111,7 +111,7 @@ The next pay date is 2026-10-31 (semimonthly, anchored on the 15th, spec 007 rul
 | 4 | `test_health_figures_follow_the_selected_plan_and_usage` | Plan user | Keys `result.plans[0].name`, `result.plans[0].medium_cost_cents`, ...; the first value is "Bronze HSA" |
 | 5 | `test_w4_suggestion_figure_matches_the_suggestion` | W-4 decisions with each suggestion | Step 4(c) figure for the withholding suggestions, Step 4(b) for deductions, neither for `none` |
 | 6 | `test_explanation_status_from_the_latest_row` | Plan user | 401(k) `verified` with two citations in row order and their irs.gov URLs; health `fallback`; W-4 `verified`; emergency fund `none` with no citations |
-| 7 | `test_calendar_is_the_next_90_days_of_upcoming_events` | Plan user | Four events: 2026-10-31 goal contribution, election check, W-4 submit (kind order), 2026-11-14 enrollment deadline; no review, no dismissed v1 check |
+| 7 | `test_calendar_is_the_next_90_days_of_upcoming_events` | Plan user | Four events: 2026-10-31 election check, goal contribution, W-4 submit (kind order), 2026-11-14 enrollment deadline; no review, no dismissed v1 check |
 | 8 | `test_pay_stub_is_the_newest` | Plan user | `pay_date` 2026-10-15, gross 270,833, net 199,604 |
 | 9 | `test_goals_match_get_goals` | Plan user | `goals` equals `GET /goals`: target 546,900, balance 214,000, progress "39.13" |
 | 10 | Cross-user (`tests/rls/test_cross_user.py`) | A is the plan user | B's `GET /plan` is empty |

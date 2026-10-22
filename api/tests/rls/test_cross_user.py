@@ -498,6 +498,23 @@ def list_calendar(connection: Connection, client_as: Callable[[FixtureUser], Tes
     return Case("GET", "/calendar", 200, body=body)
 
 
+def get_plan(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    a_decision(client_as, explained=True)
+    a_goal(client_as)
+    make_pay_stub(connection, USER_A.id, a_document(connection, with_blob=False))
+
+    def body(data: Any) -> None:
+        assert (data["decisions"], data["goals"], data["calendar"], data["pay_stub"]) == (
+            [],
+            [],
+            [],
+            None,
+        )
+        assert data["completeness"]["saved"] == []
+
+    return Case("GET", "/plan", 200, body=body)
+
+
 def spending_summary(
     connection: Connection, client_as: Callable[[FixtureUser], TestClient]
 ) -> Case:
@@ -574,6 +591,7 @@ ROUTE_CASES: dict[tuple[str, str], Builder] = {
     ("GET", "/decisions/{decision_id}/explanation"): get_explanation,
     ("POST", "/explain"): explain,
     ("GET", "/calendar"): list_calendar,
+    ("GET", "/plan"): get_plan,
     ("GET", "/goals"): list_goals,
     ("PATCH", "/goals/{goal_id}"): update_goal,
     ("GET", "/spending/summary"): spending_summary,
