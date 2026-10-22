@@ -93,11 +93,6 @@ async function savedVersion(save: Locator) {
   return Number(/v(\d+)/.exec((await save.textContent()) ?? '')![1]);
 }
 
-/** Type an amount into an empty field; a prefilled one keeps what the API gave it. */
-async function fillIfEmpty(field: Locator, text: string) {
-  if ((await field.inputValue()) === '') await field.fill(text);
-}
-
 test('saves an emergency fund version and pauses and resumes its goal', async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto('/setup/decisions');
@@ -106,23 +101,32 @@ test('saves an emergency fund version and pauses and resumes its goal', async ({
   const transfer = fund.getByLabel('Monthly transfer to savings');
   await expect(transfer).toBeVisible({ timeout: 30_000 });
 
-  // Essentials come from the spending summary and savings from the emergency
-  // fund account when the e2e user has them; otherwise they are typed.
-  await fillIfEmpty(fund.getByLabel('Essential spending per month'), '1,800.00');
-  await fillIfEmpty(fund.getByLabel('Saved so far'), '2,000.00');
+  // Essentials start from the spending summary and savings from the emergency
+  // fund account when the e2e user has them, which depends on the sandbox
+  // bank's month (a few dollars of essentials make any savings enough). Type
+  // over them, as the hint invites, so the result is the same every run.
+  await fund.getByLabel('Essential spending per month').fill('1,800.00');
+  await fund.getByLabel('Saved so far').fill('2,000.00');
+  await fund.getByRole('slider', { name: /Months of essentials to hold/ }).fill('3');
   // Move away from whatever is saved, so there is a version to save.
-  await transfer.fill((await transfer.inputValue()) === '300.00' ? '250.00' : '300.00');
+  const monthly = (await transfer.inputValue()) === '300.00' ? '250.00' : '300.00';
+  await transfer.fill(monthly);
 
+  // Spec 011: the target is 3 x $1,800 = $5,400, the shortfall $3,400, and
+  // the months to close it ceil(3,400 / 300) = 12 or ceil(3,400 / 250) = 14.
+  const months = monthly === '300.00' ? 12 : 14;
   const result = fund.getByRole('group', { name: 'Calculator result' });
   await expect(result).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
-  await expect(result).toContainText(/Target \$/);
+  await expect(result).toContainText(`Target $5,400, reached in ${months} months`);
   const save = fund.getByRole('button', { name: /^Save|^Saved as v/ });
   await expect(save).toBeEnabled();
   await save.click();
   await savedVersion(save);
 
+  // The goal is the saved version's: its transfer toward its target.
   const goal = fund.getByRole('group', { name: 'Your emergency fund goal' });
   await expect(goal).toBeVisible({ timeout: 15_000 });
+  await expect(goal).toContainText(`$${monthly} a month toward $5,400.00.`);
   // A goal marked reached earlier goes back to active first.
   const notReached = goal.getByRole('button', { name: 'Not reached yet' });
   if (await notReached.isVisible()) await notReached.click();

@@ -704,8 +704,9 @@ tests share.
 `link.spec.ts` (project `authenticated-link`) unlinks everything, links Plaid's sandbox bank with
 the e2e-only button, follows the sync and sets roles; `spending.spec.ts` (project
 `authenticated-spending`, which depends on it) reads those transactions, checks that the
-diagram's buckets match the summary tiles, drives a node from the keyboard, changes the period
-and saves a category fix; `import.spec.ts` (project `authenticated-import`, after Spending)
+diagram's buckets match the summary tiles (and that the scale badge shows only when there is
+gross pay or income to scale by: the sandbox bank's last month may deposit nothing), drives a node
+from the keyboard, changes the period and saves a category fix; `import.spec.ts` (project `authenticated-import`, after Spending)
 imports `e2e/fixtures/bank-export.csv` (five synthetic rows) into a new CSV account, imports it
 again without making a second account, and checks a broken file's row errors.
 Both change the e2e user's data, so they are ordered projects with serial files rather than
@@ -716,9 +717,10 @@ the read, confirms every field and continues to Spending. `decisions.spec.ts` (p
 `authenticated-decisions`, after confirm) fills in the plan details if the profile has none,
 saves a 401(k) decision, changes it and saves the next version, then opens its explanation and
 accepts verified, fallback, or "not available" when the API has no model; it then saves an
-emergency fund version and pauses and resumes its goal, and saves a health plan choice (typing two
-synthetic plans when no benefits summary is confirmed) with an enrollment deadline, and saves a W-4
-version that reads those two decisions, with its reminder. Decisions cannot be
+emergency fund version (typing the essentials and savings over what the e2e user's linked data
+fills in, so the target is the same every run) and pauses and resumes its goal, and saves a health
+plan choice (typing two synthetic plans when no benefits summary is confirmed) with an enrollment
+deadline, and saves a W-4 version that reads those two decisions, with its reminder. Decisions cannot be
 deleted, so it reads the current version instead of assuming v1. `plan.spec.ts` (project
 `authenticated-plan`, after decisions) reads the four decisions back on `/plan` (and the nav's
 done mark), downloads the `.ics` and checks its first line is `BEGIN:VCALENDAR`, and exports the
