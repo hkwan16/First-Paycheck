@@ -279,3 +279,25 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** In the subagent's branch: the tone table as above; the dependency in `playwright.config.ts`; the sample QueryClient defaults to `enabled: false`, so only hooks that turn reads on themselves can fetch.
 
 **Time saved or lost:** Not measured.
+
+## 2026-10-21: web follows the unlink's recurring detection; a CSV account is removed
+
+**Task:** The web side of three API changes on `main`: `DELETE /sync/items/{id}` returning `{recurring_job_id}`, `AccountOut.provider`, and the 422 `not_plaid_item` for a manual sync of a CSV item.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Follow the job with `useJob` from `useUnlinkItem` and the accounts card, check what `recurring.detect` invalidates, drop Sync now for a CSV institution and say Remove instead of Unlink, failing tests first, no edits under `api/`, and the gate `pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build && pnpm e2e`.
+
+**What it produced:** `unlink.recurringJob` in `web/src/lib/api/hooks/sync.ts`; `recurring.detect` in `JOB_INVALIDATES` now also reads check-ins, and `invalidateAfterUnlink` stops reading recurring charges at once (they change only when the job runs); `removalWords` and `provider` on each institution group (`web/src/components/screens/link/account-format.ts`); `recurringJobId(n)`, `recurringJobStates` and the CSV refusal in the MSW handlers; `sampleCsvAccount`; and an import e2e check that an imported account offers Remove and no Sync now.
+
+**What was wrong:**
+- `unlinkAll` in `web/e2e/support/api.ts`, which gives `link.spec.ts` a clean slate "CSV accounts included", matched only `Unlink` buttons, so after the rename it would have left an earlier run's imported account behind.
+- Spec 017 rule 11 says the open check-in is settled when the returned job finishes, but `recurring.detect` only queues a `checkin.monthly` refresh, whose id the client never sees. Reading check-ins when detection ends can still show a finding the refresh is about to retract. Recorded in `web/CLAUDE.md`; the API was out of scope.
+- The `TODO(GET /spending/summary, M5)` in `web/src/lib/categories.ts` is not a small change: the summary's `category_buckets` would have to reach the transaction table and its category select, which today render without a summary, and the API has a `transfer` bucket the client folds into "Not spending". Left as it was.
+- Through the local real-API stack, `spending.spec.ts` (no "Scale" badge: no pay stub is confirmed when the Spending project runs) and the emergency fund test in `decisions.spec.ts` (September's sandbox essentials are $6.33, so the card reads "already cover the $19 target" and never "Target $") fail on `main`'s commit too. Not fixed here.
+
+**How it was caught:** Searching the e2e specs for the words being changed; reading `api/jobs/handlers/recurring.py` and `checkin/engine.py:queue_refresh` before deciding what the job's finish should refresh.
+
+**Fix:** In the subagent's branch: `unlinkAll` matches Unlink or Remove inside the accounts card; the rest as above.
+
+**Time saved or lost:** Not measured.
