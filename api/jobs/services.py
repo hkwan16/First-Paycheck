@@ -3,8 +3,10 @@
 A missing credential never stops the worker: Plaid and the token cipher are
 built on first use, so a sync job fails with a clear error and is retried,
 while every other job kind keeps running. The gateway is built at startup;
-without ``ANTHROPIC_API_KEY`` (and with ``LLM_FAKE`` off) categorize and extract jobs fail
-with "no LLM gateway is configured" until the key is set.
+without ``ANTHROPIC_API_KEY`` (and with ``LLM_FAKE`` off) there is none, so
+categorize runs its rules only (``stopped: "no_model"``) and extraction goes to
+manual entry (``no_model``) until the key is set (specs 003 rule 12a, 005 rule
+12). A key the API rejects ends those jobs the same way, call by call.
 """
 
 from __future__ import annotations
@@ -58,7 +60,7 @@ def default_services(settings: Settings) -> Services:
     try:
         gateway: Gateway | None = get_gateway(settings)
     except LLMNotConfigured as exc:
-        log.warning("categorize and ingest.extract jobs will fail: %s", exc)
+        log.warning("no model: categorize runs rules only, extraction is manual: %s", exc)
         gateway = None
     return Services(
         provider_for=plaid_provider_factory(settings), labeler=gateway, extractor=gateway

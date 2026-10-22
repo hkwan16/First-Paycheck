@@ -71,6 +71,8 @@ FAKE_FIXTURES = REPO_ROOT / "api" / "tests" / "fixtures" / "llm"
 FAKE_DEFAULT = ("other", 0.5)
 # How many facts FakeGateway's explanation states.
 FAKE_EXPLAIN_FACTS = 4
+# HTTP statuses that mean the key, its permissions or the model id is wrong.
+MISCONFIGURED_STATUSES = frozenset({401, 403, 404})
 
 Schema = TypeVar("Schema", bound=BaseModel)
 Clock = Callable[[], dt.datetime]
@@ -87,6 +89,7 @@ __all__ = [
     "LLMBudgetExceeded",
     "LLMError",
     "LLMGateway",
+    "LLMMisconfigured",
     "LLMNotConfigured",
     "LLMRefused",
     "LLMSchemaError",
@@ -110,7 +113,7 @@ class LLMNotConfigured(RuntimeError):
 
 
 class LLMError(Exception):
-    """A call failed in a way retrying the same request will not fix."""
+    """A model call failed; the subclasses name the cases callers tell apart."""
 
 
 class LLMBudgetExceeded(LLMError):
@@ -127,6 +130,15 @@ class LLMSchemaError(LLMError):
 
 class LLMUnavailable(LLMError):
     """Rate limited, overloaded, timed out or unreachable; worth retrying later."""
+
+
+class LLMMisconfigured(LLMError):
+    """The API rejected the key (401), its permissions (403) or the model id (404).
+
+    No retry can fix this until the configuration changes, so callers treat it
+    as having no model (spec 003 rules 12a and 24), the way a worker without
+    ``ANTHROPIC_API_KEY`` is treated (``LLMNotConfigured``).
+    """
 
 
 @dataclass(frozen=True)
@@ -504,7 +516,8 @@ class Gateway(ABC):
 
     @abstractmethod
     def _send(self, prompt: Prompt, model: str, content: Content) -> Reply:
-        """Make the model call. Raise ``LLMUnavailable`` or ``LLMError`` on failure."""
+        """Make the model call. Raise ``LLMUnavailable``, ``LLMMisconfigured`` or
+        ``LLMError`` on failure."""
 
 
 class LLMGateway(Gateway):
@@ -556,6 +569,13 @@ class LLMGateway(Gateway):
             message = f"Anthropic API returned HTTP {status} ({type(exc).__name__})"
             if status == 429 or status >= 500:
                 raise LLMUnavailable(message) from None
+            if status in MISCONFIGURED_STATUSES:
+                log.error(
+                    "the Anthropic API rejected the configuration: %s;"
+                    " check ANTHROPIC_API_KEY, its account and the LLM_MODEL_* settings",
+                    message,
+                )
+                raise LLMMisconfigured(message) from None
             raise LLMError(message) from None
         except anthropic.APIConnectionError as exc:
             raise LLMUnavailable(

@@ -29,7 +29,7 @@ from ingest.proposal import (
 from ingest.reader import UnreadableDocument
 from jobs.context import JobContext
 from jobs.queue import MAX_ATTEMPTS
-from llm.gateway import LLMBudgetExceeded, LLMError, LLMRefused, ModelPage
+from llm.gateway import LLMBudgetExceeded, LLMError, LLMMisconfigured, LLMRefused, ModelPage
 from llm.schemas import BenefitsSummaryExtraction, PayStubExtraction
 
 SKIPPED: dict[str, Any] = {"status": "skipped"}
@@ -132,8 +132,12 @@ def _extract(
         return manual(DocumentStatusReason.REFUSED)
     except LLMBudgetExceeded:
         return manual(DocumentStatusReason.BUDGET)
+    except LLMMisconfigured:
+        # The API rejected the key or the model id (spec 005 rule 12): no
+        # retry can fix that, so the user gets manual entry at once.
+        return manual(DocumentStatusReason.NO_MODEL)
     except LLMError:
-        # Schema and API errors retry (spec 002 rule 34); the last attempt
+        # Schema and other API errors retry (spec 002 rule 34); the last attempt
         # hands the document to the user instead of leaving it stuck.
         if ctx.job.attempts < MAX_ATTEMPTS:
             raise

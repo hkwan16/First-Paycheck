@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from db.enums import CategorySource, RuleMatch, RuleSource
 from db.models import CategoryRule as CategoryRuleRow
 from db.models import Transaction
-from llm.gateway import CategorizeItem, LLMBudgetExceeded, LLMRefused
+from llm.gateway import CategorizeItem, LLMBudgetExceeded, LLMMisconfigured, LLMRefused
 from llm.schemas import CategoryBatch
 from sync.categories import CATEGORIES
 
@@ -162,8 +162,9 @@ def categorize_user(
 ) -> CategorizeResult:
     """Label the user's uncategorized transactions: rules, reuse, then the LLM.
 
-    Without a labeler (no gateway configured, spec 003 rule 12a) the rules and
-    reuse steps still run and the unknown merchants wait for a later run.
+    Without a labeler (no gateway configured, spec 003 rule 12a), or once the
+    API rejects the key or the model id, the rules and reuse steps still count
+    and the unknown merchants wait for a later run.
 
     No database transaction is open while the gateway is called; each batch's
     labels are written in their own short session, so a later failure keeps
@@ -194,6 +195,11 @@ def categorize_user(
             answer = labeler.categorize(user_id, items, job_id=job_id)
         except LLMBudgetExceeded:
             result.stopped = "budget"
+            break
+        except LLMMisconfigured:
+            # The API rejected the key or the model id: as if there were no
+            # model (rule 12a), since no retry can fix it.
+            result.stopped = "no_model"
             break
         except LLMRefused:
             result.stopped = "refused"
