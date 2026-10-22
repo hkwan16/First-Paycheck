@@ -119,7 +119,9 @@ export const JOB_INVALIDATES: Record<JobKind, readonly QueryKey[]> = {
   'sync.incremental': [queryKeys.accounts(), ...spendingReads, ...balanceReads],
   'categorize.run': spendingReads,
   'ingest.extract': documentReads,
-  'recurring.detect': [queryKeys.recurring()],
+  // Detection writes the charges, then asks for a refresh of the month's open
+  // check-in, whose findings name them (spec 015 rule 15, spec 017 rule 14).
+  'recurring.detect': [queryKeys.recurring(), queryKeys.checkIns(), queryKeys.checkIn()],
   'checkin.monthly': [queryKeys.checkIns(), queryKeys.checkIn()],
   'schedule.tick': [],
   // The PDF is read by job id once the job succeeds; no cached read changes.
@@ -149,18 +151,16 @@ export const invalidateLinkedData = (client: QueryClient) =>
 /**
  * After unlinking an institution (spec 017 rules 12-14): its accounts,
  * transactions, balances and holdings are gone, so every total built from
- * them changes, goal progress loses its account, and the API queues
- * recurring detection, which drops charges only that institution billed and
- * retracts their check-in findings. `DELETE /sync/items/{id}` returns no job
- * id to follow, so recurring charges and check-ins are read again now and
- * once more whenever their screens next fetch.
+ * them changes, including a check-in's cash flow, and goal progress loses its
+ * account. Recurring charges change only when the `recurring.detect` job the
+ * unlink queued has run; `useUnlinkItem` follows that job, and its
+ * `JOB_INVALIDATES` row reads the charges and check-ins again when it ends.
  */
 export const invalidateAfterUnlink = (client: QueryClient) =>
   invalidateAll(client, [
     queryKeys.accounts(),
     ...spendingReads,
     ...balanceReads,
-    queryKeys.recurring(),
     queryKeys.checkIns(),
     queryKeys.checkIn(),
   ]);

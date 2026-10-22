@@ -47,6 +47,24 @@ export const sampleAccounts: readonly Account[] = [
   },
 ];
 
+/** A credit union's export, imported as a CSV account: no bank link, so no sync. */
+export const CREDIT_UNION_ITEM_ID = '0b9a7c55-7f9e-4c1a-9b8f-1c2d3e4f5a02';
+export const CREDIT_UNION_ID = '1a2b3c4d-0000-4000-8000-000000000c51';
+
+export const sampleCsvAccount: Account = {
+  id: CREDIT_UNION_ID,
+  sync_item_id: CREDIT_UNION_ITEM_ID,
+  provider: 'csv',
+  institution_name: 'Credit union',
+  name: 'Credit union checking',
+  kind: 'checking',
+  mask: null,
+  role: null,
+  is_active: true,
+  balance_cents: null,
+  balance_as_of: null,
+};
+
 type Row = [
   day: number,
   merchant: string,

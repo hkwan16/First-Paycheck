@@ -1,12 +1,15 @@
 import { act, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
-import { CHASE_ITEM_ID } from '@/test/fixtures/sample';
-import { apiUrl } from '@/test/msw/handlers';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CHASE_ITEM_ID, SAMPLE_NOW } from '@/test/fixtures/sample';
+import { apiUrl, recurringJobId, recurringJobStates, scriptJob } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderHookWithClient } from '@/test/render';
 import type { LinkItemRequest } from '../types';
 import { useAccounts } from './accounts';
+import { useCheckIns } from './checkins';
+import { JOB_POLL_MS } from './jobs';
+import { useRecurring } from './recurring';
 import {
   SANDBOX_INSTITUTION_ID,
   useCreateSyncItem,
@@ -97,5 +100,57 @@ describe('useUnlinkItem', () => {
     act(() => result.current.unlink.mutate(CHASE_ITEM_ID));
     await waitFor(() => expect(result.current.unlink.isSuccess).toBe(true));
     await waitFor(() => expect(result.current.accounts.data).toEqual([]));
+  });
+
+  describe('following the recurring detection it queued', () => {
+    beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) }));
+    afterEach(() => {
+      vi.useRealTimers();
+      server.events.removeAllListeners();
+    });
+
+    function countReads(path: string) {
+      const reads = { count: 0 };
+      server.events.on('request:start', ({ request }) => {
+        if (request.method === 'GET' && new URL(request.url).pathname === path) reads.count += 1;
+      });
+      return reads;
+    }
+
+    it('reads recurring charges and check-ins again once the job ends, not before', async () => {
+      const jobId = scriptJob(recurringJobStates(recurringJobId(1)));
+      const recurring = countReads('/recurring');
+      const checkIns = countReads('/check-ins');
+      const { result } = renderHookWithClient(() => ({
+        recurring: useRecurring(),
+        checkIns: useCheckIns(),
+        unlink: useUnlinkItem(),
+      }));
+      await waitFor(() => expect(result.current.recurring.isSuccess).toBe(true));
+      await waitFor(() => expect(result.current.checkIns.isSuccess).toBe(true));
+      expect([recurring.count, checkIns.count]).toEqual([1, 1]);
+
+      act(() => result.current.unlink.mutate(CHASE_ITEM_ID));
+      await waitFor(() => expect(result.current.unlink.recurringJob.data?.status).toBe('queued'));
+      expect(result.current.unlink.recurringJob.data?.id).toBe(jobId);
+      // A check-in's cash flow changes with the unlink itself; the charges wait for the job.
+      await waitFor(() => expect(checkIns.count).toBe(2));
+      expect(recurring.count).toBe(1);
+
+      await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));
+      expect(result.current.unlink.recurringJob.data?.status).toBe('running');
+      expect(recurring.count).toBe(1);
+
+      await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));
+      expect(result.current.unlink.recurringJob.isTerminal).toBe(true);
+      await waitFor(() => expect(recurring.count).toBe(2));
+      await waitFor(() => expect(checkIns.count).toBe(3));
+    });
+
+    it('follows nothing before an unlink', () => {
+      const { result } = renderHookWithClient(() => useUnlinkItem());
+      expect(result.current.recurringJob.data).toBeUndefined();
+      expect(result.current.recurringJob.isTerminal).toBe(false);
+    });
   });
 });

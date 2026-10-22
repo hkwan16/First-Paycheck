@@ -16,9 +16,14 @@ import {
   useTriggerSync,
   useUnlinkItem,
 } from '@/lib/api/hooks';
-import type { Job, LinkedItem } from '@/lib/api/types';
+import type { Job, LinkedItem, SyncProvider } from '@/lib/api/types';
 import { formatNumber } from '@/lib/money';
-import { groupByInstitution, ownedText, type InstitutionGroup as Group } from './account-format';
+import {
+  groupByInstitution,
+  ownedText,
+  removalWords,
+  type InstitutionGroup as Group,
+} from './account-format';
 import { CsvImport } from './CsvImport';
 import { InstitutionGroup } from './InstitutionGroup';
 import { LinkBankButton } from './LinkBankButton';
@@ -35,6 +40,7 @@ interface ActiveSync {
 interface Unlinking {
   itemId: string;
   name: string;
+  provider: SyncProvider;
   count: number;
 }
 
@@ -117,7 +123,12 @@ export function AccountsCard({ showSandboxLink }: AccountsCardProps) {
 
   const startUnlink = (group: Group) => {
     setLinkError(null);
-    setUnlinking({ itemId: group.itemId, name: group.name, count: group.accounts.length });
+    setUnlinking({
+      itemId: group.itemId,
+      name: group.name,
+      provider: group.provider,
+      count: group.accounts.length,
+    });
     unlink.mutate(group.itemId);
   };
 
@@ -203,7 +214,8 @@ export function AccountsCard({ showSandboxLink }: AccountsCardProps) {
 
       {unlinked && (
         <Notice ref={doneRef} tabIndex={-1} tone="confirmed" compact role="status">
-          Unlinked {unlinked.name}. {ownedText(unlinked.count)} were deleted.
+          {removalWords(unlinked.provider).done} {unlinked.name}. {ownedText(unlinked.count)} were
+          deleted.
         </Notice>
       )}
 

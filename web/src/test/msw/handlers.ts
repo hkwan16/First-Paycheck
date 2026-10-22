@@ -93,6 +93,29 @@ export function syncJobStates(id: string, kind: Job['kind'] = 'sync.initial'): J
   ];
 }
 
+/** The n-th `recurring.detect` job an unlink queued (`DELETE /sync/items/{id}`). */
+export const recurringJobId = (n: number) =>
+  `5b000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
+/**
+ * A recurring detection after an unlink: queued, running, succeeded with the
+ * counts `run_detection` reports (one charge only the institution billed went).
+ */
+export function recurringJobStates(id: string): Job[] {
+  const job = (overrides: Partial<Job>) =>
+    sampleJob({ id, kind: 'recurring.detect', created_at: SAMPLE_NOW, ...overrides });
+  return [
+    job({ status: 'queued', progress: 0 }),
+    job({ status: 'running', progress: 0 }),
+    job({
+      status: 'succeeded',
+      progress: 100,
+      result: { detected: 2, new: 0, changed: 0, stopped: 0, deleted: 1 },
+      finished_at: SAMPLE_NOW,
+    }),
+  ];
+}
+
 /** An extraction: queued, running at 50%, succeeded (the proposal is written then). */
 export function extractJobStates(id: string, documentId: string): Job[] {
   const job = (overrides: Partial<Job>) =>
@@ -449,8 +472,15 @@ export const handlers = [
   }),
 
   http.post<{ id: string }>(apiUrl('/sync/items/:id/sync'), ({ params }) => {
-    if (!db.accounts.some((a) => a.sync_item_id === params.id)) {
-      return notFound('Linked institution not found');
+    const account = db.accounts.find((a) => a.sync_item_id === params.id);
+    if (!account) return notFound('Linked institution not found');
+    if (account.provider !== 'plaid') {
+      // Spec 002 rule 29: an imported account's data arrives only by import.
+      return appError(
+        422,
+        'not_plaid_item',
+        'Only a linked institution can sync; import a new CSV file instead',
+      );
     }
     const jobId = scriptJob(syncJobStates(nextId('5a000000'), 'sync.incremental'));
     return HttpResponse.json({ job_id: jobId }, { status: 202 });
@@ -461,9 +491,18 @@ export const handlers = [
     if (gone.size === 0) return notFound('Linked institution not found');
     db.accounts = db.accounts.filter((a) => !gone.has(a.id));
     db.transactions = db.transactions.filter((t) => !gone.has(t.account_id));
-    // The API answers with the recurring.detect job it queued for the rest of the data.
-    const recurringJobId = scriptJob(syncJobStates(nextId('5b000000'), 'recurring.detect'));
-    return HttpResponse.json({ recurring_job_id: recurringJobId }, { status: 200 });
+    // The recurring.detect job it queued for what is left, or the one still
+    // waiting (spec 017 rule 11). Unless a test scripted it, it has already
+    // succeeded by the first poll.
+    const last = db.recurringJobs.at(-1);
+    if (last !== undefined && db.jobs.get(last)?.status === 'queued') {
+      return HttpResponse.json({ recurring_job_id: last });
+    }
+    const jobId = recurringJobId(db.recurringJobs.length + 1);
+    db.recurringJobs.push(jobId);
+    const succeeded = recurringJobStates(jobId).at(-1);
+    if (succeeded && !db.jobs.has(jobId)) db.jobs.set(jobId, succeeded);
+    return HttpResponse.json({ recurring_job_id: jobId });
   }),
 
   http.get(apiUrl('/docs'), () => HttpResponse.json(db.documents)),

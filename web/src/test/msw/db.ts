@@ -28,6 +28,8 @@ export interface TestDb {
   accounts: Account[];
   transactions: Transaction[];
   jobs: Map<string, Job>;
+  /** `recurring.detect` jobs `DELETE /sync/items/{id}` handed out, oldest first. */
+  recurringJobs: string[];
   /** Accounts a linked item's initial sync will add when its job succeeds. */
   pendingAccounts: Map<string, Account[]>;
   /** Newest first, as `GET /docs` lists them. */
@@ -53,6 +55,7 @@ export const db: TestDb = {
   accounts: [],
   transactions: [],
   jobs: new Map(),
+  recurringJobs: [],
   pendingAccounts: new Map(),
   documents: [],
   proposals: new Map(),
@@ -76,6 +79,7 @@ export function resetDb() {
   db.accounts = clone([...sampleAccounts]);
   db.transactions = clone([...sampleTransactions]);
   db.jobs = new Map();
+  db.recurringJobs = [];
   db.pendingAccounts = new Map();
   const stub = sampleDocument();
   db.documents = [stub];
