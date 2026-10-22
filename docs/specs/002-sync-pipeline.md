@@ -58,7 +58,7 @@ Bring a user's bank data into First Paycheck and keep it current. A linked insti
    | `depository` | `savings`, `money market`, `cd`, `hsa` | `savings` |
    | `depository` | anything else | `checking` |
    | `credit` | any | `credit` |
-   | `loan` | any | `credit` (a liability; its balance is the amount owed, spec 001 rule 22) |
+   | `loan` | any (`auto`, `mortgage`, `student`, `home equity`, `line of credit`, ...) | `loan` (a liability like `credit`; its balance is the amount owed, spec 001 rule 22) |
    | `investment` | `401a`, `401k`, `403B`, `457b`, `ira`, `roth`, `roth 401k`, `sep ira`, `simple ira`, `keogh`, `pension`, `retirement`, `thrift savings plan`, `tsp`, `lif`, `lira`, `rrsp`, `rrif`, `tfsa` | `retirement` |
    | `investment` | anything else | `investment` |
    | `other` or unknown | any | skipped, logged; its transactions are skipped too |
@@ -101,7 +101,7 @@ Bring a user's bank data into First Paycheck and keep it current. A linked insti
 28. `DELETE /sync/items/{id}` asks Plaid to remove the item (best effort: a Plaid failure, an undecryptable token or an unconfigured Plaid is logged, not returned) with no transaction open, then deletes the row; `ON DELETE CASCADE` removes its accounts, transactions, snapshots and holdings (spec 001 rule 25). The response's `recurring_job_id` is the `recurring.detect` job the unlink queues (or the one already queued), so the client can wait for it and then refresh recurring charges and the check-in. The full unlink path, including the derived data it retracts, is spec 017 rules 11-16.
 29. `POST /sync/items/{id}/sync` returns the already-queued `sync.incremental` job for that item when there is one, otherwise a new one. A CSV item is 422 `not_plaid_item` and queues nothing: it has no provider to pull from (its data arrives only through `POST /accounts/import`, spec 010), so a queued sync could only fail.
 30. `GET /accounts` lists the user's accounts ordered by institution, then name, each with its latest balance snapshot (`balance_cents`, `balance_as_of`, null when none), institution name and `provider` (`plaid` or `csv`, its sync item's provider), so a client can tell an imported account from a linked one: only a Plaid item can be synced on demand.
-31. `PATCH /accounts/{id}` accepts `role` (an `account_role` or null) and `is_active`; omitted fields are unchanged. Assigning `emergency_fund` moves it: the user's previous emergency-fund account loses the role in the same transaction (spec 001 allows one).
+31. `PATCH /accounts/{id}` accepts `role` (an `account_role` or null) and `is_active`; omitted fields are unchanged. Assigning `emergency_fund` moves it: the user's previous emergency-fund account loses the role in the same transaction (spec 001 allows one). A role does not depend on the account's kind: a `loan` takes the same roles a `credit` account does.
 
 ### Jobs (`jobs/`)
 
@@ -118,7 +118,7 @@ Bring a user's bank data into First Paycheck and keep it current. A linked insti
 | # | Test | Input | Expected |
 |---|---|---|---|
 | 1 | `test_cents_from_plaid_amounts` | `89.4`, `12`, `0.005`, `-0.005`, `4.335`, `-1234.567` | `8940`, `1200`, `1`, `-1`, `434`, `-123457` |
-| 2 | `test_account_kind_mapping` | `depository/checking`, `depository/cd`, `credit/credit card`, `loan/student`, `investment/401k`, `investment/brokerage`, `other/other` | `checking`, `savings`, `credit`, `credit`, `retirement`, `investment`, skipped |
+| 2 | `test_account_kind_mapping` | `depository/checking`, `depository/cd`, `credit/credit card`, `loan/student`, `loan/mortgage`, `loan/auto`, `loan/home equity`, `loan/line of credit`, `investment/401k`, `investment/brokerage`, `other/other` | `checking`, `savings`, `credit`, `loan`, `loan`, `loan`, `loan`, `loan`, `retirement`, `investment`, skipped |
 | 3 | `test_two_pages_added_modified_removed` | Page 1 (cursor null): add t1 $12.00, t2 $5.50; page 2: modify t1 to $13.25, remove t2, add t3 -$1,000.00 | Rows t1 1325, t3 -100000; t2 absent; cursor = page 2's `next_cursor` |
 | 4 | `test_cursor_saved_only_after_last_page` | Page 2 raises a provider error | Cursor still null; no transactions written |
 | 5 | `test_rerun_is_idempotent` | Example 3 run twice from the same cursor | Same rows and values; one more balance snapshot per account |
@@ -139,6 +139,7 @@ Arithmetic for example 7: `2^1 * 30 = 60`, `2^2 * 30 = 120`, `2^3 * 30 = 240`, `
 - A webhook with no `Plaid-Verification` header, an unparsable JWT, or a body that is not JSON is 401 (signature first, then parsing).
 - `POST /sync/items` with both or neither of `public_token` and `sandbox_institution_id` is 422.
 - `PATCH /accounts/{id}` with an empty body returns the account unchanged.
+- A Plaid loan synced as `credit` before `0015_loan_account_kind` becomes `loan` on its item's next sync, because rule 14 updates `kind`; its role and active flag stay the user's. The migration cannot tell such an account from a credit card, so it changes no rows.
 - A job whose kind has no registered handler fails with `last_error` naming the kind, and backs off like any failure.
 
 ## Out of scope

@@ -61,7 +61,7 @@ Every job handler, after the privileged dequeue, opens a user-scoped session wit
 ### Sign convention
 
 21. `transactions.amount_cents > 0` is money leaving the account (purchases, bills, fees, transfers out); `< 0` is money arriving (paychecks, refunds, transfers in). This is Plaid's convention. The CSV provider converts its file to this convention before the shared pipeline upserts anything.
-22. `balance_snapshots.balance_cents` is the provider's current balance as reported. For depository and investment accounts it is money held; for credit accounts it is the amount owed, positive when the user owes money (Plaid's convention). Net worth subtracts credit balances by account kind.
+22. `balance_snapshots.balance_cents` is the provider's current balance as reported. For depository and investment accounts it is money held; for `credit` and `loan` accounts it is the amount owed, positive when the user owes money (Plaid's convention). Net worth subtracts credit and loan balances by account kind.
 23. Pay stub and benefits amounts are non-negative magnitudes; whether a line adds or subtracts is carried by the column (or, in an extraction proposal, by the field's `role`).
 
 ### Retention and deletion
@@ -85,7 +85,7 @@ Every job handler, after the privileged dequeue, opens a user-scoped session wit
 | `plan_kind` | `hdhp`, `ppo`, `hmo` |
 | `sync_provider` | `plaid`, `csv` |
 | `sync_status` | `active`, `login_required`, `error` |
-| `account_kind` | `checking`, `savings`, `credit`, `investment`, `retirement` |
+| `account_kind` | `checking`, `savings`, `credit`, `loan`, `investment`, `retirement` (`loan` added by `0015_loan_account_kind`, placed after `credit` so the liabilities sort together) |
 | `account_role` | `spending`, `emergency_fund`, `retirement` |
 | `category_source` | `rule`, `user`, `llm` |
 | `rule_match` | `exact`, `prefix` |
@@ -452,6 +452,7 @@ Reference data, no `user_id` (RLS exception).
 | `0007_lock_alembic_version` | Nothing new. Revokes Supabase's default grants to `anon` and `authenticated` from `alembic_version` and the `public` functions, which `enable_rls` never touched, then grants back only what 0001, 0002 and 0006 intended. The test auth shim copies those defaults so a future object that skips its revoke fails `test_migrations` |
 | `0012_checkin_findings` | Nothing new. `check_in_findings.key` with `UNIQUE (check_in_id, key)` and an index on `(user_id, key)`; `finding_action` rebuilt as `done`, `dismissed` (spec 015) |
 | `0014_delete_account_fn` | `delete_user_account(uuid)`: deletes one `auth.users` row so every user table cascades (spec 017) |
+| `0015_loan_account_kind` | Nothing new. `account_kind` gains `loan` after `credit` (spec 002 rule 4). The downgrade maps `loan` accounts back to `credit` and rebuilds the type with its five 0002 labels |
 
 CI runs upgrade, downgrade, upgrade and `alembic check` on every pull request.
 
