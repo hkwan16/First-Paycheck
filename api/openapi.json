@@ -6528,6 +6528,43 @@
         ]
       }
     },
+    "/plan/calendar.ics": {
+      "get": {
+        "description": "Every calendar event, any status, as an iCalendar file to import (RFC 5545).",
+        "operationId": "get_plan_calendar",
+        "responses": {
+          "200": {
+            "content": {
+              "text/calendar": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Plan Calendar",
+        "tags": [
+          "plan"
+        ]
+      }
+    },
     "/profile": {
       "get": {
         "description": "The saved profile, or the defaults when nothing is saved yet.",

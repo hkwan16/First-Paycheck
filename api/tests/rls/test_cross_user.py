@@ -57,7 +57,7 @@ class Case:
     # A multipart body: form fields and files.
     form: dict[str, str] | None = None
     files: dict[str, tuple[str, bytes, str]] | None = None
-    # Extra checks on B's response body.
+    # Extra checks on B's response body (parsed JSON, else the text).
     body: Callable[[Any], None] | None = None
     # Checks that A's data is untouched, run against the test connection.
     after: Callable[[Connection], None] | None = None
@@ -515,6 +515,16 @@ def get_plan(connection: Connection, client_as: Callable[[FixtureUser], TestClie
     return Case("GET", "/plan", 200, body=body)
 
 
+def plan_calendar(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    a_decision(client_as)
+
+    def body(data: Any) -> None:
+        assert "BEGIN:VCALENDAR" in data
+        assert "BEGIN:VEVENT" not in data
+
+    return Case("GET", "/plan/calendar.ics", 200, body=body)
+
+
 def spending_summary(
     connection: Connection, client_as: Callable[[FixtureUser], TestClient]
 ) -> Case:
@@ -592,6 +602,7 @@ ROUTE_CASES: dict[tuple[str, str], Builder] = {
     ("POST", "/explain"): explain,
     ("GET", "/calendar"): list_calendar,
     ("GET", "/plan"): get_plan,
+    ("GET", "/plan/calendar.ics"): plan_calendar,
     ("GET", "/goals"): list_goals,
     ("PATCH", "/goals/{goal_id}"): update_goal,
     ("GET", "/spending/summary"): spending_summary,
@@ -673,6 +684,7 @@ def test_user_b_cannot_reach_user_a_data(
     if case.status == 404:
         assert response.json()["error"]["code"] == "not_found"
     if case.body is not None:
-        case.body(response.json())
+        json_body = response.headers["content-type"].startswith("application/json")
+        case.body(response.json() if json_body else response.text)
     if case.after is not None:
         case.after(db_connection)

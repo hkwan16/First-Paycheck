@@ -42,4 +42,4 @@ build-backend = "hatchling.build"
 # top-level packages, matching `python -m app.openapi`, `python -m jobs.worker`
 # and `python -m db.seed.load`. Add each new top-level package here.
 [tool.hatch.build.targets.wheel]
-packages = ["app", "calc", "db", "ingest", "jobs", "llm", "retrieval", "sync", "verify"]
+packages = ["app", "calc", "db", "export", "ingest", "jobs", "llm", "retrieval", "sync", "verify"]
