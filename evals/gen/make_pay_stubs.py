@@ -1,14 +1,16 @@
 # WeasyPrint and pypdfium2 ship no type information; the exemption is scoped to this file.
 # mypy: disable-error-code="import-untyped"
-"""Seeded generator for ``evals/fixtures/pay_stubs/``: 10 labeled synthetic pay
+"""Seeded generator for ``evals/fixtures/pay_stubs/``: 30 labeled synthetic pay
 stubs for the extraction suites (spec 005 rules 26-27).
 
-Two layouts in the style of common payroll providers: ``ledger`` (a dense
-earnings statement with this-period and year-to-date columns, slash dates) and
+Three layouts in the style of common payroll providers: ``ledger`` (a dense
+earnings statement with this-period and year-to-date columns, slash dates),
 ``summary`` (a modern pay summary with written-out dates and no year-to-date
-column). Each stub is HTML rendered to PDF with WeasyPrint; image stubs are
-that PDF rasterized with pypdfium2 at 200 dpi, some with scan-style speckle,
-blur and a slight rotation, one wrapped back into a PDF with no text layer.
+column) and ``advice`` (a payroll advice with earnings and deductions side by
+side, ISO dates and the deposit split from the net pay line). Each stub is
+HTML rendered to PDF with WeasyPrint; image stubs are that PDF rasterized with
+pypdfium2 at 200 dpi, some with scan-style speckle, blur and a slight
+rotation, some wrapped back into a PDF with no text layer.
 Several print a synthetic SSN (area 900-999, never issued) and an account
 number, masked or in full, so redaction is exercised.
 
@@ -39,7 +41,7 @@ SEED = 146
 DEFAULT_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "pay_stubs"
 RASTER_DPI = 200
 
-Layout = Literal["ledger", "summary"]
+Layout = Literal["ledger", "summary", "advice"]
 Output = Literal["text_pdf", "png", "noisy_png", "noisy_jpeg", "scanned_pdf"]
 Frequency = Literal["weekly", "biweekly", "semimonthly", "monthly"]
 
@@ -107,6 +109,27 @@ PLANS: tuple[Plan, ...] = (
     Plan("summary", "text_pdf", "masked", "masked"),
     Plan("ledger", "noisy_png", "full", "full"),
     Plan("summary", "text_pdf", "full", "full"),
+    # M10: twenty more, with the advice layout, every output and identifier case.
+    Plan("advice", "text_pdf", "full", "masked"),
+    Plan("advice", "png", "none", "full"),
+    Plan("advice", "noisy_png", "full", "full"),
+    Plan("advice", "scanned_pdf", "masked", "masked"),
+    Plan("ledger", "text_pdf", "none", "none"),
+    Plan("summary", "noisy_png", "full", "masked"),
+    Plan("advice", "noisy_jpeg", "full", "masked"),
+    Plan("ledger", "png", "masked", "full"),
+    Plan("summary", "scanned_pdf", "full", "none"),
+    Plan("advice", "text_pdf", "full", "full"),
+    Plan("ledger", "noisy_png", "none", "masked"),
+    Plan("summary", "png", "full", "masked"),
+    Plan("advice", "png", "full", "none"),
+    Plan("ledger", "scanned_pdf", "none", "full"),
+    Plan("summary", "noisy_jpeg", "full", "full"),
+    Plan("ledger", "text_pdf", "masked", "full"),
+    Plan("advice", "noisy_jpeg", "none", "none"),
+    Plan("summary", "text_pdf", "full", "masked"),
+    Plan("ledger", "noisy_jpeg", "full", "masked"),
+    Plan("advice", "scanned_pdf", "full", "full"),
 )
 
 
@@ -415,8 +438,64 @@ def _summary(stub: Stub) -> str:
 """
 
 
+def _iso(day: dt.date) -> str:
+    return day.isoformat()
+
+
+def _side(lines: Sequence[Line]) -> list[str]:
+    return [
+        f"<td>{html.escape(line.label)}</td><td class='num'>{dollars(line.cents)}</td>"
+        for line in lines
+    ]
+
+
+ADVICE_HEADER = (
+    '<tr><th>Earnings</th><th class="num">Amount</th>'
+    '<th>Withholdings</th><th class="num">Amount</th></tr>'
+)
+
+
+def _advice(stub: Stub) -> str:
+    """Earnings on the left, taxes and deductions on the right, row by row."""
+    left = _side(stub.earnings)
+    right = _side((*stub.taxes, *stub.deductions))
+    blank = "<td></td><td></td>"
+    rows = "".join(
+        f"<tr>{left[i] if i < len(left) else blank}{right[i] if i < len(right) else blank}</tr>"
+        for i in range(max(len(left), len(right)))
+    )
+    withheld = stub.gross_cents - stub.net_cents
+    identity = "".join(f"<div>{html.escape(line)}</div>" for line in _identity_lines(stub))
+    return f"""
+<h1>PAYROLL ADVICE</h1>
+<table class="meta">
+<tr><td>Company</td><td>{html.escape(stub.employer)}</td></tr>
+<tr><td>Address</td><td>{html.escape(stub.employer_address)}</td></tr>
+<tr><td>Employee name</td><td>{html.escape(stub.employee)}</td></tr>
+<tr><td>Check date</td><td>{_iso(stub.pay_date)}</td></tr>
+<tr><td>Period beginning</td><td>{_iso(stub.period_start)}</td></tr>
+<tr><td>Period ending</td><td>{_iso(stub.period_end)}</td></tr>
+<tr><td>Pay frequency</td><td>{FREQUENCY_LABELS[stub.frequency]}</td></tr>
+</table>
+{identity}
+<h2>Current period</h2>
+<table>
+{ADVICE_HEADER}
+{rows}
+<tr class="total"><td>Total gross</td><td class="num">{dollars(stub.gross_cents)}</td>
+<td>Total withheld</td><td class="num">{dollars(withheld)}</td></tr>
+</table>
+<h2>Net pay distribution</h2>
+<table><tr class="total"><td>Net pay</td><td class="num">{dollars(stub.net_cents)}</td></tr>
+<tr><td>Direct deposit</td><td class="num">{dollars(stub.net_cents)}</td></tr></table>
+"""
+
+
+LAYOUTS = {"ledger": _ledger, "summary": _summary, "advice": _advice}
+
+
 def render_html(stub: Stub) -> str:
-    body = _ledger(stub) if stub.layout == "ledger" else _summary(stub)
+    body = LAYOUTS[stub.layout](stub)
     head = f"<meta charset='utf-8'><style>{STYLE}</style>"
     return f"<!doctype html><html><head>{head}</head><body>{body}</body></html>"
 

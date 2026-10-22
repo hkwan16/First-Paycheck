@@ -121,7 +121,7 @@ def test_smoke_suite_on_text_stubs() -> None:
 
 def test_smoke_suite_on_every_stub(tesseract: None) -> None:
     result = extraction_smoke.run(Budget(0))
-    assert result.cases == 10
+    assert result.cases == 30
     assert result.metrics == {"pipeline_ok": 1.0, "redaction_recall": 1.0, "ssn_free": 1.0}, (
         result.failures
     )

@@ -1,5 +1,5 @@
 """The extraction-smoke suite (free, spec 005 rule 27): the document pipeline
-end to end over the 10 labeled stubs, with ``FakeGateway`` in place of the
+end to end over the 30 labeled stubs, with ``FakeGateway`` in place of the
 model, so it costs nothing and runs on every ``make eval``.
 
 What it checks is what the model would receive. Text pages are searched

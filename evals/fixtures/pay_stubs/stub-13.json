@@ -1,0 +1,25 @@
+{
+  "account_number": "152149249552",
+  "content_type": "image/png",
+  "fields": {
+    "employer_name": "Acme Corp",
+    "federal_withholding_cents": 20420,
+    "gross_cents": 216667,
+    "medical_premium_cents": 2500,
+    "medicare_cents": 3142,
+    "net_cents": 147522,
+    "other_deductions_cents": 11233,
+    "pay_date": "2026-10-15",
+    "pay_frequency": "semimonthly",
+    "period_end": "2026-10-15",
+    "period_start": "2026-10-01",
+    "retirement_contribution_cents": 8667,
+    "social_security_cents": 13433,
+    "state_tax_cents": 9750
+  },
+  "file": "stub-13.png",
+  "id": "stub-13",
+  "layout": "advice",
+  "output": "noisy_png",
+  "ssn": "941-90-1036"
+}

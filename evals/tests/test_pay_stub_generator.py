@@ -40,18 +40,20 @@ def test_generation_is_deterministic_and_seed_dependent() -> None:
     assert gen.generate(seed=1) != gen.generate()
 
 
-def test_ten_stubs_across_layouts_and_formats() -> None:
+OUTPUTS = {"text_pdf", "png", "noisy_png", "noisy_jpeg", "scanned_pdf"}
+
+
+def test_thirty_stubs_across_layouts_and_formats() -> None:
     stubs = gen.generate()
-    assert len(stubs) == 10
-    assert {stub.layout for stub in stubs} == {"ledger", "summary"}
-    assert {stub.output for stub in stubs} == {
-        "text_pdf",
-        "png",
-        "noisy_png",
-        "noisy_jpeg",
-        "scanned_pdf",
-    }
-    assert sum(stub.ssn is not None for stub in stubs) >= 5
+    assert len(stubs) == 30
+    assert {stub.layout for stub in stubs} == {"ledger", "summary", "advice"}
+    # Every layout appears in every output format.
+    for layout in ("ledger", "summary", "advice"):
+        assert {stub.output for stub in stubs if stub.layout == layout} == OUTPUTS, layout
+    noisy = [stub for stub in stubs if stub.output in ("noisy_png", "noisy_jpeg", "scanned_pdf")]
+    assert len(noisy) >= 12
+    assert sum(stub.ssn is not None for stub in stubs) >= 15
+    assert len({stub.frequency for stub in stubs}) == 4
     assert any(stub.ssn_masked for stub in stubs)
     assert any(stub.account_masked for stub in stubs)
     assert any(stub.account is not None and not stub.account_masked for stub in stubs)

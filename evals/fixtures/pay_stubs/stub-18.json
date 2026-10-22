@@ -1,0 +1,25 @@
+{
+  "account_number": "963520107026",
+  "content_type": "image/png",
+  "fields": {
+    "employer_name": "Harbor Light Studios",
+    "federal_withholding_cents": 23007,
+    "gross_cents": 211538,
+    "medical_premium_cents": 4150,
+    "medicare_cents": 3067,
+    "net_cents": 156353,
+    "other_deductions_cents": 2327,
+    "pay_date": "2026-09-18",
+    "pay_frequency": "weekly",
+    "period_end": "2026-09-16",
+    "period_start": "2026-09-10",
+    "retirement_contribution_cents": null,
+    "social_security_cents": 13115,
+    "state_tax_cents": 9519
+  },
+  "file": "stub-18.png",
+  "id": "stub-18",
+  "layout": "ledger",
+  "output": "png",
+  "ssn": null
+}
