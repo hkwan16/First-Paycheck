@@ -14,6 +14,7 @@ import {
   findingTone,
   handledText,
   KIND_LABELS,
+  offersCheckInNow,
   planBarValue,
   planStatusText,
   planStatusTone,
@@ -166,6 +167,20 @@ describe('planBarValue', () => {
   it('draws no bar without a plan to measure against', () => {
     expect(planBarValue(line(22_349, null))).toBeNull();
     expect(planBarValue(line(0, 0))).toBeNull();
+  });
+});
+
+describe('offersCheckInNow', () => {
+  it('is offered on this month’s open check-in only', () => {
+    expect(offersCheckInNow(novemberCheckIn(), '2026-11-16')).toBe(true);
+    expect(offersCheckInNow(novemberCheckIn(), '2026-11-30')).toBe(true);
+  });
+
+  it('is not offered on a completed check-in, another month’s, or before the clock is known', () => {
+    expect(offersCheckInNow(completedNovemberCheckIn(), '2026-11-16')).toBe(false);
+    expect(offersCheckInNow(novemberCheckIn(), '2026-12-01')).toBe(false);
+    expect(offersCheckInNow(novemberCheckIn(), '2026-10-31')).toBe(false);
+    expect(offersCheckInNow(novemberCheckIn(), null)).toBe(false);
   });
 });
 

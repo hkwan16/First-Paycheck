@@ -1,8 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { findingsReducer, userActionOf } from '@/lib/findings';
 import { $api, fetchClient } from '../client';
 import { invalidateCheckIn, queryKeys } from '../keys';
-import type { CheckInDetail, FindingAction } from '../types';
+import type { CheckInDetail, FindingAction, Job } from '../types';
+import { useJob, type JobState } from './jobs';
 import { unwrap } from './request';
 
 /** `GET /check-ins`: every check-in, newest month first, with finding and handled counts. */
@@ -106,4 +108,72 @@ export function useUpdateFinding(checkInId: string, { onError }: UpdateFindingOp
       return invalidateCheckIn(queryClient, checkInId);
     },
   });
+}
+
+/** What a finished `checkin.monthly` run did (spec 015 rule 8). */
+export type CheckInOutcome = 'created' | 'refreshed' | 'skipped';
+
+const OUTCOMES: ReadonlySet<string> = new Set(['created', 'refreshed', 'skipped']);
+
+/**
+ * The outcome and check-in a succeeded `checkin.monthly` job reports in its
+ * `result` (`CheckInRun.as_job_result`); null before it succeeds.
+ */
+export function checkInRunOf(
+  job: Job | undefined,
+): { outcome: CheckInOutcome; checkInId: string | null } | null {
+  if (job?.kind !== 'checkin.monthly' || job.status !== 'succeeded') return null;
+  const outcome = job.result?.outcome;
+  const checkInId = job.result?.check_in_id;
+  if (typeof outcome !== 'string' || !OUTCOMES.has(outcome)) return null;
+  return {
+    outcome: outcome as CheckInOutcome,
+    checkInId: typeof checkInId === 'string' ? checkInId : null,
+  };
+}
+
+export interface CheckInNowState {
+  /** `POST /check-ins`; while the month's run is still queued the API returns that job again. */
+  start: () => void;
+  isStarting: boolean;
+  /** The start was refused (an `ApiError`: a 429 says when to try again). */
+  startError: unknown;
+  /** The `checkin.monthly` job being followed, once started. */
+  jobId: string | null;
+  job: JobState;
+  /**
+   * This month's check-in: the one the 202 named, then the one the finished
+   * job reports (a new check-in has no id before its run makes it).
+   */
+  checkInId: string | null;
+  /** What the run did, once its job succeeded; null before. */
+  outcome: CheckInOutcome | null;
+}
+
+/**
+ * "Check in now" (spec 015 rule 23): queue this month's check-in run, then
+ * follow its `checkin.monthly` job with `useJob` until it succeeds or dies.
+ * When it finishes, `useJob` reads the list and every check-in again
+ * (`JOB_INVALIDATES`). A dead job is `job.isFailed`; `start()` again queues a
+ * new run.
+ */
+export function useCheckInNow(): CheckInNowState {
+  const [queued, setQueued] = useState<{ jobId: string; checkInId: string | null } | null>(null);
+  const queue = useMutation({
+    mutationFn: () => unwrap(fetchClient.POST('/check-ins')),
+    onSuccess: ({ job_id, check_in_id }) => setQueued({ jobId: job_id, checkInId: check_in_id }),
+  });
+  const jobId = queued?.jobId ?? null;
+  const job = useJob(jobId);
+  const run = job.data?.id === jobId ? checkInRunOf(job.data) : null;
+
+  return {
+    start: () => queue.mutate(),
+    isStarting: queue.isPending,
+    startError: queue.error,
+    jobId,
+    job,
+    checkInId: run?.checkInId ?? queued?.checkInId ?? null,
+    outcome: run?.outcome ?? null,
+  };
 }

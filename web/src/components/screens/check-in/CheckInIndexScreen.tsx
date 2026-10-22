@@ -10,12 +10,13 @@ import { IconTile } from '@/components/ui/IconTile';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { apiErrorMessage } from '@/lib/api/errors';
-import { useCheckIns } from '@/lib/api/hooks';
+import { useCheckInNow, useCheckIns } from '@/lib/api/hooks';
 import type { CheckInSummary } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import { formatNumber } from '@/lib/money';
 import { checkInRoute } from '@/lib/routes';
 import { checkInMonth, handledText } from './checkin-format';
+import { CheckInNowButton, CheckInNowStatus } from './CheckInNow';
 import { NetWorthCard } from './NetWorthCard';
 
 function statusText(checkIn: CheckInSummary): string {
@@ -27,9 +28,12 @@ function statusText(checkIn: CheckInSummary): string {
 /**
  * `/check-in`: every monthly check-in, newest first, each with how much of it
  * is handled, and net worth, which does not wait for the first check-in.
+ * "Check in now" runs this month's check-in without waiting for the month's
+ * tick (spec 015 rule 23); the list is read again when it finishes.
  */
 export function CheckInIndexScreen() {
   const checkIns = useCheckIns();
+  const checkInNow = useCheckInNow();
   const items = checkIns.data;
 
   let body;
@@ -51,7 +55,8 @@ export function CheckInIndexScreen() {
       <Card gap={14} aria-label="Check-ins">
         <p className="m-0">
           No check-in yet. The first one runs at the start of next month, and again whenever a sync
-          brings in new pay stubs or transactions that month.
+          brings in new pay stubs or transactions that month. Check in now to run this month’s
+          today.
         </p>
       </Card>
     );
@@ -93,7 +98,9 @@ export function CheckInIndexScreen() {
       <PageTitle
         title="Monthly check-ins"
         lead="Each month, and whenever new data arrives, your pay stubs and transactions are compared with the plan you saved."
+        aside={<CheckInNowButton state={checkInNow} />}
       />
+      <CheckInNowStatus state={checkInNow} from="list" />
       {body}
       <CardErrorBoundary title="Net worth">
         <NetWorthCard />

@@ -21,6 +21,7 @@ import {
   within,
   type userEvent,
 } from '@/test/render';
+import { CheckInIndexScreen } from './check-in/CheckInIndexScreen';
 import { CheckInScreen } from './check-in/CheckInScreen';
 import { EmergencyFundCard } from './decisions/EmergencyFundCard';
 import { Match401kCard } from './decisions/Match401kCard';
@@ -265,6 +266,16 @@ const SURFACES: readonly Surface[] = [
       await user.click(within(row).getByRole('button', { name: 'Done' }));
     },
     lead: 'It is back to how it was.',
+  },
+  {
+    name: 'checking in now',
+    route: ['post', '/check-ins'],
+    ui: () => <CheckInIndexScreen />,
+    act: async (user) => {
+      await screen.findByRole('list', { name: 'Check-ins' });
+      await user.click(screen.getByRole('button', { name: 'Check in now' }));
+    },
+    lead: 'Could not check in now.',
   },
   {
     name: 'pausing a goal',

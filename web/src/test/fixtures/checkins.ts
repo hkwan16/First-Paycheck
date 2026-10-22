@@ -9,6 +9,7 @@ import type {
   FindingPayload,
   FindingSeverity,
   Holdings,
+  Job,
   NetWorth,
   PlanLine,
   SpendingSummary,
@@ -16,7 +17,7 @@ import type {
 } from '@/lib/api/types';
 import { CATEGORY_BUCKETS, emptyCashflow } from './cashflow';
 import { DECISION_V1_ID } from './decisions';
-import { CHECKING_ID, SAVINGS_ID } from './sample';
+import { CHECKING_ID, sampleJob, SAVINGS_ID } from './sample';
 
 /*
  * Spec 015's November user (the mockup's CheckIn.dc.html): semimonthly at
@@ -665,4 +666,51 @@ export function partialBasisHoldings(): Holdings {
   holdings.cost_basis_cents = null;
   holdings.gain_cents = null;
   return holdings;
+}
+
+/** The n-th `checkin.monthly` job `POST /check-ins` hands out. */
+export const checkInJobId = (n: number) => `5c000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
+/** What a `checkin.monthly` job reports when it ends (spec 015, `CheckInRun.as_job_result`). */
+export interface CheckInJobResult {
+  outcome: 'created' | 'refreshed' | 'skipped';
+  check_in_id: string | null;
+}
+
+/** A `checkin.monthly` job in one state. */
+export function checkInJob(id: string, overrides: Partial<Job> = {}): Job {
+  return sampleJob({
+    id,
+    kind: 'checkin.monthly',
+    created_at: '2026-11-16T18:00:00Z',
+    ...overrides,
+  });
+}
+
+/** The job's result as the API writes it, the counts included. */
+export const checkInJobResult = ({ outcome, check_in_id }: CheckInJobResult) => ({
+  outcome,
+  check_in_id,
+  inserted: outcome === 'created' ? 9 : 0,
+  updated: outcome === 'refreshed' ? 9 : 0,
+  retracted: 0,
+  dropped: 0,
+  marked_active: 0,
+});
+
+/** A check-in run from queued, through running, to succeeded with `result`. */
+export function checkInJobStates(
+  id: string,
+  result: CheckInJobResult = { outcome: 'refreshed', check_in_id: NOVEMBER_ID },
+): Job[] {
+  return [
+    checkInJob(id, { status: 'queued' }),
+    checkInJob(id, { status: 'running', progress: 50 }),
+    checkInJob(id, {
+      status: 'succeeded',
+      progress: 100,
+      result: checkInJobResult(result),
+      finished_at: '2026-11-16T18:00:05Z',
+    }),
+  ];
 }

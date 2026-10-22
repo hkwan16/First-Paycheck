@@ -92,12 +92,13 @@ export default defineConfig({
       dependencies: ['authenticated-decisions'],
       use: { ...desktop, storageState: STORAGE_STATE },
     },
-    // Reads the check-ins the worker's monthly tick made and marks a finding
-    // done and undone, leaving it as it was; needs only the saved session.
+    // Checks in now (the worker runs this month's check-in), then marks a
+    // finding done, dismissed and undone, leaving it as it was. After
+    // Decisions, whose dates due within 30 days are the month's findings.
     {
       name: 'authenticated-check-in',
       testMatch: 'check-in.spec.ts',
-      dependencies: ['setup'],
+      dependencies: ['authenticated-decisions'],
       use: { ...desktop, storageState: STORAGE_STATE },
     },
     // Spending reads the bank Link linked, so it needs Plaid's sandbox.

@@ -132,6 +132,17 @@ export function planBarValue(line: PlanLine): number | null {
   return (line.actual_cents / line.plan_cents) * 100;
 }
 
+/**
+ * Whether a check-in offers "Check in now": `POST /check-ins` runs the
+ * request clock's UTC month (spec 015 rule 23) and leaves a completed
+ * check-in as it is, so only this month's open check-in. `today` is
+ * `useToday()`, null until the client knows the date.
+ */
+export const offersCheckInNow = (
+  checkIn: Pick<CheckInDetail, 'period' | 'status'>,
+  today: string | null,
+) => checkIn.status === 'open' && today !== null && checkIn.period === `${today.slice(0, 7)}-01`;
+
 const iso = (date: Date) => date.toISOString().slice(0, 10);
 
 /**

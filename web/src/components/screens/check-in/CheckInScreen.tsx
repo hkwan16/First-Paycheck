@@ -8,9 +8,11 @@ import { CardErrorBoundary } from '@/components/ui/CardErrorBoundary';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { apiErrorCode, apiErrorMessage } from '@/lib/api/errors';
-import { useCheckIn } from '@/lib/api/hooks';
+import { useCheckIn, useCheckInNow } from '@/lib/api/hooks';
 import { formatDate } from '@/lib/dates';
-import { checkInTitle } from './checkin-format';
+import { useToday } from '@/lib/periods';
+import { checkInTitle, offersCheckInNow } from './checkin-format';
+import { CheckInNowButton, CheckInNowStatus } from './CheckInNow';
 import { DeadlinesCard } from './DeadlinesCard';
 import { FindingsCard } from './FindingsCard';
 import { NetWorthCard } from './NetWorthCard';
@@ -26,10 +28,14 @@ const allCheckIns = (
  * `/check-in/[checkInId]`, from docs/mockup/CheckIn.dc.html: what changed
  * since the plan was saved (each finding marked done, dismissed or undone),
  * the month's cash flow against the plan beside net worth and holdings (where
- * the mockup puts them), and the dates coming up.
+ * the mockup puts them), and the dates coming up. This month's open
+ * check-in offers "Check in now" (the mockup's "Run again now"), which runs
+ * it again and reads it back when the job finishes.
  */
 export function CheckInScreen({ checkInId }: { checkInId: string }) {
   const checkIn = useCheckIn(checkInId);
+  const checkInNow = useCheckInNow();
+  const today = useToday();
   const data = checkIn.data;
 
   if (checkIn.isError) {
@@ -63,13 +69,25 @@ export function CheckInScreen({ checkInId }: { checkInId: string }) {
     );
   }
 
+  // Once started, the run's progress and outcome stay, even if the check-in completes meanwhile.
+  const offered = offersCheckInNow(data, today) || checkInNow.jobId !== null;
   return (
     <>
       <PageTitle
         title={checkInTitle(data.period)}
         lead={`Compared with your plan on ${formatDate(data.updated_at)}. Each finding names the part of your plan it affects; mark it done once you have dealt with it.`}
-        aside={allCheckIns}
+        aside={
+          offered ? (
+            <div className="flex flex-wrap gap-2">
+              <CheckInNowButton state={checkInNow} />
+              {allCheckIns}
+            </div>
+          ) : (
+            allCheckIns
+          )
+        }
       />
+      {offered && <CheckInNowStatus state={checkInNow} from="check-in" />}
       <CardErrorBoundary title="What changed">
         <FindingsCard checkIn={data} />
       </CardErrorBoundary>

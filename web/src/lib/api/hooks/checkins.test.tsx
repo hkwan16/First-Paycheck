@@ -1,16 +1,25 @@
 import { act, waitFor } from '@testing-library/react';
 import { delay, http, HttpResponse } from 'msw';
-import { afterEach, describe, expect, it } from 'vitest';
-import { NOVEMBER_ID, novemberCalendar, OCTOBER_ID } from '@/test/fixtures/checkins';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  checkInJob,
+  checkInJobId,
+  checkInJobStates,
+  NOVEMBER_ID,
+  novemberCalendar,
+  OCTOBER_ID,
+} from '@/test/fixtures/checkins';
 import { checkinDb } from '@/test/msw/checkin-handlers';
 import { db } from '@/test/msw/db';
-import { apiUrl } from '@/test/msw/handlers';
+import { apiUrl, scriptJob } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderHookWithClient } from '@/test/render';
+import { ApiError } from '../errors';
 import { queryKeys } from '../keys';
 import type { CheckInDetail } from '../types';
 import { useCalendar } from './decisions';
-import { useCheckIn, useCheckIns, useUpdateFinding } from './checkins';
+import { useCheckIn, useCheckInNow, useCheckIns, useUpdateFinding } from './checkins';
+import { JOB_POLL_MS } from './jobs';
 
 /** November's 401(k) election finding. */
 const electionId = 'f1000000-0000-4000-8000-000000000001';
@@ -219,5 +228,104 @@ describe('useCalendar with a window', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toHaveLength(3);
     expect(queryClient.getQueryData(queryKeys.calendar())).toHaveLength(3);
+  });
+});
+
+describe('useCheckInNow', () => {
+  beforeEach(() =>
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date('2026-11-16T18:00:00Z') }),
+  );
+  afterEach(() => vi.useRealTimers());
+
+  /** `METHOD /path` of every request, in order. */
+  function requests() {
+    const seen: string[] = [];
+    server.events.on('request:start', ({ request }) => {
+      seen.push(`${request.method} ${new URL(request.url).pathname}`);
+    });
+    return seen;
+  }
+
+  function setupNow() {
+    return renderHookWithClient(() => ({
+      list: useCheckIns(),
+      detail: useCheckIn(NOVEMBER_ID),
+      now: useCheckInNow(),
+    }));
+  }
+
+  it('does nothing until started', async () => {
+    const { result } = renderHookWithClient(() => useCheckInNow());
+    const seen = requests();
+    await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS * 2));
+    expect(result.current.jobId).toBeNull();
+    expect(result.current.outcome).toBeNull();
+    expect(seen).toEqual([]);
+  });
+
+  it('queues the month’s run, follows its job, then reads the list and the check-in again', async () => {
+    const id = checkInJobId(1);
+    scriptJob(checkInJobStates(id));
+    const { result } = setupNow();
+    await waitFor(() => expect(result.current.detail.isSuccess).toBe(true));
+    await waitFor(() => expect(result.current.list.isSuccess).toBe(true));
+    const seen = requests();
+
+    act(() => result.current.now.start());
+    await waitFor(() => expect(result.current.now.jobId).toBe(id));
+    // The 202 names the month's check-in when it already exists.
+    expect(result.current.now.checkInId).toBe(NOVEMBER_ID);
+    await waitFor(() => expect(result.current.now.job.data?.status).toBe('queued'));
+    expect(result.current.now.outcome).toBeNull();
+
+    await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));
+    await waitFor(() => expect(result.current.now.job.data?.status).toBe('running'));
+    expect(seen).not.toContain('GET /check-ins');
+
+    await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));
+    await waitFor(() => expect(result.current.now.outcome).toBe('refreshed'));
+    expect(result.current.now.checkInId).toBe(NOVEMBER_ID);
+    await waitFor(() => expect(seen).toContain('GET /check-ins'));
+    await waitFor(() => expect(seen).toContain(`GET /check-ins/${NOVEMBER_ID}`));
+    expect(seen[0]).toBe('POST /check-ins');
+  });
+
+  it('takes the new check-in’s id from the job when the month had none', async () => {
+    checkinDb.checkIns = [];
+    const { result } = setupNow();
+    act(() => result.current.now.start());
+    await waitFor(() => expect(result.current.now.outcome).toBe('created'));
+    expect(result.current.now.checkInId).toBe(NOVEMBER_ID);
+    await waitFor(() => expect(result.current.list.data?.map((c) => c.id)).toEqual([NOVEMBER_ID]));
+  });
+
+  it('reports a dead run as failed, and a new start queues a new job', async () => {
+    scriptJob([checkInJob(checkInJobId(1), { status: 'dead', last_error: 'boom' })]);
+    const { result } = renderHookWithClient(() => useCheckInNow());
+
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.job.isFailed).toBe(true));
+    expect(result.current.outcome).toBeNull();
+
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.jobId).toBe(checkInJobId(2)));
+    await waitFor(() => expect(result.current.outcome).toBe('refreshed'));
+    expect(result.current.job.isFailed).toBe(false);
+  });
+
+  it('reports a refused start, a 429 with its wait', async () => {
+    server.use(
+      http.post(apiUrl('/check-ins'), () =>
+        HttpResponse.json(
+          { error: { code: 'rate_limited', message: 'Too many requests' } },
+          { status: 429, headers: { 'Retry-After': '1200' } },
+        ),
+      ),
+    );
+    const { result } = renderHookWithClient(() => useCheckInNow());
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.startError).toBeInstanceOf(ApiError));
+    expect(result.current.startError).toMatchObject({ status: 429, retryAfterSeconds: 1200 });
+    expect(result.current.jobId).toBeNull();
   });
 });

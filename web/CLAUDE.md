@@ -250,7 +250,11 @@ next is a real disabled button, never a dead link).
   again (`invalidateCheckIn`) once no other finding write is in flight. `useCalendar({ from, to })`
   bounds `due_at`; with no bounds it is the plain read under `queryKeys.calendar()`. A finished
   `checkin.monthly` job refreshes the list and every check-in; a sync refreshes net worth and
-  holdings.
+  holdings. `useCheckInNow()` posts `POST /check-ins` (`start()`; 202 `{ job_id, check_in_id }`,
+  the waiting job again while one is queued), follows the job with `useJob`, and gives `outcome`
+  (`created`, `refreshed`, `skipped`) and `checkInId` from the succeeded job's `result`
+  (`checkInRunOf`; before that, the 202's id, null for a month with no check-in yet). A dead job is
+  `job.isFailed`; `start()` again queues a new run.
 - **The plan** (`hooks/plan.ts`, spec 016): `usePlan()` is `GET /plan`. `useExportPlan()` posts
   `POST /plan/export` (`start()`; the API returns the queued job again while one waits), follows
   the `plan.export` job with `useJob`, and gives `pdfUrl` once it succeeded; a dead job is
@@ -288,9 +292,14 @@ next is a real disabled button, never a dead link).
   `PATCH /recurring/{id}`) live in `src/test/msw/spending-handlers.ts` over `spendingDb`, seeded
   from `fixtures/cashflow.ts` and reset after every test.
 - Check-in routes (`GET /check-ins`, `GET /check-ins/{id}`, `PATCH .../findings/{fid}`,
-  `GET /net-worth`, `GET /holdings`) live in `src/test/msw/checkin-handlers.ts` over `checkinDb`,
-  seeded from `fixtures/checkins.ts` (November open with nine findings, October completed) and
-  reset after every test. `GET /calendar` filters `from`/`to` over `db.calendar`.
+  `POST /check-ins`, `GET /net-worth`, `GET /holdings`) live in `src/test/msw/checkin-handlers.ts`
+  over `checkinDb`, seeded from `fixtures/checkins.ts` (November open with nine findings, October
+  completed) and reset after every test. `GET /calendar` filters `from`/`to` over `db.calendar`.
+  `POST /check-ins` works on the month of `checkinDb.now` (November); its n-th job is
+  `checkInJobId(n)` in `db.jobs`, and one nothing scripted has already succeeded, having created
+  the month's check-in (November's findings), refreshed an open one or skipped a completed one.
+  `scriptJob(checkInJobStates(checkInJobId(1), { outcome, check_in_id }), onSucceeded)` before the
+  click shows queued, running and succeeded instead (`onSucceeded` writes what the run would).
 - Plan routes (`GET /plan`, `GET /plan/calendar.ics`, `POST /plan/export`,
   `GET /plan/export/{job_id}`) live in `src/test/msw/plan-handlers.ts` over `planDb` (`plan`,
   the export job ids handed out), reset after every test. `samplePlan()` (every decision saved;
@@ -532,9 +541,16 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
   legend and the table cover.
 - **Coming up** (`DeadlinesCard`): `GET /calendar` from the first of the month to the end of the
   next (`checkInWindow`).
-- The API cannot create a check-in (no `POST /check-ins`): the worker's monthly tick makes one per
-  user, so `e2e/check-in.spec.ts` reads what is there and checks the empty state when there is
-  nothing.
+- **Check in now** (`CheckInNow.tsx`, spec 015 rule 23): `CheckInNowButton` in the title row (the
+  mockup's "Run again now") and `CheckInNowStatus` under it, over one `useCheckInNow()`. The list
+  always offers it; a check-in offers it only when it is this month's and open
+  (`offersCheckInNow` with `useToday()`), because `POST /check-ins` runs the request clock's month
+  and leaves a completed check-in as it is. While the job runs, `JobProgress` ("Checking in"; a
+  dead job says "Nothing was changed." with Try again); a refused start says "Could not check in
+  now." and `apiErrorMessage` (the 429 sentence). A polite status line, always rendered, says the
+  outcome: on the list "This month's check-in is ready." or "is up to date." with Open it, on the
+  check-in "Checked again just now. This page is up to date.", and for a completed month "already
+  complete, so nothing was changed."
 
 ## Plan screen
 
@@ -697,10 +713,11 @@ deleted, so it reads the current version instead of assuming v1. `plan.spec.ts` 
 done mark), downloads the `.ics` and checks its first line is `BEGIN:VCALENDAR`, and exports the
 PDF through the worker, checking the `GET /plan/export/{id}` response is `application/pdf` and
 the saved file starts with `%PDF-`. `check-in.spec.ts` (project
-`authenticated-check-in`) lists the check-ins (or the empty state), opens the newest, marks a
-finding done and undoes it (checking both survive a reload), and opens a check-in that is not
-the user's. Never use a real document as a
-fixture.
+`authenticated-check-in`, after decisions, whose dates due within 30 days become the month's
+findings) presses Check in now on the list and waits for the worker's run, finds this month's
+check-in at the top of the list and opens it, runs it again from its own page, marks a finding
+done and then dismissed, undoing each (checking every step survives a reload and leaving it open),
+and opens a check-in that is not the user's. Never use a real document as a fixture.
 
 ### Local real-API stack
 
