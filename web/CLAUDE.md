@@ -88,11 +88,13 @@ src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fa
                     emergency fund, health plans, goal, benefits plans and benefits proposal; results
                     from emergency-fund-results.json and health-plans-results.json, made by
                     make-emergency-fund-results.py and make-health-plans-results.py),
+                    fixtures/w4.ts (the W-4 sample and decision; results from w4-results.json,
+                    made by make-w4-results.py),
                     fixtures/cashflow.ts (the sample period's cash flow, spending summary and
                     recurring charges), msw/db.ts (in-memory API state), msw/handlers.ts (every
                     route, stateful), msw/spending-handlers.ts (cash flow, summary, recurring;
-                    `spendingDb`), msw/planning-handlers.ts (M6 calculators, goals, benefits
-                    plans, benefits confirm; `planningDb`)
+                    `spendingDb`), msw/planning-handlers.ts (M6 and M7 calculators, goals,
+                    benefits plans, benefits confirm; `planningDb`)
 e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions,
                     import, alpha), support/auth.ts, support/api.ts, fixtures/ (synthetic
                     acme-paystub.pdf and the script that makes it, bank-export.csv), baselines
@@ -260,6 +262,9 @@ next is a real disabled button, never a dead link).
   contribution and review events; the enrollment deadline event), and a benefits confirm writes
   plans and the profile's match. Helpers: `savedEmergencyFund()`, `savedHealthPlan()`,
   `benefitsConfirmed()` (the two sample plans), `benefitsWaiting()` (the sample summary proposed).
+  `POST /calc/w4` answers from `w4-results.json` (`make-w4-results.py`, which also writes the
+  case each suggestion leads to once applied); a saved W-4 adds the `w4_submit` reminder, and
+  `savedW4()` seeds v1 (the sample reading the saved 401(k) and Gold PPO decisions).
 - Debounces: measure them on the fake clock instead of asserting "nothing yet at 149 ms", which
   races `shouldAdvanceTime`. Record `Date.now()` when the input stops and when the request starts
   (`request:start`), and assert the difference is at least the debounce. Set inputs with
@@ -477,7 +482,8 @@ the read, confirms every field and continues to Spending. `decisions.spec.ts` (p
 saves a 401(k) decision, changes it and saves the next version, then opens its explanation and
 accepts verified, fallback, or "not available" when the API has no model; it then saves an
 emergency fund version and pauses and resumes its goal, and saves a health plan choice (typing two
-synthetic plans when no benefits summary is confirmed) with an enrollment deadline. Decisions cannot be
+synthetic plans when no benefits summary is confirmed) with an enrollment deadline, and saves a W-4
+version that reads those two decisions, with its reminder. Decisions cannot be
 deleted, so it reads the current version instead of assuming v1. Never use a real document as a
 fixture.
 
