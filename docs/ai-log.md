@@ -301,3 +301,24 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** In the subagent's branch: `unlinkAll` matches Unlink or Remove inside the accounts card; the rest as above.
 
 **Time saved or lost:** Not measured.
+
+## 2026-10-21: two real-API e2e failures CI cannot see
+
+**Task:** `spending.spec.ts` ("the cash flow and the summary tiles show the same totals") and the emergency fund test in `decisions.spec.ts` failed through the local real-API stack with Plaid sandbox keys. CI has no Plaid secrets, so it leaves the Spending project out and runs Decisions on a user without sandbox transactions.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Reproduce each through `scripts/e2e_stack.py`, verify the reported diagnosis, fix the root cause (test, web or API), prefer making a test true for the state its project produces over adding a project dependency, and the gate `pnpm lint && pnpm format:check && pnpm typecheck && pnpm test` plus both projects against the stack.
+
+**What it produced:** A conditional scale-badge check and a `<main>`-scoped alert check in `web/e2e/spending.spec.ts`, a screen test for spending with no pay stub and no income, typed emergency fund figures with a hand-worked headline and goal check in `web/e2e/decisions.spec.ts`, and the e2e notes in `web/CLAUDE.md`.
+
+**What was wrong:**
+- The reported cause for Spending held, with a second half: no stub is confirmed in September (the Acme stub is paid in October, and the project depends on Link only), and the sandbox bank deposits nothing that month either. `flowScale` has no reference, so the diagram draws every amount without bands or a badge. The screen is right; the test assumed a scale.
+- Fixing that exposed a failure it had hidden (serial mode skips the rest of the file): the period test asserted no `role="alert"` on the page, and Next's route announcer is an empty `role="alert"` it appends to `<body>` on every page, so that assertion could never pass.
+- Decisions failed only when Link ran in the same stack, which `--project=authenticated-decisions` alone does not do: with the sandbox bank linked, essentials start at September's $6.33, the target is $19, and the card says "already cover the $19 target".
+
+**How it was caught:** Running each project through the stack, then `--project=authenticated-link --project=authenticated-spending --project=authenticated-decisions --workers=1`, and reading the page snapshot in each failure's `error-context.md` (the stray alert sat beside the app's root, outside `<main>`).
+
+**Fix:** In the subagent's branch: the badge is expected only when gross pay or income is drawn; alerts are looked for inside `<main>`; the emergency fund test types $1,800 of essentials, $2,000 saved and 3 months, expects "Target $5,400, reached in 12 months" (or 14 at $250), and checks the saved goal's transfer and target. No API or web code changed.
+
+**Time saved or lost:** Not measured.
