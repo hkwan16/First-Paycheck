@@ -7,12 +7,21 @@ export interface SelectProps extends Omit<ComponentPropsWithRef<'select'>, 'size
   invalid?: boolean;
 }
 
-/** A native select in the field style: the platform picker is the accessible one. */
+/**
+ * A native select in the field style: the platform picker is the accessible one. The closed
+ * field draws its own chevron (`select-chevron`, in the text color) because the platform's arrow
+ * comes from the OS theme and moves with host settings; forced colors gets the platform's back.
+ */
 export function Select({ size, invalid, className, ...rest }: SelectProps) {
   return (
     <select
       aria-invalid={invalid || undefined}
-      className={cn(fieldClasses({ size }), className)}
+      className={cn(
+        fieldClasses({ size }),
+        'select-chevron appearance-none forced-colors:appearance-auto forced-colors:bg-none',
+        size === 'sm' ? 'pr-8' : 'pr-9',
+        className,
+      )}
       {...rest}
     />
   );
