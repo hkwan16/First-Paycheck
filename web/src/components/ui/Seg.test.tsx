@@ -108,6 +108,8 @@ describe('Seg', () => {
       'aria-pressed:shadow-thumb',
       'active:scale-[.97]',
       'motion-reduce:active:scale-100',
+      // Tailwind v4 scale-* sets the standalone `scale` property, not `transform`.
+      'transition-[scale]',
     );
   });
 });

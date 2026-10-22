@@ -193,6 +193,40 @@ describe('LinkScreen accounts', () => {
     expect(screen.queryByRole('group', { name: 'Chase Total Checking' })).not.toBeInTheDocument();
   });
 
+  it('says the institution is unlinked, with no undo, and keeps focus on the card', async () => {
+    const { user } = renderLink();
+    await screen.findByRole('group', { name: 'Chase Total Checking' });
+    await user.click(screen.getByRole('button', { name: 'Unlink Chase' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, unlink Chase' }));
+
+    const done = await within(accountsCard()).findByRole('status');
+    expect(done).toHaveTextContent(
+      'Unlinked Chase. Its 2 accounts and their transactions were deleted.',
+    );
+    // Focus does not fall to the page when the Unlink button leaves with its institution.
+    expect(done).toHaveFocus();
+    expect(within(accountsCard()).queryByRole('button', { name: /Undo/ })).toBeNull();
+  });
+
+  it('says why an unlink failed and keeps the institution', async () => {
+    server.use(
+      http.delete(apiUrl('/sync/items/:id'), () =>
+        HttpResponse.json(
+          { error: { code: 'internal_error', message: 'Database is busy' } },
+          { status: 500 },
+        ),
+      ),
+    );
+    const { user } = renderLink();
+    await screen.findByRole('group', { name: 'Chase Total Checking' });
+    await user.click(screen.getByRole('button', { name: 'Unlink Chase' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, unlink Chase' }));
+    expect(await within(accountsCard()).findByRole('alert')).toHaveTextContent(
+      'Could not unlink Chase. Database is busy',
+    );
+    expect(screen.getByRole('group', { name: 'Chase Total Checking' })).toBeInTheDocument();
+  });
+
   it('shows an empty state and holds the next step until an account exists', async () => {
     emptyDb();
     renderLink();
@@ -644,7 +678,7 @@ describe('LinkScreen documents', () => {
     );
     const alert = await within(docsCard()).findByRole('alert');
     expect(alert).toHaveTextContent(
-      'acme.pdf was not uploaded. You have reached the upload limit for now. Try again in about 20 minutes.',
+      'acme.pdf was not uploaded. You have reached the limit for now. Try again in about 20 minutes.',
     );
     expect(within(docsCard()).queryByRole('progressbar')).toBeNull();
     await user.click(within(alert).getByRole('button', { name: 'Dismiss' }));

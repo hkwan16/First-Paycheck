@@ -24,9 +24,12 @@ export const sessionTokens = createSessionTokens({
   getAuth: () => (typeof window === 'undefined' ? null : getSupabaseBrowserClient()?.auth) ?? null,
   onSessionExpired: () =>
     hardNavigate(signInRoute({ next: `${window.location.pathname}${window.location.search}` })),
+  // Nothing to return to: the sign-in screen says the account and its data were deleted.
+  onAccountDeleted: () => hardNavigate(signInRoute({ deleted: true })),
 });
 
-// Bearer token on every request; one refresh and retry on 401, then sign in again.
+// Bearer token on every request; one refresh and retry on 401, then sign in again;
+// a 401 account_deleted signs out at once.
 fetchClient.use(createAuthMiddleware(sessionTokens));
 
 /** TanStack Query bindings: `$api.useQuery('get', '/health')`. */

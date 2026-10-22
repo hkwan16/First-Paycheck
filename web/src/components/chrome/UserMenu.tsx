@@ -7,6 +7,7 @@ import { chipClasses } from '@/components/ui/Chip';
 import { cn } from '@/lib/cn';
 import { hardNavigate } from '@/lib/navigation';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { DeleteAccountConfirm } from './DeleteAccountConfirm';
 
 export interface UserMenuProps {
   /** The person's name or email, shown on the chip. */
@@ -15,26 +16,42 @@ export interface UserMenuProps {
 
 /**
  * The header's user chip as a disclosure button: it opens a small panel with
- * "Sign out". Escape or a click elsewhere closes it. Sign-out ends only this
- * browser's session, then fully navigates to /sign-in so no state from the
- * session survives.
+ * "Sign out" and "Delete account". Escape or a click elsewhere closes it.
+ * Sign-out ends only this browser's session, then fully navigates to /sign-in
+ * so no state from the session survives. Delete account swaps the panel for
+ * an in-page confirmation (`DeleteAccountConfirm`); closing the menu drops it.
  */
 export function UserMenu({ label }: UserMenuProps) {
   const panelId = useId();
   const [open, setOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const deleteRef = useRef<HTMLButtonElement>(null);
+  const returnToDelete = useRef(false);
+
+  // A closed menu forgets the confirmation, so it never reopens half typed.
+  const close = () => {
+    setOpen(false);
+    setDeleting(false);
+  };
+
+  useEffect(() => {
+    if (deleting || !returnToDelete.current) return;
+    returnToDelete.current = false;
+    deleteRef.current?.focus();
+  }, [deleting]);
 
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(event.target as Node)) close();
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      setOpen(false);
+      close();
       triggerRef.current?.focus();
     };
     document.addEventListener('pointerdown', onPointerDown);
@@ -67,7 +84,7 @@ export function UserMenu({ label }: UserMenuProps) {
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => (open ? close() : setOpen(true))}
         className={cn(
           chipClasses,
           // The chip stays 26px tall; the invisible ::after grows the target to 44px.
@@ -87,12 +104,26 @@ export function UserMenu({ label }: UserMenuProps) {
       <div
         id={panelId}
         hidden={!open}
-        className="absolute top-full right-0 z-20 mt-2.5 flex w-56 flex-col gap-2 rounded-tile bg-surface p-2 shadow-pop"
+        className={cn(
+          'absolute top-full right-0 z-20 mt-2.5 flex max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-tile bg-surface p-2 shadow-pop',
+          deleting ? 'w-80' : 'w-56',
+        )}
       >
-        {open && (
+        {open && deleting && (
+          <DeleteAccountConfirm
+            onCancel={() => {
+              returnToDelete.current = true;
+              setDeleting(false);
+            }}
+          />
+        )}
+        {open && !deleting && (
           <>
             <Button block loading={signingOut} onClick={signOut}>
               Sign out
+            </Button>
+            <Button ref={deleteRef} block disabled={signingOut} onClick={() => setDeleting(true)}>
+              Delete account
             </Button>
             {error && (
               <p role="alert" className="m-0 px-1 text-small text-ink-2">

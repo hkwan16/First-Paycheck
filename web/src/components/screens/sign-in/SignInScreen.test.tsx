@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { SignInScreen, type SignInScreenProps } from './SignInScreen';
 
 const renderScreen = (props: Partial<SignInScreenProps> = {}) =>
-  render(<SignInScreen mode="sign-in" next={null} linkError={false} {...props} />);
+  render(<SignInScreen mode="sign-in" next={null} linkError={false} deleted={false} {...props} />);
 
 describe('SignInScreen', () => {
   it('leads with the promise, highlighting "with your own numbers"', () => {
@@ -46,12 +46,24 @@ describe('SignInScreen', () => {
   it('starts a fresh form when the mode changes', () => {
     const { rerender } = renderScreen({ linkError: true });
     expect(screen.getByRole('alert')).toBeInTheDocument();
-    rerender(<SignInScreen mode="sign-up" next={null} linkError={false} />);
+    rerender(<SignInScreen mode="sign-up" next={null} linkError={false} deleted={false} />);
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('shows the link error from /auth/callback', () => {
     renderScreen({ linkError: true });
     expect(screen.getByRole('alert')).toHaveTextContent('That sign-in link is invalid');
+  });
+
+  it('says calmly that the account was deleted, above the sign-in form', () => {
+    renderScreen({ deleted: true });
+    expect(screen.getByRole('status')).toHaveTextContent('Your account and its data were deleted.');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('form', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('says nothing about deletion otherwise', () => {
+    renderScreen();
+    expect(screen.queryByText(/were deleted/)).toBeNull();
   });
 });

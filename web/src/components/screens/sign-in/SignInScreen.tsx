@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { CalendarIcon, LinesIcon, ShieldIcon } from '@/components/icons';
 import { IconTile } from '@/components/ui/IconTile';
+import { Notice } from '@/components/ui/Notice';
 import type { Hue } from '@/lib/design/tone';
 import { AuthForm } from './AuthForm';
 import type { SignInParams } from './sign-in-params';
@@ -35,8 +36,10 @@ export type SignInScreenProps = SignInParams;
 /**
  * Screen 0 of the mockup (Main.dc.html): the pitch and the sign-in form, whose
  * mode, return path and link error come from the URL (`parseSignInParams`).
+ * After `DELETE /me` (`?deleted=1`) a calm notice above the form says the
+ * account and its data are gone.
  */
-export function SignInScreen({ mode, next, linkError }: SignInScreenProps) {
+export function SignInScreen({ mode, next, linkError, deleted }: SignInScreenProps) {
   return (
     <div className="mx-auto flex w-full max-w-[1040px] flex-1 flex-wrap items-center justify-center gap-12 px-6 py-12">
       <div className="flex min-w-0 flex-[1_1_360px] flex-col gap-6">
@@ -65,8 +68,15 @@ export function SignInScreen({ mode, next, linkError }: SignInScreenProps) {
         </div>
       </div>
 
-      {/* A new mode starts clean: no stale notice or errors from the other form. */}
-      <AuthForm key={mode} mode={mode} next={next} linkError={linkError} />
+      <div className="flex min-w-0 flex-[0_1_400px] flex-col gap-4">
+        {deleted && (
+          <Notice tone="blue" role="status">
+            Your account and its data were deleted. You can create a new account at any time.
+          </Notice>
+        )}
+        {/* A new mode starts clean: no stale notice or errors from the other form. */}
+        <AuthForm key={mode} mode={mode} next={next} linkError={linkError} />
+      </div>
     </div>
   );
 }

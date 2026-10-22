@@ -74,7 +74,7 @@ export function Seg<T extends string>({ label, options, value, onChange, classNa
           onKeyDown={(event) => onKeyDown(event, index)}
           className={cn(
             'min-h-[38px] rounded-seg border-0 bg-transparent px-3.5 text-small leading-[1.5] font-medium text-ink-2',
-            'transition-transform duration-(--duration-press) ease-out active:scale-[.97] motion-reduce:active:scale-100',
+            'transition-[scale] duration-(--duration-press) ease-out active:scale-[.97] motion-reduce:active:scale-100',
             'aria-pressed:bg-surface aria-pressed:font-semibold aria-pressed:text-ink aria-pressed:shadow-thumb',
           )}
         >

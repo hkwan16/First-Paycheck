@@ -134,7 +134,8 @@ describe('useUpdateFinding', () => {
     await waitFor(() => expect(election(result.current.detail.data)?.user_action).toBe('done'));
     await waitFor(() => expect(result.current.update.isError).toBe(true));
     expect(result.current.detail.data).toEqual(before);
-    expect(result.current.update.error).toEqual({
+    expect(result.current.update.error).toMatchObject({
+      status: 404,
       error: { code: 'not_found', message: 'Finding not found' },
     });
   });
@@ -176,8 +177,8 @@ describe('useUpdateFinding', () => {
     expect(second?.user_action).toBe('done');
     expect(result.current.detail.data?.handled_count).toBe(1);
     // The earlier, refused change is reported even though a later one was made.
-    expect(refused).toEqual([
-      [electionId, { error: { code: 'internal_error', message: 'Try again' } }],
+    expect(refused).toMatchObject([
+      [electionId, { status: 500, error: { code: 'internal_error', message: 'Try again' } }],
     ]);
   });
 

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Middleware } from 'openapi-fetch';
+import { apiErrorCode } from './errors';
 
 /** The slice of Supabase Auth the middleware uses. */
 export type SessionAuth = Pick<SupabaseClient['auth'], 'getSession' | 'refreshSession' | 'signOut'>;
@@ -9,6 +10,21 @@ export interface AuthMiddlewareOptions {
   getAuth: () => SessionAuth | null;
   /** The API rejected the refreshed token too: the session is gone. */
   onSessionExpired: () => void;
+  /**
+   * The API answered 401 `account_deleted` (spec 017 rule 9): the token is
+   * still valid but its account is gone, so there is nothing to refresh.
+   */
+  onAccountDeleted: () => void;
+}
+
+/** True for the API's 401 `account_deleted`; reads a copy, so the body stays readable. */
+async function isAccountDeleted(response: Response): Promise<boolean> {
+  try {
+    const body: unknown = await response.clone().json();
+    return apiErrorCode(body) === 'account_deleted';
+  } catch {
+    return false;
+  }
 }
 
 function withToken(request: Request, token: string): Request {
@@ -32,13 +48,24 @@ export interface SessionTokens {
   refreshed: () => Promise<string | null>;
   /** Clear the local session and report it gone. */
   expire: () => Promise<void>;
+  /** Clear the local session and report the account deleted. */
+  accountDeleted: () => Promise<void>;
 }
 
 export function createSessionTokens({
   getAuth,
   onSessionExpired,
+  onAccountDeleted,
 }: AuthMiddlewareOptions): SessionTokens {
   let refreshing: Promise<string | null> | null = null;
+
+  const signOutLocally = async () => {
+    try {
+      await getAuth()?.signOut({ scope: 'local' });
+    } catch {
+      // Unreachable Auth: the session is unusable anyway, so sign-in is still the way out.
+    }
+  };
 
   return {
     async current() {
@@ -66,13 +93,13 @@ export function createSessionTokens({
     },
 
     async expire() {
-      const auth = getAuth();
-      try {
-        await auth?.signOut({ scope: 'local' });
-      } catch {
-        // Unreachable Auth: the session is unusable anyway, so sign-in is still the way out.
-      }
+      await signOutLocally();
       onSessionExpired();
+    },
+
+    async accountDeleted() {
+      await signOutLocally();
+      onAccountDeleted();
     },
   };
 }
@@ -81,7 +108,8 @@ export function createSessionTokens({
  * openapi-fetch middleware for the FastAPI client. Every request carries the
  * Supabase access token as a bearer header. A 401 triggers one shared refresh
  * and one retry; a second 401, or a failed refresh, clears the local session
- * and calls `onSessionExpired`.
+ * and calls `onSessionExpired`. A 401 `account_deleted`, first or after the
+ * retry, clears it and calls `onAccountDeleted` instead, with no refresh.
  */
 export function createAuthMiddleware(tokens: SessionTokens): Middleware {
   // The body of a sent Request is consumed, so each request keeps an unsent copy for the retry.
@@ -101,12 +129,17 @@ export function createAuthMiddleware(tokens: SessionTokens): Middleware {
       const copy = retryCopies.get(request);
       retryCopies.delete(request);
       if (!tokens.enabled() || !copy) return undefined;
+      if (await isAccountDeleted(response)) {
+        await tokens.accountDeleted();
+        return undefined;
+      }
 
       const token = await tokens.refreshed();
       if (token) {
         const retried = await options.fetch(withToken(copy, token));
         if (retried.status !== 401) return retried;
-        await tokens.expire();
+        if (await isAccountDeleted(retried)) await tokens.accountDeleted();
+        else await tokens.expire();
         return retried;
       }
       await tokens.expire();

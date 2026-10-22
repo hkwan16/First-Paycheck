@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { createRef } from 'react';
 import { describe, expect, it } from 'vitest';
 import { Notice } from './Notice';
 
@@ -58,5 +59,16 @@ describe('Notice', () => {
       </Notice>,
     );
     expect(screen.getByRole('status')).toHaveClass('rounded-control', 'py-3');
+  });
+
+  it('forwards a ref, so a screen can move focus to a notice that replaced a control', () => {
+    const ref = createRef<HTMLDivElement>();
+    render(
+      <Notice ref={ref} tabIndex={-1} role="status">
+        Unlinked.
+      </Notice>,
+    );
+    ref.current?.focus();
+    expect(screen.getByRole('status')).toHaveFocus();
   });
 });

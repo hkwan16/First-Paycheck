@@ -5,6 +5,7 @@ import type { Route } from 'next';
 import { useState, type ReactNode } from 'react';
 import { Header } from '@/components/chrome/Header';
 import { Shell } from '@/components/chrome/Shell';
+import { UserMenu } from '@/components/chrome/UserMenu';
 import { SideNav, type NavKey } from '@/components/chrome/SideNav';
 import { CheckInIndexScreen } from '@/components/screens/check-in/CheckInIndexScreen';
 import { CheckInScreen } from '@/components/screens/check-in/CheckInScreen';
@@ -87,6 +88,10 @@ export type SampleScreenName =
   | 'confirm'
   | 'confirm-manual'
   | 'confirm-benefits'
+  | 'confirm-extracting'
+  | 'confirm-failed'
+  | 'confirm-confirmed'
+  | 'account'
   | 'spending'
   | 'decisions'
   | 'why'
@@ -100,6 +105,10 @@ export type SampleScreenName =
 
 /** The manual-entry variant's document: the same stub, which the AI declined to read. */
 const MANUAL_DOC_ID = '4d000000-0000-4000-8000-0000000000aa';
+/** The same stub while it is read, after it failed to open, and once confirmed. */
+const EXTRACTING_DOC_ID = '4d000000-0000-4000-8000-0000000000ab';
+const FAILED_DOC_ID = '4d000000-0000-4000-8000-0000000000ac';
+const CONFIRMED_DOC_ID = '4d000000-0000-4000-8000-0000000000ad';
 
 const SEEDED_AT = Date.parse(SAMPLE_NOW);
 
@@ -178,17 +187,34 @@ const SCREENS: Record<
   {
     nav: NavKey;
     render: () => ReactNode;
+    /** The header's account menu (UserMenu) in place of the person's name chip. */
+    accountMenu?: boolean;
     seed?: (seed: Seed) => void;
     /** Id-bound nav links, as AppSideNav gives them from API data. */
     hrefs?: Partial<Record<NavKey, Route>>;
   }
 > = {
   link: { nav: 'link', render: () => <LinkScreen showSandboxLink={false} /> },
+  // The Link screen with the header's account menu, for the account deletion flow.
+  account: {
+    nav: 'link',
+    render: () => <LinkScreen showSandboxLink={false} />,
+    accountMenu: true,
+  },
   confirm: { nav: 'confirm', render: () => <ConfirmScreen documentId={PAY_STUB_DOC_ID} /> },
   'confirm-manual': { nav: 'confirm', render: () => <ConfirmScreen documentId={MANUAL_DOC_ID} /> },
   'confirm-benefits': {
     nav: 'confirm',
     render: () => <ConfirmScreen documentId={BENEFITS_DOC_ID} />,
+  },
+  'confirm-extracting': {
+    nav: 'confirm',
+    render: () => <ConfirmScreen documentId={EXTRACTING_DOC_ID} />,
+  },
+  'confirm-failed': { nav: 'confirm', render: () => <ConfirmScreen documentId={FAILED_DOC_ID} /> },
+  'confirm-confirmed': {
+    nav: 'confirm',
+    render: () => <ConfirmScreen documentId={CONFIRMED_DOC_ID} />,
   },
   spending: {
     nav: 'spending',
@@ -282,6 +308,24 @@ export function seededClient(screen: SampleScreenName = 'link') {
     queryKeys.document(BENEFITS_DOC_ID),
     sampleDocumentDetail(sampleBenefitsDocument, sampleBenefitsProposal),
   );
+  seed(
+    queryKeys.document(EXTRACTING_DOC_ID),
+    sampleDocumentDetail({ id: EXTRACTING_DOC_ID, status: 'extracting' }, null),
+  );
+  seed(
+    queryKeys.document(FAILED_DOC_ID),
+    sampleDocumentDetail(
+      { id: FAILED_DOC_ID, status: 'failed', status_reason: 'unreadable_file' },
+      null,
+    ),
+  );
+  seed(
+    queryKeys.document(CONFIRMED_DOC_ID),
+    sampleDocumentDetail(
+      { id: CONFIRMED_DOC_ID, status: 'confirmed', confirmed_at: SAMPLE_NOW },
+      null,
+    ),
+  );
   seed(queryKeys.transactionPages({ limit: TRANSACTIONS_PAGE_SIZE }), {
     pages: [{ items: [...sampleTransactions], next_cursor: null }],
     pageParams: [null],
@@ -304,14 +348,17 @@ export function seededClient(screen: SampleScreenName = 'link') {
 
 export function SampleScreen({ screen }: { screen: SampleScreenName }) {
   const [client] = useState(() => seededClient(screen));
-  const { nav, render, hrefs } = SCREENS[screen];
+  const { nav, render, hrefs, accountMenu = false } = SCREENS[screen];
+  const context = `${SAMPLE_USER.employer} · ${SAMPLE_USER.frequency}`;
   return (
     <QueryClientProvider client={client}>
       <Shell
         header={
-          <Header
-            chips={[`${SAMPLE_USER.employer} · ${SAMPLE_USER.frequency}`, SAMPLE_USER.name]}
-          />
+          accountMenu ? (
+            <Header chips={[context]} account={<UserMenu label={SAMPLE_USER.name} />} />
+          ) : (
+            <Header chips={[context, SAMPLE_USER.name]} />
+          )
         }
         nav={<SideNav current={nav} hrefs={hrefs} />}
       >

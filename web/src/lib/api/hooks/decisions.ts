@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { $api, fetchClient } from '../client';
-import { apiErrorCode } from '../errors';
+import { ApiError, apiErrorCode, isApiErrorBody, type ApiErrorBody } from '../errors';
 import { invalidateAfterDecision, invalidateDecisions, queryKeys } from '../keys';
 import type { CalculatorKind, Decision, DecisionSaved } from '../types';
 import type { CalcPath } from './calc';
+import { apiErrorFrom } from './request';
 
 /** `GET /decisions`: each calculator's current decision and its version history. */
 export function useDecisions() {
@@ -49,23 +50,17 @@ const CALC_PATHS: Partial<Record<CalculatorKind, CalcPath>> = {
   w4: '/calc/w4',
 };
 
-interface ApiErrorBody {
-  error: { code: string; message: string; details?: Record<string, unknown> | null };
-}
-
 /**
- * The server recomputed the result and it differs from the one sent (spec 007
- * rule 2): the numbers on screen are out of date. `fields` names what
- * differed; `error` keeps the API body so `apiErrorMessage` reads it.
+ * The server recomputed the result and it differs from the one sent (a 422,
+ * spec 007 rule 2): the numbers on screen are out of date. `fields` names
+ * what differed; as an `ApiError` it reads through `apiErrorMessage`.
  */
-export class ResultMismatch extends Error {
-  readonly error: ApiErrorBody['error'];
+export class ResultMismatch extends ApiError {
   readonly fields: string[];
 
   constructor(body: ApiErrorBody) {
-    super(body.error.message);
+    super(422, body);
     this.name = 'ResultMismatch';
-    this.error = body.error;
     const fields = body.error.details?.fields;
     this.fields = Array.isArray(fields) ? fields.filter((f) => typeof f === 'string') : [];
   }
@@ -94,7 +89,7 @@ export function useSaveDecision(calculator: CalculatorKind) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ inputs, result, current }: SaveDecisionVariables) => {
-      const { data, error } = await fetchClient.POST('/decisions', {
+      const { data, error, response } = await fetchClient.POST('/decisions', {
         body: {
           calculator,
           inputs: inputs as Record<string, unknown>,
@@ -103,9 +98,9 @@ export function useSaveDecision(calculator: CalculatorKind) {
         },
       });
       if (error !== undefined) {
-        throw apiErrorCode(error) === 'result_mismatch'
-          ? new ResultMismatch(error as ApiErrorBody)
-          : error;
+        throw isApiErrorBody(error) && error.error.code === 'result_mismatch'
+          ? new ResultMismatch(error)
+          : apiErrorFrom(response, error);
       }
       return data as DecisionSaved;
     },

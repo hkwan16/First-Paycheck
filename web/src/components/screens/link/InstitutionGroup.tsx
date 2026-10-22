@@ -6,10 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { ListRows } from '@/components/ui/ListRows';
 import { Notice } from '@/components/ui/Notice';
 import { apiErrorMessage } from '@/lib/api/errors';
-import { useUnlinkItem } from '@/lib/api/hooks';
-import { formatNumber } from '@/lib/money';
 import { AccountRow } from './AccountRow';
-import type { InstitutionGroup as Group } from './account-format';
+import { ownedText, type InstitutionGroup as Group } from './account-format';
 
 export interface InstitutionGroupProps {
   group: Group;
@@ -17,6 +15,11 @@ export interface InstitutionGroupProps {
   syncDisabled: boolean;
   syncPending: boolean;
   onSync: () => void;
+  /** The confirmed unlink; AccountsCard owns it, since this group leaves when it lands. */
+  onUnlink: () => void;
+  unlinkPending: boolean;
+  /** Why this institution's unlink failed, or null. */
+  unlinkError: unknown;
 }
 
 /**
@@ -29,8 +32,10 @@ export function InstitutionGroup({
   syncDisabled,
   syncPending,
   onSync,
+  onUnlink,
+  unlinkPending,
+  unlinkError,
 }: InstitutionGroupProps) {
-  const unlink = useUnlinkItem();
   const [confirming, setConfirming] = useState(false);
   const keepRef = useRef<HTMLButtonElement>(null);
   const unlinkRef = useRef<HTMLButtonElement>(null);
@@ -50,12 +55,6 @@ export function InstitutionGroup({
     returnFocus.current = true;
     setConfirming(false);
   };
-
-  const count = accounts.length;
-  const owned =
-    count === 1
-      ? 'Its account and its transactions'
-      : `Its ${formatNumber(count)} accounts and their transactions`;
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -97,29 +96,24 @@ export function InstitutionGroup({
         >
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <span>
-              <strong id={confirmId}>Unlink {name}?</strong> {owned} will be deleted. You can link
-              it again later.
+              <strong id={confirmId}>Unlink {name}?</strong> {ownedText(accounts.length)} will be
+              deleted. You can link it again later.
             </span>
             <span className="flex flex-wrap gap-2">
-              <Button ref={keepRef} size="sm" onClick={keep} disabled={unlink.isPending}>
+              <Button ref={keepRef} size="sm" onClick={keep} disabled={unlinkPending}>
                 Keep {name}
               </Button>
-              <Button
-                size="sm"
-                variant="primary"
-                loading={unlink.isPending}
-                onClick={() => unlink.mutate(group.itemId)}
-              >
+              <Button size="sm" variant="primary" loading={unlinkPending} onClick={onUnlink}>
                 Yes, unlink {name}
               </Button>
             </span>
           </div>
         </Notice>
       )}
-      {unlink.isError && (
+      {unlinkError != null && (
         <Notice tone="warning" compact role="alert">
           Could not unlink {name}.{' '}
-          {apiErrorMessage(unlink.error, 'Check your connection and try again.')}
+          {apiErrorMessage(unlinkError, 'Check your connection and try again.')}
         </Notice>
       )}
 

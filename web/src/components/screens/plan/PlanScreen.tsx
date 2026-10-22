@@ -6,6 +6,7 @@ import { StepFooter } from '@/components/chrome/StepFooter';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { CardErrorBoundary } from '@/components/ui/CardErrorBoundary';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { apiErrorMessage } from '@/lib/api/errors';
@@ -112,19 +113,29 @@ export function PlanScreen() {
       <StillToDecide completeness={data.completeness} />
       <div className="flex flex-wrap items-start gap-6">
         <div className="flex min-w-0 flex-[1_1_520px] flex-col gap-6">
-          <PaycheckCard payStub={data.pay_stub} />
+          <CardErrorBoundary title="Your paycheck">
+            <PaycheckCard payStub={data.pay_stub} />
+          </CardErrorBoundary>
           <ul aria-label="Saved decisions" className="m-0 flex list-none flex-col gap-6 p-0">
             {data.decisions.map((decision) => (
               <li key={decision.id}>
-                <DecisionSummary decision={decision} />
+                <CardErrorBoundary title={CALCULATOR_LABELS[decision.calculator]}>
+                  <DecisionSummary decision={decision} />
+                </CardErrorBoundary>
               </li>
             ))}
           </ul>
-          <GoalsCard goals={data.goals} />
+          <CardErrorBoundary title="Goals">
+            <GoalsCard goals={data.goals} />
+          </CardErrorBoundary>
         </div>
         <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-6">
-          <ExportCard />
-          <PlanCalendarCard plan={data} />
+          <CardErrorBoundary title="Export">
+            <ExportCard />
+          </CardErrorBoundary>
+          <CardErrorBoundary title="Next 90 days">
+            <PlanCalendarCard plan={data} />
+          </CardErrorBoundary>
         </div>
       </div>
       <StepFooter

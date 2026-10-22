@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { PageTitle } from '@/components/chrome/PageTitle';
 import { StepFooter } from '@/components/chrome/StepFooter';
+import { CardErrorBoundary } from '@/components/ui/CardErrorBoundary';
 import { useCashflow, type Period } from '@/lib/api/hooks';
 import { features } from '@/lib/features';
 import { CashFlowCard } from './CashFlowCard';
@@ -40,18 +41,26 @@ export function SpendingScreen({
         title={title}
         lead="Known merchants are labeled by rules. Only unknown ones went to the AI, with a confidence score. Fix any label and it becomes a rule for next time."
       />
-      <SummaryCard
-        summary={flow?.spending}
-        updating={cashflow.isPlaceholderData}
-        error={cashflow.error}
-        onRetry={() => void cashflow.refetch()}
-        picker={<PeriodPicker value={period} shown={flow} onChange={setPeriod} />}
-      />
+      <CardErrorBoundary title="Spending summary">
+        <SummaryCard
+          summary={flow?.spending}
+          updating={cashflow.isPlaceholderData}
+          error={cashflow.error}
+          onRetry={() => void cashflow.refetch()}
+          picker={<PeriodPicker value={period} shown={flow} onChange={setPeriod} />}
+        />
+      </CardErrorBoundary>
       {showSankey && !cashflow.isError && (
-        <CashFlowCard flow={flow} updating={cashflow.isPlaceholderData} />
+        <CardErrorBoundary title="Where each dollar of pay went">
+          <CashFlowCard flow={flow} updating={cashflow.isPlaceholderData} />
+        </CardErrorBoundary>
       )}
-      <RecurringCard />
-      <TransactionsCard />
+      <CardErrorBoundary title="Recurring charges">
+        <RecurringCard />
+      </CardErrorBoundary>
+      <CardErrorBoundary title="Transactions">
+        <TransactionsCard />
+      </CardErrorBoundary>
       <StepFooter
         back={{ href: '/setup/link' }}
         next={{ label: 'Use these numbers in decisions', href: '/setup/decisions' }}

@@ -32,18 +32,18 @@ over a generated OpenAPI client, and Supabase Auth. The visual target is Mockup 
 pnpm comes from Corepack (`"packageManager"` in `package.json`). If `pnpm` is not on your PATH,
 run `corepack enable` once, or prefix commands with `corepack pnpm`. Node 22.13+ is required.
 
-| Command                                 | What it does                                                                |
-| --------------------------------------- | --------------------------------------------------------------------------- |
-| `pnpm dev`                              | Next dev server on :3000                                                    |
-| `pnpm build`                            | Production build (also typechecks)                                          |
-| `pnpm lint`                             | ESLint, zero warnings allowed                                               |
-| `pnpm format` / `pnpm format:check`     | Prettier with Tailwind class sorting                                        |
-| `pnpm typecheck`                        | `next typegen` (route types) then `tsc --noEmit`                            |
-| `pnpm test` / `pnpm test:watch`         | Vitest (jsdom, Testing Library, MSW) over `src/**/*.test.ts(x)`             |
-| `pnpm e2e`                              | Playwright: smoke (axe, screenshots at 1280x820 and 390x844) and auth flows |
-| `pnpm exec playwright install chromium` | One-time browser install for `pnpm e2e`                                     |
-| `pnpm gen:api`                          | Regenerate `src/lib/api/schema.d.ts` from `../api/openapi.json`             |
-| `pnpm check:api`                        | Regenerate and fail if the committed schema drifted (CI)                    |
+| Command                                 | What it does                                                                         |
+| --------------------------------------- | ------------------------------------------------------------------------------------ |
+| `pnpm dev`                              | Next dev server on :3000                                                             |
+| `pnpm build`                            | Production build (also typechecks)                                                   |
+| `pnpm lint`                             | ESLint, zero warnings allowed                                                        |
+| `pnpm format` / `pnpm format:check`     | Prettier with Tailwind class sorting                                                 |
+| `pnpm typecheck`                        | `next typegen` (route types) then `tsc --noEmit`                                     |
+| `pnpm test` / `pnpm test:watch`         | Vitest (jsdom, Testing Library, MSW) over `src/**/*.test.ts(x)`                      |
+| `pnpm e2e`                              | Playwright: smoke (axe, screenshots, a Tab walk at 1280x820 and 390x844), auth flows |
+| `pnpm exec playwright install chromium` | One-time browser install for `pnpm e2e`                                              |
+| `pnpm gen:api`                          | Regenerate `src/lib/api/schema.d.ts` from `../api/openapi.json`                      |
+| `pnpm check:api`                        | Regenerate and fail if the committed schema drifted (CI)                             |
 
 `pnpm e2e` starts `next dev` on :3100 (`/dev/kit` is a 404 in production builds) with
 `NEXT_PUBLIC_FEATURES=e2e,sankey`. `playwright.config.ts` loads `web/.env.local` (variables
@@ -61,7 +61,8 @@ baselines in that same image (mount `web/` read-only, copy it without `node_modu
 ```
 src/app/            routes. (auth)/sign-in; (app)/setup/{link,confirm,confirm/[documentId],spending,decisions},
                     (app)/why (index of saved decisions), (app)/why/[decisionId], (app)/plan,
-                    (app)/check-in (list of check-ins), (app)/check-in/[checkInId]; dev/kit
+                    (app)/check-in (list of check-ins), (app)/check-in/[checkInId]; (app)/error.tsx
+                    (the segment's error boundary); dev/kit
 src/app/auth/callback/route.ts  exchanges the email-link code for a session
 src/proxy.ts        Next 16 proxy (formerly middleware): refreshes the Supabase session, sends
                     signed-out requests for (app) screens to /sign-in, forwards the requested path
@@ -77,10 +78,11 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
                     documents.ts, decisions.ts, deep-equal.ts, features.ts, findings.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts,
-                    page-hydration.ts
-src/app/dev/screens/{link,spending,confirm,confirm/manual,confirm/benefits,decisions,why,why/fallback,
-                    why-index,check-in,check-in/complete,check-in-index,plan,plan/empty}  a screen on
-                    the sample data, no API (development only)
+                    page-hydration.ts, log-error.ts
+src/app/dev/screens/{link,account,spending,confirm,confirm/manual,confirm/benefits,confirm/extracting,
+                    confirm/failed,confirm/confirmed,decisions,why,why/fallback,why-index,check-in,
+                    check-in/complete,check-in-index,plan,plan/empty}  a screen on the sample data, no
+                    API (development only); `account` is Link with the header's account menu
 src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fake-xhr.ts,
                     fake-download.ts (object URLs and anchor clicks recorded, no navigation),
                     fixtures/sample.ts (the Acme / J. Rivera dataset), fixtures/documents.ts (the
@@ -104,6 +106,7 @@ src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fa
 e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions,
                     plan, import, check-in, alpha), support/auth.ts, support/api.ts, fixtures/ (synthetic
                     acme-paystub.pdf and the script that makes it, bank-export.csv), baselines
+../docs/user-test/  the 5-to-8-person user test kit (script, quiz, consent, observation sheet)
 ```
 
 ## Component map
@@ -128,7 +131,8 @@ comment.
 | `Seg`                                           | `.seg`                                            | generic options; role group of `aria-pressed` buttons; one tab stop; arrows, Home, End; `value` may be `null` (nothing chosen yet)                                                                                                  |
 | `Input`, `Select`, `Label`, `Range`, `Checkbox` | `.input`, `.label`, `.range`, `.check`            | `Range` shows the two-sided label row and speaks `valueLabel`                                                                                                                                                                       |
 | `FieldError`                                    | none (follows the input's invalid border)         | inline message under an invalid field; `id` for `aria-describedby`; renders nothing when empty                                                                                                                                      |
-| `Notice`                                        | `.notice` and inline result rows                  | `tone` blue, confirmed, warning; `compact`                                                                                                                                                                                          |
+| `Notice`                                        | `.notice` and inline result rows                  | `tone` blue, confirmed, warning; `compact`; forwards `ref` (focus a notice that replaced the control pressed)                                                                                                                       |
+| `CardErrorBoundary`                             | `.card` (fallback only)                           | class component; `title`, `className` (the card's layout classes, kept by the fallback); see "Error boundaries"                                                                                                                     |
 | `Swatch`                                        | `.sw`                                             | token `color` or `dashed` (a $0 node)                                                                                                                                                                                               |
 | `ListRows`                                      | `.list`                                           | hairline-separated rows                                                                                                                                                                                                             |
 | `DropZone`                                      | `.drop`                                           | a real file input, keyboard operable; filters by `accept` (drops too)                                                                                                                                                               |
@@ -136,7 +140,8 @@ comment.
 
 Chrome (`components/chrome`): `Wordmark`, `Header` (`chips`, `account` slot, `minimal`),
 `HeaderAccount` (server: "Sample data" chip and `UserMenu` from the Supabase user), `UserMenu` (the
-user chip as a disclosure button with "Sign out"), `NavStep`, `SideNav`
+user chip as a disclosure button with "Sign out" and "Delete account"; see "Deleting the account"),
+`DeleteAccountConfirm`, `NavStep`, `SideNav`
 (`current`, `done` from `lib/setup-progress.ts`, `hrefs` for id-bound screens; wraps into a chip
 row under 780px), `AppSideNav` (current item from the URL), `Shell` (header, nav column
 `1 1 200px` up to 240px, main `999 1 560px`, skip link), `PageTitle` (`title`, `lead`, `aside`,
@@ -146,16 +151,30 @@ next is a real disabled button, never a dead link).
 ## Data layer
 
 - **Hooks** live in `src/lib/api/hooks/` (one file per area, re-exported from `hooks/index.ts`);
-  screens import them from `@/lib/api/hooks`. Reads use `$api.useQuery`; paginated reads and
-  mutations use TanStack directly over `fetchClient`, through `unwrap()`, so every hook's `error`
-  is the API's `{ error: { code, message } }` body. Turn errors into sentences with
-  `apiErrorMessage(error, fallback)` (`lib/api/errors.ts`), never by printing the object.
+  screens import them from `@/lib/api/hooks`. Reads use `$api.useQuery` (its `error` is the API's
+  `{ error: { code, message } }` body); paginated reads and mutations use TanStack directly over
+  `fetchClient`, through `unwrap()`, which throws an `ApiError` (`lib/api/errors.ts`): `status`,
+  `code`, `error` (the body's error, so it reads like a bare body) and `retryAfterSeconds` from
+  Retry-After. A mutation that throws its own class (`ResultMismatch`, `PayStubUnbalanced`) extends
+  `ApiError`, and so do `UploadError` and `DownloadError`. Turn errors into sentences with
+  `apiErrorMessage(error, fallback)`, never by printing the object.
+- **Limits** (M10): every write route can answer 429 `rate_limited` (with Retry-After, which the
+  API exposes through CORS) and 413 `body_too_large`. `apiErrorMessage` turns any 429 into the one
+  sentence `rateLimitMessage` makes, "You have reached the limit for now. Try again in about 20
+  minutes." (`formatWait`, from `parseRetryAfter`; "later" without the header), and a 413 into the
+  API's message, so a surface only adds its own lead ("Could not sync Chase."). Never special-case
+  429 on a screen. `components/screens/limits.test.tsx` refuses every mutation surface with both and
+  checks what it says; add a row for a new one.
 - **Keys** (`lib/api/keys.ts`): `$api` caches under `[method, path, init?]`, so `['get', path]` is a
   prefix of every read of a route. Invalidate through the helpers there (`invalidateAccounts`,
   `invalidateSpending`, `invalidateLinkedData`, `invalidateRecurring`, `invalidateForJob`), not
   with keys spelled at call sites. `useTransactions` is an infinite query under
   `queryKeys.transactionPages(filters)`; the trailing `'pages'` keeps its `InfiniteData` apart
-  from plain reads under the same prefix.
+  from plain reads under the same prefix. After an unlink, `invalidateAfterUnlink` reads again
+  everything an institution fed (spec 017 rules 12-14): accounts, transactions, summary, cash flow,
+  recurring charges, check-ins, net worth, holdings, goals and the plan. `DELETE /sync/items/{id}`
+  returns no id for the `recurring.detect` job it queues, so recurring charges and check-ins are
+  read once now and again whenever their screens next fetch.
   Documents: `invalidateDocuments` after an upload or extraction, `invalidateAfterConfirm`
   (documents, pay stubs, benefits plans, the profile and the plan) after a confirm. Decisions: `invalidateDecisions` (the list and every
   `GET /decisions/{id}`) and `invalidateAfterDecision` (also calendar, plan and goals) after a save.
@@ -193,8 +212,11 @@ next is a real disabled button, never a dead link).
 - **Optimistic writes** cancel the affected reads, patch every cached copy (`setQueriesData` over
   the prefix, paged or not), keep a snapshot for rollback in `onError`, and invalidate in
   `onSettled`. Mirror what the server will write: `useFixCategory` also relabels the merchant's
-  other rows as `rule` and sets `confidence: null`, as the API does. Destructive writes (unlink)
-  are not optimistic: the rows leave when the server says they are gone.
+  other rows as `rule` and sets `confidence: null`, as the API does. Destructive writes (unlink,
+  delete the account) are not optimistic: the rows leave when the server says they are gone. A
+  write whose control leaves with the rows (an institution's Unlink) is owned by the component that
+  stays (`AccountsCard`), which reads the outcome from the mutation's state: a `mutate` callback is
+  dropped once its component unmounts.
 - **Job polling**: a route that queues work returns a `job_id`; pass it to `useJob(jobId)`, which
   polls `GET /jobs/{id}` every 1.5 s (`JOB_POLL_MS`), stops at `succeeded`, `dead` or a read error,
   and on finishing invalidates what its kind changes (`JOB_INVALIDATES` in keys.ts; add a row when
@@ -239,15 +261,13 @@ next is a real disabled button, never a dead link).
   `parseAs: 'blob'` (the token, one refresh and one resend on a 401, like every request), name
   the file from Content-Disposition (`filenameFrom`, `filename*=` first, no directory part) and
   hand it over with `saveFile` (an object URL on a hidden anchor in the document, clicked, revoked
-  after `REVOKE_AFTER_MS`). The API does not list Content-Disposition in CORS `expose_headers`,
-  so a cross-origin browser falls back to `first-paycheck-calendar.ics` and
-  `first-paycheck-plan.pdf`. Failures are `DownloadError` (`status`, 0 for no answer; `code`;
-  `error` for `apiErrorMessage`). `isApiErrorBody` (`errors.ts`) is shared with the uploads.
+  after `REVOKE_AFTER_MS`). The API exposes Content-Disposition through CORS; without it (an older
+  API) the names fall back to `first-paycheck-calendar.ics` and `first-paycheck-plan.pdf`. Failures
+  are `DownloadError`, an `ApiError` (`status` 0 for no answer).
 - **Uploads** (`lib/api/upload.ts`): `POST /docs` and `POST /accounts/import` (`importCsv`,
   wrapped by `useImportCsv`) go over XMLHttpRequest, because fetch cannot report upload progress.
-  They share `sessionTokens` with the fetch middleware (one refresh and one resend on a 401), and
-  fail with `UploadError` (`status`, `code`, `retryAfterSeconds`; `error` reads like any API
-  error). `useUploadDocument` wraps the document upload; the Link documents card then calls
+  They share `sessionTokens` with the fetch middleware (one refresh and one resend on a 401; a
+  401 `account_deleted` signs out at once), and fail with `UploadError`, an `ApiError`. `useUploadDocument` wraps the document upload; the Link documents card then calls
   `useExtractDocument` and follows the job with `useJob`. A CSV import refused with 422
   `csv_invalid` carries its row errors: `csvProblems(error)` reads `{ errors, total }` (the first
   50 and how many in all); the Link screen's `CsvImport` lists them, offers Try again on 409
@@ -292,6 +312,10 @@ next is a real disabled button, never a dead link).
   that writes `db.nextProposal` when it succeeds; `emptyDocuments()` clears the documents.
 - Assert requests with `server.events.on('request:start', ...)` and remove the listeners in
   `afterEach`. For hooks, `renderHookWithClient(hook)` returns the `queryClient` for cache checks.
+- `DELETE /me` empties `db` (`emptyDb()`) and answers 204. A test of the sign-out paths mocks
+  `@/lib/supabase/client` and `@/lib/navigation` (see `UserMenu.test.tsx`, `account.test.tsx`).
+- `components/screens/card-boundaries.test.tsx` mocks one card per screen to throw and checks the
+  rest of the screen still works; `limits.test.tsx` is the 429 and 413 table (see "Limits").
 - Third-party widgets are mocked at the module (`vi.mock('react-plaid-link', ...)`, see
   `LinkScreen.test.tsx`), and the test calls the callbacks the widget would.
 - Screen tests cannot name status colors (ESLint): test a tone through a pure helper
@@ -319,6 +343,64 @@ next is a real disabled button, never a dead link).
   races `shouldAdvanceTime`. Record `Date.now()` when the input stops and when the request starts
   (`request:start`), and assert the difference is at least the debounce. Set inputs with
   `fireEvent.change` so typing does not spread over the window being measured.
+
+## Error boundaries
+
+- **Per card**: `CardErrorBoundary` (`components/ui`, a class component because React has no hook
+  for one) wraps every calculator card, the Sankey, the spending summary, recurring and
+  transactions cards, the check-in's findings, plan lines and dates, net worth (on both check-in
+  screens), every plan card and the Link cards. Wrap at the screen, around the card, with the
+  card's title and its layout classes (`className`, so a flex basis survives the fallback). A
+  render error shows the card's frame, its title and a calm blue `role="status"` notice ("This card
+  could not be shown. The rest of the page still works, and nothing you saved has changed.") with
+  Try again, which remounts the card (a new key). A new card on a screen gets a boundary.
+- **Per segment**: `app/(app)/error.tsx` (Next's convention, which lets `redirect()` and
+  `notFound()` through) catches what no card boundary did, inside the header and side nav: "This
+  page could not be shown", Try again (Next's `retry`) and a plain "Reload the page" link to the
+  same address.
+- Both log once with `console.error` through `logErrorOnce` (`lib/log-error.ts`, which remembers
+  error objects, so Strict Mode's second effect run does not log again). React logs a caught error
+  too; there is no web Sentry.
+
+## Deleting the account
+
+The header's account menu (`UserMenu`) has Delete account under Sign out. It swaps the panel for
+`DeleteAccountConfirm`: what goes, a field labeled "Type delete to confirm" (focused; capitals and
+spaces around the word do not matter; Enter submits only once it says delete), Delete my account
+and Keep my account (which returns focus to Delete account). Closing the menu (Escape, a click
+elsewhere) drops the confirmation. `useDeleteAccount` calls `DELETE /me`, then
+`sessionTokens.accountDeleted()`: the local session is cleared through the Supabase client and the
+browser goes to `/sign-in?deleted=1`. Success means the page is unloading, so the button stays busy.
+A failure says "Your account was not deleted." with the reason and keeps the person signed in.
+
+## Accessibility audit (M10)
+
+Every sample screen runs in the smoke spec at 1280 and 390: axe, the visual baseline, and a Tab
+walk (`tabWalk`): every control a person can Tab to (tabindex 0; a roving group's one stop) is
+reached, each shows a focus ring (an outline on it, or on the ancestor that draws one for a
+visually hidden input, as `DropZone` does), none lands under the sticky header, and Tab leaves the
+page (a date field takes one Tab per part and is not a trap). M10 added the sample screens that
+were missing: sign-in after a deletion (`/sign-in?deleted=1`), Confirm while reading, failed and
+confirmed, and `account` (the account menu); the unlink and account deletion confirmations are
+checked in place.
+
+What the audit found and fixed:
+
+- axe at serious or critical: nothing on any screen. At every impact, one minor
+  `aria-allowed-role`: the account deletion confirmation put `role="group"` on its `<form>`; the
+  group is now a `<div>` around the form. With that, no screen has a violation at any impact, so
+  the smoke spec's gate is now every impact, not only serious and critical.
+- Keyboard: every control on every screen was reachable with a visible ring and no trap; the walk
+  stays in the smoke spec so it stays true. Focus after an action that removes its control now
+  moves somewhere useful: an unlink focuses its done notice, Keep my account returns to Delete
+  account.
+- Motion: every `animate-` and `transition` was checked (`Bar`, `Button`, `Seg`, `Skeleton`,
+  `DropZone`, `FieldRow`, `UserMenu`, the Sankey's popover and bands; Recharts runs with no
+  animation). Durations are tokens that reduced motion sets to zero; the indeterminate bar and the
+  button spinner pulse in place; the popover fades instead of growing. One bug: `Seg` transitioned
+  `transform` while Tailwind v4's `scale-*` sets `scale`, so its press feedback never animated; it
+  now transitions `scale`, like `Button`. The smoke spec's reduced-motion test emulates the setting
+  and fails on any running movement animation or a movement transition with a duration.
 
 ## Confirm screen
 
@@ -517,8 +599,11 @@ for the amounts over one SVG of cubic bands. Not d3-sankey and not a chart libra
    the page is still inert, and Playwright then races hydration.
 7. Add the screen to the Playwright visual spec: render it on the sample data under
    `/dev/screens/<screen>` (`SampleScreen` seeds a QueryClient that never fetches) and add it to
-   `SCREENS` in `e2e/smoke.spec.ts` with `sample: true` (frozen clock, Plaid's script stubbed). An
-   end-to-end spec against the real API goes in an `authenticated-*` project (below).
+   `SCREENS` in `e2e/smoke.spec.ts` with `sample: true` (frozen clock, Plaid's script stubbed). It
+   then gets axe, a baseline at both widths and the Tab walk. Add a sample for each state that
+   renders differently. An end-to-end spec against the real API goes in an `authenticated-*`
+   project (below).
+8. Wrap each card in a `CardErrorBoundary` with its title.
 
 ## Auth
 
@@ -554,6 +639,12 @@ previews without secrets).
   `/sign-in?next=<current path>`.
 - **Sign-out**: the header's user menu calls `signOut({ scope: 'local' })` (other devices stay signed
   in) and fully navigates to `/sign-in`.
+- **A deleted account** (spec 017 rule 9): its access token stays valid until it expires, and a
+  write under it is a 401 `account_deleted`. The fetch middleware and the uploads skip the refresh
+  for it (there is no session left to refresh), clear the local session and go to
+  `/sign-in?deleted=1` (`sessionTokens.accountDeleted()`, `signInRoute({ deleted: true })`, which
+  drops `next`: nothing is left to return to). The sign-in screen then shows a calm notice,
+  "Your account and its data were deleted." (`parseSignInParams().deleted`).
 - **Supabase project settings**: add `http://localhost:3000/auth/callback` and each deployed
   `https://<host>/auth/callback` to Auth > URL Configuration > Redirect URLs, or email links fall
   back to the Site URL.
@@ -617,6 +708,11 @@ variable above itself, plus `E2E_ALPHA_USER_EMAIL`/`E2E_ALPHA_USER_PASSWORD` and
 `link.spec.ts` and the alpha's link steps and leaves the spending project out.
 `uv run python -m scripts.e2e_stack run -- <command>` runs any command against it (CI's `e2e`
 workflow picks the real-API projects), and `up` keeps it running. Logs go to `.e2e-stack/`.
+On macOS the worker's plan PDF needs Homebrew's pango: run the stack directly (make's shell drops
+`DYLD_*`) with `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib`, which it passes on to the worker,
+or `plan.spec.ts`'s export waits out its budget while the job fails with "cannot load library
+'libpango-1.0-0'" in `.e2e-stack/api.log`. Running beside other stacks, set your own
+`E2E_DATABASE_URL` (a `first_paycheck_e2e_*` name), `E2E_PORT`, `E2E_API_PORT` and `E2E_AUTH_PORT`.
 
 `alpha.spec.ts` (project `alpha`) is the whole alpha as a new user (`E2E_ALPHA_USER_*`, which the
 stack makes per run; against a hosted API, a fresh confirmed user): it signs in through the form,
@@ -640,6 +736,10 @@ calculator" with an irs.gov source (what the fake model produces).
   import) intercepts it. Keep that if you touch `lib/api/client.ts`.
 - Tailwind v4 `scale-*` sets the standalone `scale` property: transition `scale`, not
   `transform`.
+- Never let the OS theme paint something a baseline sees. The native select arrow moved 2px on
+  macOS between two runs an hour apart (the host had switched to dark appearance), failing every
+  darwin baseline with a select; `Select` now draws its chevron in CSS (`select-chevron` in
+  `globals.css`, the text color) and hands it back to the platform only in forced colors.
 - `cn()` uses a tailwind-merge config that knows the token names; without it `text-small` and
   `text-ink-3` would collide.
 - jsdom is pinned to 29 because jsdom 30 needs Node 22.22+; bump it with the Node floor.

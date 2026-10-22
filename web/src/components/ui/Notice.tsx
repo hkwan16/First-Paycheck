@@ -1,10 +1,10 @@
-import type { HTMLAttributes, ReactNode } from 'react';
+import type { ComponentPropsWithRef, ReactNode } from 'react';
 import { AlertIcon, CheckIcon, ShieldCheckIcon } from '@/components/icons';
 import { cn } from '@/lib/cn';
 
 type NoticeTone = 'blue' | 'confirmed' | 'warning';
 
-export interface NoticeProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
+export interface NoticeProps extends Omit<ComponentPropsWithRef<'div'>, 'title'> {
   tone?: NoticeTone;
   /** Bold lead-in sentence. */
   title?: ReactNode;

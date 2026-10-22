@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchClient } from '../client';
-import { invalidateLinkedData } from '../keys';
+import { invalidateAfterUnlink } from '../keys';
 import { unwrap } from './request';
 
 /** Plaid's sandbox First Platypus Bank, linked without Plaid Link (non-production only). */
@@ -60,7 +60,9 @@ export function useTriggerSync() {
 
 /**
  * `DELETE /sync/items/{id}`: unlink an institution with its accounts and
- * transactions. Not optimistic: the rows leave when the server says they are gone.
+ * transactions (a CSV import's account included). Not optimistic: the rows
+ * leave when the server says they are gone; then everything they fed is read
+ * again (`invalidateAfterUnlink`).
  */
 export function useUnlinkItem() {
   const queryClient = useQueryClient();
@@ -69,6 +71,6 @@ export function useUnlinkItem() {
       unwrap(
         fetchClient.DELETE('/sync/items/{item_id}', { params: { path: { item_id: itemId } } }),
       ),
-    onSuccess: () => invalidateLinkedData(queryClient),
+    onSuccess: () => invalidateAfterUnlink(queryClient),
   });
 }

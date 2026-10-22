@@ -115,7 +115,8 @@ describe('useUpdateRecurring', () => {
     );
     await waitFor(() => expect(result.current.update.isError).toBe(true));
     expect(find(result.current.list.data, SPOTIFY.id)).toEqual(SPOTIFY);
-    expect(result.current.update.error).toEqual({
+    expect(result.current.update.error).toMatchObject({
+      status: 422,
       error: { code: 'validation_error', message: 'merchant_clean is too long' },
     });
   });

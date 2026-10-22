@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { CheckIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -9,10 +9,16 @@ import { JobProgress } from '@/components/ui/JobProgress';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { apiErrorMessage } from '@/lib/api/errors';
-import { useAccounts, useJob, useSandboxLink, useTriggerSync } from '@/lib/api/hooks';
+import {
+  useAccounts,
+  useJob,
+  useSandboxLink,
+  useTriggerSync,
+  useUnlinkItem,
+} from '@/lib/api/hooks';
 import type { Job, LinkedItem } from '@/lib/api/types';
 import { formatNumber } from '@/lib/money';
-import { groupByInstitution } from './account-format';
+import { groupByInstitution, ownedText, type InstitutionGroup as Group } from './account-format';
 import { CsvImport } from './CsvImport';
 import { InstitutionGroup } from './InstitutionGroup';
 import { LinkBankButton } from './LinkBankButton';
@@ -23,6 +29,13 @@ interface ActiveSync {
   institution: string;
   /** A new link (initial sync) or a sync the person asked for. */
   kind: 'link' | 'sync';
+}
+
+/** The institution being unlinked, kept for the done notice: its rows leave with it. */
+interface Unlinking {
+  itemId: string;
+  name: string;
+  count: number;
 }
 
 /** The sync job's own counts, read defensively: `result` is free-form JSON. */
@@ -81,14 +94,32 @@ export function AccountsCard({ showSandboxLink }: AccountsCardProps) {
   const accounts = useAccounts();
   const sandbox = useSandboxLink();
   const trigger = useTriggerSync();
+  const unlink = useUnlinkItem();
   const [active, setActive] = useState<ActiveSync | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
+  const [unlinking, setUnlinking] = useState<Unlinking | null>(null);
   const [csvOpen, setCsvOpen] = useState(false);
   const csvPanelId = useId();
+  const doneRef = useRef<HTMLDivElement>(null);
   const job = useJob(active?.jobId);
 
   const list = accounts.data ?? [];
-  const syncing = active !== null && !job.isTerminal && !job.isFailed;
+  // The institution unlinked last, once the server said so and the list was read again.
+  const unlinked = unlink.isSuccess && unlinking?.itemId === unlink.variables ? unlinking : null;
+  // A sync of an institution that is gone has nothing left to show.
+  const shown = active && active.itemId !== unlinked?.itemId ? active : null;
+  const syncing = shown !== null && !job.isTerminal && !job.isFailed;
+
+  // The Unlink button left with its institution: focus the notice that replaced it.
+  useEffect(() => {
+    if (unlinked) doneRef.current?.focus();
+  }, [unlinked]);
+
+  const startUnlink = (group: Group) => {
+    setLinkError(null);
+    setUnlinking({ itemId: group.itemId, name: group.name, count: group.accounts.length });
+    unlink.mutate(group.itemId);
+  };
 
   const onLinked = (linked: LinkedItem, institution: string) =>
     setActive({
@@ -148,6 +179,9 @@ export function AccountsCard({ showSandboxLink }: AccountsCardProps) {
         syncDisabled={syncing || trigger.isPending}
         syncPending={trigger.isPending && trigger.variables === group.itemId}
         onSync={() => startSync(group.itemId, group.name, 'sync')}
+        onUnlink={() => startUnlink(group)}
+        unlinkPending={unlink.isPending && unlink.variables === group.itemId}
+        unlinkError={unlink.isError && unlink.variables === group.itemId ? unlink.error : null}
       />
     ));
   }
@@ -167,16 +201,22 @@ export function AccountsCard({ showSandboxLink }: AccountsCardProps) {
 
       {body}
 
-      {active &&
+      {unlinked && (
+        <Notice ref={doneRef} tabIndex={-1} tone="confirmed" compact role="status">
+          Unlinked {unlinked.name}. {ownedText(unlinked.count)} were deleted.
+        </Notice>
+      )}
+
+      {shown &&
         (job.isTerminal && job.data && !job.isFailed ? (
-          <SyncOutcome job={job.data} active={active} />
+          <SyncOutcome job={job.data} active={shown} />
         ) : (
           <JobProgress
-            label={`Syncing ${active.institution}`}
+            label={`Syncing ${shown.institution}`}
             job={job.data}
             failed={job.isFailed}
             failedMessage="Anything already synced is kept."
-            onRetry={() => startSync(active.itemId, active.institution, active.kind)}
+            onRetry={() => startSync(shown.itemId, shown.institution, shown.kind)}
             retrying={trigger.isPending}
           />
         ))}

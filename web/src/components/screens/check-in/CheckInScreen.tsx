@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { PageTitle } from '@/components/chrome/PageTitle';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { CardErrorBoundary } from '@/components/ui/CardErrorBoundary';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { apiErrorCode, apiErrorMessage } from '@/lib/api/errors';
@@ -69,12 +70,20 @@ export function CheckInScreen({ checkInId }: { checkInId: string }) {
         lead={`Compared with your plan on ${formatDate(data.updated_at)}. Each finding names the part of your plan it affects; mark it done once you have dealt with it.`}
         aside={allCheckIns}
       />
-      <FindingsCard checkIn={data} />
+      <CardErrorBoundary title="What changed">
+        <FindingsCard checkIn={data} />
+      </CardErrorBoundary>
       <div className="flex flex-wrap items-start gap-6">
-        <PlanLinesCard cashFlow={data.cash_flow} className="flex-[1_1_440px]" />
-        <NetWorthCard className="flex-[1_1_320px]" />
+        <CardErrorBoundary title="Cash flow against the plan" className="flex-[1_1_440px]">
+          <PlanLinesCard cashFlow={data.cash_flow} className="flex-[1_1_440px]" />
+        </CardErrorBoundary>
+        <CardErrorBoundary title="Net worth" className="flex-[1_1_320px]">
+          <NetWorthCard className="flex-[1_1_320px]" />
+        </CardErrorBoundary>
       </div>
-      <DeadlinesCard period={data.period} />
+      <CardErrorBoundary title="Coming up">
+        <DeadlinesCard period={data.period} />
+      </CardErrorBoundary>
     </>
   );
 }

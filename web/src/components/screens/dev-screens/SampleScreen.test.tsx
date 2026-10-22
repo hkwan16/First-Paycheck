@@ -175,6 +175,29 @@ describe('SampleScreen after Confirm', () => {
     ).toBeInTheDocument();
     expect(requests).toEqual([]);
   });
+
+  it.each([
+    ['confirm-extracting', /Reading pay stub/],
+    ['confirm-failed', /This file could not be opened\./],
+    ['confirm-confirmed', /This pay stub is confirmed\./],
+  ] as const)(
+    'renders the Confirm screen in its %s state, with no requests',
+    async (name, text) => {
+      const requests = countRequests();
+      render(<SampleScreen screen={name} />);
+      expect(await screen.findByText(text)).toBeInTheDocument();
+      expect(requests).toEqual([]);
+    },
+  );
+
+  it('renders the account menu in the header for the account sample, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="account" />);
+    const menu = screen.getByRole('button', { name: 'J. Rivera' });
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    expect(await screen.findByRole('group', { name: 'Chase Total Checking' })).toBeInTheDocument();
+    expect(requests).toEqual([]);
+  });
 });
 
 describe('seededClient', () => {

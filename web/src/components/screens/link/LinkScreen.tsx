@@ -2,6 +2,7 @@
 
 import { PageTitle } from '@/components/chrome/PageTitle';
 import { StepFooter, type StepFooterProps } from '@/components/chrome/StepFooter';
+import { CardErrorBoundary } from '@/components/ui/CardErrorBoundary';
 import { newestReviewable, useAccounts, useDocuments } from '@/lib/api/hooks';
 import { features } from '@/lib/features';
 import { confirmRoute } from '@/lib/routes';
@@ -37,8 +38,12 @@ export function LinkScreen({ showSandboxLink = features.e2e }: LinkScreenProps) 
         title="Link your accounts and add your documents"
         lead="Both feed one pipeline. Nothing here is sent to an AI model; only the redacted document pages are, on the next step."
       />
-      <AccountsCard showSandboxLink={showSandboxLink} />
-      <DocumentsCard />
+      <CardErrorBoundary title="Bank accounts">
+        <AccountsCard showSandboxLink={showSandboxLink} />
+      </CardErrorBoundary>
+      <CardErrorBoundary title="Documents">
+        <DocumentsCard />
+      </CardErrorBoundary>
       <StepFooter
         next={next}
         status={accounts.length === 0 ? 'Link an account to continue' : undefined}

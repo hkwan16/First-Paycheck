@@ -142,12 +142,28 @@ export const invalidateSpending = (client: QueryClient) => invalidateAll(client,
 export const invalidateRecurring = (client: QueryClient) =>
   invalidateAll(client, [queryKeys.recurring()]);
 
-/**
- * After unlinking (the institution's accounts and transactions are gone) or
- * a CSV import (a new account and its transactions are there).
- */
+/** After a CSV import: a new account and its transactions are there. */
 export const invalidateLinkedData = (client: QueryClient) =>
   invalidateAll(client, [queryKeys.accounts(), ...spendingReads]);
+
+/**
+ * After unlinking an institution (spec 017 rules 12-14): its accounts,
+ * transactions, balances and holdings are gone, so every total built from
+ * them changes, goal progress loses its account, and the API queues
+ * recurring detection, which drops charges only that institution billed and
+ * retracts their check-in findings. `DELETE /sync/items/{id}` returns no job
+ * id to follow, so recurring charges and check-ins are read again now and
+ * once more whenever their screens next fetch.
+ */
+export const invalidateAfterUnlink = (client: QueryClient) =>
+  invalidateAll(client, [
+    queryKeys.accounts(),
+    ...spendingReads,
+    ...balanceReads,
+    queryKeys.recurring(),
+    queryKeys.checkIns(),
+    queryKeys.checkIn(),
+  ]);
 
 /** After an upload or a queued extraction: statuses changed. */
 export const invalidateDocuments = (client: QueryClient) => invalidateAll(client, documentReads);
