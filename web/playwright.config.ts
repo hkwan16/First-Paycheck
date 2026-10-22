@@ -84,6 +84,14 @@ export default defineConfig({
       dependencies: ['authenticated-confirm'],
       use: { ...desktop, storageState: STORAGE_STATE },
     },
+    // Reads the plan the decisions made, downloads its calendar file and
+    // exports its PDF through the worker; changes nothing it reads.
+    {
+      name: 'authenticated-plan',
+      testMatch: 'plan.spec.ts',
+      dependencies: ['authenticated-decisions'],
+      use: { ...desktop, storageState: STORAGE_STATE },
+    },
     // Reads the check-ins the worker's monthly tick made and marks a finding
     // done and undone, leaving it as it was; needs only the saved session.
     {

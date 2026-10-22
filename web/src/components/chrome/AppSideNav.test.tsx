@@ -3,6 +3,8 @@ import { markPageHydrated, resetPageHydration } from '@/lib/page-hydration';
 import { NOVEMBER_ID } from '@/test/fixtures/checkins';
 import { samplePayStub } from '@/test/fixtures/documents';
 import { db } from '@/test/msw/db';
+import { partialPlan } from '@/test/fixtures/plan';
+import { planDb } from '@/test/msw/plan-handlers';
 import { server } from '@/test/msw/server';
 import { act, renderWithProviders as render, screen, waitFor } from '@/test/render';
 import { AppSideNav } from './AppSideNav';
@@ -52,6 +54,25 @@ describe('AppSideNav', () => {
     );
     // Transactions, and a summary (GET /spending/summary) with none uncategorized: step 3 is done.
     expect(await screen.findByRole('link', { name: 'Spending map, done' })).toBeInTheDocument();
+  });
+
+  it('marks the plan done when GET /plan says no decision is missing', async () => {
+    pathname.current = '/setup/link';
+    render(<AppSideNav />);
+    expect(await screen.findByRole('link', { name: 'Plan and calendar, done' })).toHaveAttribute(
+      'href',
+      '/plan',
+    );
+  });
+
+  it('leaves the plan open while a decision is missing from it', async () => {
+    planDb.plan = partialPlan();
+    pathname.current = '/setup/link';
+    render(<AppSideNav />);
+    await screen.findByRole('link', { name: 'Accounts and documents, done' });
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Plan and calendar' })).toBeInTheDocument(),
+    );
   });
 
   it('links the monthly check-in to the newest open one once the list arrives', async () => {

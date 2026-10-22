@@ -41,6 +41,11 @@ export function useUpdateGoal() {
       queryClient.setQueryData<Goal[]>(key, (goals) =>
         goals?.map((goal) => (goal.id === saved.id ? saved : goal)),
       ),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
+    // The plan lists the goals too.
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: key }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.plan() }),
+      ]),
   });
 }

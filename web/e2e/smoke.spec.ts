@@ -82,6 +82,13 @@ const SCREENS: readonly Screen[] = [
     heading: 'Monthly check-ins',
     sample: true,
   },
+  { path: '/dev/screens/plan', name: 'plan', heading: 'Your plan, on one page', sample: true },
+  {
+    path: '/dev/screens/plan/empty',
+    name: 'plan-empty',
+    heading: 'Your plan, on one page',
+    sample: true,
+  },
 ];
 
 /** Collect console errors and uncaught exceptions for the life of the page. */

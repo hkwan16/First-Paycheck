@@ -5,6 +5,7 @@ import { calculatorIdOf } from '@/lib/decisions';
 import { useAccounts } from './accounts';
 import { useDecisions } from './decisions';
 import { useDocuments } from './documents';
+import { usePlan } from './plan';
 import { usePayStubs } from './profile';
 import { useSpendingSummary } from './spending';
 import { useTransactions } from './transactions';
@@ -23,6 +24,7 @@ export function useSetupFacts(): SetupFacts {
   // The default period, as the Spending screen opens on it.
   const summary = useSpendingSummary().data;
   const decisions = useDecisions().data;
+  const plan = usePlan().data;
 
   return useMemo(
     () => ({
@@ -33,8 +35,9 @@ export function useSetupFacts(): SetupFacts {
       categorizationFinished: summary !== undefined && summary.uncategorized_count === 0,
       liveCalculators: features.calculators,
       savedDecisionCalculators: decisions?.items.map((d) => calculatorIdOf(d.calculator)) ?? [],
+      planMissingCount: plan ? plan.completeness.missing.length : null,
     }),
-    [accounts, transactions, documents, payStubs, summary, decisions],
+    [accounts, transactions, documents, payStubs, summary, decisions, plan],
   );
 }
 

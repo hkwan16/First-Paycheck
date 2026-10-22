@@ -128,3 +128,12 @@ export type KindTotal = Schemas['KindTotal'];
 export type Holdings = Schemas['HoldingsOut'];
 export type AccountHoldings = Schemas['AccountHoldingsOut'];
 export type Position = Schemas['PositionValue'];
+
+// The plan, its calendar file and the PDF export (M9, spec 016).
+export type Plan = Schemas['PlanOut'];
+export type PlanCompleteness = Schemas['PlanCompleteness'];
+export type PlanDecision = Schemas['PlanDecision'];
+export type PlanFigure = Schemas['PlanFigure'];
+export type PlanExplanation = Schemas['PlanExplanation'];
+export type PlanPayStub = Schemas['PlanPayStub'];
+export type PlanExportQueued = Schemas['PlanExportQueued'];

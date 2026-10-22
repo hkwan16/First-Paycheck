@@ -92,6 +92,7 @@ describe('document keys', () => {
       profile: $api.queryOptions('get', '/profile').queryKey,
       benefitsPlans: $api.queryOptions('get', '/benefits-plans').queryKey,
       accounts: $api.queryOptions('get', '/accounts').queryKey,
+      plan: queryKeys.plan(),
     };
     for (const key of Object.values(keys)) client.setQueryData(key, {});
     const invalidated = (key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
@@ -134,7 +135,30 @@ describe('document keys', () => {
     // A benefits summary writes plans, and its 401(k) match to the profile.
     expect(invalidated(keys.benefitsPlans)).toBe(true);
     expect(invalidated(keys.profile)).toBe(true);
+    // The plan shows the newest confirmed pay stub.
+    expect(invalidated(keys.plan)).toBe(true);
     expect(invalidated(keys.accounts)).toBe(false);
+  });
+});
+
+describe('plan keys', () => {
+  it("match the key $api's hook caches under", () => {
+    expect(queryKeys.plan()).toEqual($api.queryOptions('get', '/plan').queryKey);
+  });
+
+  it('a sync refreshes goals and the plan, whose progress reads the new balances', async () => {
+    for (const kind of ['sync.initial', 'sync.incremental'] as const) {
+      const client = new QueryClient();
+      client.setQueryData(queryKeys.goals(), []);
+      client.setQueryData(queryKeys.plan(), {});
+      await invalidateForJob(client, kind);
+      expect(client.getQueryState(queryKeys.goals())?.isInvalidated).toBe(true);
+      expect(client.getQueryState(queryKeys.plan())?.isInvalidated).toBe(true);
+    }
+  });
+
+  it('a finished export changes no cached read', () => {
+    expect(JOB_INVALIDATES['plan.export']).toEqual([]);
   });
 });
 

@@ -16,6 +16,7 @@ export * from './health';
 export * from './imports';
 export * from './jobs';
 export * from './net-worth';
+export * from './plan';
 export * from './profile';
 export * from './recurring';
 export * from './setup';

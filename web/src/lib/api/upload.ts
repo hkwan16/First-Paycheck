@@ -1,5 +1,6 @@
 import { API_BASE_URL } from './base-url';
 import { sessionTokens } from './client';
+import { isApiErrorBody, type ApiErrorBody } from './errors';
 import type { AccountKind, AmountSign, CsvImport, DocumentCreated, DocumentType } from './types';
 
 /*
@@ -15,18 +16,6 @@ export interface UploadDocumentOptions {
   onProgress?: (percent: number) => void;
   signal?: AbortSignal;
 }
-
-interface ApiErrorBody {
-  error: { code: string; message: string; details?: Record<string, unknown> | null };
-}
-
-const isApiErrorBody = (value: unknown): value is ApiErrorBody =>
-  typeof value === 'object' &&
-  value !== null &&
-  'error' in value &&
-  typeof (value as ApiErrorBody).error === 'object' &&
-  (value as ApiErrorBody).error !== null &&
-  typeof (value as ApiErrorBody).error.message === 'string';
 
 /**
  * A failed upload. `status` is 0 when the request never got an answer.
