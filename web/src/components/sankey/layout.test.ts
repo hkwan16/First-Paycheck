@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyCashflow, sampleCashflow } from '@/test/fixtures/cashflow';
+import { emptyCashflow, sampleCashflow, sandboxCashflow } from '@/test/fixtures/cashflow';
 import {
   flowScale,
   layoutCashFlow,
@@ -196,6 +196,23 @@ describe('layoutCashFlow', () => {
     expect(outOf(noStubs, 'gross')).toEqual([]);
     // The scale now comes from the income.
     expect(noStubs.scale!.centsPerPx).toBe(998);
+  });
+
+  it('draws the sandbox month as the API gives it: a little income, spending far beyond it', () => {
+    // GUSTO PAY is money out on the sandbox, so the API counts only 4.22 of
+    // interest as income (spec 007 rule 22a) and the month overspent.
+    const sandbox = layoutCashFlow(sandboxCashflow(), 928);
+    expect(node(sandbox, 'take-home')).toMatchObject({ name: 'Income deposited', cents: 422 });
+    expect(node(sandbox, 'bucket:left_over')).toMatchObject({
+      name: 'Spent beyond income',
+      cents: -168_541,
+      zero: true,
+    });
+    // Scaled to 400 px for 4.22, savings alone would be about 94,800 px tall.
+    // The tallest node sets the scale instead: savings, 1,000.00, at 400 px.
+    expect(node(sandbox, 'bucket:savings').valuePx).toBeCloseTo(TARGET_GROSS_PX, 6);
+    expect(Math.max(...sandbox.nodes.map((n) => n.valuePx))).toBeCloseTo(TARGET_GROSS_PX, 6);
+    expect(sandbox.scale!.centsPerPx).toBe(250);
   });
 
   it('draws spending beyond income as a dashed node with no band', () => {

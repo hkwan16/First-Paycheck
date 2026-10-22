@@ -95,7 +95,8 @@ src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fa
                     fixtures/w4.ts (the W-4 sample and decision; results from w4-results.json,
                     made by make-w4-results.py),
                     fixtures/cashflow.ts (the sample period's cash flow, spending summary and
-                    recurring charges), msw/db.ts (in-memory API state), msw/handlers.ts (every
+                    recurring charges; `sandboxCashflow`, the Plaid sandbox's October with an
+                    income-labeled outflow), msw/db.ts (in-memory API state), msw/handlers.ts (every
                     route, stateful), msw/spending-handlers.ts (cash flow, summary, recurring;
                     `spendingDb`), msw/planning-handlers.ts (M6 and M7 calculators, goals,
                     benefits plans, benefits confirm; `planningDb`),
@@ -597,9 +598,14 @@ for the amounts over one SVG of cubic bands. Not d3-sankey and not a chart libra
 
 - **Layout** (`layoutCashFlow(flow, containerWidth)`) is pure geometry: four columns (gross pay;
   withholding lines and take-home; buckets; categories), node heights from a scale fixed by a
-  400 px target for gross pay (income when there is no confirmed stub), so the "1 px is about $N"
-  badge is computed, not hand-tuned. Amounts are placed, never added: a node is as tall as its own
-  value or the bands leaving it, whichever is more. Colors are `FlowColor` token names.
+  400 px target for the tallest node: gross pay (income when there is no confirmed stub), or a
+  bucket or category when spending outran that income (the Plaid sandbox deposits $4.22 in a
+  month that spends $1,689.63). No scale, and no badge, without pay or income to draw from. The
+  "1 px is about $N" badge is computed, not hand-tuned. Amounts are placed, never added or
+  re-signed: income is money in only and never negative because the API counts it so (spec 007
+  rule 22a), and "Spent beyond income" is the API's negative `left_over_cents` drawn dashed. A
+  node is as tall as its own value or the bands leaving it, whichever is more. Colors are
+  `FlowColor` token names.
   `hostW = max(880, containerWidth)`; narrower containers scroll sideways. Under 640 px the
   Spending card draws `FlowStack` (stacked bars and lists) instead.
 - **Popover** state is `flowPopoverReducer` (`popover.ts`) through `useFlowPopover`: hover opens

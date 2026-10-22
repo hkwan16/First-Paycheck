@@ -1,6 +1,6 @@
 import { delay, http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { emptyCashflow } from '@/test/fixtures/cashflow';
+import { emptyCashflow, sandboxCashflow } from '@/test/fixtures/cashflow';
 import { SAMPLE_NOW, sampleTransactions } from '@/test/fixtures/sample';
 import { db, emptyDb } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
@@ -255,6 +255,20 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
     expect(node('Flexible $500.00')).toBeInTheDocument();
     expect(node('Spent beyond income -$506.33')).toBeInTheDocument();
     expect(within(card()).queryByText(/1 px is about/)).not.toBeInTheDocument();
+  });
+
+  it('draws the sandbox month the API counts money in for, at a scale its tallest node sets', async () => {
+    // The production walkthrough's month: GUSTO PAY is booked as money out,
+    // so income is the 4.22 of interest that came in (spec 007 rule 22a).
+    spendingDb.cashflow = sandboxCashflow();
+    await renderSpending({ showSankey: true });
+    expect(await within(card()).findByRole('button', { name: 'Savings $1,000.00' })).toBeVisible();
+    expect(node('Income deposited $4.22')).toBeInTheDocument();
+    expect(node('Spent beyond income -$1,685.41')).toBeInTheDocument();
+    expect(tile('Income')).toHaveTextContent('$4.22');
+    // Savings, the tallest node, is drawn 400 px tall: $1,000.00 / 400 is $2.50,
+    // shown in whole dollars. (Scaled by the $4.22 of income, it read "$0.01".)
+    expect(within(card()).getByText('Scale: 1 px is about $3')).toBeInTheDocument();
   });
 
   it('says there is nothing to draw for an empty period', async () => {
