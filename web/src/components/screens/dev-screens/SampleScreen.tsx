@@ -13,6 +13,7 @@ import { NET_WORTH_MONTHS } from '@/components/screens/check-in/NetWorthCard';
 import { ConfirmScreen } from '@/components/screens/confirm/ConfirmScreen';
 import { DecisionsScreen } from '@/components/screens/decisions/DecisionsScreen';
 import { LinkScreen } from '@/components/screens/link/LinkScreen';
+import { PlanScreen } from '@/components/screens/plan/PlanScreen';
 import { SpendingScreen } from '@/components/screens/spending/SpendingScreen';
 import { WhyIndexScreen } from '@/components/screens/why/WhyIndexScreen';
 import { WhyScreen } from '@/components/screens/why/WhyScreen';
@@ -70,6 +71,7 @@ import {
   sampleAccounts,
   sampleTransactions,
 } from '@/test/fixtures/sample';
+import { emptyPlan, samplePlan } from '@/test/fixtures/plan';
 import { sampleW4Decision, sampleW4Event } from '@/test/fixtures/w4';
 
 /*
@@ -92,7 +94,9 @@ export type SampleScreenName =
   | 'why-index'
   | 'check-in'
   | 'check-in-complete'
-  | 'check-in-index';
+  | 'check-in-index'
+  | 'plan'
+  | 'plan-empty';
 
 /** The manual-entry variant's document: the same stub, which the AI declined to read. */
 const MANUAL_DOC_ID = '4d000000-0000-4000-8000-0000000000aa';
@@ -232,6 +236,17 @@ const SCREENS: Record<
     render: () => <CheckInIndexScreen />,
     seed: (seed) => seedCheckIns(seed, novemberCheckIn()),
     hrefs: CHECK_IN_HREFS,
+  },
+  // Every decision saved: the same decisions, goal, dates and pay stub as the other samples.
+  plan: {
+    nav: 'plan',
+    render: () => <PlanScreen />,
+    seed: (seed) => seed(queryKeys.plan(), samplePlan()),
+  },
+  'plan-empty': {
+    nav: 'plan',
+    render: () => <PlanScreen />,
+    seed: (seed) => seed(queryKeys.plan(), emptyPlan()),
   },
 };
 
