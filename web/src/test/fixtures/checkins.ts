@@ -15,7 +15,7 @@ import type {
   SpendingSummary,
   WithholdingLine,
 } from '@/lib/api/types';
-import { CATEGORY_BUCKETS, emptyCashflow } from './cashflow';
+import { ACCOUNT_KINDS_COUNTED, CATEGORY_BUCKETS, emptyCashflow } from './cashflow';
 import { DECISION_V1_ID } from './decisions';
 import { CHECKING_ID, sampleJob, SAVINGS_ID } from './sample';
 
@@ -318,6 +318,8 @@ const NOVEMBER_SPENDING: SpendingSummary = {
   transaction_count: 9,
   uncategorized_count: 0,
   paycheck_count: 1,
+  ledger_rows_skipped: { count: 0, net_cents: 0 },
+  account_kinds_counted: ACCOUNT_KINDS_COUNTED,
   categories: [
     category('income', 'income', 205_892),
     category('utilities', 'essentials', 8_215),

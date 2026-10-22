@@ -10,17 +10,20 @@ import { StatTile } from '@/components/ui/StatTile';
 import { maskLabel } from '@/lib/accounts';
 import { apiErrorMessage } from '@/lib/api/errors';
 import { useAccounts } from '@/lib/api/hooks';
-import type { Account, SpendingSummary } from '@/lib/api/types';
-import { formatNumber, formatPct } from '@/lib/money';
-import { periodText } from './spending-format';
+import type { Account, AccountKind, SpendingSummary } from '@/lib/api/types';
+import { formatNumber } from '@/lib/money';
+import { ledgerNote, periodText, shareText as share } from './spending-format';
 
 const list = new Intl.ListFormat('en-US', { style: 'long', type: 'conjunction' });
 
-/** "Chase ··4821 and ··7730": the active accounts the totals cover. */
-function accountsText(accounts: readonly Account[]): string {
+/**
+ * "Chase ··4821 and ··7730": the active accounts the totals cover, of the
+ * kinds the API says it read (`account_kinds_counted`) once the totals are in.
+ */
+function accountsText(accounts: readonly Account[], kinds?: readonly AccountKind[]): string {
   const byInstitution = new Map<string, string[]>();
   for (const account of accounts) {
-    if (!account.is_active) continue;
+    if (!account.is_active || (kinds && !kinds.includes(account.kind))) continue;
     const name = account.institution_name ?? 'Linked bank';
     const masks = byInstitution.get(name) ?? [];
     masks.push(maskLabel(account.mask) ?? account.name);
@@ -28,12 +31,6 @@ function accountsText(accounts: readonly Account[]): string {
   }
   return list.format([...byInstitution].map(([name, masks]) => `${name} ${list.format(masks)}`));
 }
-
-const NO_INCOME = 'No income to compare yet';
-
-/** A bucket's share as the API rounded it, or why there is none. */
-const share = (pct: string | null, words: (pct: string) => string) =>
-  pct === null ? NO_INCOME : words(formatPct(pct));
 
 /** "Not yet spent: $1,618.94 ..." or, when spending ran past income, by how much. */
 function LeftOver({ cents }: { cents: number }) {
@@ -72,6 +69,8 @@ export function SummaryCard({ summary, updating, error, onRetry, picker }: Summa
   const paychecks =
     summary &&
     `${formatNumber(summary.paycheck_count)} ${summary.paycheck_count === 1 ? 'paycheck' : 'paychecks'}`;
+  const covered = accountsText(accounts, summary?.account_kinds_counted);
+  const ledgers = summary && ledgerNote(summary.ledger_rows_skipped);
 
   return (
     <Card aria-labelledby="summary-title" aria-busy={(loading && !failed) || updating || undefined}>
@@ -82,9 +81,7 @@ export function SummaryCard({ summary, updating, error, onRetry, picker }: Summa
               ? `${periodText(summary.start, summary.end)} · ${paychecks}`
               : 'Your month so far'}
           </h2>
-          {accounts.length > 0 && (
-            <span className="text-small text-ink-3">{accountsText(accounts)}</span>
-          )}
+          {covered && <span className="text-small text-ink-3">{covered}</span>}
         </div>
         {picker}
       </div>
@@ -131,9 +128,12 @@ export function SummaryCard({ summary, updating, error, onRetry, picker }: Summa
         />
       </div>
       {summary ? (
-        <p className="m-0 text-small text-ink-3">
-          <LeftOver cents={summary.left_over_cents} />
-        </p>
+        <>
+          <p className="m-0 text-small text-ink-3">
+            <LeftOver cents={summary.left_over_cents} />
+          </p>
+          {ledgers && <p className="m-0 text-tiny text-ink-3">{ledgers}</p>}
+        </>
       ) : (
         <p className="m-0 text-small text-ink-3">
           <Skeleton className="w-72 max-w-full" />

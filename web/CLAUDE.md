@@ -96,7 +96,8 @@ src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fa
                     made by make-w4-results.py),
                     fixtures/cashflow.ts (the sample period's cash flow, spending summary and
                     recurring charges; `sandboxCashflow`, the Plaid sandbox's October with an
-                    income-labeled outflow), msw/db.ts (in-memory API state), msw/handlers.ts (every
+                    income-labeled outflow; `dynamicCashflow`, `user_transactions_dynamic`'s
+                    October: loan ledgers left out, 12 cents of income, null shares), msw/db.ts (in-memory API state), msw/handlers.ts (every
                     route, stateful), msw/spending-handlers.ts (cash flow, summary, recurring;
                     `spendingDb`), msw/planning-handlers.ts (M6 and M7 calculators, goals,
                     benefits plans, benefits confirm; `planningDb`),
@@ -245,6 +246,12 @@ next is a real disabled button, never a dead link).
   `useToday()` (null on the server, so nothing reads the clock while rendering).
   `useRecurring()` lists recurring charges; `useUpdateRecurring()` PATCHes `user_status` or
   `name` optimistically, with rollback.
+  The summary reads only the account kinds in `account_kinds_counted` (checking, savings,
+  credit; spec 007 rule 21a): the summary card names only those accounts, a category's popover
+  lists only their rows, and `ledgerNote` says how many loan, investment and retirement rows
+  `ledger_rows_skipped` left out (on Spending and the check-in's cash flow). A share of income the
+  API sends as null (no income, or one over 1,000%: rule 25) reads `NO_SHARE`, "n/a, income too
+  small to compare", through `shareText` (`spending-format.ts`); never work one out.
 - **Check-ins and net worth** (`hooks/checkins.ts`, `hooks/net-worth.ts`): `useCheckIns()`,
   `useCheckIn(id)` (a 404 is not retried), `useUpdateFinding(checkInId, { onError })`,
   `useNetWorth(months)` and `useHoldings()`. `useUpdateFinding` takes `{ findingId, type }` with

@@ -6,7 +6,7 @@ import { Money } from '@/components/ui/Money';
 import type { CheckInCashFlow, PlanLine } from '@/lib/api/types';
 import { cn } from '@/lib/cn';
 import { formatMoney, formatNumber } from '@/lib/money';
-import { monthName, periodText } from '../spending/spending-format';
+import { ledgerNote, monthName, periodText } from '../spending/spending-format';
 import { planBarValue, planStatusText, planStatusTone } from './checkin-format';
 
 function Line({ line }: { line: PlanLine }) {
@@ -76,6 +76,7 @@ export function PlanLinesCard({
 }) {
   const flow = cashFlow.cash_flow;
   const paychecks = flow.withholding.paycheck_count;
+  const ledgers = ledgerNote(flow.spending.ledger_rows_skipped);
   return (
     <Card aria-labelledby="plan-lines-title" gap={14} className={cn('@container', className)}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -115,6 +116,7 @@ export function PlanLinesCard({
         month still under way is counted to date.{' '}
         <Link href="/setup/spending">Open the Spending map</Link>
       </p>
+      {ledgers && <p className="m-0 text-tiny text-ink-3">{ledgers}</p>}
     </Card>
   );
 }

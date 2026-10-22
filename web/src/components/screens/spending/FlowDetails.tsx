@@ -4,9 +4,16 @@ import Link from 'next/link';
 import type { FlowNode } from '@/components/sankey';
 import { Money } from '@/components/ui/Money';
 import { maskLabel } from '@/lib/accounts';
-import type { CashFlow, Transaction, WithholdingLine } from '@/lib/api/types';
+import type {
+  AccountKind,
+  CashFlow,
+  SpendingSummary,
+  Transaction,
+  WithholdingLine,
+} from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
-import { formatNumber, formatPct, formatTransactionAmount } from '@/lib/money';
+import { formatNumber, formatTransactionAmount } from '@/lib/money';
+import { shareText } from './spending-format';
 import { SourceBadge } from './TransactionTable';
 
 /** How many of a category's transactions the popover lists. */
@@ -35,15 +42,24 @@ export interface FlowDetailsProps {
   transactions: readonly Transaction[];
   /** account_id to its mask ("4821"). */
   masks: ReadonlyMap<string, string | null>;
+  /** account_id to its kind, to leave out the ledgers the API does not count. */
+  kinds: ReadonlyMap<string, AccountKind>;
 }
+
+/** A bucket's share of income in the summary; the other buckets have none. */
+const BUCKET_SHARES = {
+  essentials: (s: SpendingSummary) => s.essentials_pct,
+  flexible: (s: SpendingSummary) => s.flexible_pct,
+  savings: (s: SpendingSummary) => s.savings_rate_pct,
+} as const;
 
 /**
  * What a Sankey node's popover says under its name and amount. Every number
  * is one the API sent (amounts, percentages, counts); the category lines are
- * the loaded transactions of that category in the period, as the table
- * lists them.
+ * the loaded transactions of that category in the period on the accounts the
+ * API counted, as the table lists them.
  */
-export function FlowDetails({ node, flow, transactions, masks }: FlowDetailsProps) {
+export function FlowDetails({ node, flow, transactions, masks, kinds }: FlowDetailsProps) {
   const stubs = flow.withholding.paycheck_count;
   const stubWords = count(stubs, 'pay stub', 'pay stubs');
 
@@ -106,15 +122,10 @@ export function FlowDetails({ node, flow, transactions, masks }: FlowDetailsProp
       );
 
     case 'bucket': {
-      const pct =
-        node.key === 'essentials'
-          ? flow.spending.essentials_pct
-          : node.key === 'flexible'
-            ? flow.spending.flexible_pct
-            : node.key === 'savings'
-              ? flow.spending.savings_rate_pct
-              : null;
-      if (pct !== null) return <Muted>{formatPct(pct, { decimals: 1 })} of income</Muted>;
+      const share = BUCKET_SHARES[node.key as keyof typeof BUCKET_SHARES];
+      if (share) {
+        return <Muted>{shareText(share(flow.spending), (p) => `${p} of income`, 1)}</Muted>;
+      }
       if (node.key === 'left_over') {
         return (
           <Muted>
@@ -129,13 +140,20 @@ export function FlowDetails({ node, flow, transactions, masks }: FlowDetailsProp
 
     case 'category': {
       const total = flow.spending.categories.find((c) => c.category === node.key);
+      // The rows the API counted: posted, in the period, and not on a loan,
+      // investment or retirement ledger (spec 007 rule 21a).
+      const counted = (accountId: string) => {
+        const kind = kinds.get(accountId);
+        return kind === undefined || flow.spending.account_kinds_counted.includes(kind);
+      };
       const lines = transactions
         .filter(
           (t) =>
             t.category === node.key &&
             !t.pending &&
             t.posted_at >= flow.start &&
-            t.posted_at <= flow.end,
+            t.posted_at <= flow.end &&
+            counted(t.account_id),
         )
         .slice(0, POPOVER_LINES);
       return (
