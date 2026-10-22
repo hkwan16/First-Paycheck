@@ -53,6 +53,13 @@ export function groupByInstitution(accounts: readonly Account[]): InstitutionGro
   return [...groups.values()];
 }
 
+/** What unlinking an institution with `count` accounts deletes, as a sentence's subject. */
+export function ownedText(count: number): string {
+  return count === 1
+    ? 'Its account and its transactions'
+    : `Its ${formatNumber(count)} accounts and their transactions`;
+}
+
 /** "94 transactions since Jul 2026", "200+ transactions" or "No transactions yet". */
 export function transactionCountText({ count, more, since }: AccountTransactionCount): string {
   if (count === 0) return 'No transactions yet';

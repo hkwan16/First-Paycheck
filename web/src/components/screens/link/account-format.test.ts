@@ -3,6 +3,7 @@ import { sampleAccounts } from '@/test/fixtures/sample';
 import {
   groupByInstitution,
   institutionInitials,
+  ownedText,
   patchForRole,
   roleValue,
   transactionCountText,
@@ -63,5 +64,12 @@ describe('transactionCountText', () => {
     [{ count: 0, more: false, since: null }, 'No transactions yet'],
   ])('%j reads %s', (count, text) => {
     expect(transactionCountText(count)).toBe(text);
+  });
+});
+
+describe('ownedText', () => {
+  it('names what unlinking deletes', () => {
+    expect(ownedText(1)).toBe('Its account and its transactions');
+    expect(ownedText(2)).toBe('Its 2 accounts and their transactions');
   });
 });

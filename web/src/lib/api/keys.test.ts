@@ -4,6 +4,7 @@ import { $api } from './client';
 import {
   invalidateAfterConfirm,
   invalidateAfterDecision,
+  invalidateAfterUnlink,
   invalidateCheckIn,
   invalidateDecisions,
   invalidateDocuments,
@@ -337,5 +338,39 @@ describe('check-in, net worth and holdings keys', () => {
     expect(invalidated(keys.netWorth)).toBe(true);
     expect(invalidated(keys.holdings)).toBe(true);
     expect(invalidated(keys.list)).toBe(false);
+  });
+});
+
+describe('invalidateAfterUnlink', () => {
+  it('refreshes what an institution fed: accounts, spending, recurring, check-ins, balances', async () => {
+    const client = new QueryClient();
+    const keys = {
+      accounts: queryKeys.accounts(),
+      page: queryKeys.transactionPages({ limit: 50 }),
+      cashflow: $api.queryOptions('get', '/cashflow').queryKey,
+      summary: $api.queryOptions('get', '/spending/summary').queryKey,
+      recurring: queryKeys.recurring(),
+      checkIns: queryKeys.checkIns(),
+      checkIn: queryKeys.checkIn('c1'),
+      netWorth: $api.queryOptions('get', '/net-worth', { params: { query: { months: 12 } } })
+        .queryKey,
+      holdings: queryKeys.holdings(),
+      goals: queryKeys.goals(),
+      plan: queryKeys.plan(),
+      // Kept on unlink (spec 017 rule 16): decisions and documents.
+      decisions: queryKeys.decisions(),
+      documents: queryKeys.documents(),
+    };
+    for (const key of Object.values(keys)) client.setQueryData(key, {});
+    const invalidated = (key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
+
+    await invalidateAfterUnlink(client);
+
+    const { decisions, documents, ...refreshed } = keys;
+    for (const [name, key] of Object.entries(refreshed)) {
+      expect(invalidated(key), name).toBe(true);
+    }
+    expect(invalidated(decisions)).toBe(false);
+    expect(invalidated(documents)).toBe(false);
   });
 });
