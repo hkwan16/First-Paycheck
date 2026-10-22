@@ -90,7 +90,7 @@ The backlog is a GitHub Project. Every issue has a title, a description (its bod
 - Project board: https://github.com/users/hkwan16/projects/1 (issues: https://github.com/hkwan16/First-Paycheck/issues)
 - Board screenshot: `screenshots/backlog.png` (to capture)
 
-`backlog.yaml` holds 124 issues: 114 done, 7 in progress and 3 to do (46 High, 77 Medium, 1 Low priority), across milestones M0 to M10 in dependency order, each leaving a deployed product.
+`backlog.yaml` holds 127 issues: 117 done, 7 in progress and 3 to do (47 High, 78 Medium, 2 Low priority), across milestones M0 to M10 in dependency order, each leaving a deployed product.
 
 | Milestone | Scope | Done | In progress | To do |
 |---|---|---|---|---|

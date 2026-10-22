@@ -1365,7 +1365,15 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: High
-    status: todo
+    status: done
+    # Fixed October 22 with a failing test first: spec 007 rule 22a, the
+    # calculator and the summary's income_outflows_ignored_cents field. The
+    # reproduction ran the recorded sandbox history through the real pipeline
+    # and matched production to the cent. The diagram's "Spent beyond income"
+    # node still shows a negative left-over when spending really exceeds what
+    # came in (the sandbox's October: 4.22 in, 1,689.63 out); it is no longer
+    # driven by the payroll's sign. The same fix exposed and fixed a second bug:
+    # the diagram's scale, which blew up with tiny income and no stub.
   - title: "Prefilled figures are values, not placeholders, on the decision cards"
     body: >-
       Found on the October 22 production walkthrough. The 401(k) plan details
@@ -1381,7 +1389,12 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Fixed October 22 with failing tests first. Placeholders read "for example
+    # 65,000.00" and "for example 300.00" (and "for example 1996"); the
+    # confirmed stub now carries annual_salary_cents (spec 005 rule 24a, a pure
+    # calc function), and the plan details form fills the salary from it with a
+    # note naming the stub, so a new user saves without retyping.
   - title: "Net worth lists loans under the right kind, not \"Credit card\""
     body: >-
       Found on the October 22 production walkthrough: the net worth card shows
@@ -1392,4 +1405,8 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: Low
-    status: todo
+    status: done
+    # Fixed October 22 with failing tests first: a loan account kind (migration
+    # 0015), the Plaid mapping, net worth as a liability like credit, and the
+    # "Loan" label. Stored loans become loan on their item's next sync; the
+    # migration cannot tell a stored loan from a credit card.
