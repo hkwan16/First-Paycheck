@@ -79,7 +79,7 @@ Part B lets a user bring in an account they will not link through Plaid: `POST /
 2. **Lines.** Each stub's seven deduction columns become the seven lines above. Amounts are the stored non-negative magnitudes (spec 001 rule 23).
 3. **Per stub.** `deductions_cents` is the sum of the seven lines; `roles` sums the lines by role. `calc/cashflow.py` checks `gross_cents - deductions_cents = net_cents` and raises on a stub that does not balance (the `pay_stub_balances` constraint makes that unreachable for stored rows).
 4. **Period totals.** `withholding` sums each line, `gross_cents`, `deductions_cents` and `net_cents` over the period's stubs; with no stubs every amount is 0 and `pay_stubs` is empty.
-5. **Spending.** `spending` is computed by the same code as `GET /spending/summary` with the same period; the two routes never disagree.
+5. **Spending.** `spending` is computed by the same code as `GET /spending/summary` with the same period; the two routes never disagree. Its `income_cents` counts money in only (spec 007 rule 22a), so the diagram's "Income deposited" node is never negative and its "Spent beyond income" node (a negative `left_over_cents`) appears only when spending really ran past the money that came in. The client draws these amounts as the API gives them; it never adds or flips a sign.
 6. All arithmetic is in `calc/cashflow.py`: pure, integer cents, no I/O. The route reads rows and maps ids and dates.
 
 ### Part B: parsing the file (`sync/csv_provider.py`)
@@ -128,6 +128,7 @@ Working:
 | 1 | `test_september_cash_flow` | Spec 007 part B's September transactions and two mockup stubs paid 2026-09-15 and 2026-09-30 | `pay_stubs` in date order, each net 199,604; `withholding` as example 2 with `paycheck_count = 2`; `spending` equal to `GET /spending/summary?start=2026-09-01&end=2026-09-30` (income 399,208, left over 166,808) |
 | 2 | `test_default_period_is_last_month` | Today 2026-10-21 | `start = 2026-09-01`, `end = 2026-09-30` |
 | 3 | `test_period_validation` | `start` alone; `start > end`; 367 days | 422 each |
+| 4 | `test_sandbox_income_is_never_negative` | The Plaid sandbox's October (spec 007 part B), no confirmed stub | `spending` equal to `GET /spending/summary` for October: `income_cents` 422 (the GUSTO PAY outflow in `income_outflows_ignored_cents` 585,000), `left_over_cents` -168,541 |
 
 ### Parsing (`api/tests/unit/sync/test_csv_provider.py`)
 

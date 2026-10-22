@@ -1,6 +1,6 @@
 # 007: Decisions, versioning, the calendar and the spending summary
 
-Status: Implemented, M3. Part B (`GET /spending/summary`) is pulled forward from M5 because the Spending tiles need it.
+Status: Implemented, M3. Part B (`GET /spending/summary`) is pulled forward from M5 because the Spending tiles need it. Rule 22a (income counts money in only) added in M10 after the October 22 production walkthrough showed negative income on a Plaid sandbox history.
 
 ## Goal
 
@@ -75,17 +75,18 @@ Save the calculator result a user picks as an immutable, versioned `decisions` r
 
 ### Outputs (`SpendingSummary`)
 
-`start`, `end`, `income_cents`, `essentials_cents`, `flexible_cents`, `savings_cents`, `other_cents`, `transfers_ignored_cents`, `uncategorized_cents`, `left_over_cents`, `essentials_pct`, `flexible_pct`, `savings_rate_pct` (Decimal strings with one decimal place, or null when income is not positive), `transaction_count`, `uncategorized_count`, `paycheck_count`, `categories` (one `CategoryTotal` per category with transactions: `category`, `bucket`, `total_cents`, `count`, in category list order) and `category_buckets` (every category to its bucket).
+`start`, `end`, `income_cents`, `essentials_cents`, `flexible_cents`, `savings_cents`, `other_cents`, `transfers_ignored_cents`, `income_outflows_ignored_cents`, `uncategorized_cents`, `left_over_cents`, `essentials_pct`, `flexible_pct`, `savings_rate_pct` (Decimal strings with one decimal place, or null when income is not positive), `transaction_count`, `uncategorized_count`, `paycheck_count`, `categories` (one `CategoryTotal` per category with transactions counted in its bucket: `category`, `bucket`, `total_cents`, `count`, in category list order) and `category_buckets` (every category to its bucket).
 
 ### Rules
 
 20. **Buckets** live in `sync/categories.py` (`CATEGORY_BUCKETS`), next to the category list, and cover every category: `income` (income); `essentials` (housing, utilities, phone_internet, groceries, transport, insurance, healthcare); `flexible` (dining, subscriptions, shopping, entertainment, travel, personal_care, education, gifts_donations); `savings` (savings_investment); `other` (debt_payment, fees, taxes, other); `transfer` (transfer).
 21. **Which transactions.** Posted (`pending = false`) transactions of active accounts with `posted_at` in the period, read under RLS. The per-category sums and counts are one SQL `GROUP BY category`; the bucket roll-up and percentages are `calc/spending.py:summarize`, a pure function.
-22. **Signs** follow spec 001 rule 21 (positive is money out). `income_cents` is minus the net amount of `income` transactions. `essentials_cents`, `flexible_cents`, `savings_cents` and `other_cents` are the net amounts of their buckets, so refunds reduce spending. A category's `total_cents` is reported in the same direction as its bucket (income positive when money came in).
-23. **Ignored and uncategorized.** `transfer` transactions are left out of every total; `transfers_ignored_cents` is the sum of their absolute amounts. Uncategorized transactions (category null) are left out of the buckets and reported as `uncategorized_count` and `uncategorized_cents` (net, positive out).
+22. **Signs** follow spec 001 rule 21 (positive is money out). `income_cents` is the money that came in under `income`: the sum of the magnitudes of the negative amounts of `income` transactions (rule 22a), so it is never negative. `essentials_cents`, `flexible_cents`, `savings_cents` and `other_cents` are the net amounts of their buckets, so refunds reduce spending. A category's `total_cents` is reported in the same direction as its bucket (income positive when money came in), and its `count` is the number of transactions behind that total.
+22a. **Income counts money in only.** An `income` transaction that is money out (amount above 0) is not income. Banks usually book payroll as money in, but the Plaid sandbox books its GUSTO PAY payroll as money out (585,000) while the seed rules label it `income`, and a mislabel or a payroll reversal can do the same; netting such a row would make income negative and every figure derived from it wrong. The row is left out of every total, like a transfer, and reported as `income_outflows_ignored_cents`, the sum of those amounts. `left_over_cents` (rule 24) and the percentages (rule 25) follow from the money-in `income_cents`. An `income` row of exactly 0 is counted as income (it adds nothing). The `income` category's `total_cents` equals `income_cents`, its `count` leaves the money-out rows out, and it is listed in `categories` only when that count is above 0. The other buckets keep netting (refunds reduce spending, a withdrawal reduces savings).
+23. **Ignored and uncategorized.** `transfer` transactions are left out of every total; `transfers_ignored_cents` is the sum of their absolute amounts. Money-out `income` transactions are left out too (rule 22a) and reported apart from transfers in `income_outflows_ignored_cents`, so `transfers_ignored_cents` stays the money moved between the user's own accounts. Uncategorized transactions (category null) are left out of the buckets and reported as `uncategorized_count` and `uncategorized_cents` (net, positive out).
 24. `left_over_cents = income - essentials - flexible - savings - other`; it can be negative.
 25. Percentages are `bucket / income * 100` rounded half up to one decimal place: `essentials_pct`, `flexible_pct`, and `savings_rate_pct` (savings over income). Null when `income_cents <= 0`.
-26. `transaction_count` counts every transaction in the period (all buckets, transfers and uncategorized included). `paycheck_count` counts the user's confirmed pay stubs with `pay_date` in the period.
+26. `transaction_count` counts every transaction in the period (all buckets, transfers, ignored income outflows and uncategorized included). `paycheck_count` counts the user's confirmed pay stubs with `pay_date` in the period.
 
 ## Hand-worked examples
 
@@ -123,10 +124,31 @@ Save the calculator result a user picks as an immutable, versioned `decisions` r
 
 September 2026, one checking account: paycheck -199,604 and -199,604 (income); rent 150,000 (housing); groceries 32,000 and a refund of -2,000 (groceries); dining 8,500; transfer to savings 40,000 (savings_investment); transfer between own accounts 25,000 (transfer); credit card fee 3,900 (fees); an uncategorized 1,200; a pending 9,999 dining (ignored); an August dining 5,000 (outside the period); two confirmed pay stubs paid in September.
 
-- `income_cents = 399,208`; `essentials_cents = 150,000 + 30,000 = 180,000`; `flexible_cents = 8,500`; `savings_cents = 40,000`; `other_cents = 3,900`; `transfers_ignored_cents = 25,000`; `uncategorized_cents = 1,200`.
+- `income_cents = 399,208`; `essentials_cents = 150,000 + 30,000 = 180,000`; `flexible_cents = 8,500`; `savings_cents = 40,000`; `other_cents = 3,900`; `transfers_ignored_cents = 25,000`; `income_outflows_ignored_cents = 0`; `uncategorized_cents = 1,200`.
 - `left_over_cents = 399,208 - 180,000 - 8,500 - 40,000 - 3,900 = 166,808`.
 - `essentials_pct = 180,000 / 399,208 * 100 = 45.089...`, "45.1"; `flexible_pct = 2.129...`, "2.1"; `savings_rate_pct = 10.019...`, "10.0".
 - `transaction_count = 10` (the pending and August rows excluded); `uncategorized_count = 1`; `paycheck_count = 2`.
+
+### Income-labeled money out (rule 22a; `api/tests/unit/calc/test_spending.py`)
+
+One month: a paycheck -200,000 and interest -422 (income); the payroll a bank booked as money out, 585,000 (income); rent 50,000 (housing); dining 1,633.
+
+- `income_cents = 200,000 + 422 = 200,422`; the 585,000 row is not income: `income_outflows_ignored_cents = 585,000`, `transfers_ignored_cents = 0`. (Netting it, as before rule 22a, gave `200,422 - 585,000 = -384,578`.)
+- `essentials_cents = 50,000`; `flexible_cents = 1,633`; `savings_cents = other_cents = 0`.
+- `left_over_cents = 200,422 - 50,000 - 1,633 = 148,789`.
+- `essentials_pct = 50,000 / 200,422 * 100 = 24.947...`, "24.9"; `flexible_pct = 0.814...`, "0.8"; `savings_rate_pct = 0`, "0.0".
+- `transaction_count = 5`; the `income` category is `total_cents = 200,422`, `count = 2`.
+- The money-out row alone: `income_cents = 0`, `income_outflows_ignored_cents = 585,000`, null percentages, `left_over_cents = 0`, and no `income` entry in `categories`.
+
+### The Plaid sandbox's October (rule 22a; `api/tests/integration/test_spending_summary.py`)
+
+The recorded sandbox item (`api/tests/fixtures/plaid/recorded`) synced through `run_sync` and labeled by the seed rules alone, October 2026: INTRST PYMNT -422 and ACH Electronic CreditGUSTO PAY 585,000 (income); Uber 540 (transport); Starbucks 433, McDonald's 1,200 and KFC 50,000 (dining); SparkFun 8,940 and Madison Bicycle Shop 50,000 (shopping); Touchstone Climbing 7,850 (entertainment); United Airlines -50,000 (travel, a refund); CD DEPOSIT .INITIAL. 100,000 (savings_investment); CREDIT CARD 3333 PAYMENT 2,500 and AUTOMATIC PAYMENT - THANK 207,850 (transfer); Tectra Inc 50,000 (no rule, uncategorized).
+
+- `income_cents = 422` (was -584,578); `income_outflows_ignored_cents = 585,000`; `transfers_ignored_cents = 2,500 + 207,850 = 210,350`.
+- `essentials_cents = 540`; `flexible_cents = 433 + 1,200 + 50,000 + 8,940 + 50,000 + 7,850 - 50,000 = 68,423`; `savings_cents = 100,000`; `other_cents = 0`; `uncategorized_cents = 50,000`.
+- `left_over_cents = 422 - 540 - 68,423 - 100,000 = -168,541` (was -753,541): this month really did spend beyond the 4.22 that came in.
+- `essentials_pct = 540 / 422 * 100 = 127.96...`, "128.0"; `flexible_pct = 68,423 / 422 * 100 = 16,213.98...`, "16214.0"; `savings_rate_pct = 100,000 / 422 * 100 = 23,696.68...`, "23696.7". Shares this far over 100% are what a month with almost nothing deposited looks like; they are not clamped.
+- `transaction_count = 14`; `uncategorized_count = 1`; `paycheck_count = 0`; the `income` category is `total_cents = 422`, `count = 1`.
 
 ## Edge cases
 
@@ -134,6 +156,7 @@ September 2026, one checking account: paycheck -199,604 and -199,604 (income); r
 - A tax year without constants is 422 from input validation, before anything is saved.
 - A user with no profile and no pay stub still gets an event, dated from `pay_periods_per_year` with no anchor.
 - A month with no income gives null percentages and a negative or zero `left_over_cents`.
+- A month whose only `income` rows are money out has `income_cents = 0` (never negative), the rows in `income_outflows_ignored_cents`, and null percentages.
 - A summary period with no transactions returns zeros, empty `categories`, and the full `category_buckets`.
 
 ## Out of scope
