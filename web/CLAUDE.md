@@ -509,10 +509,16 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
   or the Spending map. Done and Dismiss become Undo; focus moves to the button that replaces the
   one pressed (and back on a rollback), and a polite status line says what changed. The badge
   reads `handled_count` and `finding_count`; a completed check-in shows a confirmed notice.
-- **Cash flow against the plan** (`PlanLinesCard`): `cash_flow.plan` lines as a table with each
-  planned line's `Bar` in the line's hue (`planLineTone`). The bar width is geometry
-  (`planBarValue`: actual over plan), never shown or compared; the API sends no on-plan status, so
-  none is drawn. In a card under 28rem (a container query) the difference moves under the plan.
+- **Cash flow against the plan** (`PlanLinesCard`): `cash_flow.plan` lines as a table. Each
+  line's `status` (spec 015 rule 19a: `on_plan | over | under`, null without a plan) is the API's;
+  `planStatusTone` only decides whether that side matters for the line: `on_plan` is `confirmed`;
+  over is a `warning` on spending lines (essentials, flexible, other) and under is `confirmed`;
+  savings, retirement, take-home and left over are the reverse (more is not a problem); health
+  premiums warn on either side (they should match the chosen plan); null is neutral. That tone
+  colors the planned line's `Bar` and a `Badge` beside the actual saying the status in words
+  (`planStatusText`: On plan, Over plan, Under plan). The bar width is geometry (`planBarValue`:
+  actual over plan), never shown or compared. In a card under 28rem (a container query) the
+  difference moves under the plan and the badge wraps under the actual.
 - **Net worth** (`NetWorthCard`) sits beside it, where the mockup puts it, and on the list of
   check-ins, so it does not wait for the first check-in: the figure, assets and liabilities, the
   change since the first month, `NetWorthChart`, a "Monthly figures" table, each account, and

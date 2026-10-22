@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Badge } from '@/components/ui/Badge';
 import { Bar } from '@/components/ui/Bar';
 import { Card } from '@/components/ui/Card';
 import { Money } from '@/components/ui/Money';
@@ -6,11 +7,13 @@ import type { CheckInCashFlow, PlanLine } from '@/lib/api/types';
 import { cn } from '@/lib/cn';
 import { formatMoney, formatNumber } from '@/lib/money';
 import { monthName, periodText } from '../spending/spending-format';
-import { planBarValue, planLineTone } from './checkin-format';
+import { planBarValue, planStatusText, planStatusTone } from './checkin-format';
 
 function Line({ line }: { line: PlanLine }) {
   const bar = planBarValue(line);
   const total = line.key === 'left_over';
+  const tone = planStatusTone(line);
+  const status = planStatusText(line.status);
   return (
     <tr className="border-t border-line align-top first:border-t-0">
       <th
@@ -23,14 +26,18 @@ function Line({ line }: { line: PlanLine }) {
             className="mt-2"
             height={6}
             value={bar}
-            tone={planLineTone(line.key)}
+            tone={tone}
             label={`${line.label} against plan`}
             valueText={`${formatMoney(line.actual_cents)} of ${formatMoney(line.plan_cents)} planned`}
           />
         )}
       </th>
       <td className={cn('py-2.5 pl-3 text-right', total && 'font-semibold')}>
-        <Money cents={line.actual_cents} />
+        {/* The status sits beside the amount, and wraps under it in a narrow card. */}
+        <span className="inline-flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+          <Money cents={line.actual_cents} />
+          {status !== null && <Badge tone={tone}>{status}</Badge>}
+        </span>
       </td>
       <td className="py-2.5 pl-3 text-right">
         {line.plan_cents === null ? (
@@ -56,8 +63,9 @@ function Line({ line }: { line: PlanLine }) {
  * The month's cash flow against the plan (spec 015 rule 19): each line's
  * actual beside the target its decision set, and the difference, all as the
  * API worked them out. A line's bar shows how much of its target the month
- * has reached so far, in the line's own hue: whether that is on plan is not
- * something the client decides.
+ * has reached so far, colored by the API's status for it (rule 19a) and the
+ * status said in words beside the actual: the client only decides which side
+ * of the plan matters for the line (`planStatusTone`), never the side itself.
  */
 export function PlanLinesCard({
   cashFlow,

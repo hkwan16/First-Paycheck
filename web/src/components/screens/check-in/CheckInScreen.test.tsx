@@ -167,8 +167,15 @@ describe('CheckInScreen', () => {
       name: '401(k) from pay stubs against plan',
     });
     expect(bar).toHaveAttribute('aria-valuetext', '$54.17 of $108.33 planned');
-    // A line with no plan has no target and no bar.
-    expect(within(card).getByRole('row', { name: /^Flexible/ })).toHaveTextContent('No target');
+    // The API's status, in words beside the actual.
+    expect(within(row).getByText('Under plan')).toBeVisible();
+    expect(within(card).getByRole('row', { name: /^Health premiums/ })).toHaveTextContent(
+      'On plan',
+    );
+    // A line with no plan has no target, no bar and no status.
+    const flexible = within(card).getByRole('row', { name: /^Flexible/ });
+    expect(flexible).toHaveTextContent('No target');
+    expect(flexible).not.toHaveTextContent(/(On|Over|Under) plan/);
     expect(within(card).queryByRole('progressbar', { name: 'Flexible against plan' })).toBeNull();
     expect(within(card).getAllByRole('progressbar')).toHaveLength(4);
     expect(within(card).getByRole('link', { name: 'Open the Spending map' })).toHaveAttribute(
