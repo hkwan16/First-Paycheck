@@ -17,12 +17,15 @@ from sqlalchemy.dialects.postgresql import insert
 from app.auth import CurrentUser
 from app.deps import (
     CipherDep,
+    OptionalCipher,
+    OptionalPlaid,
     PlaidDep,
     RawBody,
     SandboxAllowed,
     ServiceSession,
     SettingsDep,
     UserSession,
+    UserSessions,
     WebhookKeys,
 )
 from app.errors import AppError, NotFound, error_responses
@@ -30,9 +33,9 @@ from app.types import UtcDateTime
 from db.enums import JobKind, SyncProvider, SyncStatus
 from db.models import SyncItem
 from jobs import queue
-from sync.crypto import TokenDecryptError
 from sync.plaid.client import PlaidError
 from sync.plaid.webhook import WebhookVerificationError, verify_plaid_webhook
+from sync.revoke import LinkedToken, remove_at_provider
 
 logger = logging.getLogger(__name__)
 
@@ -217,27 +220,29 @@ def link_item(
     "/items/{item_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
-    responses=error_responses(401, 404, 503),
+    responses=error_responses(401, 404),
 )
 def delete_item(
     item_id: uuid.UUID,
     user: CurrentUser,
-    session: UserSession,
-    plaid: PlaidDep,
-    cipher: CipherDep,
+    sessions: UserSessions,
+    plaid: OptionalPlaid,
+    cipher: OptionalCipher,
 ) -> None:
     """Unlink an institution: remove it at Plaid (best effort) and delete it with
     its accounts, transactions, balances and holdings."""
-    item = _own_item(session, item_id)
-    if item.access_token_enc is not None:
-        try:
-            plaid.item_remove(cipher.decrypt(item.access_token_enc))
-        except (PlaidError, TokenDecryptError) as exc:
-            logger.warning("could not remove item %s at Plaid: %s", item.id, exc)
-    session.delete(item)
-    session.flush()
-    # Charges seen only in this item's transactions go on the next run (spec 009 rule 16).
-    queue.enqueue_unless_queued(session, user_id=user.id, kind=JobKind.RECURRING_DETECT)
+    # Spec 017 rule 11: read, call Plaid with no transaction open, then delete.
+    with sessions() as session:
+        item = _own_item(session, item_id)
+        token = item.access_token_enc
+    if token is not None:
+        remove_at_provider(plaid, cipher, [LinkedToken(item_id=item_id, access_token_enc=token)])
+    with sessions() as session:
+        session.delete(_own_item(session, item_id))
+        session.flush()
+        # Charges seen only in this item's transactions go on the next run
+        # (spec 009 rule 16), which then refreshes the open check-in (spec 017 rule 14).
+        queue.enqueue_unless_queued(session, user_id=user.id, kind=JobKind.RECURRING_DETECT)
 
 
 @router.post(

@@ -78,7 +78,7 @@ Bring a user's bank data into First Paycheck and keep it current. A linked insti
 14. **Upserts.** Accounts by `(sync_item_id, provider_account_id)`, updating `name`, `kind`, `mask`; `role` and `is_active` belong to the user and are never overwritten. Transactions by `(account_id, provider_txn_id)`, page by page in order: added, then modified, then removed. A modified transaction keeps its category when its `merchant_norm` is unchanged or its `category_source` is `user`; otherwise the category, source and confidence are cleared so categorization runs again. Removed transactions are deleted. Transactions for an unknown or skipped account are counted as `skipped`.
 15. **Snapshots.** One `balance_snapshots` row per account per sync at `as_of` = the sync time; the table is append-only, so a duplicate `(account_id, as_of)` is skipped, never updated. Holdings upsert on `(account_id, as_of, security_id)`; holdings of a synced account and date that the provider no longer returns are deleted.
 16. **Follow-up jobs.** After the write the item gets `cursor`, `last_synced_at = now()` and `status = 'active'`, and the pipeline enqueues `categorize.run` and `recurring.detect` for the user unless one of that kind is already queued.
-17. **Missing item.** If the item was deleted before the job ran, the outcome is `item_missing` and the job succeeds.
+17. **Missing item.** If the item was deleted before the job ran, the outcome is `item_missing` and the job succeeds. The provider is built only after the item is found, so this holds on a worker with no provider configured too (spec 017 rule 15).
 18. **Login required.** `ItemLoginRequired` sets the item's `status` to `login_required`; the job succeeds with that outcome and is not retried.
 
 ### Token encryption (`sync/crypto.py`)
@@ -98,7 +98,7 @@ Bring a user's bank data into First Paycheck and keep it current. A linked insti
 ### Routes
 
 27. `POST /sync/items` takes exactly one of `public_token` or `sandbox_institution_id`. The sandbox field is rejected with 422 when `APP_ENV=production`. The access token is encrypted before it touches the database. A `provider_item_id` that is already linked is 409 `item_already_linked`. The response's `job_id` is the `sync.initial` job, whose idempotency key is `sync.initial:<item id>`.
-28. `DELETE /sync/items/{id}` asks Plaid to remove the item (best effort: a Plaid failure is logged, not returned) and deletes the row; `ON DELETE CASCADE` removes its accounts, transactions, snapshots and holdings (spec 001 rule 25).
+28. `DELETE /sync/items/{id}` asks Plaid to remove the item (best effort: a Plaid failure, an undecryptable token or an unconfigured Plaid is logged, not returned) with no transaction open, then deletes the row; `ON DELETE CASCADE` removes its accounts, transactions, snapshots and holdings (spec 001 rule 25). The full unlink path, including the derived data it retracts, is spec 017 rules 11-16.
 29. `POST /sync/items/{id}/sync` returns the already-queued `sync.incremental` job for that item when there is one, otherwise a new one.
 30. `GET /accounts` lists the user's accounts ordered by institution, then name, each with its latest balance snapshot (`balance_cents`, `balance_as_of`, null when none) and institution name.
 31. `PATCH /accounts/{id}` accepts `role` (an `account_role` or null) and `is_active`; omitted fields are unchanged. Assigning `emergency_fund` moves it: the user's previous emergency-fund account loses the role in the same transaction (spec 001 allows one).

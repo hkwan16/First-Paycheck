@@ -6,7 +6,8 @@ import uuid
 from typing import Any
 
 from jobs.context import JobContext
-from sync.pipeline import run_sync
+from sync.pipeline import SyncItemSecrets, run_sync
+from sync.provider import SyncProvider
 
 
 def sync_item_id(payload: dict[str, Any]) -> uuid.UUID:
@@ -18,9 +19,15 @@ def sync_item_id(payload: dict[str, Any]) -> uuid.UUID:
 
 def run(ctx: JobContext) -> dict[str, Any]:
     item_id = sync_item_id(ctx.job.payload)
-    provider_for = ctx.services.provider_for
-    if provider_for is None:
-        raise RuntimeError("no sync provider is configured for this worker")
+    configured = ctx.services.provider_for
+
+    def provider_for(item: SyncItemSecrets) -> SyncProvider:
+        # Built only once the item is found, so a sync queued for an unlinked
+        # item succeeds as item_missing on any worker (spec 002 rule 17).
+        if configured is None:
+            raise RuntimeError("no sync provider is configured for this worker")
+        return configured(item)
+
     result = run_sync(
         user_id=ctx.user_id,
         item_id=item_id,

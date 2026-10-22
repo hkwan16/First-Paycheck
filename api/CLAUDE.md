@@ -385,7 +385,8 @@ function.
   user's check-ins is dropped (reported once), a key already here is updated
   in place (the user's action stays), a condition (`election_mismatch`,
   `goal_off_pace`, `upcoming_deadline`) nobody produces any more is retracted
-  unless handled, events are kept. Surfacing sets `new`/`changed` recurring
+  unless handled, events are kept unless their subject is gone (a recurring
+  finding whose charge an unlink removed). Surfacing sets `new`/`changed` recurring
   charges `active`; the engine holds `checkin:{user}` then
   `recurring.detect:{user}` advisory locks so it never interleaves with
   detection.
@@ -474,6 +475,14 @@ adds `public.delete_user_account(uuid)`; no new table.
 - A write under a deleted account's still-valid token fails on
   `fk_<table>_user_id_users`; `app/errors.py` answers 401 `account_deleted`
   instead of a 500 (`is_missing_owner`; a test checks every key's name).
+- **Unlinking** (`DELETE /sync/items/{id}`) follows the same read, revoke,
+  delete order with two `UserSessions`, then queues `recurring.detect`, which
+  drops charges with no transaction left and refreshes the open check-in. The
+  engine retracts an unhandled `recurring_*` finding whose
+  `recurring_charge_id` is gone (`checkin.engine.subject_gone`), like a cleared
+  condition. A sync queued for the item succeeds as `item_missing` even on a
+  worker with no provider (the handler builds the provider lazily).
+  `tests/integration/test_unlink.py` runs the whole path on the November user.
 - `tests/support/full_user.py:populate_every_table` writes a row in every user
   table; `test_account_deletion` lists the tables from `information_schema` and
   fails when a table has no row there, so add one for every new user table.
