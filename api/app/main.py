@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 
-from app.body_limit import BodySizeLimit
+from app.body_limit import BodyRule, BodySizeLimit
 from app.config import Settings, get_settings
 from app.db import dispose_engines
 from app.errors import install_error_handlers
@@ -76,17 +76,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.git_sha = resolve_git_sha(settings.git_sha)
     # Added before CORS so CORS wraps it: a 413 still carries CORS headers.
+    # Every other body gets DEFAULT_RULE (1 MB, body_too_large).
     app.add_middleware(
         BodySizeLimit,
-        paths=["/docs"],
-        max_bytes=docs.MAX_UPLOAD_BYTES + docs.MULTIPART_OVERHEAD_BYTES,
-        message="The file is larger than 10 MB",
-    )
-    app.add_middleware(
-        BodySizeLimit,
-        paths=["/accounts/import"],
-        max_bytes=accounts.MAX_IMPORT_BYTES + accounts.MULTIPART_OVERHEAD_BYTES,
-        message="The file is larger than 10 MB",
+        paths={
+            "/docs": BodyRule(
+                max_bytes=docs.MAX_UPLOAD_BYTES + docs.MULTIPART_OVERHEAD_BYTES,
+                code="file_too_large",
+                message="The file is larger than 10 MB",
+            ),
+            "/accounts/import": BodyRule(
+                max_bytes=accounts.MAX_IMPORT_BYTES + accounts.MULTIPART_OVERHEAD_BYTES,
+                code="file_too_large",
+                message="The file is larger than 10 MB",
+            ),
+        },
     )
     app.add_middleware(
         CORSMiddleware,

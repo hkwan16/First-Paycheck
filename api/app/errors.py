@@ -112,7 +112,8 @@ async def _http_error(_: Request, error: Exception) -> JSONResponse:
     exc = cast(StarletteHTTPException, error)
     message = exc.detail if isinstance(exc.detail, str) else HTTPStatus(exc.status_code).phrase
     return JSONResponse(
-        error_body(_status_code_name(exc.status_code), message),
+        # An exception may name its own code (app/body_limit.py:BodyTooLarge).
+        error_body(getattr(exc, "code", None) or _status_code_name(exc.status_code), message),
         status_code=exc.status_code,
         headers=exc.headers,
     )

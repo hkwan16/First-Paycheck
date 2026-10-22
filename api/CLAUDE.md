@@ -291,7 +291,7 @@ Specs 009 and 010. Migration `0005_checkins` adds `recurring_charges`,
   description and the occurrence number, so re-imports never duplicate. The
   route runs `run_sync` with `CsvProvider` inside the request's own session (no
   network, so one transaction); a stale cursor is 409 `import_conflict`. Its
-  10 MB limit is a second `BodySizeLimit` in `app/main.py`.
+  10 MB limit is a `BodyRule` of `BodySizeLimit` in `app/main.py`.
 - `tests/support/spending_month.py` holds spec 007's September month, shared by
   the spending and cash-flow tests.
 
@@ -486,6 +486,45 @@ adds `public.delete_user_account(uuid)`; no new table.
 - `tests/support/full_user.py:populate_every_table` writes a row in every user
   table; `test_account_deletion` lists the tables from `information_schema` and
   fails when a table has no row there, so add one for every new user table.
+
+## Rate limits and body sizes (from M10)
+
+Every route that is not a GET has an entry in
+`app/ratelimit.py:WRITE_ROUTE_POLICIES`: a `Limit` or the reason it needs none.
+`tests/unit/test_write_route_policies.py` fails on a write route without one,
+and `tests/integration/test_rate_limits.py` checks each limit (one request
+counts one; a full window is 429 `rate_limited` with `Retry-After` and writes
+nothing). Limits are per user and per clock hour (UTC), counted in
+`rate_limit_counters` inside the request's transaction, so a request that fails
+(including the 429 itself) does not count. Every request counts, including one
+that returns an already-queued job.
+
+| Route (operation) | Per user per hour | Why |
+|---|---|---|
+| `POST /docs` (`upload_document`) | 10 | stores up to 10 MB (spec 004) |
+| `POST /docs/{id}/extract` (`extract_document`) | 20 | each queues a Sonnet call; the daily LLM budget is the second guard |
+| `POST /explain` (`explain`) | 30 runs that reach the model | spec 008; stored answers are free |
+| `POST /decisions` (`save_decision`) | 60 | each writes an immutable version |
+| `POST /plan/export` (`export_plan`) | 10 | each queues a WeasyPrint render and stores a PDF |
+| `POST /sync/link-token` (`create_link_token`) | 30 | a Plaid call |
+| `POST /sync/items` (`link_item`) | 10 | Plaid exchange plus an initial sync |
+| `POST /sync/items/{id}/sync` (`sync_item`) | 30 | a Plaid `/transactions/sync` per job |
+| `POST /accounts/import` (`import_csv`) | 20 | parses up to 10 MB and syncs inside the request |
+
+No limit, with the reason in the table: `POST /docs/{id}/confirm` (once per
+document), `DELETE /sync/items/{id}` (deletes what links created),
+`DELETE /me` (once per account), `POST /sync/webhook` (no user; signature
+first, bounded body, deduplicated queueing), the four `POST /calc/*` (pure
+computation on bounded validated bodies) and the small own-row updates
+(`PATCH /accounts/{id}`, `/transactions/{id}`, `/recurring/{id}`,
+`/goals/{id}`, `/check-ins/{id}/findings/{fid}`, `PUT /profile`).
+
+Bodies: `app/body_limit.py:BodySizeLimit` refuses a declared `Content-Length`
+over the limit before reading, and counts streamed bytes so a chunked body is
+cut off too (`BodyTooLarge`, an `HTTPException` FastAPI lets through its body
+parsing). `POST /docs` and `POST /accounts/import` allow 10 MB plus multipart
+overhead (`file_too_large`); every other body 1 MB (`body_too_large`), which
+also bounds the Plaid webhook before its signature check.
 
 ## Testing
 

@@ -14,6 +14,7 @@ from fastapi import APIRouter, Response, status
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app import ratelimit
 from app.auth import CurrentUser
 from app.deps import Now, UserSession
 from app.errors import NotFound, error_responses
@@ -63,9 +64,10 @@ def get_plan_calendar(session: UserSession, now: Now) -> Response:
     )
 
 
-@router.post("/export", status_code=status.HTTP_202_ACCEPTED, responses=error_responses(401))
-def export_plan(session: UserSession, user: CurrentUser) -> PlanExportQueued:
+@router.post("/export", status_code=status.HTTP_202_ACCEPTED, responses=error_responses(401, 429))
+def export_plan(session: UserSession, user: CurrentUser, now: Now) -> PlanExportQueued:
     """Queue the plan PDF; a second request while one is waiting returns the same job."""
+    ratelimit.consume(session, user.id, ratelimit.PLAN_EXPORTS, now=now)
     job_id = queue.enqueue_unless_queued(session, user_id=user.id, kind=JobKind.PLAN_EXPORT)
     return PlanExportQueued(job_id=job_id)
 

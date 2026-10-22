@@ -14,9 +14,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 
+from app import ratelimit
 from app.auth import CurrentUser
 from app.deps import (
     CipherDep,
+    Now,
     OptionalCipher,
     OptionalPlaid,
     PlaidDep,
@@ -140,9 +142,12 @@ def _own_item(session: UserSession, item_id: uuid.UUID) -> SyncItem:
     return item
 
 
-@router.post("/link-token", responses=error_responses(401, 502, 503))
-def create_link_token(user: CurrentUser, plaid: PlaidDep, settings: SettingsDep) -> LinkToken:
+@router.post("/link-token", responses=error_responses(401, 429, 502, 503))
+def create_link_token(
+    user: CurrentUser, session: UserSession, plaid: PlaidDep, settings: SettingsDep, now: Now
+) -> LinkToken:
     """A Plaid Link token for the signed-in user."""
+    ratelimit.consume(session, user.id, ratelimit.LINK_TOKENS, now=now)
     with _plaid_errors():
         token = plaid.link_token_create(user_id=str(user.id), webhook=settings.plaid_webhook_url)
     return LinkToken(**token)
@@ -151,7 +156,7 @@ def create_link_token(user: CurrentUser, plaid: PlaidDep, settings: SettingsDep)
 @router.post(
     "/items",
     status_code=status.HTTP_201_CREATED,
-    responses=error_responses(401, 409, 422, 502, 503),
+    responses=error_responses(401, 409, 422, 429, 502, 503),
 )
 def link_item(
     body: LinkItemRequest,
@@ -161,10 +166,12 @@ def link_item(
     cipher: CipherDep,
     settings: SettingsDep,
     sandbox_allowed: SandboxAllowed,
+    now: Now,
 ) -> LinkedItem:
     """Exchange a Link public token (or, outside production, create one for a
     sandbox institution), store the encrypted access token and queue the
     initial sync."""
+    ratelimit.consume(session, user.id, ratelimit.LINKS, now=now)
     sandbox_id = body.sandbox_institution_id
     if sandbox_id is not None and not sandbox_allowed:
         raise AppError(
@@ -248,10 +255,11 @@ def delete_item(
 @router.post(
     "/items/{item_id}/sync",
     status_code=status.HTTP_202_ACCEPTED,
-    responses=error_responses(401, 404),
+    responses=error_responses(401, 404, 429),
 )
-def sync_item(item_id: uuid.UUID, user: CurrentUser, session: UserSession) -> QueuedJob:
+def sync_item(item_id: uuid.UUID, user: CurrentUser, session: UserSession, now: Now) -> QueuedJob:
     """Queue an incremental sync, or return the one already waiting."""
+    ratelimit.consume(session, user.id, ratelimit.MANUAL_SYNCS, now=now)
     item = _own_item(session, item_id)
     job_id = queue.enqueue_unless_queued(
         session,

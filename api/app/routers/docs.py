@@ -210,12 +210,13 @@ def get_document(document_id: uuid.UUID, session: UserSession) -> DocumentDetail
 @router.post(
     "/{document_id}/extract",
     status_code=status.HTTP_202_ACCEPTED,
-    responses=error_responses(401, 404, 409, 422),
+    responses=error_responses(401, 404, 409, 422, 429),
 )
 def extract_document(
-    document_id: uuid.UUID, session: UserSession, user: CurrentUser
+    document_id: uuid.UUID, session: UserSession, user: CurrentUser, now: Now
 ) -> ExtractionQueued:
     """Queue reading the document; returns the running job while one is in flight."""
+    ratelimit.consume(session, user.id, ratelimit.EXTRACTIONS, now=now)
     document = _locked(session, document_id)
     if document.type not in EXTRACTABLE:
         raise AppError(
