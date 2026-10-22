@@ -6399,6 +6399,16 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
           }
         },
         "security": [
@@ -7236,6 +7246,16 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
           }
         },
         "security": [
@@ -7737,6 +7757,16 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
           }
         },
         "security": [
@@ -8095,6 +8125,36 @@
         ]
       }
     },
+    "/me": {
+      "delete": {
+        "description": "Delete the signed-in user's account and every row they own, after\nremoving their linked institutions at Plaid (best effort).",
+        "operationId": "delete_account",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Account",
+        "tags": [
+          "account"
+        ]
+      }
+    },
     "/net-worth": {
       "get": {
         "description": "Assets minus liabilities now and at the end of each month, from balance snapshots.",
@@ -8297,6 +8357,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
           }
         },
         "security": [
@@ -8734,6 +8804,16 @@
             },
             "description": "Unprocessable Entity"
           },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
           "502": {
             "content": {
               "application/json": {
@@ -8815,16 +8895,6 @@
               }
             },
             "description": "Validation Error"
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Service Unavailable"
           }
         },
         "security": [
@@ -8894,6 +8964,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
           }
         },
         "security": [
@@ -8931,6 +9011,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
           },
           "502": {
             "content": {

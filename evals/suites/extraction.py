@@ -1,5 +1,5 @@
 """The extraction suite (LLM, spec 005 rule 26): the real pipeline and model
-over the 10 labeled synthetic stubs in ``evals/fixtures/pay_stubs/``.
+over the 30 labeled synthetic stubs in ``evals/fixtures/pay_stubs/``.
 
 Each stub goes through ``prepare_document`` (read, OCR, redact), the real
 ``LLMGateway`` and the proposal builder, exactly as the ``ingest.extract`` job

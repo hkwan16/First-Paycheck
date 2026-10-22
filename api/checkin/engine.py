@@ -44,6 +44,7 @@ __all__ = [
     "reconcile",
     "run_check_in",
     "settle_status",
+    "subject_gone",
 ]
 
 Trigger = Literal["schedule", "sync"]
@@ -52,6 +53,10 @@ Trigger = Literal["schedule", "sync"]
 # unhandled one that no finder produces any more is retracted.
 CONDITIONS = frozenset(
     {FindingKind.ELECTION_MISMATCH, FindingKind.GOAL_OFF_PACE, FindingKind.UPCOMING_DEADLINE}
+)
+# Events about a recurring charge: their subject is the charge's row.
+RECURRING_EVENTS = frozenset(
+    {FindingKind.RECURRING_NEW, FindingKind.RECURRING_CHANGED, FindingKind.RECURRING_STOPPED}
 )
 
 
@@ -64,6 +69,26 @@ class Existing:
     kind: FindingKind
     # True when the user marked it done or dismissed.
     handled: bool
+    # True when what it reports on no longer exists (``subject_gone``).
+    subject_gone: bool = False
+
+
+def subject_gone(
+    kind: FindingKind, payload: dict[str, Any], charge_ids: Collection[uuid.UUID]
+) -> bool:
+    """Rule 10.4: a recurring finding whose charge is no longer one of the
+    user's (it was detected only from an unlinked institution, spec 017 rule 14).
+
+    Other kinds report on pay stubs, decisions, goals and calendar events, which
+    unlinking never deletes.
+    """
+    if kind not in RECURRING_EVENTS:
+        return False
+    try:
+        charge_id = uuid.UUID(str(payload.get("recurring_charge_id")))
+    except ValueError:
+        return True
+    return charge_id not in charge_ids
 
 
 @dataclass(frozen=True)
@@ -94,7 +119,9 @@ def reconcile(
         else:
             changes.update.append((row.id, finding))
     for row in existing:
-        if row.key not in produced and row.kind in CONDITIONS and not row.handled:
+        if row.key in produced or row.handled:
+            continue
+        if row.kind in CONDITIONS or row.subject_gone:
             changes.retract.append(row.id)
     return changes
 
@@ -207,9 +234,16 @@ def run_check_in(
             )
         )
     )
+    charge_ids = set(session.scalars(select(RecurringCharge.id)))
     changes = reconcile(
         [
-            Existing(id=row.id, key=row.key, kind=row.kind, handled=row.user_action is not None)
+            Existing(
+                id=row.id,
+                key=row.key,
+                kind=row.kind,
+                handled=row.user_action is not None,
+                subject_gone=subject_gone(row.kind, row.payload, charge_ids),
+            )
             for row in rows.values()
         ],
         candidates,

@@ -1,0 +1,96 @@
+name: Nightly evals
+
+# Every eval suite once a day: the free ones always, the LLM ones when the
+# ANTHROPIC_API_KEY secret is set (skipped with a notice otherwise), the whole
+# run capped by --max-cost-cents. A regression, the cost cap or an unavailable
+# suite opens one issue labeled nightly-evals, or updates the open one, and
+# fails the run. Baseline updates stay manual, in a commit of their own.
+on:
+  schedule:
+    - cron: "17 9 * * *" # 09:17 UTC, after the US evening
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-evals
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  UV_VERSION: "0.12.3"
+  PYTHON_VERSION: "3.12"
+  # About a dollar for the 30 pay stubs on Sonnet, well under one for the rest.
+  EVAL_MAX_COST_CENTS: "300"
+  REPORT: evals/results/nightly.json
+
+jobs:
+  evals:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --locked
+      # extraction-smoke and the extraction suites OCR the image stubs.
+      - name: install tesseract
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
+      - name: choose suites
+        id: suites
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "suite=all" >> "$GITHUB_OUTPUT"
+            echo "llm=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::ANTHROPIC_API_KEY is not set; running the free suites only"
+            echo "suite=free" >> "$GITHUB_OUTPUT"
+            echo "llm=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: run the eval suites
+        id: run
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUITE: ${{ steps.suites.outputs.suite }}
+        run: |
+          set +e
+          uv run python -m evals.run --suite "$SUITE" \
+            --max-cost-cents "$EVAL_MAX_COST_CENTS" --report "$REPORT"
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+      - name: open or update the regression issue
+        if: steps.run.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EXIT_CODE: ${{ steps.run.outputs.exit_code }}
+          LLM_RAN: ${{ steps.suites.outputs.llm }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          flags=()
+          if [ "$LLM_RAN" = "true" ]; then flags+=(--llm-ran); fi
+          uv run python -m evals.nightly --report "$REPORT" --exit-code "$EXIT_CODE" \
+            --run-url "$RUN_URL" "${flags[@]}" > issue.md
+          title="$(uv run python -c 'from evals.nightly import TITLE; print(TITLE)')"
+          label="$(uv run python -c 'from evals.nightly import LABEL; print(LABEL)')"
+          gh label create "$label" --color B60205 \
+            --description "Opened by the nightly eval workflow" --force
+          number="$(gh issue list --state open --label "$label" --json number --jq '.[0].number // empty')"
+          if [ -z "$number" ]; then
+            gh issue create --title "$title" --label "$label" --body-file issue.md
+          else
+            gh issue edit "$number" --body-file issue.md
+            gh issue comment "$number" --body "Still failing: $RUN_URL (exit $EXIT_CODE)."
+          fi
+      - name: fail on a regression
+        if: steps.run.outputs.exit_code != '0'
+        env:
+          EXIT_CODE: ${{ steps.run.outputs.exit_code }}
+        run: |
+          echo "::error::the eval run exited $EXIT_CODE"
+          exit 1

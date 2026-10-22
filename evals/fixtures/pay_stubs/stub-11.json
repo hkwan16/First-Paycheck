@@ -1,0 +1,25 @@
+{
+  "account_number": null,
+  "content_type": "application/pdf",
+  "fields": {
+    "employer_name": "Lumen Data Co",
+    "federal_withholding_cents": 136657,
+    "gross_cents": 991667,
+    "medical_premium_cents": 4150,
+    "medicare_cents": 14379,
+    "net_cents": 695540,
+    "other_deductions_cents": 620,
+    "pay_date": "2026-11-30",
+    "pay_frequency": "monthly",
+    "period_end": "2026-11-30",
+    "period_start": "2026-11-01",
+    "retirement_contribution_cents": 29750,
+    "social_security_cents": 61483,
+    "state_tax_cents": 49088
+  },
+  "file": "stub-11.pdf",
+  "id": "stub-11",
+  "layout": "advice",
+  "output": "text_pdf",
+  "ssn": "948-20-5402"
+}

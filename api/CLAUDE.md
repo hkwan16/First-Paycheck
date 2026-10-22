@@ -54,7 +54,9 @@ Rules:
   (dequeue across users), `jobs/scheduler.py`, the seed loader
   (`db/seed/load.py`, which writes the ownerless seed rules) and Alembic only.
   Cross-user SQL outside those places goes through a reviewed
-  `SECURITY DEFINER` function.
+  `SECURITY DEFINER` function granted to `app_api` only:
+  `enqueue_sync_for_plaid_item(text)` (the webhook) and
+  `delete_user_account(uuid)` (`DELETE /me`).
 - A row owned by someone else is invisible under RLS, so the route returns 404.
 - `app_api` is `NOINHERIT` and owns nothing; without the role switch it cannot
   read user data. Turn off Supabase's Data API exposure of `public` (Project
@@ -289,7 +291,7 @@ Specs 009 and 010. Migration `0005_checkins` adds `recurring_charges`,
   description and the occurrence number, so re-imports never duplicate. The
   route runs `run_sync` with `CsvProvider` inside the request's own session (no
   network, so one transaction); a stale cursor is 409 `import_conflict`. Its
-  10 MB limit is a second `BodySizeLimit` in `app/main.py`.
+  10 MB limit is a `BodyRule` of `BodySizeLimit` in `app/main.py`.
 - `tests/support/spending_month.py` holds spec 007's September month, shared by
   the spending and cash-flow tests.
 
@@ -383,7 +385,8 @@ function.
   user's check-ins is dropped (reported once), a key already here is updated
   in place (the user's action stays), a condition (`election_mismatch`,
   `goal_off_pace`, `upcoming_deadline`) nobody produces any more is retracted
-  unless handled, events are kept. Surfacing sets `new`/`changed` recurring
+  unless handled, events are kept unless their subject is gone (a recurring
+  finding whose charge an unlink removed). Surfacing sets `new`/`changed` recurring
   charges `active`; the engine holds `checkin:{user}` then
   `recurring.detect:{user}` advisory locks so it never interleaves with
   detection.
@@ -451,6 +454,77 @@ table `plan_exports` (`enable_rls`, SELECT and INSERT only).
   fail in CI, which installs pango and runs `tests/*/export` in the image too.
   On macOS run them with `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib uv run
   pytest ...` (make's shell drops `DYLD_*` variables).
+
+## Account deletion and unlinking (from M10)
+
+Spec 017. Migration `0014_delete_account_fn` (revises `0013_plan_export_job`)
+adds `public.delete_user_account(uuid)`; no new table.
+
+- **`DELETE /me`** (`app/routers/account.py`, operation `delete_account`):
+  read the user's Plaid tokens in one user session, remove each item at Plaid
+  with no transaction open (`sync/revoke.py:remove_at_provider`, best effort:
+  errors are logged with the item id, never returned), then call
+  `delete_user_account(sub)` in a `ServiceSessions` session (`SET LOCAL ROLE
+  app_api`). The function is `SECURITY DEFINER`, executable only by `app_api`
+  (`db.rls.restrict_function`), and deletes the `auth.users` row; every user
+  table cascades, decisions through spec 007 rule 9, jobs with them. 204, also
+  when the account is already gone.
+- `OptionalPlaid` / `OptionalCipher` (`app/deps.py`) are None when Plaid or the
+  token key is not configured, so deletion and unlinking never 503 on Plaid.
+  The `app` fixture overrides `get_optional_plaid_client` with `fake_plaid` too.
+- A write under a deleted account's still-valid token fails on
+  `fk_<table>_user_id_users`; `app/errors.py` answers 401 `account_deleted`
+  instead of a 500 (`is_missing_owner`; a test checks every key's name).
+- **Unlinking** (`DELETE /sync/items/{id}`) follows the same read, revoke,
+  delete order with two `UserSessions`, then queues `recurring.detect`, which
+  drops charges with no transaction left and refreshes the open check-in. The
+  engine retracts an unhandled `recurring_*` finding whose
+  `recurring_charge_id` is gone (`checkin.engine.subject_gone`), like a cleared
+  condition. A sync queued for the item succeeds as `item_missing` even on a
+  worker with no provider (the handler builds the provider lazily).
+  `tests/integration/test_unlink.py` runs the whole path on the November user.
+- `tests/support/full_user.py:populate_every_table` writes a row in every user
+  table; `test_account_deletion` lists the tables from `information_schema` and
+  fails when a table has no row there, so add one for every new user table.
+
+## Rate limits and body sizes (from M10)
+
+Every route that is not a GET has an entry in
+`app/ratelimit.py:WRITE_ROUTE_POLICIES`: a `Limit` or the reason it needs none.
+`tests/unit/test_write_route_policies.py` fails on a write route without one,
+and `tests/integration/test_rate_limits.py` checks each limit (one request
+counts one; a full window is 429 `rate_limited` with `Retry-After` and writes
+nothing). Limits are per user and per clock hour (UTC), counted in
+`rate_limit_counters` inside the request's transaction, so a request that fails
+(including the 429 itself) does not count. Every request counts, including one
+that returns an already-queued job.
+
+| Route (operation) | Per user per hour | Why |
+|---|---|---|
+| `POST /docs` (`upload_document`) | 10 | stores up to 10 MB (spec 004) |
+| `POST /docs/{id}/extract` (`extract_document`) | 20 | each queues a Sonnet call; the daily LLM budget is the second guard |
+| `POST /explain` (`explain`) | 30 runs that reach the model | spec 008; stored answers are free |
+| `POST /decisions` (`save_decision`) | 60 | each writes an immutable version |
+| `POST /plan/export` (`export_plan`) | 10 | each queues a WeasyPrint render and stores a PDF |
+| `POST /sync/link-token` (`create_link_token`) | 30 | a Plaid call |
+| `POST /sync/items` (`link_item`) | 10 | Plaid exchange plus an initial sync |
+| `POST /sync/items/{id}/sync` (`sync_item`) | 30 | a Plaid `/transactions/sync` per job |
+| `POST /accounts/import` (`import_csv`) | 20 | parses up to 10 MB and syncs inside the request |
+
+No limit, with the reason in the table: `POST /docs/{id}/confirm` (once per
+document), `DELETE /sync/items/{id}` (deletes what links created),
+`DELETE /me` (once per account), `POST /sync/webhook` (no user; signature
+first, bounded body, deduplicated queueing), the four `POST /calc/*` (pure
+computation on bounded validated bodies) and the small own-row updates
+(`PATCH /accounts/{id}`, `/transactions/{id}`, `/recurring/{id}`,
+`/goals/{id}`, `/check-ins/{id}/findings/{fid}`, `PUT /profile`).
+
+Bodies: `app/body_limit.py:BodySizeLimit` refuses a declared `Content-Length`
+over the limit before reading, and counts streamed bytes so a chunked body is
+cut off too (`BodyTooLarge`, an `HTTPException` FastAPI lets through its body
+parsing). `POST /docs` and `POST /accounts/import` allow 10 MB plus multipart
+overhead (`file_too_large`); every other body 1 MB (`body_too_large`), which
+also bounds the Plaid webhook before its signature check.
 
 ## Testing
 

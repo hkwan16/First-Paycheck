@@ -15,6 +15,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.request_log import REQUEST_ID_HEADER, request_id_of
@@ -111,7 +112,8 @@ async def _http_error(_: Request, error: Exception) -> JSONResponse:
     exc = cast(StarletteHTTPException, error)
     message = exc.detail if isinstance(exc.detail, str) else HTTPStatus(exc.status_code).phrase
     return JSONResponse(
-        error_body(_status_code_name(exc.status_code), message),
+        # An exception may name its own code (app/body_limit.py:BodyTooLarge).
+        error_body(getattr(exc, "code", None) or _status_code_name(exc.status_code), message),
         status_code=exc.status_code,
         headers=exc.headers,
     )
@@ -146,8 +148,37 @@ async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
+# Every user table's key to auth.users is named fk_<table>_user_id_users (spec
+# 001 naming convention; test_account_deletion checks it).
+_OWNER_KEY_SUFFIX = "_user_id_users"
+_FOREIGN_KEY_VIOLATION = "23503"
+
+
+def is_missing_owner(exc: IntegrityError) -> bool:
+    """True when a write failed because its ``user_id`` names no ``auth.users``
+    row: the account was deleted while its access token is still valid."""
+    diag = getattr(exc.orig, "diag", None)
+    constraint = getattr(diag, "constraint_name", None) or ""
+    return getattr(exc.orig, "sqlstate", None) == _FOREIGN_KEY_VIOLATION and constraint.endswith(
+        _OWNER_KEY_SUFFIX
+    )
+
+
+async def _integrity_error(request: Request, error: Exception) -> JSONResponse:
+    exc = cast(IntegrityError, error)
+    if is_missing_owner(exc):
+        # Spec 017 rule 9: the client signs out instead of seeing a 500.
+        return JSONResponse(
+            error_body("account_deleted", "This account has been deleted"),
+            status_code=401,
+            headers=Unauthorized.headers,
+        )
+    return await _unhandled(request, exc)
+
+
 def install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, _app_error)
+    app.add_exception_handler(IntegrityError, _integrity_error)
     app.add_exception_handler(StarletteHTTPException, _http_error)
     app.add_exception_handler(RequestValidationError, _validation_error)
     app.add_exception_handler(Exception, _unhandled)

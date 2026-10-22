@@ -189,3 +189,27 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above, in the subagent's branch.
 
 **Time saved or lost:** Not measured.
+
+## 2026-10-21: M10 backend hardening: account deletion, unlink, eval sets, nightly evals, limits
+
+**Task:** The backend items of M10: `DELETE /me`, a complete unlink path, the 30-stub extraction set and the categorization LLM suite over the 500 transactions, a nightly eval workflow, the eval tolerance check, and a rate-limit and body-size audit of every write route.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Spec first (new spec 017; amendments to specs 001, 002, 003, 005 and 015), failing tests first, one commit per item, baselines in their own commit.
+
+**What it produced:** Migration `0014_delete_account_fn` and `DELETE /me` (Plaid revoked with no transaction open, then one `SECURITY DEFINER` delete that cascades every user table); a deletion test that lists the user tables from `information_schema` and fails on one its fixture leaves empty; an unlink path that retracts check-in findings about charges the unlink removed; 20 more pay stubs in a third layout; the `categorization` suite; `.github/workflows/nightly.yml` with `evals/nightly.py`; `WRITE_ROUTE_POLICIES` and a body limit on every request.
+
+**What was wrong:**
+- Reproducing unlink end to end on the November user showed a stale finding: after the worker re-ran detection and refreshed the check-in, the Equinox `recurring_new` finding still pointed at a deleted charge, because spec 015 only retracted conditions. Events whose subject is gone are now retracted unless the user acted on them.
+- Unlinking a CSV account returned 503 when Plaid was not configured, and the Plaid call ran inside the request's transaction.
+- A sync queued for an unlinked item failed and retried on a worker with no provider, although spec 002 rule 17 says it succeeds as `item_missing`.
+- A write with a deleted account's still-valid token was a 500 (a foreign key violation); it is now 401 `account_deleted`.
+- Only uploads had a body limit: a JSON body of any size reached FastAPI's parser, and a chunked upload with no `Content-Length` skipped the check.
+- The first route listing for the policy test read `app.routes`, which hides included routers, so it found no routes; `iter_route_contexts` flattens them, as the cross-user test already did.
+
+**How it was caught:** The end-to-end unlink test written before the fix, the completeness check over `information_schema`, and failing unit tests for streamed bodies and route policies.
+
+**Fix:** As above, in the subagent's branch.
+
+**Time saved or lost:** Not measured.

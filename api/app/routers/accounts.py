@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import Select, select, true, update
 from sqlalchemy.orm import Session
 
+from app import ratelimit
 from app.auth import CurrentUser
 from app.deps import Now, UserSession
 from app.errors import AppError, NotFound, error_responses
@@ -189,7 +190,7 @@ def _target(
     return item.id, display or default, kind
 
 
-@router.post("/import", responses=error_responses(401, 404, 409, 413, 422))
+@router.post("/import", responses=error_responses(401, 404, 409, 413, 422, 429))
 def import_csv(
     file: Annotated[UploadFile, File(description="A CSV export of at most 10 MB")],
     user: CurrentUser,
@@ -209,6 +210,7 @@ def import_csv(
 ) -> CsvImport:
     """Import a bank's CSV export through the sync pipeline, then queue
     categorization and recurring detection."""
+    ratelimit.consume(session, user.id, ratelimit.CSV_IMPORTS, now=now)
     data = file.file.read(MAX_IMPORT_BYTES + 1)
     if len(data) > MAX_IMPORT_BYTES:
         raise AppError("The file is larger than 10 MB", code="file_too_large", status_code=413)

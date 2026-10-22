@@ -16,7 +16,7 @@ from sqlalchemy import column, exists, select, table
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import decision_effects
+from app import decision_effects, ratelimit
 from app.auth import CurrentUser
 from app.deps import Now, UserSession
 from app.errors import AppError, NotFound, error_responses
@@ -152,11 +152,14 @@ def _next_version(session: Session, body: DecisionIn) -> int:
     return parent.version + 1
 
 
-@router.post("", status_code=status.HTTP_201_CREATED, responses=error_responses(401, 404, 409, 422))
+@router.post(
+    "", status_code=status.HTTP_201_CREATED, responses=error_responses(401, 404, 409, 422, 429)
+)
 def save_decision(
     body: DecisionIn, session: UserSession, user: CurrentUser, now: Now
 ) -> DecisionSaved:
     """Save the result the user picked as a new decision version."""
+    ratelimit.consume(session, user.id, ratelimit.DECISIONS, now=now)
     try:
         spec = calculator(body.calculator)
     except UnknownCalculator as exc:

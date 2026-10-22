@@ -10,9 +10,11 @@ Exit codes: 0 every metric meets its baseline; 1 a regression or a suite with
 no baseline; 2 the cost cap was hit, a suite cannot run here (no API key) or the
 arguments are wrong.
 
-Deterministic suites must match their baseline exactly; LLM suites may drop up
-to 2 points. ``--update-baseline`` rewrites the baseline from this run; commit
-that change on its own.
+Deterministic suites may not drop below their baseline at all (tolerance 0);
+LLM suites may drop up to 2 points, the model's run-to-run drift. A metric above
+its baseline passes. ``--update-baseline`` rewrites the baseline from this run;
+commit that change on its own. ``--report`` is written even when the cost cap
+or an unavailable suite stops the run, with the reason under ``stopped``.
 """
 
 from __future__ import annotations
@@ -106,11 +108,11 @@ def main(argv: Sequence[str] | None = None, *, registry: Mapping[str, Suite] = S
     for suite in suites:
         try:
             result = suite.run(budget)
-        except CostCapExceeded as exc:
-            print(f"{suite.name}: stopped, {exc}")
-            return 2
-        except SuiteUnavailable as exc:
-            print(f"{suite.name}: unavailable, {exc}")
+        except (CostCapExceeded, SuiteUnavailable) as exc:
+            word = "stopped" if isinstance(exc, CostCapExceeded) else "unavailable"
+            report["stopped"] = f"{suite.name}: {word}, {exc}"
+            print(report["stopped"])
+            _write_report(args.report, report, budget)
             return 2
         tolerance = LLM_TOLERANCE if suite.llm else DETERMINISTIC_TOLERANCE
         if args.update_baseline:
@@ -136,15 +138,19 @@ def main(argv: Sequence[str] | None = None, *, registry: Mapping[str, Suite] = S
             "cost_cents": result.cost_cents,
             "regressions": found,
         }
-    report["spent_cents"] = budget.spent_cents
-
     if args.update_baseline:
         args.baseline.write_text(json.dumps(baseline, indent=2, sort_keys=True) + "\n")
         print(f"baseline written to {args.baseline}")
-    if args.report is not None:
-        args.report.parent.mkdir(parents=True, exist_ok=True)
-        args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    _write_report(args.report, report, budget)
     return 1 if failed else 0
+
+
+def _write_report(path: Path | None, report: dict[str, Any], budget: Budget) -> None:
+    if path is None:
+        return
+    report["spent_cents"] = budget.spent_cents
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
 
 
 if __name__ == "__main__":
