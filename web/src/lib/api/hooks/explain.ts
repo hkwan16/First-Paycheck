@@ -34,7 +34,10 @@ export function useExplain() {
     mutationFn: ({ decisionId, force = false }: ExplainVariables) =>
       unwrap(fetchClient.POST('/explain', { body: { decision_id: decisionId, force } })),
     // Setting data also clears a stored 404, so the read shows the new row.
-    onSuccess: (explanation) =>
-      queryClient.setQueryData(queryKeys.explanation(explanation.decision_id), explanation),
+    // The plan reports each decision's explanation status, so it is read again.
+    onSuccess: (explanation) => {
+      queryClient.setQueryData(queryKeys.explanation(explanation.decision_id), explanation);
+      return queryClient.invalidateQueries({ queryKey: queryKeys.plan() });
+    },
   });
 }

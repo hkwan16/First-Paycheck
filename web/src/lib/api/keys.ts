@@ -86,8 +86,8 @@ export const queryKeys = {
   holdings: () => ['get', '/holdings'] as const,
 
   /**
-   * The plan screen's read (M4); a saved decision changes it. The route does
-   * not exist yet: the key is reserved so invalidation covers it when it lands.
+   * `GET /plan` (spec 016): decisions, goals, the calendar and the newest pay
+   * stub in one read, so whatever changes one of those changes it too.
    */
   plan: () => ['get', '/plan'] as const,
 
@@ -102,8 +102,16 @@ const documentReads = [queryKeys.documents(), queryKeys.document()];
 
 const spendingReads = [queryKeys.transactions(), queryKeys.spendingSummary(), queryKeys.cashflow()];
 
-/** Balances and positions a sync writes (spec 015 rules 20 and 21). */
-const balanceReads = [queryKeys.netWorth(), queryKeys.holdings()];
+/**
+ * Balances and positions a sync writes (spec 015 rules 20 and 21), and the
+ * goal progress read from them (on its own and in the plan).
+ */
+const balanceReads = [
+  queryKeys.netWorth(),
+  queryKeys.holdings(),
+  queryKeys.goals(),
+  queryKeys.plan(),
+];
 
 /** What each background job changes, so a finished job refreshes exactly those reads. */
 export const JOB_INVALIDATES: Record<JobKind, readonly QueryKey[]> = {
@@ -146,7 +154,8 @@ export const invalidateDocuments = (client: QueryClient) => invalidateAll(client
 
 /**
  * After a confirm: the document is confirmed, and a pay stub row exists or a
- * benefits summary's plans do (with its 401(k) match on the profile).
+ * benefits summary's plans do (with its 401(k) match on the profile). The
+ * plan shows the newest pay stub.
  */
 export const invalidateAfterConfirm = (client: QueryClient) =>
   invalidateAll(client, [
@@ -154,6 +163,8 @@ export const invalidateAfterConfirm = (client: QueryClient) =>
     queryKeys.payStubs(),
     queryKeys.benefitsPlans(),
     queryKeys.profile(),
+    // The plan shows the newest confirmed pay stub.
+    queryKeys.plan(),
   ]);
 
 /** The list and every version read (`is_current` changes when a version lands). */

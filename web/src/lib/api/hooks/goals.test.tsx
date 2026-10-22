@@ -37,6 +37,17 @@ describe('useGoals', () => {
 });
 
 describe('useUpdateGoal', () => {
+  it('reads the plan again, which shows the goal', async () => {
+    savedEmergencyFund();
+    const { result, queryClient } = renderHookWithClient(() => useUpdateGoal());
+    queryClient.setQueryData(queryKeys.plan(), {});
+    act(() => result.current.mutate({ goalId: GOAL_ID, patch: { status: 'paused' } }));
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await waitFor(() =>
+      expect(queryClient.getQueryState(queryKeys.plan())?.isInvalidated).toBe(true),
+    );
+  });
+
   it('sends only what changed and puts the goal the server returns in the list', async () => {
     savedEmergencyFund();
     const bodies = patchBodies();

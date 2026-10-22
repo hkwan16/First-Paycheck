@@ -4,6 +4,7 @@ import { DECISION_V1_ID, EXPLANATION_ID, sampleExplanation } from '@/test/fixtur
 import { db, savedDecision } from '@/test/msw/db';
 import { server } from '@/test/msw/server';
 import { renderHookWithClient } from '@/test/render';
+import { queryKeys } from '../keys';
 import { useExplain, useExplanation } from './explain';
 
 /** Each `POST /explain` body, in order. */
@@ -37,6 +38,18 @@ describe('useExplanation', () => {
 });
 
 describe('useExplain', () => {
+  it("reads the plan again, which shows the explanation's status", async () => {
+    savedDecision();
+    db.explanations = new Map();
+    const { result, queryClient } = renderHookWithClient(() => useExplain());
+    queryClient.setQueryData(queryKeys.plan(), {});
+    act(() => result.current.mutate({ decisionId: DECISION_V1_ID }));
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await waitFor(() =>
+      expect(queryClient.getQueryState(queryKeys.plan())?.isInvalidated).toBe(true),
+    );
+  });
+
   it('writes the first explanation and puts it where useExplanation reads it', async () => {
     savedDecision();
     db.explanations = new Map();

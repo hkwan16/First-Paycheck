@@ -41,6 +41,7 @@ import {
   type DecisionCalculator,
   type DecisionEffects,
 } from './planning-handlers';
+import { planHandlers } from './plan-handlers';
 import { spendingHandlers } from './spending-handlers';
 
 export const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
@@ -639,6 +640,7 @@ export const handlers = [
 
   ...spendingHandlers,
   ...checkinHandlers,
+  ...planHandlers,
 ];
 
 /** Forget scripted job states (called with resetDb after every test). */
