@@ -164,3 +164,17 @@ def test_sandbox_options_carry_the_webhook_and_user() -> None:
         "webhook": "https://api.example/sync/webhook",
         "override_username": "user_custom",
     }
+
+
+def test_sandbox_options_carry_the_password() -> None:
+    """Spec 002 rule 27: ``password`` is Plaid's ``override_password`` (a
+    ``user_custom`` configuration), sent as plain text only in the request."""
+    config = '{"override_accounts": []}'
+    plaid, pool = client((200, {"public_token": "public-sandbox-4"}))
+    plaid.sandbox_public_token_create(
+        "ins_109508", username="user_custom", password=SecretStr(config)
+    )
+    assert pool.requests[0][1]["options"] == {
+        "override_username": "user_custom",
+        "override_password": config,
+    }

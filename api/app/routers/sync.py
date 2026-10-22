@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, status
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 
@@ -66,8 +66,14 @@ class LinkToken(BaseModel):
     expiration: str
 
 
+# Plaid refuses a request body over 100,000 bytes, and a user_custom JSON
+# configuration's quotes are escaped again inside it (spec 002 rule 27).
+MAX_SANDBOX_PASSWORD_CHARS = 65_536
+
+
 class LinkItemRequest(BaseModel):
-    """Exactly one of ``public_token`` (from Plaid Link) or ``sandbox_institution_id``."""
+    """Exactly one of ``public_token`` (from Plaid Link) or ``sandbox_institution_id``;
+    with the latter, optionally the Plaid sandbox user to link (spec 002 rule 27)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -75,12 +81,33 @@ class LinkItemRequest(BaseModel):
     sandbox_institution_id: str | None = Field(
         default=None, min_length=1, max_length=64, examples=["ins_109508"]
     )
+    sandbox_username: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        description="Plaid's sandbox user (override_username); user_good when absent.",
+        examples=["user_transactions_dynamic"],
+    )
+    sandbox_password: SecretStr | None = Field(
+        default=None,
+        min_length=1,
+        max_length=MAX_SANDBOX_PASSWORD_CHARS,
+        description=(
+            "The sandbox user's password (override_password): user_custom's JSON "
+            "configuration, or any non-empty value for a Sandbox Studio user. "
+            "Never logged, stored or echoed."
+        ),
+    )
     institution_name: str | None = Field(default=None, min_length=1, max_length=200)
 
     @model_validator(mode="after")
     def _exactly_one_source(self) -> LinkItemRequest:
         if (self.public_token is None) == (self.sandbox_institution_id is None):
             raise ValueError("give exactly one of public_token or sandbox_institution_id")
+        if self.sandbox_username is not None and self.sandbox_institution_id is None:
+            raise ValueError("sandbox_username is accepted only with sandbox_institution_id")
+        if self.sandbox_password is not None and self.sandbox_username is None:
+            raise ValueError("sandbox_password is accepted only with sandbox_username")
         return self
 
 
@@ -174,9 +201,9 @@ def link_item(
     sandbox_allowed: SandboxAllowed,
     now: Now,
 ) -> LinkedItem:
-    """Exchange a Link public token (or, outside production, create one for a
-    sandbox institution), store the encrypted access token and queue the
-    initial sync."""
+    """Exchange a Link public token (or, while Plaid is in its sandbox, create
+    one for a sandbox institution and sandbox user), store the encrypted access
+    token and queue the initial sync."""
     ratelimit.consume(session, user.id, ratelimit.LINKS, now=now)
     sandbox_id = body.sandbox_institution_id
     if sandbox_id is not None and not sandbox_allowed:
@@ -189,7 +216,10 @@ def link_item(
     with _plaid_errors():
         if sandbox_id is not None:
             public_token = plaid.sandbox_public_token_create(
-                sandbox_id, webhook=settings.plaid_webhook_url
+                sandbox_id,
+                webhook=settings.plaid_webhook_url,
+                username=body.sandbox_username,
+                password=body.sandbox_password,
             )
         elif body.public_token is not None:
             public_token = body.public_token

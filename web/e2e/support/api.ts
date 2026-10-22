@@ -71,9 +71,42 @@ export async function unlinkAll(page: Page) {
  */
 const SYNC_BUDGET_MS = 300_000;
 
-/** Link Plaid's sandbox bank with the e2e-only button and wait for its accounts. */
+/**
+ * The Plaid sandbox user to link (the API's `sandbox_username`, spec 002 rule
+ * 27), from E2E_PLAID_USERNAME. Unset links Plaid's default, `user_good`,
+ * whose account names (Plaid Checking, Plaid Saving) the specs assert.
+ */
+export function plaidSandboxUsername(): string | null {
+  return process.env.E2E_PLAID_USERNAME?.trim() || null;
+}
+
+/**
+ * Add `sandbox_username` to the link request the e2e-only button sends, so
+ * the button itself stays a one-click link of Plaid's default user.
+ */
+async function linkAsSandboxUser(page: Page, username: string) {
+  await page.route(
+    (url) => url.pathname === '/sync/items',
+    async (route) => {
+      const request = route.request();
+      if (request.method() !== 'POST') {
+        await route.fallback();
+        return;
+      }
+      const body = request.postDataJSON() as Record<string, unknown>;
+      await route.fallback({ postData: JSON.stringify({ ...body, sandbox_username: username }) });
+    },
+  );
+}
+
+/**
+ * Link Plaid's sandbox bank with the e2e-only button and wait for its
+ * accounts. E2E_PLAID_USERNAME links another sandbox user.
+ */
 export async function linkSandboxBank(page: Page) {
   test.info().setTimeout(test.info().timeout + SYNC_BUDGET_MS);
+  const username = plaidSandboxUsername();
+  if (username) await linkAsSandboxUser(page, username);
   await page.getByRole('button', { name: 'Link sandbox bank (test)' }).click();
   // Plaid's sandbox takes seconds to make and exchange the token before the
   // sync starts, and a short sync can finish between two looks at the bar, so
@@ -83,5 +116,10 @@ export async function linkSandboxBank(page: Page) {
     timeout: 60_000,
   });
   await expect(done).toBeVisible({ timeout: SYNC_BUDGET_MS });
-  await expect(page.getByRole('group', { name: 'Plaid Checking' })).toBeVisible();
+  if (username) {
+    // Each sandbox user names its accounts its own way.
+    await expect(page.getByText(/No accounts linked yet/)).toHaveCount(0);
+  } else {
+    await expect(page.getByRole('group', { name: 'Plaid Checking' })).toBeVisible();
+  }
 }

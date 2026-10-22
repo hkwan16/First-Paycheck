@@ -3237,7 +3237,7 @@
       },
       "LinkItemRequest": {
         "additionalProperties": false,
-        "description": "Exactly one of ``public_token`` (from Plaid Link) or ``sandbox_institution_id``.",
+        "description": "Exactly one of ``public_token`` (from Plaid Link) or ``sandbox_institution_id``;\nwith the latter, optionally the Plaid sandbox user to link (spec 002 rule 27).",
         "properties": {
           "institution_name": {
             "anyOf": [
@@ -3280,6 +3280,39 @@
               "ins_109508"
             ],
             "title": "Sandbox Institution Id"
+          },
+          "sandbox_password": {
+            "anyOf": [
+              {
+                "format": "password",
+                "maxLength": 65536,
+                "minLength": 1,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The sandbox user's password (override_password): user_custom's JSON configuration, or any non-empty value for a Sandbox Studio user. Never logged, stored or echoed.",
+            "title": "Sandbox Password"
+          },
+          "sandbox_username": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Plaid's sandbox user (override_username); user_good when absent.",
+            "examples": [
+              "user_transactions_dynamic"
+            ],
+            "title": "Sandbox Username"
           }
         },
         "title": "LinkItemRequest",
@@ -8908,7 +8941,7 @@
     },
     "/sync/items": {
       "post": {
-        "description": "Exchange a Link public token (or, outside production, create one for a\nsandbox institution), store the encrypted access token and queue the\ninitial sync.",
+        "description": "Exchange a Link public token (or, while Plaid is in its sandbox, create\none for a sandbox institution and sandbox user), store the encrypted access\ntoken and queue the initial sync.",
         "operationId": "link_item",
         "requestBody": {
           "content": {

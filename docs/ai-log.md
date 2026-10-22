@@ -422,3 +422,23 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **What was wrong in the second round:** Two concurrent worktrees shared `TEST_DATABASE_URL`, and another branch had already migrated it to a revision this branch does not have (`0015_loan_account_kind`), so every integration test failed in Alembic. This worktree's `.env` now points at its own database, `first_paycheck_test_salary`. Pydantic's `@computed_field` over `@property` fails mypy (`prop-decorator`); the decorator alone (pydantic applies the property) passes without a `type: ignore`.
 
 **Time saved or lost:** Not measured.
+## 2026-10-22: choosing the Plaid sandbox user on the sandbox link route
+
+**Task:** `POST /sync/items` with `sandbox_institution_id` always linked Plaid's default `user_good`, although `PlaidClient.sandbox_public_token_create` already took a `username`. The plan wants a custom sandbox user for deterministic evals, so the route needed to name one.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Spec 002 rule 27 first, then failing route, validator and client tests, then the client, request model and route; extend the live `plaid_sandbox` test with `user_transactions_dynamic` and run it once against Plaid; let the e2e link helper take `E2E_PLAID_USERNAME`.
+
+**What it produced:** `sandbox_username` and `sandbox_password` (a `SecretStr`) on `LinkItemRequest`, passed as `override_username` and `override_password`; a `password` keyword on the client; route tests for the options reaching the fake, the 422 cases and a 502 that never echoes or logs the password; a live test linking `user_transactions_dynamic`; `linkSandboxBank` adding the username to the button's request with `page.route`.
+
+**What was wrong:**
+- The brief's 64 KB limit was checked against Plaid before it was written into the spec. Plaid refuses any request body over 100,000 bytes, and a JSON configuration's quotes are escaped again inside the body, so 65,536 characters is about the most that fits. The repo's own `evals/fixtures/recurring/custom_user.json` is 91,747 characters even compact (a 105,049-byte request) and Plaid refuses it this way; it has to be loaded some other way, such as Sandbox Studio.
+- `user_transactions_dynamic` names its accounts "Checking", "Credit card" and five loans, not "Plaid Checking", so the e2e helper's last check and the later specs' account names hold only for `user_good`. The helper now checks only that accounts appeared when a username is set, and `web/CLAUDE.md` says to run just the link step with another user.
+- Spec 002's status line still said the live sandbox path had never run against Plaid; it had (the recorded fixtures and the loan fix). It now says when it last ran.
+
+**How it was caught:** A scratch probe of `/sandbox/public_token/create` with the eval configuration, a 300,000-character password and malformed JSON (Plaid answers `INVALID_CREDENTIALS` without repeating the password); the live `plaid_sandbox` run; a local e2e stack run linking `user_transactions_dynamic` through the button, then reading its accounts from the database.
+
+**Fix:** As above, in the subagent's branch.
+
+**Time saved or lost:** Not measured.

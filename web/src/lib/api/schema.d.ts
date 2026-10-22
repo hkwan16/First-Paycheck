@@ -788,9 +788,9 @@ export interface paths {
     put?: never;
     /**
      * Link Item
-     * @description Exchange a Link public token (or, outside production, create one for a
-     *     sandbox institution), store the encrypted access token and queue the
-     *     initial sync.
+     * @description Exchange a Link public token (or, while Plaid is in its sandbox, create
+     *     one for a sandbox institution and sandbox user), store the encrypted access
+     *     token and queue the initial sync.
      */
     post: operations['link_item'];
     delete?: never;
@@ -2254,7 +2254,8 @@ export interface components {
     };
     /**
      * LinkItemRequest
-     * @description Exactly one of ``public_token`` (from Plaid Link) or ``sandbox_institution_id``.
+     * @description Exactly one of ``public_token`` (from Plaid Link) or ``sandbox_institution_id``;
+     *     with the latter, optionally the Plaid sandbox user to link (spec 002 rule 27).
      */
     LinkItemRequest: {
       /** Institution Name */
@@ -2266,6 +2267,17 @@ export interface components {
        * @example ins_109508
        */
       sandbox_institution_id?: string | null;
+      /**
+       * Sandbox Password
+       * @description The sandbox user's password (override_password): user_custom's JSON configuration, or any non-empty value for a Sandbox Studio user. Never logged, stored or echoed.
+       */
+      sandbox_password?: string | null;
+      /**
+       * Sandbox Username
+       * @description Plaid's sandbox user (override_username); user_good when absent.
+       * @example user_transactions_dynamic
+       */
+      sandbox_username?: string | null;
     };
     /** LinkToken */
     LinkToken: {
