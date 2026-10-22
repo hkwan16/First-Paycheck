@@ -158,10 +158,16 @@ def test_sandbox_linking_is_refused_in_production(
     assert fake_plaid.calls == []
 
 
-def test_sandbox_linking_allowed_follows_app_env() -> None:
-    assert sandbox_linking_allowed(Settings(_env_file=None, app_env="development")) is True
-    production = Settings.model_construct(app_env="production")
-    assert sandbox_linking_allowed(production) is False
+def test_sandbox_linking_allowed_follows_the_plaid_environment() -> None:
+    """Spec 002 rule 27: the shortcut exists only in Plaid's sandbox, so the
+    Plaid environment decides, not APP_ENV. The deployed stack stays walkable
+    until Plaid production is approved and closes by itself after."""
+    sandbox_in_production = Settings.model_construct(app_env="production", plaid_env="sandbox")
+    assert sandbox_linking_allowed(sandbox_in_production) is True
+    live_plaid_in_development = Settings(
+        _env_file=None, app_env="development", plaid_env="production"
+    )
+    assert sandbox_linking_allowed(live_plaid_in_development) is False
 
 
 def test_an_item_cannot_be_linked_twice(

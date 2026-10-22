@@ -258,8 +258,10 @@ WebhookKeys = Annotated[WebhookKeyCache, Depends(get_webhook_keys)]
 
 
 def sandbox_linking_allowed(settings: SettingsDep) -> bool:
-    """``POST /sync/items`` accepts ``sandbox_institution_id`` outside production."""
-    return settings.app_env != "production"
+    """``POST /sync/items`` accepts ``sandbox_institution_id`` while Plaid is in
+    its sandbox (spec 002 rule 27): the endpoint it uses exists nowhere else,
+    so the gate follows the Plaid environment rather than ``APP_ENV``."""
+    return settings.plaid_env == "sandbox"
 
 
 SandboxAllowed = Annotated[bool, Depends(sandbox_linking_allowed)]

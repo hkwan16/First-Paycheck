@@ -11,7 +11,7 @@ Bring a user's bank data into First Paycheck and keep it current. A linked insti
 | Input | Type | Valid range |
 |---|---|---|
 | Plaid `public_token` | string from Plaid Link | 1-512 characters; exchanged once |
-| `sandbox_institution_id` | string | Non-production only, for example `ins_109508` (First Platypus Bank) |
+| `sandbox_institution_id` | string | Only while `PLAID_ENV=sandbox`, for example `ins_109508` (First Platypus Bank) |
 | `institution_name` | string, optional | 1-200 characters, from Link's `onSuccess` metadata |
 | Provider pages | `TransactionPage` (below) | Any number of pages; `has_more` false on the last |
 | Plaid amounts | JSON numbers in dollars | Parsed as `Decimal`, never `float` |
@@ -97,7 +97,7 @@ Bring a user's bank data into First Paycheck and keep it current. A linked insti
 
 ### Routes
 
-27. `POST /sync/items` takes exactly one of `public_token` or `sandbox_institution_id`. The sandbox field is rejected with 422 when `APP_ENV=production`. The access token is encrypted before it touches the database. A `provider_item_id` that is already linked is 409 `item_already_linked`. The response's `job_id` is the `sync.initial` job, whose idempotency key is `sync.initial:<item id>`.
+27. `POST /sync/items` takes exactly one of `public_token` or `sandbox_institution_id`. The sandbox field is rejected with 422 unless `PLAID_ENV=sandbox`: Plaid's `/sandbox/public_token/create` exists only in its sandbox, so the shortcut can never reach a real bank there, and gating on the Plaid environment (not `APP_ENV`) keeps the deployed stack walkable until Plaid production is approved, after which it closes by itself. The access token is encrypted before it touches the database. A `provider_item_id` that is already linked is 409 `item_already_linked`. The response's `job_id` is the `sync.initial` job, whose idempotency key is `sync.initial:<item id>`.
 28. `DELETE /sync/items/{id}` asks Plaid to remove the item (best effort: a Plaid failure, an undecryptable token or an unconfigured Plaid is logged, not returned) with no transaction open, then deletes the row; `ON DELETE CASCADE` removes its accounts, transactions, snapshots and holdings (spec 001 rule 25). The full unlink path, including the derived data it retracts, is spec 017 rules 11-16.
 29. `POST /sync/items/{id}/sync` returns the already-queued `sync.incremental` job for that item when there is one, otherwise a new one.
 30. `GET /accounts` lists the user's accounts ordered by institution, then name, each with its latest balance snapshot (`balance_cents`, `balance_as_of`, null when none) and institution name.
