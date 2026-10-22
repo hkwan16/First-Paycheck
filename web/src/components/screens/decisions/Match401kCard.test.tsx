@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CALC_DEBOUNCE_MS } from '@/lib/api/hooks';
 import { parseMoney } from '@/lib/money';
 import { cappedK401, DECISION_V1_ID, sampleDecision, sampleK401 } from '@/test/fixtures/decisions';
-import { emptyProfile } from '@/test/fixtures/documents';
+import { emptyProfile, SAMPLE_ANNUAL_SALARY_CENTS, samplePayStub } from '@/test/fixtures/documents';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
 import { db, decisionsReady, savedDecision } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
@@ -281,6 +281,8 @@ describe('Match401kCard plan details', () => {
     ).findByRole('form', { name: 'Your plan details' });
     expect(within(card()).queryByRole('slider')).not.toBeInTheDocument();
 
+    // The stub's figure starts the field; this person types their offer letter's.
+    await user.clear(within(form).getByLabelText('Yearly salary'));
     await user.type(within(form).getByLabelText('Yearly salary'), '65,000');
     await user.click(within(form).getByRole('button', { name: 'Single' }));
     await user.type(within(form).getByLabelText('Employer adds, % of what you put in'), '100');
@@ -325,42 +327,67 @@ describe('Match401kCard plan details', () => {
     await waitFor(() => expect(result()).toHaveTextContent('You leave the whole $2,600 match'));
   });
 
-  it("leaves a new user's salary and birth year empty, with examples that read as examples", async () => {
-    // A confirmed stub and no salary in the profile. The API reports no yearly
-    // salary for a stub (gross times pay periods is calculator work), so the
-    // field starts empty, and its placeholder must not look like a value.
+  it("starts a new user's salary from the confirmed stub, so plan details save without retyping it", async () => {
+    // Spec 005 rule 24a: the API reports the yearly salary the stub implies
+    // (2,708.33 twice a month is 64,999.92), a real value in the field.
     decisionsReady();
     db.profile = { ...emptyProfile };
+    const puts: { salary_cents?: number }[] = [];
+    server.events.on('request:start', async ({ request }) => {
+      if (request.method === 'PUT') puts.push(await request.clone().json());
+    });
     const { user } = renderCard();
     const form = await within(
       await screen.findByRole('region', { name: '401(k) match' }),
     ).findByRole('form', { name: 'Your plan details' });
     const salary = within(form).getByLabelText('Yearly salary');
+    expect(salary).toHaveValue('64,999.92');
+    expect(salary).toHaveAccessibleDescription(
+      'From your pay stub of Oct 15, 2026, as a year of paychecks like it. Change it if that paycheck had overtime or a bonus.',
+    );
     const birthYear = within(form).getByLabelText('Year you were born');
-    expect(salary).toHaveValue('');
-    expect(salary).toHaveAttribute('placeholder', 'for example 65,000.00');
-    expect(parseMoney(salary.getAttribute('placeholder') ?? '')).toBeNull();
     expect(birthYear).toHaveValue('');
     expect(birthYear).toHaveAttribute('placeholder', 'for example 1996');
 
+    await user.click(within(form).getByRole('button', { name: 'Single' }));
+    await user.type(within(form).getByLabelText('Employer adds, % of what you put in'), '100');
+    await user.type(within(form).getByLabelText('Up to, % of your pay'), '4');
+    await user.type(birthYear, '1996');
     await user.click(within(form).getByRole('button', { name: 'Save plan details' }));
-    expect(salary).toHaveAccessibleDescription('Enter your yearly salary, like 65,000.00.');
-    expect(birthYear).toHaveAccessibleDescription('Enter the year you were born, like 1996.');
-    expect(db.profile.salary_cents).toBeNull();
+
+    await within(card()).findByRole('slider');
+    expect(puts).toHaveLength(1);
+    expect(puts[0]?.salary_cents).toBe(SAMPLE_ANNUAL_SALARY_CENTS);
+    await settle();
+    await waitFor(() => expect(result()).toHaveTextContent('You leave the whole $2,600 match'));
   });
 
-  it('says what to fix before sending anything', async () => {
+  it('says what to fix before sending anything, with examples that read as examples', async () => {
+    // A stub with no pay schedule: the API reports no yearly salary for it,
+    // so the field starts empty, and its placeholder must not look like a value.
     decisionsReady();
     db.profile = { ...emptyProfile };
+    db.payStubs = [samplePayStub({ pay_frequency: null, annual_salary_cents: null })];
     const { user } = renderCard();
     const form = await within(
       await screen.findByRole('region', { name: '401(k) match' }),
     ).findByRole('form', { name: 'Your plan details' });
+    const salary = within(form).getByLabelText('Yearly salary');
+    expect(salary).toHaveValue('');
+    expect(salary).toHaveAttribute('placeholder', 'for example 65,000.00');
+    expect(parseMoney(salary.getAttribute('placeholder') ?? '')).toBeNull();
+    expect(within(form).getByLabelText('Year you were born')).toHaveAttribute(
+      'placeholder',
+      'for example 1996',
+    );
+
     await user.click(within(form).getByRole('button', { name: 'Save plan details' }));
-    expect(within(form).getByLabelText('Yearly salary')).toHaveAccessibleDescription(
-      'Enter your yearly salary, like 65,000.00.',
+    expect(salary).toHaveAccessibleDescription('Enter your yearly salary, like 65,000.00.');
+    expect(within(form).getByLabelText('Year you were born')).toHaveAccessibleDescription(
+      'Enter the year you were born, like 1996.',
     );
     expect(within(form).getByText('Choose your filing status.')).toBeInTheDocument();
+    expect(within(form).getByText('Choose how often you are paid.')).toBeInTheDocument();
     expect(db.profile.salary_cents).toBeNull();
   });
 

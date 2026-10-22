@@ -6,6 +6,7 @@ import {
   needsPlanDetails,
   profileInput,
   readPlanDetails,
+  salaryFromStub,
   type PlanDetailsDraft,
 } from './plan-details';
 
@@ -42,9 +43,9 @@ describe('needsPlanDetails', () => {
 });
 
 describe('draftFromProfile', () => {
-  it('starts empty for a new profile, with the pay schedule from the stub', () => {
+  it('starts a new profile from the stub: its pay schedule and the yearly salary the API reports for it', () => {
     expect(draftFromProfile(emptyProfile, stub)).toEqual({
-      salary: '',
+      salary: '64,999.92',
       filingStatus: null,
       payFrequency: 'semimonthly',
       tiers: [{ employerPct: '', uptoPct: '' }],
@@ -52,6 +53,27 @@ describe('draftFromProfile', () => {
     });
   });
 
+  it('leaves the salary empty when the API reports none for the stub, or there is no stub', () => {
+    const noFrequency = { ...stub, pay_frequency: null, annual_salary_cents: null };
+    expect(draftFromProfile(emptyProfile, noFrequency).salary).toBe('');
+    expect(draftFromProfile(emptyProfile, undefined).salary).toBe('');
+  });
+
+  it("keeps the profile's own salary over the stub's", () => {
+    expect(draftFromProfile(sampleProfile, stub).salary).toBe('65,000.00');
+  });
+});
+
+describe('salaryFromStub', () => {
+  it('is true only when the salary starts from the stub', () => {
+    expect(salaryFromStub(emptyProfile, stub)).toBe(true);
+    expect(salaryFromStub(sampleProfile, stub)).toBe(false);
+    expect(salaryFromStub(emptyProfile, { ...stub, annual_salary_cents: null })).toBe(false);
+    expect(salaryFromStub(emptyProfile, undefined)).toBe(false);
+  });
+});
+
+describe('draftFromProfile, saved', () => {
   it('shows what is saved, as the person would type it', () => {
     expect(draftFromProfile(sampleProfile, stub)).toEqual(
       draft({ salary: '65,000.00', tiers: [{ employerPct: '100', uptoPct: '4' }] }),

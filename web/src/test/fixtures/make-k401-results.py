@@ -4,8 +4,10 @@ and the sample screens. The web app never computes a result, and neither do
 its tests: they answer from this table.
 
 Cases: the mockup's sample (J. Rivera, $65,000.00, semi-monthly, Acme matches
-100% of the first 4%, single, age 30) at every slider stop from 0% to 15%, and
-spec 006 example 9, where the 402(g) and compensation limits both bind.
+100% of the first 4%, single, age 30) at every slider stop from 0% to 15%,
+spec 006 example 9, where the 402(g) and compensation limits both bind, and
+the same new user at 0% on the salary the Acme stub implies (spec 005 rule
+24a: 270,833 x 24 = 6,499,992 cents), saved without retyping it.
 
 Run from api/, then format:
     uv run python ../web/src/test/fixtures/make-k401-results.py
@@ -50,4 +52,5 @@ def case(raw: dict[str, object]) -> dict[str, object]:
 
 cases = [case({**SAMPLE, "contribution_pct": f"{pct}.00"}) for pct in range(16)]
 cases.append(case(CAPPED))
+cases.append(case({**SAMPLE, "salary_cents": 6_499_992, "contribution_pct": "0.00"}))
 Path(__file__).with_name("k401-results.json").write_text(json.dumps(cases, indent=2) + "\n")

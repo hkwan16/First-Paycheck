@@ -615,5 +615,41 @@
         "k401.compensation_limit"
       ]
     }
+  },
+  {
+    "inputs": {
+      "salary_cents": 6499992,
+      "pay_periods_per_year": 24,
+      "match_tiers": [
+        {
+          "employee_pct_upto": "4.00",
+          "employer_pct": "100.00"
+        }
+      ],
+      "contribution_pct": "0.00",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "result": {
+      "full_match_pct": "4.00",
+      "employer_match_cents_current": 0,
+      "employer_match_cents_full": 260000,
+      "missed_cents": 260000,
+      "employee_annual_cents_current": 0,
+      "employee_annual_cents_full": 260000,
+      "per_paycheck_cost_delta_cents": 10833,
+      "per_paycheck_after_tax_cost_cents": 9533,
+      "marginal_rate_used": "12.00",
+      "deferral_limit_cents": 2450000,
+      "capped": false,
+      "compensation_capped": false,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets"
+      ]
+    }
   }
 ]

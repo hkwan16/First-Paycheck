@@ -175,6 +175,12 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   Confirm validates the body with `PayStubValues` / `PlanValues`, runs the
   arithmetic gate in `calc/pay_stub.py` (422 `pay_stub_unbalanced` with
   `details`), and stores the body's values, never the proposal's.
+- `PayStubOut` (`GET /pay-stubs`, the confirm response) adds the computed
+  field `annual_salary_cents` (spec 005 rule 24a): gross times the pay periods
+  a year, from `calc/pay_stub.py:annual_salary_cents` over
+  `calc.pay_dates.PERIODS`, exact, null without a frequency, never stored. The
+  web offers it as the starting salary in the plan details form, which saves
+  it with `PUT /profile`; the API never writes the profile from a stub.
 - Refusal, a spent budget, no readable page or no model (no gateway, or
   `LLMMisconfigured`: the API rejected the key or the model id) make the
   document `manual_entry_required` on the first attempt; schema and other API

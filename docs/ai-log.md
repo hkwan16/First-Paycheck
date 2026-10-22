@@ -385,6 +385,8 @@ Every entry has a dated heading and these fields, in this order. A field that do
 
 **How it was caught:** The production walkthrough; reproduced in the card tests with MSW, which failed on the bare placeholders before the change.
 
-**Fix:** As above.
+**Fix:** As above, then the API piece the first pass named, in a second round on the same branch: spec 005 rule 24a gives `PayStubOut` the computed field `annual_salary_cents` (`calc/pay_stub.py:annual_salary_cents`, gross times `calc.pay_dates.PERIODS`, exact, null without a frequency; `calc.pay_dates.frequency_named` reads the stored enum as the calculator's literal). The spec's example says 270,833 twice a month is 6,499,992 cents, not 65,000.00: nothing rounds it. The plan details form now starts a new user's salary from the newest stub's figure, as a value described by where it came from, so the Acme user saves without retyping; the "for example" placeholder stays for a stub with no pay schedule. A new `k401-results.json` case (made by the API's calculator) covers the card's first result on that salary.
+
+**What was wrong in the second round:** Two concurrent worktrees shared `TEST_DATABASE_URL`, and another branch had already migrated it to a revision this branch does not have (`0015_loan_account_kind`), so every integration test failed in Alembic. This worktree's `.env` now points at its own database, `first_paycheck_test_salary`. Pydantic's `@computed_field` over `@property` fails mypy (`prop-decorator`); the decorator alone (pydantic applies the property) passes without a `type: ignore`.
 
 **Time saved or lost:** Not measured.
