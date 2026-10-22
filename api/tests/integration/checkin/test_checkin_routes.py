@@ -32,6 +32,7 @@ from tests.support.factories import (
     make_item,
 )
 from tests.support.november import EMERGENCY_FUND_INPUTS, HEALTH_INPUTS, K401_INPUTS
+from tests.support.sandbox_history import link_sandbox
 from tests.support.spending_month import september
 
 Client = Callable[[FixtureUser], TestClient]
@@ -208,6 +209,26 @@ def test_cash_flow_against_the_plan(
         "health": "on_plan",
         "left_over": None,
     }
+
+
+def test_take_home_counts_money_in_only(
+    app: FastAPI, seeded_rules: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    # Spec 015 route row 12: the Plaid sandbox's October, where GUSTO PAY is an
+    # income-labeled outflow (spec 007 rule 22a). It used to read -584,578.
+    app.dependency_overrides[get_now] = lambda: dt.datetime(2026, 10, 22, 15, 0, tzinfo=dt.UTC)
+    link_sandbox(seeded_rules, user_a)
+    check_in = make_check_in(seeded_rules, user_a.id, period=dt.date(2026, 10, 1))
+
+    response = client_as(user_a).get(f"/check-ins/{check_in}")
+
+    assert response.status_code == 200, response.text
+    lines = {line["key"]: line for line in response.json()["cash_flow"]["plan"]}
+    assert lines["take_home"]["label"] == "Take-home pay"
+    assert (lines["take_home"]["actual_cents"], lines["left_over"]["actual_cents"]) == (
+        422,
+        -168_541,
+    )
 
 
 def test_unknown_check_in_is_404(frozen: FastAPI, client_as: Client, user_a: FixtureUser) -> None:

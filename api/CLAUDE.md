@@ -239,7 +239,14 @@ explanation, `GET /calendar` shows the check it implies.
   default fake answer) through `app.dependency_overrides[get_llm_gateway]`.
 - `GET /spending/summary` is one `GROUP BY category` under RLS rolled up by
   the pure `calc/spending.py:summarize`; buckets are
-  `sync/categories.py:CATEGORY_BUCKETS`.
+  `sync/categories.py:CATEGORY_BUCKETS`. Each category's money out and money
+  in come back as separate magnitudes (`CategorySum.out_cents`, `in_cents`,
+  `out_count`) because income counts money in only (spec 007 rule 22a): an
+  `income` row that is money out (the Plaid sandbox's GUSTO PAY) is left out
+  of every total and reported as `income_outflows_ignored_cents`, so
+  `income_cents` is never negative. Spending buckets still net refunds.
+  `tests/support/sandbox_history.py:link_sandbox` runs the recorded sandbox
+  item through `run_sync` and the seed rules for tests that need that shape.
 
 ## Logging and operations (from M4)
 

@@ -5524,6 +5524,10 @@
             "title": "Income Cents",
             "type": "integer"
           },
+          "income_outflows_ignored_cents": {
+            "title": "Income Outflows Ignored Cents",
+            "type": "integer"
+          },
           "left_over_cents": {
             "title": "Left Over Cents",
             "type": "integer"
@@ -5582,6 +5586,7 @@
           "savings_cents",
           "other_cents",
           "transfers_ignored_cents",
+          "income_outflows_ignored_cents",
           "uncategorized_cents",
           "left_over_cents",
           "essentials_pct",

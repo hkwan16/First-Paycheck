@@ -3090,6 +3090,8 @@ export interface components {
       flexible_pct: string | null;
       /** Income Cents */
       income_cents: number;
+      /** Income Outflows Ignored Cents */
+      income_outflows_ignored_cents: number;
       /** Left Over Cents */
       left_over_cents: number;
       /** Other Cents */
