@@ -1,12 +1,16 @@
-"""A full sync against the live Plaid sandbox (marked ``plaid_sandbox``).
+"""Full syncs against the live Plaid sandbox (marked ``plaid_sandbox``).
 
 Skipped unless PLAID_CLIENT_ID and PLAID_SECRET (sandbox) are set. Run with
-``uv run pytest -m plaid_sandbox api/tests/integration/test_plaid_sandbox.py``.
+``uv run pytest -m plaid_sandbox api/tests/integration/test_plaid_sandbox.py``
+(add ``-o log_cli=true --log-cli-level=INFO`` to see what each sandbox user
+returned).
 """
 
 from __future__ import annotations
 
+import logging
 import time
+import uuid
 
 import pytest
 from pydantic import SecretStr
@@ -17,7 +21,7 @@ from app.db import user_session_for
 from db.enums import SyncProvider
 from jobs.errors import RetryLater
 from sync.crypto import cipher_from_settings
-from sync.pipeline import SyncItemSecrets, run_sync
+from sync.pipeline import SyncItemSecrets, SyncResult, run_sync
 from sync.plaid.client import PlaidClient
 from sync.plaid.provider import PlaidProvider
 from sync.provider import SyncProvider as SyncProviderProtocol
@@ -26,6 +30,8 @@ from tests.support.env import TEST_PLAID_TOKEN_KEY, live_credential
 from tests.support.factories import make_item
 
 pytestmark = pytest.mark.plaid_sandbox
+
+logger = logging.getLogger(__name__)
 
 READY_ATTEMPTS = 12
 READY_WAIT_SECONDS = 5.0
@@ -52,40 +58,59 @@ def plaid() -> PlaidClient:
     return PlaidClient.from_settings(settings)
 
 
+def sync_linked_item(
+    plaid: PlaidClient,
+    db_connection: Connection,
+    user: FixtureUser,
+    token: SecretStr,
+    provider_item_id: str,
+) -> tuple[uuid.UUID, SyncResult]:
+    """Store the item for ``user`` and run its first sync, waiting for Plaid."""
+    cipher = cipher_from_settings(
+        Settings(_env_file=None, plaid_token_key=SecretStr(TEST_PLAID_TOKEN_KEY))
+    )
+    item = make_item(
+        db_connection,
+        user.id,
+        provider_item_id=provider_item_id,
+        access_token_enc=cipher.encrypt(token),
+    )
+
+    def provider_for(secrets: SyncItemSecrets) -> SyncProviderProtocol:
+        assert secrets.provider is SyncProvider.PLAID
+        assert secrets.access_token_enc is not None
+        return PlaidProvider(plaid, cipher.decrypt(secrets.access_token_enc))
+
+    for _ in range(READY_ATTEMPTS):
+        try:
+            result = run_sync(
+                user_id=user.id,
+                item_id=item,
+                sessions=lambda: user_session_for(user.id, bind=db_connection),
+                provider_for=provider_for,
+            )
+        except RetryLater:
+            time.sleep(READY_WAIT_SECONDS)
+        else:
+            return item, result
+    pytest.fail("Plaid never finished preparing the sandbox item")
+
+
+def account_kinds(db_connection: Connection, user: FixtureUser) -> dict[str, str]:
+    return dict(
+        db_connection.execute(
+            text("SELECT name, kind::text FROM accounts WHERE user_id = :u"), {"u": user.id}
+        ).all()
+    )
+
+
 def test_first_platypus_bank_syncs_end_to_end(
     plaid: PlaidClient, db_connection: Connection, user_a: FixtureUser
 ) -> None:
     public_token = plaid.sandbox_public_token_create("ins_109508")
     token, provider_item_id = plaid.item_public_token_exchange(public_token)
     try:
-        cipher = cipher_from_settings(
-            Settings(_env_file=None, plaid_token_key=SecretStr(TEST_PLAID_TOKEN_KEY))
-        )
-        item = make_item(
-            db_connection,
-            user_a.id,
-            provider_item_id=provider_item_id,
-            access_token_enc=cipher.encrypt(token),
-        )
-
-        def provider_for(secrets: SyncItemSecrets) -> SyncProviderProtocol:
-            assert secrets.provider is SyncProvider.PLAID
-            assert secrets.access_token_enc is not None
-            return PlaidProvider(plaid, cipher.decrypt(secrets.access_token_enc))
-
-        for _ in range(READY_ATTEMPTS):
-            try:
-                result = run_sync(
-                    user_id=user_a.id,
-                    item_id=item,
-                    sessions=lambda: user_session_for(user_a.id, bind=db_connection),
-                    provider_for=provider_for,
-                )
-                break
-            except RetryLater:
-                time.sleep(READY_WAIT_SECONDS)
-        else:
-            pytest.fail("Plaid never finished preparing the sandbox item")
+        item, result = sync_linked_item(plaid, db_connection, user_a, token, provider_item_id)
 
         assert result.outcome == "synced"
         assert result.accounts >= 1
@@ -103,15 +128,35 @@ def test_first_platypus_bank_syncs_end_to_end(
         assert counts[1] >= 1
         assert counts[2] >= 1
         assert counts[3]
-        kinds: dict[str, str] = dict(
-            db_connection.execute(
-                text("SELECT name, kind::text FROM accounts WHERE user_id = :u"),
-                {"u": user_a.id},
-            ).all()
-        )
+        kinds = account_kinds(db_connection, user_a)
         # The sandbox's loans are loans, never credit cards (spec 002 rule 4).
         assert {name: kinds.get(name) for name in SANDBOX_LOANS} == dict.fromkeys(
             SANDBOX_LOANS, "loan"
         )
+    finally:
+        plaid.item_remove(token)
+
+
+def test_a_named_sandbox_user_links_its_own_data(
+    plaid: PlaidClient, db_connection: Connection, user_a: FixtureUser
+) -> None:
+    """Spec 002 rule 27: ``user_transactions_dynamic`` has a checking account,
+    a credit card and a loan with a history dated relative to today."""
+    public_token = plaid.sandbox_public_token_create(
+        "ins_109508", username="user_transactions_dynamic"
+    )
+    token, provider_item_id = plaid.item_public_token_exchange(public_token)
+    try:
+        _, result = sync_linked_item(plaid, db_connection, user_a, token, provider_item_id)
+
+        assert result.outcome == "synced"
+        assert result.added >= 1
+        kinds = account_kinds(db_connection, user_a)
+        transactions = db_connection.execute(
+            text("SELECT count(*) FROM transactions WHERE user_id = :u"), {"u": user_a.id}
+        ).scalar_one()
+        logger.info("user_transactions_dynamic: accounts %s, %d transactions", kinds, transactions)
+        assert {"loan", "credit"} & set(kinds.values()), kinds
+        assert transactions >= 1
     finally:
         plaid.item_remove(token)

@@ -60,7 +60,12 @@ class PlaidLinking(Protocol):
     def item_public_token_exchange(self, public_token: str) -> tuple[SecretStr, str]: ...
 
     def sandbox_public_token_create(
-        self, institution_id: str, *, webhook: str | None = None, username: str | None = None
+        self,
+        institution_id: str,
+        *,
+        webhook: str | None = None,
+        username: str | None = None,
+        password: SecretStr | None = None,
     ) -> str: ...
 
     def institution_name(self, institution_id: str) -> str: ...
@@ -159,15 +164,25 @@ class PlaidClient:
         return SecretStr(str(body["access_token"])), str(body["item_id"])
 
     def sandbox_public_token_create(
-        self, institution_id: str, *, webhook: str | None = None, username: str | None = None
+        self,
+        institution_id: str,
+        *,
+        webhook: str | None = None,
+        username: str | None = None,
+        password: SecretStr | None = None,
     ) -> str:
         """Sandbox only: a public token without Link. ``username`` picks a sandbox
-        user (``user_good`` by default, or a custom sandbox user)."""
+        user (``user_good`` by default, ``user_transactions_dynamic``, a persona,
+        ``user_custom`` or a Sandbox Studio user) and ``password`` is its
+        ``override_password`` (``user_custom``'s JSON configuration), revealed
+        only in the request body (spec 002 rule 27)."""
         options: dict[str, Any] = {}
         if webhook:
             options["webhook"] = webhook
         if username:
             options["override_username"] = username
+        if password is not None:
+            options["override_password"] = password.get_secret_value()
         fields: dict[str, Any] = {}
         if options:
             fields["options"] = SandboxPublicTokenCreateRequestOptions(**options)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 import uuid
 from collections.abc import Callable
@@ -131,6 +132,70 @@ def test_link_a_sandbox_institution(
         "item_public_token_exchange",
         "institution_name",
     ]
+    # No sandbox user named: Plaid links its default, user_good (spec 002 rule 27).
+    assert fake_plaid.calls[0][1] == {
+        "institution_id": "ins_109508",
+        "webhook": None,
+        "username": None,
+        "password": None,
+    }
+
+
+# A user_custom configuration: a Plaid test fixture, but handled like a secret.
+CUSTOM_CONFIG = json.dumps(
+    {
+        "override_accounts": [
+            {
+                "type": "depository",
+                "subtype": "checking",
+                "starting_balance": 100,
+                "meta": {"name": "Distinctive Custom Checking"},
+                "transactions": [],
+            }
+        ]
+    }
+)
+
+
+def test_link_a_named_sandbox_user(
+    client_as: Client,
+    user_a: FixtureUser,
+    fake_plaid: FakePlaidClient,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Spec 002 rule 27: the sandbox user and its password reach Plaid as the
+    override options, and the password is never echoed or logged."""
+    with caplog.at_level(logging.DEBUG):
+        response = client_as(user_a).post(
+            "/sync/items",
+            json={
+                "sandbox_institution_id": "ins_109508",
+                "sandbox_username": "user_custom",
+                "sandbox_password": CUSTOM_CONFIG,
+            },
+        )
+    assert response.status_code == 201, response.text
+    sent = fake_plaid.calls[0][1]
+    assert (sent["institution_id"], sent["username"]) == ("ins_109508", "user_custom")
+    assert isinstance(sent["password"], SecretStr)
+    assert sent["password"].get_secret_value() == CUSTOM_CONFIG
+    assert "Distinctive" not in response.text
+    assert "Distinctive" not in caplog.text
+
+
+def test_a_sandbox_user_without_a_password(
+    client_as: Client, user_a: FixtureUser, fake_plaid: FakePlaidClient
+) -> None:
+    response = client_as(user_a).post(
+        "/sync/items",
+        json={
+            "sandbox_institution_id": "ins_109508",
+            "sandbox_username": "user_transactions_dynamic",
+        },
+    )
+    assert response.status_code == 201, response.text
+    sent = fake_plaid.calls[0][1]
+    assert (sent["username"], sent["password"]) == ("user_transactions_dynamic", None)
 
 
 @pytest.mark.parametrize(
@@ -141,12 +206,87 @@ def test_link_a_sandbox_institution(
         {"public_token": ""},
         {"public_token": "x" * 513},
         {"public_token": "public-sandbox-1", "institution_name": ""},
+        # A sandbox user only with a sandbox institution (spec 002 rule 27).
+        {"public_token": "public-sandbox-1", "sandbox_username": "user_good"},
+        {"public_token": "public-sandbox-1", "sandbox_username": "u", "sandbox_password": "p"},
+        {"public_token": "public-sandbox-1", "sandbox_password": "p"},
+        {"sandbox_institution_id": "ins_109508", "sandbox_password": "p"},
+        {"sandbox_institution_id": "ins_109508", "sandbox_username": ""},
+        {"sandbox_institution_id": "ins_109508", "sandbox_username": "u" * 65},
+        {"sandbox_institution_id": "ins_109508", "sandbox_username": "u", "sandbox_password": ""},
+        {
+            "sandbox_institution_id": "ins_109508",
+            "sandbox_username": "user_custom",
+            "sandbox_password": "x" * 65_537,
+        },
     ],
 )
-def test_link_item_validation(client_as: Client, user_a: FixtureUser, body: dict[str, Any]) -> None:
+def test_link_item_validation(
+    client_as: Client, user_a: FixtureUser, fake_plaid: FakePlaidClient, body: dict[str, Any]
+) -> None:
     response = client_as(user_a).post("/sync/items", json=body)
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "validation_error"
+    assert fake_plaid.calls == []
+
+
+def test_the_longest_sandbox_user_is_accepted(
+    client_as: Client, user_a: FixtureUser, fake_plaid: FakePlaidClient
+) -> None:
+    password = "x" * 65_536
+    response = client_as(user_a).post(
+        "/sync/items",
+        json={
+            "sandbox_institution_id": "ins_109508",
+            "sandbox_username": "u" * 64,
+            "sandbox_password": password,
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert fake_plaid.calls[0][1]["password"].get_secret_value() == password
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"public_token": "public-sandbox-1", "sandbox_username": "u"},
+        {"sandbox_institution_id": "ins_109508"},
+        {"sandbox_institution_id": "ins_109508", "sandbox_username": "u" * 65},
+    ],
+)
+def test_a_rejected_password_is_never_echoed(
+    client_as: Client, user_a: FixtureUser, body: dict[str, Any]
+) -> None:
+    """Spec 002 edge cases: a 422 names the field and the rule, never the value."""
+    response = client_as(user_a).post(
+        "/sync/items", json={**body, "sandbox_password": "Distinctive-config"}
+    )
+    assert response.status_code == 422
+    assert "Distinctive" not in response.text
+
+
+def test_a_custom_user_plaid_cannot_read_is_502_without_the_password(
+    client_as: Client,
+    user_a: FixtureUser,
+    fake_plaid: FakePlaidClient,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fake_plaid.fail["sandbox_public_token_create"] = plaid_error(
+        "INVALID_CREDENTIALS", error_type="ITEM_ERROR"
+    )
+    with caplog.at_level(logging.DEBUG):
+        response = client_as(user_a).post(
+            "/sync/items",
+            json={
+                "sandbox_institution_id": "ins_109508",
+                "sandbox_username": "user_custom",
+                "sandbox_password": CUSTOM_CONFIG,
+            },
+        )
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "plaid_error"
+    assert "Distinctive" not in response.text
+    assert "Distinctive" not in caplog.text
 
 
 def test_sandbox_linking_is_refused_in_production(
