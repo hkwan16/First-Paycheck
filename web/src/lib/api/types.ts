@@ -94,3 +94,8 @@ export type PlanValues = Schemas['PlanValues'];
 export type RetirementValues = Schemas['RetirementValues'];
 export type PlanProposal = Schemas['PlanProposal'];
 export type TierProposal = Schemas['TierProposal'];
+
+// The W-4 withholding calculator (M7).
+export type W4Input = Schemas['W4Input'];
+export type W4Result = Schemas['W4Result'];
+export type W4Suggestion = W4Result['suggestion'];

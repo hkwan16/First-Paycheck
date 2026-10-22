@@ -27,14 +27,15 @@ import {
   samplePlanningEvents,
 } from '../fixtures/planning';
 import { SAMPLE_NOW } from '../fixtures/sample';
+import { sampleW4Decision, sampleW4Event, w4Result } from '../fixtures/w4';
 import { db } from './db';
 
 /*
- * The M6 routes: `POST /calc/emergency-fund`, `POST /calc/health-plans`,
- * `GET /goals`, `PATCH /goals/{id}`, `GET /benefits-plans`, the benefits
- * branch of `POST /docs/{id}/confirm`, and what saving an emergency fund or
- * health plan decision computes and creates (`planningCalculators`, read by
- * `POST /decisions` in handlers.ts). Their own state is `planningDb`, reset
+ * The M6 and M7 routes: `POST /calc/emergency-fund`, `POST /calc/health-plans`,
+ * `POST /calc/w4`, `GET /goals`, `PATCH /goals/{id}`, `GET /benefits-plans`,
+ * the benefits branch of `POST /docs/{id}/confirm`, and what saving an
+ * emergency fund, health plan or W-4 decision computes and creates
+ * (`planningCalculators`, read by `POST /decisions` in handlers.ts). Their own state is `planningDb`, reset
  * after every test (src/test/setup.ts); decisions, documents, the profile and
  * the calendar stay in `db`.
  */
@@ -86,6 +87,12 @@ export function savedHealthPlan() {
   db.calendar.push(...samplePlanningEvents().filter((e) => e.decision_id === decision.id));
 }
 
+/** The W-4 decision v1 (the sample with both saved decisions read in) and its reminder. */
+export function savedW4() {
+  db.decisions.push(sampleW4Decision());
+  db.calendar.push(sampleW4Event());
+}
+
 /** The sample benefits summary confirmed: its two plans are the calculator's options. */
 export function benefitsConfirmed() {
   planningDb.benefitsPlans = structuredClone([...sampleBenefitsPlans]);
@@ -94,7 +101,7 @@ export function benefitsConfirmed() {
 // Dates, for the effects of a save: the sample's next pay date and day clamping (calc/pay_dates.py).
 
 /** The next expected pay date in the sample (semi-monthly, last stub Oct 15, today Oct 17). */
-const FIRST_CONTRIBUTION = '2026-10-31';
+const NEXT_PAY_DATE = '2026-10-31';
 const TODAY = SAMPLE_NOW.slice(0, 10);
 
 /** `calc/pay_dates.py:add_months`: the same day `months` later, clamped to the month's end. */
@@ -146,7 +153,7 @@ function emergencyFundEffects(decision: Decision): DecisionEffects {
     decision_id: decision.id,
     status: 'active' as const,
     reached_at: null,
-    target_date: months !== null && months >= 1 ? addMonths(FIRST_CONTRIBUTION, months - 1) : null,
+    target_date: months !== null && months >= 1 ? addMonths(NEXT_PAY_DATE, months - 1) : null,
     updated_at: SAMPLE_NOW,
   };
   let goal = planningDb.goals.find((g) => g.kind === 'emergency_fund');
@@ -169,14 +176,14 @@ function emergencyFundEffects(decision: Decision): DecisionEffects {
       decision,
       'goal_contribution',
       'Make your first emergency fund contribution',
-      FIRST_CONTRIBUTION,
+      NEXT_PAY_DATE,
     );
   }
   const review = event(
     decision,
     'goal_review',
     'Review your emergency fund progress',
-    addMonths(FIRST_CONTRIBUTION, 3),
+    addMonths(NEXT_PAY_DATE, 3),
   );
   return { calendar_event_id: review.id, goal_id: goal.id };
 }
@@ -186,6 +193,17 @@ function healthPlansEffects(decision: Decision): DecisionEffects {
   const deadline = (decision.inputs as unknown as HealthPlansInput).enrollment_deadline;
   if (!deadline || deadline < TODAY) return { calendar_event_id: null, goal_id: null };
   const row = event(decision, 'enrollment_deadline', 'Health plan enrollment deadline', deadline);
+  return { calendar_event_id: row.id, goal_id: null };
+}
+
+/** Spec 014 rule 18: a reminder to hand the form to the employer by the next pay date. */
+function w4Effects(decision: Decision): DecisionEffects {
+  const row = event(
+    decision,
+    'w4_submit',
+    'Give your employer your updated Form W-4',
+    NEXT_PAY_DATE,
+  );
   return { calendar_event_id: row.id, goal_id: null };
 }
 
@@ -203,6 +221,7 @@ export const planningCalculators = {
         : undefined,
     effects: healthPlansEffects,
   },
+  w4: { result: w4Result, effects: w4Effects },
 } satisfies Record<string, DecisionCalculator>;
 
 const missingCase = (file: string, inputs: unknown) =>
@@ -245,6 +264,12 @@ export const planningHandlers = [
     const inputs: unknown = await request.json();
     const result = healthPlansResult(inputs);
     return result ? HttpResponse.json(result) : missingCase('health-plans-results.json', inputs);
+  }),
+
+  http.post(apiUrl('/calc/w4'), async ({ request }) => {
+    const inputs: unknown = await request.json();
+    const result = w4Result(inputs);
+    return result ? HttpResponse.json(result) : missingCase('w4-results.json', inputs);
   }),
 
   http.get(apiUrl('/goals'), () => HttpResponse.json(planningDb.goals)),

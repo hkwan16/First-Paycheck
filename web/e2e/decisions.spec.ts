@@ -9,7 +9,9 @@ import { e2eUser, NO_E2E_USER, waitForHydration } from './support/auth';
  * a version, change it and save the next one over it, then open its
  * explanation. The emergency fund: save a version and pause and resume its
  * goal. The health plan: type two synthetic plans when no benefits summary is
- * confirmed, choose one and save it with an enrollment deadline. The e2e user
+ * confirmed, choose one and save it with an enrollment deadline. The W-4:
+ * read the saved 401(k) rate and health premium, change Step 4(c) and save a
+ * version with its reminder to hand the form in. The e2e user
  * keeps its decisions between runs (they cannot be deleted), so each test
  * reads which version is current instead of assuming v1.
  */
@@ -188,4 +190,43 @@ test('compares health plans, chooses one and saves it with its deadline', async 
   await expect(health.getByText(/ is on your calendar for /)).toBeVisible({
     timeout: 15_000,
   });
+});
+
+test('reads the saved decisions into the W-4 and saves a version with its reminder', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.goto('/setup/decisions');
+  await waitForHydration(page);
+  const w4 = page.getByRole('region', { name: 'W-4, federal only' });
+  const status = w4.getByRole('group', { name: 'Filing status' });
+  await expect(status).toBeVisible({ timeout: 30_000 });
+
+  // The 401(k) and health plan tests above saved both decisions this card reads.
+  const decided = w4.getByRole('group', { name: 'From your decisions' });
+  await expect(decided).toContainText(/401\(k\) contribution\s*[\d.]+% of salary/);
+  await expect(decided).toContainText(/Health premium per paycheck\s*\$[\d,.]+, /);
+
+  const single = status.getByRole('button', { name: 'Single or married filing separately' });
+  if ((await status.getByRole('button', { pressed: true }).count()) === 0) await single.click();
+  // Move away from whatever is saved, so there is a version to save.
+  const extra = w4.getByLabel('Step 4(c): extra withholding each paycheck');
+  await extra.fill((await extra.inputValue()) === '25.00' ? '50.00' : '25.00');
+
+  const result = w4.getByRole('group', { name: 'Calculator result' });
+  await expect(result).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
+  await expect(result).toContainText(/at tax time/);
+  await expect(result).toContainText(/Withheld each paycheck\s*\$/);
+
+  const save = w4.getByRole('button', { name: /^Save|^Saved as v/ });
+  await expect(save).toBeEnabled();
+  await save.click();
+  await savedVersion(save);
+  await expect(
+    w4.getByText(/^Give your employer your updated Form W-4 is on your calendar for /),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(w4.getByRole('link', { name: 'Why this decision' })).toHaveAttribute(
+    'href',
+    /^\/why\/[^/]+$/,
+  );
 });

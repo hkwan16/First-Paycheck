@@ -85,15 +85,13 @@ export function DecisionCard({
 
 export interface PlaceholderCardProps {
   calculator: CalculatorId;
-  /**
-   * Whether the calculator is on in this build (`features.calculators`). Off:
-   * it arrives after the alpha. On: its card is not built yet.
-   */
-  live: boolean;
 }
 
-/** A calculator without its card: muted, with what it will decide and when. */
-export function PlaceholderCard({ calculator, live }: PlaceholderCardProps) {
+/**
+ * A calculator that is off in this build (`features.calculators`): muted,
+ * with what it will decide and that it arrives after the alpha.
+ */
+export function PlaceholderCard({ calculator }: PlaceholderCardProps) {
   const { icon, tone, summary } = CALCULATOR_CARDS[calculator];
   return (
     <DecisionCard
@@ -102,11 +100,10 @@ export function PlaceholderCard({ calculator, live }: PlaceholderCardProps) {
       icon={icon}
       tone={tone}
       muted
-      badge={<Badge>{live ? 'Coming later' : 'After alpha'}</Badge>}
+      badge={<Badge>After alpha</Badge>}
     >
       <p className="m-0 text-small text-ink-3">
-        {summary}{' '}
-        {live ? 'Coming in a later milestone.' : 'This calculator arrives after the alpha.'}
+        {summary} This calculator arrives after the alpha.
       </p>
     </DecisionCard>
   );

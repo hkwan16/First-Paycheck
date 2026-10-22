@@ -30,22 +30,15 @@ describe('DecisionCard', () => {
 
 describe('PlaceholderCard', () => {
   it('marks a calculator that is off in this build as coming after the alpha', () => {
-    render(<PlaceholderCard calculator="w4" live={false} />);
+    render(<PlaceholderCard calculator="w4" />);
     const card = screen.getByRole('region', { name: 'W-4, federal only' });
     expect(within(card).getByText('After alpha')).toBeInTheDocument();
     expect(card).toHaveTextContent('This calculator arrives after the alpha.');
     expect(within(card).queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('marks a live calculator whose card is not built yet as coming in a later milestone', () => {
-    render(<PlaceholderCard calculator="emergency_fund" live />);
-    const card = screen.getByRole('region', { name: 'Emergency fund' });
-    expect(within(card).getByText('Coming later')).toBeInTheDocument();
-    expect(card).toHaveTextContent('Coming in a later milestone.');
-  });
-
   it('says what each calculator will decide', () => {
-    render(<PlaceholderCard calculator="health_plan" live={false} />);
+    render(<PlaceholderCard calculator="health_plan" />);
     expect(screen.getByRole('region', { name: 'Health plan' })).toHaveTextContent(
       'Which plan costs less at the care you expect.',
     );

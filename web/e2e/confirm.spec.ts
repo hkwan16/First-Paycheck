@@ -63,7 +63,8 @@ test('uploads a pay stub, reviews every field and continues to Spending', async 
   await expect(fields.getByText('The math checks out.')).toBeVisible();
   await page.getByRole('button', { name: /Confirm and continue/ }).click();
   await expect(page).toHaveURL('/setup/spending', { timeout: 30_000 });
+  // "Where your money went" while the cash flow loads, then the period's month.
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Where your money went' }),
+    page.getByRole('heading', { level: 1, name: /^Where (your|\w+'s) money went$/ }),
   ).toBeVisible();
 });

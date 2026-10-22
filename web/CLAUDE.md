@@ -88,11 +88,13 @@ src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fa
                     emergency fund, health plans, goal, benefits plans and benefits proposal; results
                     from emergency-fund-results.json and health-plans-results.json, made by
                     make-emergency-fund-results.py and make-health-plans-results.py),
+                    fixtures/w4.ts (the W-4 sample and decision; results from w4-results.json,
+                    made by make-w4-results.py),
                     fixtures/cashflow.ts (the sample period's cash flow, spending summary and
                     recurring charges), msw/db.ts (in-memory API state), msw/handlers.ts (every
                     route, stateful), msw/spending-handlers.ts (cash flow, summary, recurring;
-                    `spendingDb`), msw/planning-handlers.ts (M6 calculators, goals, benefits
-                    plans, benefits confirm; `planningDb`)
+                    `spendingDb`), msw/planning-handlers.ts (M6 and M7 calculators, goals,
+                    benefits plans, benefits confirm; `planningDb`)
 e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions,
                     import, alpha), support/auth.ts, support/api.ts, fixtures/ (synthetic
                     acme-paystub.pdf and the script that makes it, bank-export.csv), baselines
@@ -260,6 +262,9 @@ next is a real disabled button, never a dead link).
   contribution and review events; the enrollment deadline event), and a benefits confirm writes
   plans and the profile's match. Helpers: `savedEmergencyFund()`, `savedHealthPlan()`,
   `benefitsConfirmed()` (the two sample plans), `benefitsWaiting()` (the sample summary proposed).
+  `POST /calc/w4` answers from `w4-results.json` (`make-w4-results.py`, which also writes the
+  case each suggestion leads to once applied); a saved W-4 adds the `w4_submit` reminder, and
+  `savedW4()` seeds v1 (the sample reading the saved 401(k) and Gold PPO decisions).
 - Debounces: measure them on the fake clock instead of asserting "nothing yet at 149 ms", which
   races `shouldAdvanceTime`. Record `Date.now()` when the input stops and when the request starts
   (`request:start`), and assert the difference is at least the debounce. Set inputs with
@@ -300,10 +305,10 @@ offer letter states).
 ## Decisions screen
 
 `/setup/decisions` (`DecisionsScreen`) shows one card per calculator in the mockup's order
-(emergency fund, 401(k), health plan, W-4) with an "n of 4 saved" badge. The W-4 card is not
-built; a calculator off in `features.calculators` is a muted "After alpha" placeholder, and one
-that is on but not built says "Coming in a later milestone." Cards share `DecisionCard`,
-`SaveButton`, `AmountField` and `saveErrorText` (`decision-format.ts`).
+(emergency fund, 401(k), health plan, W-4) with an "n of 4 saved" badge that counts every saved
+calculator. Every calculator has a card; one off in `features.calculators` is a muted "After
+alpha" placeholder. Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
+(`decision-format.ts`).
 
 - **`Match401kCard`** always renders the same `DecisionCard` frame (a region named by its title)
   and swaps its body: skeleton, error, a link to Confirm when there is no confirmed pay stub,
@@ -330,6 +335,20 @@ that is on but not built says "Coming in a later milestone." Cards share `Decisi
   with break-even notes, the HSA tax effect and the HDHP notice from the result. Saving needs a
   chosen plan (a 422 `plan_not_selected` says so); an enrollment deadline adds a calendar event,
   shown under the card.
+- **`W4Card`** (spec 014): salary and pay schedule from the profile and the confirmed pay stub,
+  the age from the birth year (null without one: no catch-up), and, read-only under "From your
+  decisions", the saved 401(k) decision's `contribution_pct` and the saved health plan's chosen
+  plan's premium per paycheck (`fromDecisions` in `w4-format.ts`). Either one not saved is sent
+  as zero, the card says so, and links to that card. The person sets the filing status (from
+  the profile until changed), Step 2(c), the other jobs' wages and withholding, Steps 3 and
+  4(a)-(c) and the deductions they expect to claim (empty means the Step 4(b) entry). The result
+  is the calculator's: a balance due takes the `off` tone, a refund stays neutral (never
+  `confirmed`). "Apply suggestion" copies `suggested_extra_withholding_cents` and
+  `suggested_deductions_cents` into Steps 4(c) and 4(b) (`appliedEntries`); when Step 4(b) grows
+  and no expected deductions are set, the old Step 4(b) entry becomes them (spec 014 rule 13).
+  Always send every input, `k401_contribution_pct` as `"0.00"` when there is no 401(k)
+  decision: the API stores its unset default as `"0"`, which would never compare equal. A save
+  adds the `w4_submit` reminder, shown under the card; "Why this decision" opens `/why/[id]`.
 
 ## Why screen
 
@@ -463,7 +482,8 @@ the read, confirms every field and continues to Spending. `decisions.spec.ts` (p
 saves a 401(k) decision, changes it and saves the next version, then opens its explanation and
 accepts verified, fallback, or "not available" when the API has no model; it then saves an
 emergency fund version and pauses and resumes its goal, and saves a health plan choice (typing two
-synthetic plans when no benefits summary is confirmed) with an enrollment deadline. Decisions cannot be
+synthetic plans when no benefits summary is confirmed) with an enrollment deadline, and saves a W-4
+version that reads those two decisions, with its reminder. Decisions cannot be
 deleted, so it reads the current version instead of assuming v1. Never use a real document as a
 fixture.
 
