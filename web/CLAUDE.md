@@ -731,6 +731,10 @@ calculator" with an irs.gov source (what the fake model produces).
   import) intercepts it. Keep that if you touch `lib/api/client.ts`.
 - Tailwind v4 `scale-*` sets the standalone `scale` property: transition `scale`, not
   `transform`.
+- Never let the OS theme paint something a baseline sees. The native select arrow moved 2px on
+  macOS between two runs an hour apart (the host had switched to dark appearance), failing every
+  darwin baseline with a select; `Select` now draws its chevron in CSS (`select-chevron` in
+  `globals.css`, the text color) and hands it back to the platform only in forced colors.
 - `cn()` uses a tailwind-merge config that knows the token names; without it `text-small` and
   `text-ink-3` would collide.
 - jsdom is pinned to 29 because jsdom 30 needs Node 22.22+; bump it with the Node floor.
