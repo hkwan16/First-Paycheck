@@ -483,7 +483,9 @@ adds `public.delete_user_account(uuid)`; no new table.
   instead of a 500 (`is_missing_owner`; a test checks every key's name).
 - **Unlinking** (`DELETE /sync/items/{id}`) follows the same read, revoke,
   delete order with two `UserSessions`, then queues `recurring.detect`, which
-  drops charges with no transaction left and refreshes the open check-in. The
+  drops charges with no transaction left and refreshes the open check-in. It
+  returns 200 `{recurring_job_id}` (that job, or the one already queued) for
+  the client to poll; a repeat is 404 and queues nothing. The
   engine retracts an unhandled `recurring_*` finding whose
   `recurring_charge_id` is gone (`checkin.engine.subject_gone`), like a cleared
   condition. A sync queued for the item succeeds as `item_missing` even on a

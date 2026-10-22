@@ -162,7 +162,7 @@ The API's OpenAPI document is committed as `api/openapi.json` (exported by `pyth
 | `POST /sync/link-token` | → Plaid Link token for the client | No |
 | `POST /sync/items` | Plaid public token → sync_item; queues the initial sync job. Outside production it also accepts `{sandbox_institution_id}` and creates the public token server-side, so automated tests never drive the Plaid iframe | No |
 | `POST /sync/items/{id}/sync` | → job_id; queues an incremental sync now | No |
-| `DELETE /sync/items/{id}` | Unlinks the institution and deletes its accounts, transactions, balances and holdings | No |
+| `DELETE /sync/items/{id}` | Unlinks the institution and deletes its accounts, transactions, balances and holdings → recurring_job_id (the `recurring.detect` it queues) | No |
 | `POST /sync/webhook` | Plaid webhook (signature-verified) → queues an incremental sync through `enqueue_sync_for_plaid_item` | No |
 | `POST /accounts/import` | CSV + account kind → job_id; same pipeline as a Plaid sync | No |
 | `GET /accounts` | → accounts with latest balance, role and provider (`plaid` or `csv`) | No |

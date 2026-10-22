@@ -117,9 +117,12 @@ def link_item(connection: Connection, client_as: Callable[[FixtureUser], TestCli
 
 def delete_item(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
     item = a_item(connection)
+    connection.execute(text("DELETE FROM jobs"))
 
     def after(conn: Connection) -> None:
         assert count(conn, "sync_items", USER_A) == 1
+        # The 404 comes before the unlink queues its recurring.detect, for either user.
+        assert conn.execute(text("SELECT count(*) FROM jobs")).scalar_one() == 0
 
     return Case("DELETE", f"/sync/items/{item}", 404, after=after)
 

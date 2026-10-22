@@ -9,7 +9,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, Response, status
+from fastapi import APIRouter, Depends, Header, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
@@ -100,6 +100,12 @@ class LinkedItem(BaseModel):
 
 class QueuedJob(BaseModel):
     job_id: uuid.UUID
+
+
+class UnlinkedItem(BaseModel):
+    # The recurring.detect job the unlink queued; once it finishes, recurring
+    # charges and the open check-in no longer reflect the item (spec 017 rule 11).
+    recurring_job_id: uuid.UUID
 
 
 class WebhookAck(BaseModel):
@@ -223,21 +229,17 @@ def link_item(
     return LinkedItem(item=_item_out(item), job_id=job_id)
 
 
-@router.delete(
-    "/items/{item_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    response_class=Response,
-    responses=error_responses(401, 404),
-)
+@router.delete("/items/{item_id}", responses=error_responses(401, 404))
 def delete_item(
     item_id: uuid.UUID,
     user: CurrentUser,
     sessions: UserSessions,
     plaid: OptionalPlaid,
     cipher: OptionalCipher,
-) -> None:
-    """Unlink an institution: remove it at Plaid (best effort) and delete it with
-    its accounts, transactions, balances and holdings."""
+) -> UnlinkedItem:
+    """Unlink an institution: remove it at Plaid (best effort), delete it with
+    its accounts, transactions, balances and holdings, and return the
+    recurring detection that settles what came from it."""
     # Spec 017 rule 11: read, call Plaid with no transaction open, then delete.
     with sessions() as session:
         item = _own_item(session, item_id)
@@ -249,7 +251,10 @@ def delete_item(
         session.flush()
         # Charges seen only in this item's transactions go on the next run
         # (spec 009 rule 16), which then refreshes the open check-in (spec 017 rule 14).
-        queue.enqueue_unless_queued(session, user_id=user.id, kind=JobKind.RECURRING_DETECT)
+        job_id = queue.enqueue_unless_queued(
+            session, user_id=user.id, kind=JobKind.RECURRING_DETECT
+        )
+    return UnlinkedItem(recurring_job_id=job_id)
 
 
 @router.post(

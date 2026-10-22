@@ -71,6 +71,13 @@ def count(connection: Connection, sql: str, **params: object) -> int:
     return int(connection.execute(text(sql), params).scalar_one())
 
 
+def queued_jobs(connection: Connection) -> list[tuple[uuid.UUID, str]]:
+    rows = connection.execute(
+        text("SELECT id, kind::text FROM jobs WHERE status = 'queued' ORDER BY created_at, id")
+    )
+    return [(row[0], row[1]) for row in rows]
+
+
 @pytest.fixture
 def two_banks(empty_queue: Connection, user_a: FixtureUser) -> tuple[November, uuid.UUID]:
     """The November user with Equinox and the savings at the first bank,
@@ -137,7 +144,10 @@ def test_unlink_retracts_what_came_from_the_item_on_the_next_refresh(
     before = finding_kinds(empty_queue, user_a)
 
     response = client_as(user_a).delete(f"/sync/items/{first_bank}")
-    assert response.status_code == 204, response.text
+    assert response.status_code == 200, response.text
+    assert queued_jobs(empty_queue) == [
+        (uuid.UUID(response.json()["recurring_job_id"]), "recurring.detect")
+    ]
     run_all(empty_queue)  # recurring.detect, then the check-in refresh it queues
 
     # Spec 001 rule 25: the item's rows are gone; the goal stays, unlinked.
@@ -192,7 +202,7 @@ def test_a_handled_finding_about_the_item_is_kept_as_history(
         {"u": user_a.id},
     )
 
-    assert client_as(user_a).delete(f"/sync/items/{first_bank}").status_code == 204
+    assert client_as(user_a).delete(f"/sync/items/{first_bank}").status_code == 200
     run_all(empty_queue)
 
     assert ("recurring_new", "Equinox") in finding_kinds(empty_queue, user_a)
@@ -214,7 +224,7 @@ def test_a_sync_queued_for_the_item_finds_it_missing(
             payload={"sync_item_id": str(first_bank)},
         )
 
-    assert client_as(user_a).delete(f"/sync/items/{first_bank}").status_code == 204
+    assert client_as(user_a).delete(f"/sync/items/{first_bank}").status_code == 200
     run_all(empty_queue)
 
     status, result = empty_queue.execute(
@@ -245,7 +255,7 @@ def test_unlink_removes_the_item_at_plaid_with_no_transaction_open(
     token = cipher_from_settings(get_settings()).encrypt(SecretStr("access-unlink"))
     item = make_item(empty_queue, user_a.id, access_token_enc=token)
 
-    assert client_as(user_a).delete(f"/sync/items/{item}").status_code == 204
+    assert client_as(user_a).delete(f"/sync/items/{item}").status_code == 200
 
     assert plaid.removed == ["access-unlink"]
     assert plaid.in_transaction == [False]
@@ -260,8 +270,45 @@ def test_unlink_without_plaid_configured_still_deletes(
     token = cipher_from_settings(get_settings()).encrypt(SecretStr("access-unlink"))
     item = make_item(empty_queue, user_a.id, access_token_enc=token)
 
-    assert client_as(user_a).delete(f"/sync/items/{item}").status_code == 204
+    assert client_as(user_a).delete(f"/sync/items/{item}").status_code == 200
     assert count(empty_queue, "SELECT count(*) FROM sync_items WHERE id = :i", i=item) == 0
+
+
+def test_unlink_returns_the_recurring_job_and_a_repeat_is_404(
+    empty_queue: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Spec 017 example 15: the client follows the job; a second unlink finds nothing."""
+    item = make_item(empty_queue, user_a.id)
+    client = client_as(user_a)
+
+    first = client.delete(f"/sync/items/{item}")
+
+    assert first.status_code == 200, first.text
+    assert set(first.json()) == {"recurring_job_id"}
+    job_id = uuid.UUID(first.json()["recurring_job_id"])
+    assert queued_jobs(empty_queue) == [(job_id, "recurring.detect")]
+    assert client.get(f"/jobs/{job_id}").json()["kind"] == "recurring.detect"
+
+    again = client.delete(f"/sync/items/{item}")
+
+    assert again.status_code == 404
+    assert again.json()["error"]["code"] == "not_found"
+    assert queued_jobs(empty_queue) == [(job_id, "recurring.detect")]
+
+
+def test_unlink_returns_the_detection_already_queued(
+    empty_queue: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """A detection already waiting covers the unlink too, so the route returns it."""
+    with user_session_for(user_a.id, bind=empty_queue) as session:
+        waiting = queue.enqueue(session, user_id=user_a.id, kind=JobKind.RECURRING_DETECT)
+    item = make_item(empty_queue, user_a.id)
+
+    response = client_as(user_a).delete(f"/sync/items/{item}")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"recurring_job_id": str(waiting)}
+    assert queued_jobs(empty_queue) == [(waiting, "recurring.detect")]
 
 
 def _unconfigured() -> FakePlaidClient:

@@ -5800,6 +5800,20 @@
         "title": "TransactionPage",
         "type": "object"
       },
+      "UnlinkedItem": {
+        "properties": {
+          "recurring_job_id": {
+            "format": "uuid",
+            "title": "Recurring Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recurring_job_id"
+        ],
+        "title": "UnlinkedItem",
+        "type": "object"
+      },
       "UpcomingDeadlinePayload": {
         "additionalProperties": false,
         "properties": {
@@ -8941,7 +8955,7 @@
     },
     "/sync/items/{item_id}": {
       "delete": {
-        "description": "Unlink an institution: remove it at Plaid (best effort) and delete it with\nits accounts, transactions, balances and holdings.",
+        "description": "Unlink an institution: remove it at Plaid (best effort), delete it with\nits accounts, transactions, balances and holdings, and return the\nrecurring detection that settles what came from it.",
         "operationId": "delete_item",
         "parameters": [
           {
@@ -8956,7 +8970,14 @@
           }
         ],
         "responses": {
-          "204": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnlinkedItem"
+                }
+              }
+            },
             "description": "Successful Response"
           },
           "401": {

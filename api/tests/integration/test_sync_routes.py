@@ -208,7 +208,8 @@ def test_delete_item_cascades_and_removes_it_at_plaid(
 
     response = client_as(user_a).delete(f"/sync/items/{item}")
 
-    assert response.status_code == 204
+    assert response.status_code == 200
+    assert set(response.json()) == {"recurring_job_id"}
     assert fake_plaid.removed == ["access-a"]
     for name in ("sync_items", "accounts", "transactions"):
         rows = table(name, column("user_id"))
@@ -223,7 +224,7 @@ def test_delete_succeeds_when_plaid_fails(
 ) -> None:
     item = linked_item(db_connection, user_a)
     fake_plaid.fail["item_remove"] = plaid_error("INTERNAL_SERVER_ERROR", "API_ERROR", 500)
-    assert client_as(user_a).delete(f"/sync/items/{item}").status_code == 204
+    assert client_as(user_a).delete(f"/sync/items/{item}").status_code == 200
 
 
 def test_delete_unknown_item_is_404(client_as: Client, user_a: FixtureUser) -> None:
