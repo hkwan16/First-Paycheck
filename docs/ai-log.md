@@ -258,3 +258,24 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above, in the subagent's branch. The sync created 20 issues, set 120 statuses, closed 108 issues and updated 11 milestones; a second dry run reported no changes.
 
 **Time saved or lost:** Not measured.
+
+## 2026-10-21: web plan line status, Check in now, and the alpha document refresh
+
+**Task:** The last M8 web item (colour the check-in's plan lines from the API's new `status`, and a "Check in now" button over `POST /check-ins`), an end-to-end check-in spec that no longer skips when the user has no check-in, and a refresh of `docs/alpha/README.md` to what `main` does.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Three deliverables, a failing test first for each, one commit per step, no edits under `api/`, `evals/` or `docs/specs/`, and the gate `pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build && pnpm e2e` plus the `authenticated-check-in` project through the local stack.
+
+**What it produced:** `planStatusTone` and `planStatusText` (`web/src/components/screens/check-in/checkin-format.ts`), `useCheckInNow` and `checkInRunOf` (`web/src/lib/api/hooks/checkins.ts`), `CheckInNow.tsx`, the `POST /check-ins` MSW handler, a limits row, a rewritten `web/e2e/check-in.spec.ts` that runs after Decisions, new baselines, and the refreshed alpha document.
+
+**What was wrong:**
+- The brief's "over or under as warning for spending lines and the reverse for savings" first read as both sides warning on spending lines. The mockup's Flexible line, under its plan with an "ok" badge, settled it: on spending lines only over needs a look, on savings and retirement only under. Health premiums stay a warning either side, since a premium off the chosen plan means the election did not take.
+- A fresh e2e user has no findings, so the old spec skipped its done and undo test. The month's findings need dates due within 30 days, which only saved decisions create; the project now depends on `authenticated-decisions`.
+- Updating the visual baselines failed a different smoke test on each run: `/dev/screens/confirm/extracting` logged `ERR_CONNECTION_REFUSED`. `useDocument` re-reads an extracting document every 1.5 s, and the sample screen's QueryClient let that poll reach an API the sample does not have whenever the axe pass outlasted one poll.
+
+**How it was caught:** Comparing the brief with `docs/mockup/CheckIn.dc.html`; reading spec 015 rule 7 and `app/decision_effects.py` for what makes a finding; the smoke spec's console check, then a unit test that advances three poll intervals on the extracting sample and counts requests.
+
+**Fix:** In the subagent's branch: the tone table as above; the dependency in `playwright.config.ts`; the sample QueryClient defaults to `enabled: false`, so only hooks that turn reads on themselves can fetch.
+
+**Time saved or lost:** Not measured.
