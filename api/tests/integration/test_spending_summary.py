@@ -20,11 +20,13 @@ from tests.support.factories import (
     make_account,
     make_item,
 )
+from tests.support.sandbox_history import link_sandbox
 from tests.support.spending_month import september, spend
 
 Client = Callable[[FixtureUser], TestClient]
 NOW = dt.datetime(2026, 10, 21, 15, 0, tzinfo=dt.UTC)
 SEPTEMBER = {"start": "2026-09-01", "end": "2026-09-30"}
+OCTOBER = {"start": "2026-10-01", "end": "2026-10-31"}
 
 
 @pytest.fixture
@@ -58,6 +60,7 @@ def test_the_spec_month(
         "savings_cents": 40_000,
         "other_cents": 3_900,
         "transfers_ignored_cents": 25_000,
+        "income_outflows_ignored_cents": 0,
         "uncategorized_cents": 1_200,
         "left_over_cents": 166_808,
         "essentials_pct": "45.1",
@@ -83,6 +86,50 @@ def test_the_spec_month(
     }
     assert body["category_buckets"] == dict(CATEGORY_BUCKETS)
     assert list(body["category_buckets"]) == list(CATEGORIES)
+
+
+def test_the_sandbox_october_counts_income_in_only(
+    frozen: FastAPI, client_as: Client, user_a: FixtureUser, seeded_rules: Connection
+) -> None:
+    # Spec 007 rule 22a on the recorded Plaid sandbox item, synced and labeled
+    # by the seed rules: GUSTO PAY is booked as money out (585,000) and labeled
+    # income. Netting it gave the walkthrough's income of -584,578.
+    link_sandbox(seeded_rules, user_a)
+    body = client_as(user_a).get("/spending/summary", params=OCTOBER).json()
+    assert {key: value for key, value in body.items() if key != "category_buckets"} == {
+        "start": "2026-10-01",
+        "end": "2026-10-31",
+        "income_cents": 422,
+        "essentials_cents": 540,
+        "flexible_cents": 68_423,
+        "savings_cents": 100_000,
+        "other_cents": 0,
+        "transfers_ignored_cents": 210_350,
+        "income_outflows_ignored_cents": 585_000,
+        "uncategorized_cents": 50_000,
+        "left_over_cents": -168_541,
+        "essentials_pct": "128.0",
+        "flexible_pct": "16214.0",
+        "savings_rate_pct": "23696.7",
+        "transaction_count": 14,
+        "uncategorized_count": 1,
+        "paycheck_count": 0,
+        "categories": [
+            {"category": "income", "bucket": "income", "total_cents": 422, "count": 1},
+            {"category": "transfer", "bucket": "transfer", "total_cents": 210_350, "count": 2},
+            {"category": "dining", "bucket": "flexible", "total_cents": 51_633, "count": 3},
+            {"category": "transport", "bucket": "essentials", "total_cents": 540, "count": 1},
+            {"category": "shopping", "bucket": "flexible", "total_cents": 58_940, "count": 2},
+            {"category": "entertainment", "bucket": "flexible", "total_cents": 7_850, "count": 1},
+            {"category": "travel", "bucket": "flexible", "total_cents": -50_000, "count": 1},
+            {
+                "category": "savings_investment",
+                "bucket": "savings",
+                "total_cents": 100_000,
+                "count": 1,
+            },
+        ],
+    }
 
 
 def test_defaults_to_the_last_complete_month(

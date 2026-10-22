@@ -36,6 +36,8 @@ class SpendingSummary(BaseModel):
     savings_cents: int
     other_cents: int
     transfers_ignored_cents: int
+    # Income-labeled money out (spec 007 rule 22a): not income, left out of every total.
+    income_outflows_ignored_cents: int
     uncategorized_cents: int
     left_over_cents: int
     # One decimal place; null when income is not positive.
@@ -75,12 +77,15 @@ def period(start: dt.date | None, end: dt.date | None, today: dt.date) -> tuple[
 
 
 def _category_sums(session: Session, start: dt.date, end: dt.date) -> list[CategorySum]:
+    money_out = Transaction.amount_cents > 0
+    money_in = Transaction.amount_cents < 0
     rows = session.execute(
         select(
             Transaction.category,
-            func.coalesce(func.sum(Transaction.amount_cents), 0),
-            func.coalesce(func.sum(func.abs(Transaction.amount_cents)), 0),
+            func.coalesce(func.sum(Transaction.amount_cents).filter(money_out), 0),
+            func.coalesce(func.sum(-Transaction.amount_cents).filter(money_in), 0),
             func.count(),
+            func.count().filter(money_out),
         )
         .join(
             Account,
@@ -95,8 +100,14 @@ def _category_sums(session: Session, start: dt.date, end: dt.date) -> list[Categ
         .order_by(case(_CATEGORY_ORDER, value=Transaction.category, else_=len(_CATEGORY_ORDER)))
     )
     return [
-        CategorySum(category=category, net_cents=int(net), abs_cents=int(gross), count=int(count))
-        for category, net, gross, count in rows
+        CategorySum(
+            category=category,
+            out_cents=int(out_cents),
+            in_cents=int(in_cents),
+            count=int(count),
+            out_count=int(out_count),
+        )
+        for category, out_cents, in_cents, count, out_count in rows
     ]
 
 

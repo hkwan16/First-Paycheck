@@ -114,6 +114,7 @@ export const sampleSpendingSummary: SpendingSummary = {
   savings_cents: 30_000,
   other_cents: 0,
   transfers_ignored_cents: 0,
+  income_outflows_ignored_cents: 0,
   uncategorized_cents: 0,
   left_over_cents: 161_894,
   essentials_pct: '45.7',
@@ -186,6 +187,7 @@ export function emptyCashflow(start: string, end: string): CashFlow {
       savings_cents: 0,
       other_cents: 0,
       transfers_ignored_cents: 0,
+      income_outflows_ignored_cents: 0,
       uncategorized_cents: 0,
       left_over_cents: 0,
       essentials_pct: null,
@@ -196,6 +198,50 @@ export function emptyCashflow(start: string, end: string): CashFlow {
       paycheck_count: 0,
       categories: [],
       category_buckets: CATEGORY_BUCKETS,
+    },
+  };
+}
+
+export const SANDBOX_PERIOD = { start: '2026-10-01', end: '2026-10-31' } as const;
+
+/**
+ * `GET /cashflow` for October on the Plaid sandbox item with no confirmed
+ * stub, as the API returns it (api/tests/integration/test_spending_summary.py,
+ * spec 007 rule 22a). The sandbox books its GUSTO PAY payroll as money out,
+ * so only 4.22 of interest came in: income 422, the payroll in
+ * `income_outflows_ignored_cents`, and spending far beyond the income.
+ */
+export function sandboxCashflow(): CashFlow {
+  const empty = emptyCashflow(SANDBOX_PERIOD.start, SANDBOX_PERIOD.end);
+  return {
+    ...empty,
+    spending: {
+      ...empty.spending,
+      income_cents: 422,
+      essentials_cents: 540,
+      flexible_cents: 68_423,
+      savings_cents: 100_000,
+      other_cents: 0,
+      transfers_ignored_cents: 210_350,
+      income_outflows_ignored_cents: 585_000,
+      uncategorized_cents: 50_000,
+      left_over_cents: -168_541,
+      essentials_pct: '128.0',
+      flexible_pct: '16214.0',
+      savings_rate_pct: '23696.7',
+      transaction_count: 14,
+      uncategorized_count: 1,
+      paycheck_count: 0,
+      categories: [
+        category('income', 'income', 422, 1),
+        category('transfer', 'transfer', 210_350, 2),
+        category('dining', 'flexible', 51_633, 3),
+        category('transport', 'essentials', 540, 1),
+        category('shopping', 'flexible', 58_940, 2),
+        category('entertainment', 'flexible', 7_850, 1),
+        category('travel', 'flexible', -50_000, 1),
+        category('savings_investment', 'savings', 100_000, 1),
+      ],
     },
   };
 }

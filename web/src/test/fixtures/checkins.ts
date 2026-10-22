@@ -309,6 +309,7 @@ const NOVEMBER_SPENDING: SpendingSummary = {
   savings_cents: 30_000,
   other_cents: 0,
   transfers_ignored_cents: 0,
+  income_outflows_ignored_cents: 0,
   uncategorized_cents: 0,
   left_over_cents: 127_683,
   essentials_pct: '12.6',

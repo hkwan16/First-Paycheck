@@ -14,11 +14,13 @@ from sqlalchemy import Connection
 from app.deps import get_now
 from tests.conftest import FixtureUser
 from tests.support.factories import make_account, make_document, make_item, make_pay_stub
+from tests.support.sandbox_history import link_sandbox
 from tests.support.spending_month import september
 
 Client = Callable[[FixtureUser], TestClient]
 NOW = dt.datetime(2026, 10, 21, 15, 0, tzinfo=dt.UTC)
 SEPTEMBER = {"start": "2026-09-01", "end": "2026-09-30"}
+OCTOBER = {"start": "2026-10-01", "end": "2026-10-31"}
 
 
 @pytest.fixture
@@ -81,6 +83,24 @@ def test_september_cash_flow(
     summary = client.get("/spending/summary", params=SEPTEMBER).json()
     assert body["spending"] == summary
     assert (summary["income_cents"], summary["left_over_cents"]) == (399_208, 166_808)
+
+
+def test_sandbox_income_is_never_negative(
+    frozen: FastAPI, client_as: Client, user_a: FixtureUser, seeded_rules: Connection
+) -> None:
+    # Spec 010 route row 4: the diagram's "Income deposited" and "Spent beyond
+    # income" nodes are these two amounts, drawn as given.
+    link_sandbox(seeded_rules, user_a)
+    client = client_as(user_a)
+    body = client.get("/cashflow", params=OCTOBER).json()
+    assert body["withholding"]["paycheck_count"] == 0
+    assert body["spending"] == client.get("/spending/summary", params=OCTOBER).json()
+    spending = body["spending"]
+    assert (
+        spending["income_cents"],
+        spending["income_outflows_ignored_cents"],
+        spending["left_over_cents"],
+    ) == (422, 585_000, -168_541)
 
 
 def test_stub_ids_are_the_users_pay_stubs(

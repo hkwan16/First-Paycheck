@@ -170,15 +170,29 @@ function bandPath(x1: number, ya: number, x2: number, yb: number, t: number): st
 
 const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
 
+/** The buckets drawn in column 2, whose categories fill column 3. */
+const DRAWN_BUCKETS: ReadonlySet<string> = new Set(BUCKETS.map((spec) => spec.bucket));
+
 /**
- * Pixels per cent, from a target height for the first column's amount:
- * gross pay, or the deposits when no pay stub is confirmed for the period.
- * Null when there is nothing to draw.
+ * Pixels per cent, from a target height for the tallest node: gross pay, or
+ * the deposits when no pay stub is confirmed for the period, unless a bucket
+ * or category the diagram draws is taller. Spending can outrun the income it
+ * flows from (the Plaid sandbox deposits 4.22 in a month that spends 1,689.63),
+ * and scaled by that income alone a node would be tens of thousands of pixels
+ * tall. Picking the largest amount only sizes pixels; nothing is added and no
+ * amount shown changes. Null when there is no pay or income to draw from.
  */
 export function flowScale(flow: CashFlow): FlowScale | null {
-  const reference =
+  const pay =
     flow.withholding.paycheck_count > 0 ? flow.withholding.gross_cents : flow.spending.income_cents;
-  if (reference <= 0) return null;
+  if (pay <= 0) return null;
+  const reference = Math.max(
+    pay,
+    ...BUCKETS.map((spec) => spec.cents(flow)),
+    ...flow.spending.categories
+      .filter((total) => DRAWN_BUCKETS.has(total.bucket))
+      .map((total) => total.total_cents),
+  );
   return {
     pxPerCent: TARGET_GROSS_PX / reference,
     centsPerPx: Math.round(reference / TARGET_GROSS_PX),
