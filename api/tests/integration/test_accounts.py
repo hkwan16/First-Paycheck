@@ -12,7 +12,7 @@ from sqlalchemy import Connection
 
 from db.enums import AccountKind, AccountRole
 from tests.conftest import FixtureUser
-from tests.support.factories import make_account, make_item, make_snapshot
+from tests.support.factories import make_account, make_csv_item, make_item, make_snapshot
 
 Client = Callable[[FixtureUser], TestClient]
 
@@ -65,11 +65,30 @@ def test_list_accounts_with_latest_balance(
         "mask": "0000",
         "role": "spending",
         "is_active": True,
+        "provider": "plaid",
         "balance_cents": 12_345,
         "balance_as_of": "2026-10-02T00:00:00Z",
     }
     assert (accounts[1]["balance_cents"], accounts[1]["balance_as_of"]) == (None, None)
     assert accounts[2]["mask"] is None
+
+
+def test_list_accounts_names_each_provider(
+    db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """A CSV account cannot be synced on demand, so the client must tell it apart."""
+    linked = make_account(
+        db_connection, user_a.id, make_item(db_connection, user_a.id, institution_name="Alpha")
+    )
+    imported = make_account(
+        db_connection, user_a.id, make_csv_item(db_connection, user_a.id, institution_name="Beta")
+    )
+
+    response = client_as(user_a).get("/accounts")
+
+    assert response.status_code == 200
+    providers = {a["id"]: a["provider"] for a in response.json()}
+    assert providers == {str(linked): "plaid", str(imported): "csv"}
 
 
 def test_list_accounts_empty(client_as: Client, user_a: FixtureUser) -> None:

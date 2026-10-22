@@ -20,7 +20,7 @@ from sync.crypto import cipher_from_settings
 from sync.plaid.client import PlaidError
 from tests.conftest import FixtureUser
 from tests.support.env import TEST_PLAID_TOKEN_KEY
-from tests.support.factories import make_account, make_item, make_transaction
+from tests.support.factories import make_account, make_csv_item, make_item, make_transaction
 from tests.support.fake_plaid import FakePlaidClient, plaid_error, sign_webhook
 
 Client = Callable[[FixtureUser], TestClient]
@@ -208,7 +208,8 @@ def test_delete_item_cascades_and_removes_it_at_plaid(
 
     response = client_as(user_a).delete(f"/sync/items/{item}")
 
-    assert response.status_code == 204
+    assert response.status_code == 200
+    assert set(response.json()) == {"recurring_job_id"}
     assert fake_plaid.removed == ["access-a"]
     for name in ("sync_items", "accounts", "transactions"):
         rows = table(name, column("user_id"))
@@ -223,7 +224,7 @@ def test_delete_succeeds_when_plaid_fails(
 ) -> None:
     item = linked_item(db_connection, user_a)
     fake_plaid.fail["item_remove"] = plaid_error("INTERNAL_SERVER_ERROR", "API_ERROR", 500)
-    assert client_as(user_a).delete(f"/sync/items/{item}").status_code == 204
+    assert client_as(user_a).delete(f"/sync/items/{item}").status_code == 200
 
 
 def test_delete_unknown_item_is_404(client_as: Client, user_a: FixtureUser) -> None:
@@ -242,6 +243,19 @@ def test_manual_sync_reuses_the_queued_job(
     assert first.json() == second.json()
     [job] = jobs(empty_queue)
     assert (job["kind"], job["payload"]) == ("sync.incremental", {"sync_item_id": str(item)})
+
+
+def test_manual_sync_of_a_csv_item_is_refused(
+    empty_queue: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Spec 002 rule 29: a CSV item has no provider, so a queued sync could only fail."""
+    item = make_csv_item(empty_queue, user_a.id)
+
+    response = client_as(user_a).post(f"/sync/items/{item}/sync")
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "not_plaid_item"
+    assert jobs(empty_queue) == []
 
 
 def test_manual_sync_of_unknown_item_is_404(client_as: Client, user_a: FixtureUser) -> None:

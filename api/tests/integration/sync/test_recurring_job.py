@@ -97,7 +97,7 @@ def run_queued(connection: Connection, today: dt.date) -> dict[str, Any]:
     assert worker.run_once()
     row = connection.execute(
         text(
-            "SELECT status::text AS status, result FROM jobs WHERE kind = 'recurring.detect'"
+            "SELECT id, status::text AS status, result FROM jobs WHERE kind = 'recurring.detect'"
             " ORDER BY finished_at DESC NULLS LAST LIMIT 1"
         )
     ).one()
@@ -190,8 +190,10 @@ def test_unlinking_deletes_its_charges(
     detect_as(empty_queue, user_a, TODAY)
     assert len(rows(empty_queue, user_a)) == 1
 
-    assert client_as(user_a).delete(f"/sync/items/{item}").status_code == 204
+    response = client_as(user_a).delete(f"/sync/items/{item}")
+    assert response.status_code == 200
     job = run_queued(empty_queue, TODAY)
+    assert job["id"] == uuid.UUID(response.json()["recurring_job_id"])
 
     assert job["result"] == {"detected": 0, "new": 0, "changed": 0, "stopped": 0, "deleted": 1}
     assert rows(empty_queue, user_a) == []

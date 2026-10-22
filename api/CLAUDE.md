@@ -292,6 +292,10 @@ Specs 009 and 010. Migration `0005_checkins` adds `recurring_charges`,
   route runs `run_sync` with `CsvProvider` inside the request's own session (no
   network, so one transaction); a stale cursor is 409 `import_conflict`. Its
   10 MB limit is a `BodyRule` of `BodySizeLimit` in `app/main.py`.
+- `AccountOut.provider` (`plaid` or `csv`, from the account's sync item) lets
+  the client tell an imported account from a linked one: `POST
+  /sync/items/{id}/sync` on a CSV item is 422 `not_plaid_item` (its sync job
+  could only fail), and unlinking a CSV item is "Remove".
 - `tests/support/spending_month.py` holds spec 007's September month, shared by
   the spending and cash-flow tests.
 
@@ -483,7 +487,9 @@ adds `public.delete_user_account(uuid)`; no new table.
   instead of a 500 (`is_missing_owner`; a test checks every key's name).
 - **Unlinking** (`DELETE /sync/items/{id}`) follows the same read, revoke,
   delete order with two `UserSessions`, then queues `recurring.detect`, which
-  drops charges with no transaction left and refreshes the open check-in. The
+  drops charges with no transaction left and refreshes the open check-in. It
+  returns 200 `{recurring_job_id}` (that job, or the one already queued) for
+  the client to poll; a repeat is 404 and queues nothing. The
   engine retracts an unhandled `recurring_*` finding whose
   `recurring_charge_id` is gone (`checkin.engine.subject_gone`), like a cleared
   condition. A sync queued for the item succeeds as `item_missing` even on a
@@ -498,7 +504,9 @@ adds `public.delete_user_account(uuid)`; no new table.
 Every route that is not a GET has an entry in
 `app/ratelimit.py:WRITE_ROUTE_POLICIES`: a `Limit` or the reason it needs none.
 `tests/unit/test_write_route_policies.py` fails on a write route without one,
-and `tests/integration/test_rate_limits.py` checks each limit (one request
+and on an `api/openapi.json` operation whose `429` response does not match its
+policy (declare it with `error_responses(..., 429)` exactly when the route
+consumes a `Limit`), and `tests/integration/test_rate_limits.py` checks each limit (one request
 counts one; a full window is 429 `rate_limited` with `Retry-After` and writes
 nothing). Limits are per user and per clock hour (UTC), counted in
 `rate_limit_counters` inside the request's transaction, so a request that fails

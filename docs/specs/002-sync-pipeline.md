@@ -35,10 +35,10 @@ Bring a user's bank data into First Paycheck and keep it current. A linked insti
 |---|---|---|
 | `POST /sync/link-token` | 200 `{link_token, expiration}` | 503 `plaid_unavailable` |
 | `POST /sync/items` | 201 `{item, job_id}`; queues `sync.initial` | 409 `item_already_linked`, 422, 502 `plaid_error`, 503 |
-| `DELETE /sync/items/{id}` | 204 | 404 |
-| `POST /sync/items/{id}/sync` | 202 `{job_id}`; queues `sync.incremental` | 404 |
+| `DELETE /sync/items/{id}` | 200 `{recurring_job_id}`; queues `recurring.detect` | 404 |
+| `POST /sync/items/{id}/sync` | 202 `{job_id}`; queues `sync.incremental` | 404, 422 `not_plaid_item` |
 | `POST /sync/webhook` | 200 `{status: "ok"}` | 401 `invalid_webhook` |
-| `GET /accounts` | 200 list with latest balance and role | - |
+| `GET /accounts` | 200 list with latest balance, role and `provider` | - |
 | `PATCH /accounts/{id}` | 200 updated account | 404, 422 |
 | `GET /jobs/{id}` | 200 `{id, kind, status, progress, result, last_error, created_at, finished_at}` | 404 |
 
@@ -98,9 +98,9 @@ Bring a user's bank data into First Paycheck and keep it current. A linked insti
 ### Routes
 
 27. `POST /sync/items` takes exactly one of `public_token` or `sandbox_institution_id`. The sandbox field is rejected with 422 unless `PLAID_ENV=sandbox`: Plaid's `/sandbox/public_token/create` exists only in its sandbox, so the shortcut can never reach a real bank there, and gating on the Plaid environment (not `APP_ENV`) keeps the deployed stack walkable until Plaid production is approved, after which it closes by itself. The access token is encrypted before it touches the database. A `provider_item_id` that is already linked is 409 `item_already_linked`. The response's `job_id` is the `sync.initial` job, whose idempotency key is `sync.initial:<item id>`.
-28. `DELETE /sync/items/{id}` asks Plaid to remove the item (best effort: a Plaid failure, an undecryptable token or an unconfigured Plaid is logged, not returned) with no transaction open, then deletes the row; `ON DELETE CASCADE` removes its accounts, transactions, snapshots and holdings (spec 001 rule 25). The full unlink path, including the derived data it retracts, is spec 017 rules 11-16.
-29. `POST /sync/items/{id}/sync` returns the already-queued `sync.incremental` job for that item when there is one, otherwise a new one.
-30. `GET /accounts` lists the user's accounts ordered by institution, then name, each with its latest balance snapshot (`balance_cents`, `balance_as_of`, null when none) and institution name.
+28. `DELETE /sync/items/{id}` asks Plaid to remove the item (best effort: a Plaid failure, an undecryptable token or an unconfigured Plaid is logged, not returned) with no transaction open, then deletes the row; `ON DELETE CASCADE` removes its accounts, transactions, snapshots and holdings (spec 001 rule 25). The response's `recurring_job_id` is the `recurring.detect` job the unlink queues (or the one already queued), so the client can wait for it and then refresh recurring charges and the check-in. The full unlink path, including the derived data it retracts, is spec 017 rules 11-16.
+29. `POST /sync/items/{id}/sync` returns the already-queued `sync.incremental` job for that item when there is one, otherwise a new one. A CSV item is 422 `not_plaid_item` and queues nothing: it has no provider to pull from (its data arrives only through `POST /accounts/import`, spec 010), so a queued sync could only fail.
+30. `GET /accounts` lists the user's accounts ordered by institution, then name, each with its latest balance snapshot (`balance_cents`, `balance_as_of`, null when none), institution name and `provider` (`plaid` or `csv`, its sync item's provider), so a client can tell an imported account from a linked one: only a Plaid item can be synced on demand.
 31. `PATCH /accounts/{id}` accepts `role` (an `account_role` or null) and `is_active`; omitted fields are unchanged. Assigning `emergency_fund` moves it: the user's previous emergency-fund account loses the role in the same transaction (spec 001 allows one).
 
 ### Jobs (`jobs/`)

@@ -18,7 +18,7 @@ Let a user delete their account: every row they own goes, their linked instituti
 | Route | Success | Errors |
 |---|---|---|
 | `DELETE /me` | 204, no body | 401 |
-| `DELETE /sync/items/{id}` | 204, no body | 401, 404 |
+| `DELETE /sync/items/{id}` | 200 `{recurring_job_id}`: the `recurring.detect` job it queued (rule 11) | 401, 404 |
 
 The SQL function `public.delete_user_account(p_user_id uuid) RETURNS boolean`: true when it deleted the `auth.users` row, false when there was none.
 
@@ -39,7 +39,7 @@ The SQL function `public.delete_user_account(p_user_id uuid) RETURNS boolean`: t
 
 ### Unlinking (`DELETE /sync/items/{id}`, spec 002 rule 28)
 
-11. **Order.** As rule 2: one user session reads the item (404 when it is not the user's) and commits; with no transaction open the item is removed at Plaid when it has a token (rule 3, so an unconfigured Plaid never makes unlinking fail); a second user session deletes the row and queues `recurring.detect` (`enqueue_unless_queued`). An item already deleted by the time of the second session is 404.
+11. **Order.** As rule 2: one user session reads the item (404 when it is not the user's) and commits; with no transaction open the item is removed at Plaid when it has a token (rule 3, so an unconfigured Plaid never makes unlinking fail); a second user session deletes the row and queues `recurring.detect` (`enqueue_unless_queued`), whose id the response returns as `recurring_job_id`: when that job finishes, the charges and the open check-in (rules 13-14) are settled, so the client polls it before refreshing them. An item already deleted by the time of the second session is 404, and so is a second `DELETE` of the same item: unlinking is idempotent in effect, and the repeat queues nothing.
 12. **Rows.** The `sync_items` row goes with its encrypted token; `ON DELETE CASCADE` removes its `accounts` and their `transactions`, `balance_snapshots` and `holdings`; `goals.account_id` becomes null (spec 001 rule 25). Nothing else references an account.
 13. **Recurring charges.** `recurring.detect` deletes every charge whose merchant has no transaction left (spec 009 rule 16), so a charge seen only at the unlinked institution goes; one also billed elsewhere is re-detected from what remains.
 14. **Check-in findings.** When the detection has written, it queues a refresh of the month's open check-in (spec 015 rule 15). The refresh retracts, unless the user has acted on it, (a) every condition no finder produces any more (spec 015 rule 10.4: a goal off pace whose goal lost its account is one), and (b) every event finding whose subject is gone: a `recurring_*` finding whose `recurring_charge_id` is no longer one of the user's `recurring_charges`. A finding the user marked done or dismissed is kept as history. Findings about pay stubs, decisions and calendar events do not depend on bank data and are kept.
@@ -63,7 +63,8 @@ The SQL function `public.delete_user_account(p_user_id uuid) RETURNS boolean`: t
 | 11 | `test_a_handled_finding_about_the_item_is_kept_as_history` | Example 10 with the Equinox finding dismissed before the unlink | The Equinox finding stays |
 | 12 | `test_a_sync_queued_for_the_item_finds_it_missing` | Example 10 with a `sync.incremental` queued for bank 1 before the unlink; the worker has no provider | The job succeeds with outcome `item_missing` |
 | 13 | `test_unlink_removes_the_item_at_plaid_with_no_transaction_open` | An item with a token | Plaid's `item_remove` gets the token while no session is open; the row is gone |
-| 14 | `test_unlink_without_plaid_configured_still_deletes` | Plaid is not configured | 204; the row is gone |
+| 14 | `test_unlink_without_plaid_configured_still_deletes` | Plaid is not configured | 200; the row is gone |
+| 15 | `test_unlink_returns_the_recurring_job_and_a_repeat_is_404` | A Plaid item; `DELETE` it twice | First 200 with `recurring_job_id` naming the one queued `recurring.detect` job; second 404 `not_found`, still one queued job |
 
 Example 1 is the completeness check: the test lists the tables from `information_schema.columns` (`table_schema = 'public'`, `column_name = 'user_id'`, base tables only) and first asserts that A has a row in each, so a table added later without a row in the fixture fails the test instead of passing unchecked.
 
