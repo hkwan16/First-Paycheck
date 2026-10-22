@@ -237,3 +237,24 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As listed, each in its own commit on main.
 
 **Time saved or lost:** Not measured. The whole post-alpha plan (M3 to M10, scheduled for November 6 to December 11) landed in one day; the cost was the orchestration itself, roughly a third of the main session's time on merges and conflict resolution.
+
+## 2026-10-21: backlog statuses synced to the board
+
+**Task:** Bring the GitHub Project up to date for the alpha's backlog requirement: a status on every issue, closed issues for finished work, and issues for work no issue described.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Add `status` to `backlog.yaml` and to `scripts/sync_backlog.py` (failing tests first), mark each issue truthfully from `main` after reading the code and guides, add issues for unlisted work, run the sync and verify the counts.
+
+**What it produced:** `status` (todo, in_progress, done) in the backlog and the sync, which sets the Project's Status field, closes done issues and reopens the rest, and retries rate-limited `gh` calls; 124 issues (108 done, 9 in progress, 7 todo), 20 of them new: specs 009 to 017, the Supabase grant lockdown, the e2e stack, the no-model fallback, two M5 web pieces, plan line status, write-route limits and eval tolerance as done, and the web check-in-now button, web account deletion and the live LLM eval run as todo.
+
+**What was wrong:**
+- Every milestone in `backlog.yaml` used a `due` key that the parser never read, so no milestone on GitHub had a due date. The parser now rejects unknown keys, the file uses `due_on`, and the sync updates a milestone whose due date differs.
+- Several issues looked done from their titles but were not by their own definitions of done: the CI e2e run skips the Plaid link steps because Actions has no Plaid secrets, the LLM eval baselines hold targets because no key has been available, the ingest-in-docker job is not required because `main` has no branch protection, and the web app has no production deployment.
+- `web/CLAUDE.md` still says the API has no `POST /check-ins` and no plan line status; both landed in the API today. Recorded as a todo issue rather than edited here.
+
+**How it was caught:** Reading `render.yaml`, the workflows, `evals/baseline.json`, the repo's secrets list, branch protection and the live `/health`, rather than the milestone summaries; the milestone dates showed up as a dry run reporting every milestone stale.
+
+**Fix:** As above, in the subagent's branch. The sync created 20 issues, set 120 statuses, closed 108 issues and updated 11 milestones; a second dry run reported no changes.
+
+**Time saved or lost:** Not measured.
