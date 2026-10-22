@@ -152,13 +152,12 @@ test('a new user goes from sign-in to a verified 401(k) explanation', async ({ p
     await form.getByRole('button', { name: 'Single' }).click();
     await form.getByLabel('Employer adds, % of what you put in').fill('100');
     await form.getByLabel('Up to, % of your pay').fill('4');
+    // The calculator's age comes from the birth year (spec 006 open question 2, settled in M6).
+    await form.getByLabel('Year you were born').fill('1996');
     await form.getByRole('button', { name: 'Save plan details' }).click();
 
     const slider = card(page).getByRole('slider', { name: /Your contribution/ });
     await expect(slider).toBeVisible({ timeout: 30_000 });
-    await card(page)
-      .getByLabel(/Your age at the end of/)
-      .fill('30');
     await setContribution(page, slider, 4);
     await expect(saveButton(page)).toBeEnabled();
     await saveButton(page).click();
