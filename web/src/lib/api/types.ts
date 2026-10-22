@@ -73,3 +73,33 @@ export type RecurringUserStatus = Schemas['RecurringUserStatus'];
 export type RecurringCadence = Schemas['RecurringCadence'];
 export type CsvImport = Schemas['CsvImport'];
 export type AmountSign = Schemas['AmountSign'];
+
+// Monthly check-ins, net worth and holdings (M8, spec 015).
+export type CheckInSummary = Schemas['CheckInSummary'];
+export type CheckInDetail = Schemas['CheckInDetail'];
+export type CheckInStatus = Schemas['CheckinStatus'];
+export type CheckInCashFlow = Schemas['CheckInCashFlow'];
+export type PlanLine = Schemas['PlanLine'];
+export type Finding = Schemas['FindingOut'];
+export type FindingKind = Schemas['FindingKind'];
+export type FindingSeverity = Schemas['FindingSeverity'];
+export type FindingAction = Schemas['FindingAction'];
+export type FindingPatch = Schemas['FindingPatch'];
+/** A finding's payload: a union discriminated by its own `kind`. */
+export type FindingPayload = Finding['payload'];
+export type ElectionMismatchPayload = Schemas['ElectionMismatchPayload'];
+export type GoalOffPacePayload = Schemas['GoalOffPacePayload'];
+export type RecurringPayload = Schemas['RecurringPayload'];
+export type PayChangePayload = Schemas['PayChangePayload'];
+export type DeductionChangePayload = Schemas['DeductionChangePayload'];
+export type UpcomingDeadlinePayload = Schemas['UpcomingDeadlinePayload'];
+/** The part of the plan a finding affects (`payload.affects`). */
+export type FindingAffects = NonNullable<FindingPayload['affects']>;
+export type CalendarKind = Schemas['CalendarKind'];
+export type NetWorth = Schemas['NetWorthOut'];
+export type NetWorthPoint = Schemas['NetWorthPoint'];
+export type AccountBalance = Schemas['AccountBalanceOut'];
+export type KindTotal = Schemas['KindTotal'];
+export type Holdings = Schemas['HoldingsOut'];
+export type AccountHoldings = Schemas['AccountHoldingsOut'];
+export type Position = Schemas['PositionValue'];

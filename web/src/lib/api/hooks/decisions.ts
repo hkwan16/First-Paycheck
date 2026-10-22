@@ -21,9 +21,24 @@ export function useDecision(decisionId: string) {
   );
 }
 
-/** `GET /calendar`: upcoming checks and deadlines, soonest first. */
-export function useCalendar() {
-  return $api.useQuery('get', '/calendar');
+/** Inclusive due dates (`YYYY-MM-DD`) bounding a calendar read; either may be left out. */
+export interface CalendarWindow {
+  from?: string;
+  to?: string;
+}
+
+/**
+ * `GET /calendar`: upcoming checks and deadlines, soonest first, within
+ * `window` when given (spec 015 rule 22). With no bounds it is the plain read
+ * every screen shares.
+ */
+export function useCalendar({ from, to }: CalendarWindow = {}) {
+  const query = { ...(from ? { from } : {}), ...(to ? { to } : {}) };
+  return $api.useQuery(
+    'get',
+    '/calendar',
+    Object.keys(query).length > 0 ? { params: { query } } : undefined,
+  );
 }
 
 /** The calculator route that produces each calculator's result. */

@@ -4,6 +4,7 @@ import { $api } from './client';
 import {
   invalidateAfterConfirm,
   invalidateAfterDecision,
+  invalidateCheckIn,
   invalidateDecisions,
   invalidateDocuments,
   invalidateForJob,
@@ -245,5 +246,65 @@ describe('spending and recurring keys', () => {
     expect(invalidated(keys.accounts)).toBe(true);
     expect(invalidated(keys.cashflow)).toBe(true);
     expect(invalidated(keys.recurring)).toBe(false);
+  });
+});
+
+describe('check-in, net worth and holdings keys', () => {
+  function seededCheckIns() {
+    const client = new QueryClient();
+    const keys = {
+      list: $api.queryOptions('get', '/check-ins').queryKey,
+      one: $api.queryOptions('get', '/check-ins/{check_in_id}', {
+        params: { path: { check_in_id: 'c1' } },
+      }).queryKey,
+      other: $api.queryOptions('get', '/check-ins/{check_in_id}', {
+        params: { path: { check_in_id: 'c2' } },
+      }).queryKey,
+      netWorth: $api.queryOptions('get', '/net-worth', { params: { query: { months: 12 } } })
+        .queryKey,
+      holdings: $api.queryOptions('get', '/holdings').queryKey,
+      calendar: $api.queryOptions('get', '/calendar', {
+        params: { query: { from: '2026-11-01', to: '2026-12-31' } },
+      }).queryKey,
+    };
+    for (const key of Object.values(keys)) client.setQueryData(key, {});
+    const invalidated = (key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
+    return { client, keys, invalidated };
+  }
+
+  it("match the keys $api's hooks cache under", () => {
+    const { keys } = seededCheckIns();
+    expect(queryKeys.checkIns()).toEqual(keys.list);
+    expect(queryKeys.checkIn('c1')).toEqual(keys.one);
+    expect(keys.one.slice(0, 2)).toEqual(queryKeys.checkIn());
+    expect(keys.netWorth.slice(0, 2)).toEqual(queryKeys.netWorth());
+    expect(queryKeys.holdings()).toEqual(keys.holdings);
+    expect(keys.calendar.slice(0, 2)).toEqual(queryKeys.calendar());
+  });
+
+  it('a finding update refreshes that check-in and the list, not other check-ins', async () => {
+    const { client, keys, invalidated } = seededCheckIns();
+    await invalidateCheckIn(client, 'c1');
+    expect(invalidated(keys.one)).toBe(true);
+    expect(invalidated(keys.list)).toBe(true);
+    expect(invalidated(keys.other)).toBe(false);
+    expect(invalidated(keys.netWorth)).toBe(false);
+  });
+
+  it('a monthly check-in job refreshes the list and every check-in', async () => {
+    const { client, keys, invalidated } = seededCheckIns();
+    await invalidateForJob(client, 'checkin.monthly');
+    expect(invalidated(keys.list)).toBe(true);
+    expect(invalidated(keys.one)).toBe(true);
+    expect(invalidated(keys.other)).toBe(true);
+    expect(invalidated(keys.holdings)).toBe(false);
+  });
+
+  it('a sync refreshes net worth and holdings (new balances and positions)', async () => {
+    const { client, keys, invalidated } = seededCheckIns();
+    await invalidateForJob(client, 'sync.incremental');
+    expect(invalidated(keys.netWorth)).toBe(true);
+    expect(invalidated(keys.holdings)).toBe(true);
+    expect(invalidated(keys.list)).toBe(false);
   });
 });

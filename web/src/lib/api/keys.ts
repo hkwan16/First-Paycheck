@@ -65,17 +65,30 @@ export const queryKeys = {
     ] as const,
   calendar: () => ['get', '/calendar'] as const,
 
-  // Routes that do not exist yet (see pending.ts). Their keys are reserved here
-  // so job invalidation already covers them when they land.
   /** Prefixes of every period's read (hooks/spending.ts). */
   spendingSummary: () => ['get', '/spending/summary'] as const,
   cashflow: () => ['get', '/cashflow'] as const,
   recurring: () => ['get', '/recurring'] as const,
 
-  // Routes that do not exist yet (see pending.ts). Their keys are reserved here
-  // so job invalidation already covers them when they land.
+  /** Monthly check-ins (M8), newest first. */
   checkIns: () => ['get', '/check-ins'] as const,
-  /** The plan screen's read (M4); a saved decision changes it. */
+  /** One check-in with its findings; without an id, the prefix of every check-in read. */
+  checkIn: (checkInId?: string) =>
+    checkInId === undefined
+      ? (['get', '/check-ins/{check_in_id}'] as const)
+      : ([
+          'get',
+          '/check-ins/{check_in_id}',
+          { params: { path: { check_in_id: checkInId } } },
+        ] as const),
+  /** Prefix of every `GET /net-worth` read, whatever its `months`. */
+  netWorth: () => ['get', '/net-worth'] as const,
+  holdings: () => ['get', '/holdings'] as const,
+
+  /**
+   * The plan screen's read (M4); a saved decision changes it. The route does
+   * not exist yet: the key is reserved so invalidation covers it when it lands.
+   */
   plan: () => ['get', '/plan'] as const,
   /** Savings goals (M6); a saved emergency fund decision creates one. */
   goals: () => ['get', '/goals'] as const,
@@ -86,14 +99,17 @@ const documentReads = [queryKeys.documents(), queryKeys.document()];
 
 const spendingReads = [queryKeys.transactions(), queryKeys.spendingSummary(), queryKeys.cashflow()];
 
+/** Balances and positions a sync writes (spec 015 rules 20 and 21). */
+const balanceReads = [queryKeys.netWorth(), queryKeys.holdings()];
+
 /** What each background job changes, so a finished job refreshes exactly those reads. */
 export const JOB_INVALIDATES: Record<JobKind, readonly QueryKey[]> = {
-  'sync.initial': [queryKeys.accounts(), ...spendingReads],
-  'sync.incremental': [queryKeys.accounts(), ...spendingReads],
+  'sync.initial': [queryKeys.accounts(), ...spendingReads, ...balanceReads],
+  'sync.incremental': [queryKeys.accounts(), ...spendingReads, ...balanceReads],
   'categorize.run': spendingReads,
   'ingest.extract': documentReads,
   'recurring.detect': [queryKeys.recurring()],
-  'checkin.monthly': [queryKeys.checkIns()],
+  'checkin.monthly': [queryKeys.checkIns(), queryKeys.checkIn()],
   'schedule.tick': [],
 };
 
@@ -144,3 +160,10 @@ export const invalidateAfterDecision = (client: QueryClient) =>
     queryKeys.plan(),
     queryKeys.goals(),
   ]);
+
+/**
+ * After a finding is marked done or dismissed, or undone: that check-in (its
+ * counts and status change, spec 015 rule 13) and the list's counts.
+ */
+export const invalidateCheckIn = (client: QueryClient, checkInId: string) =>
+  invalidateAll(client, [queryKeys.checkIn(checkInId), queryKeys.checkIns()]);
