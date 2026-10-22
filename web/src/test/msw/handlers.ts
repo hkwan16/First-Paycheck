@@ -174,6 +174,7 @@ export function platypusAccounts(itemId: string): Account[] {
     {
       id: nextId('2b000000'),
       sync_item_id: itemId,
+      provider: 'plaid',
       institution_name: 'First Platypus Bank',
       name: 'Plaid Checking',
       kind: 'checking',
@@ -186,6 +187,7 @@ export function platypusAccounts(itemId: string): Account[] {
     {
       id: nextId('2b000000'),
       sync_item_id: itemId,
+      provider: 'plaid',
       institution_name: 'First Platypus Bank',
       name: 'Plaid Saving',
       kind: 'savings',
@@ -459,7 +461,9 @@ export const handlers = [
     if (gone.size === 0) return notFound('Linked institution not found');
     db.accounts = db.accounts.filter((a) => !gone.has(a.id));
     db.transactions = db.transactions.filter((t) => !gone.has(t.account_id));
-    return new HttpResponse(null, { status: 204 });
+    // The API answers with the recurring.detect job it queued for the rest of the data.
+    const recurringJobId = scriptJob(syncJobStates(nextId('5b000000'), 'recurring.detect'));
+    return HttpResponse.json({ recurring_job_id: recurringJobId }, { status: 200 });
   }),
 
   http.get(apiUrl('/docs'), () => HttpResponse.json(db.documents)),

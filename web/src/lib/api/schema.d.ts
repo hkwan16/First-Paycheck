@@ -810,8 +810,9 @@ export interface paths {
     post?: never;
     /**
      * Delete Item
-     * @description Unlink an institution: remove it at Plaid (best effort) and delete it with
-     *     its accounts, transactions, balances and holdings.
+     * @description Unlink an institution: remove it at Plaid (best effort), delete it with
+     *     its accounts, transactions, balances and holdings, and return the
+     *     recurring detection that settles what came from it.
      */
     delete: operations['delete_item'];
     options?: never;
@@ -984,6 +985,7 @@ export interface components {
       mask: string | null;
       /** Name */
       name: string;
+      provider: components['schemas']['SyncProvider'];
       role: components['schemas']['AccountRole'] | null;
       /**
        * Sync Item Id
@@ -3202,6 +3204,14 @@ export interface components {
       /** Next Cursor */
       next_cursor: string | null;
     };
+    /** UnlinkedItem */
+    UnlinkedItem: {
+      /**
+       * Recurring Job Id
+       * Format: uuid
+       */
+      recurring_job_id: string;
+    };
     /** UpcomingDeadlinePayload */
     UpcomingDeadlinePayload: {
       /** Affects */
@@ -5332,11 +5342,13 @@ export interface operations {
     requestBody?: never;
     responses: {
       /** @description Successful Response */
-      204: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          'application/json': components['schemas']['UnlinkedItem'];
+        };
       };
       /** @description Unauthorized */
       401: {
@@ -5405,13 +5417,13 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Validation Error */
+      /** @description Unprocessable Entity */
       422: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['HTTPValidationError'];
+          'application/json': components['schemas']['ErrorResponse'];
         };
       };
       /** @description Too Many Requests */

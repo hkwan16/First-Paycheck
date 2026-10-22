@@ -22,6 +22,7 @@ export const sampleAccounts: readonly Account[] = [
   {
     id: CHECKING_ID,
     sync_item_id: CHASE_ITEM_ID,
+    provider: 'plaid',
     institution_name: 'Chase',
     name: 'Chase Total Checking',
     kind: 'checking',
@@ -34,6 +35,7 @@ export const sampleAccounts: readonly Account[] = [
   {
     id: SAVINGS_ID,
     sync_item_id: CHASE_ITEM_ID,
+    provider: 'plaid',
     institution_name: 'Chase',
     name: 'Chase Savings',
     kind: 'savings',
