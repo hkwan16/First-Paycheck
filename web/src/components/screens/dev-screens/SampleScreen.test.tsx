@@ -1,7 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, render, renderHook, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useAccounts, useCalc } from '@/lib/api/hooks';
+import { JOB_POLL_MS, useAccounts, useCalc } from '@/lib/api/hooks';
 import { sampleK401, sampleK401Inputs } from '@/test/fixtures/decisions';
 import { SAMPLE_NOW, sampleAccounts } from '@/test/fixtures/sample';
 import { server } from '@/test/msw/server';
@@ -189,6 +189,15 @@ describe('SampleScreen after Confirm', () => {
       expect(requests).toEqual([]);
     },
   );
+
+  it('never polls the API for the document still being read', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="confirm-extracting" />);
+    expect(await screen.findByText(/Reading pay stub/)).toBeInTheDocument();
+    // useDocument re-reads an extracting document every JOB_POLL_MS; the sample has no API.
+    await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS * 3));
+    expect(requests).toEqual([]);
+  });
 
   it('renders the account menu in the header for the account sample, with no requests', async () => {
     const requests = countRequests();

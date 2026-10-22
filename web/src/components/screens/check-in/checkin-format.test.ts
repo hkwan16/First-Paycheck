@@ -14,8 +14,10 @@ import {
   findingTone,
   handledText,
   KIND_LABELS,
+  offersCheckInNow,
   planBarValue,
-  planLineTone,
+  planStatusText,
+  planStatusTone,
   severityTone,
 } from './checkin-format';
 
@@ -84,18 +86,66 @@ describe('handledText', () => {
   });
 });
 
-describe('planLineTone', () => {
-  it('gives each line the hue of what it is', () => {
-    expect(novemberPlan().map((line) => [line.key, planLineTone(line.key)])).toEqual([
-      ['take_home', 'plum'],
-      ['essentials', 'blue'],
-      ['flexible', 'coral'],
+describe('planStatusTone', () => {
+  const line = (key: PlanLine['key'], status: PlanLine['status']): PlanLine => ({
+    key,
+    label: key,
+    actual_cents: 0,
+    plan_cents: status === null ? null : 10_000,
+    difference_cents: null,
+    status,
+  });
+
+  it('reads the API status on the November lines', () => {
+    expect(novemberPlan().map((l) => [l.key, planStatusTone(l)])).toEqual([
+      ['take_home', 'neutral'],
+      ['essentials', 'confirmed'],
+      ['flexible', 'neutral'],
       ['other', 'neutral'],
-      ['savings', 'teal'],
-      ['retirement', 'plum'],
-      ['health', 'coral'],
+      ['savings', 'confirmed'],
+      ['retirement', 'warning'],
+      ['health', 'confirmed'],
       ['left_over', 'neutral'],
     ]);
+  });
+
+  it('is confirmed on plan, whatever the line', () => {
+    for (const key of ['essentials', 'savings', 'retirement', 'health'] as const) {
+      expect(planStatusTone(line(key, 'on_plan'))).toBe('confirmed');
+    }
+  });
+
+  it('asks for a look above the plan on spending lines, where less is not a problem', () => {
+    for (const key of ['essentials', 'flexible', 'other'] as const) {
+      expect(planStatusTone(line(key, 'over'))).toBe('warning');
+      expect(planStatusTone(line(key, 'under'))).toBe('confirmed');
+    }
+  });
+
+  it('asks for a look below the plan where more is not a problem', () => {
+    for (const key of ['savings', 'retirement', 'take_home', 'left_over'] as const) {
+      expect(planStatusTone(line(key, 'under'))).toBe('warning');
+      expect(planStatusTone(line(key, 'over'))).toBe('confirmed');
+    }
+  });
+
+  it('asks for a look either side on health premiums, which should match the chosen plan', () => {
+    expect(planStatusTone(line('health', 'over'))).toBe('warning');
+    expect(planStatusTone(line('health', 'under'))).toBe('warning');
+  });
+
+  it('stays neutral without a plan', () => {
+    expect(planStatusTone(line('essentials', null))).toBe('neutral');
+    expect(planStatusTone(line('savings', null))).toBe('neutral');
+  });
+});
+
+describe('planStatusText', () => {
+  it('says the status in words, and nothing without one', () => {
+    expect(planStatusText('on_plan')).toBe('On plan');
+    expect(planStatusText('over')).toBe('Over plan');
+    expect(planStatusText('under')).toBe('Under plan');
+    expect(planStatusText(null)).toBeNull();
   });
 });
 
@@ -117,6 +167,20 @@ describe('planBarValue', () => {
   it('draws no bar without a plan to measure against', () => {
     expect(planBarValue(line(22_349, null))).toBeNull();
     expect(planBarValue(line(0, 0))).toBeNull();
+  });
+});
+
+describe('offersCheckInNow', () => {
+  it('is offered on this month’s open check-in only', () => {
+    expect(offersCheckInNow(novemberCheckIn(), '2026-11-16')).toBe(true);
+    expect(offersCheckInNow(novemberCheckIn(), '2026-11-30')).toBe(true);
+  });
+
+  it('is not offered on a completed check-in, another month’s, or before the clock is known', () => {
+    expect(offersCheckInNow(completedNovemberCheckIn(), '2026-11-16')).toBe(false);
+    expect(offersCheckInNow(novemberCheckIn(), '2026-12-01')).toBe(false);
+    expect(offersCheckInNow(novemberCheckIn(), '2026-10-31')).toBe(false);
+    expect(offersCheckInNow(novemberCheckIn(), null)).toBe(false);
   });
 });
 

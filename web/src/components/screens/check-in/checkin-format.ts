@@ -80,30 +80,68 @@ export const handledText = ({
 }: Pick<CheckInDetail, 'handled_count' | 'finding_count'>) =>
   `${formatNumber(handled_count)} of ${formatNumber(finding_count)} handled`;
 
-const LINE_TONES: Record<PlanLine['key'], Hue> = {
-  take_home: 'plum',
-  essentials: 'blue',
-  flexible: 'coral',
-  other: 'neutral',
-  savings: 'teal',
-  retirement: 'plum',
-  health: 'coral',
-  left_over: 'neutral',
+/**
+ * Which side of the plan needs a look, by line (spec 015 rule 19a: the API
+ * says the side, the client says whether it matters). Spending more than the
+ * plan does, spending less does not. Where more is not a problem (saving or
+ * contributing more, more pay, more left over), only falling short does.
+ * Health premiums should match the chosen plan, so either side does: a
+ * premium off the plan means the election is not the one saved.
+ */
+const NEEDS_A_LOOK: Record<PlanLine['key'], ReadonlySet<'over' | 'under'>> = {
+  take_home: new Set(['under']),
+  essentials: new Set(['over']),
+  flexible: new Set(['over']),
+  other: new Set(['over']),
+  savings: new Set(['under']),
+  retirement: new Set(['under']),
+  health: new Set(['over', 'under']),
+  left_over: new Set(['under']),
 };
 
-/** The hue of what a cash-flow line is (pay, essentials, flexible, savings, 401(k), health). */
-export const planLineTone = (key: PlanLine['key']): Hue => LINE_TONES[key];
+/**
+ * A line's state against its plan, from the API's `status`: on plan is
+ * confirmed, a side that needs a look is a warning, a side that does not is
+ * confirmed too, and a line with no plan (no status) stays neutral.
+ */
+export function planStatusTone(line: PlanLine): Tone {
+  if (line.status === null) return 'neutral';
+  if (line.status === 'on_plan') return 'confirmed';
+  return NEEDS_A_LOOK[line.key].has(line.status) ? 'warning' : 'confirmed';
+}
+
+const STATUS_WORDS: Record<NonNullable<PlanLine['status']>, string> = {
+  on_plan: 'On plan',
+  over: 'Over plan',
+  under: 'Under plan',
+};
+
+/** The API's status in words ("Under plan"), or null for a line with no plan. */
+export const planStatusText = (status: PlanLine['status']): string | null =>
+  status === null ? null : STATUS_WORDS[status];
 
 /**
  * How far a line's bar fills: its actual as a share of its plan. This is
  * geometry, like the Sankey's scale: it sizes a mark and is never shown,
- * compared or rounded. Whether a line is on plan is the API's to say. Null
+ * compared or rounded. Whether a line is on plan is the API's to say
+ * (`status`, read by `planStatusTone`). Null
  * when there is no plan to measure against.
  */
 export function planBarValue(line: PlanLine): number | null {
   if (line.plan_cents === null || line.plan_cents <= 0) return null;
   return (line.actual_cents / line.plan_cents) * 100;
 }
+
+/**
+ * Whether a check-in offers "Check in now": `POST /check-ins` runs the
+ * request clock's UTC month (spec 015 rule 23) and leaves a completed
+ * check-in as it is, so only this month's open check-in. `today` is
+ * `useToday()`, null until the client knows the date.
+ */
+export const offersCheckInNow = (
+  checkIn: Pick<CheckInDetail, 'period' | 'status'>,
+  today: string | null,
+) => checkIn.status === 'open' && today !== null && checkIn.period === `${today.slice(0, 7)}-01`;
 
 const iso = (date: Date) => date.toISOString().slice(0, 10);
 

@@ -1,6 +1,9 @@
 import { delay, http, HttpResponse } from 'msw';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { JOB_POLL_MS } from '@/lib/api/hooks';
 import {
+  checkInJobId,
+  checkInJobStates,
   completedNovemberCheckIn,
   NOVEMBER_ID,
   novemberCalendar,
@@ -8,9 +11,9 @@ import {
 } from '@/test/fixtures/checkins';
 import { checkinDb } from '@/test/msw/checkin-handlers';
 import { db } from '@/test/msw/db';
-import { apiUrl } from '@/test/msw/handlers';
+import { apiUrl, scriptJob } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
-import { renderWithProviders as render, screen, waitFor, within } from '@/test/render';
+import { act, renderWithProviders as render, screen, waitFor, within } from '@/test/render';
 import { CheckInScreen } from './CheckInScreen';
 
 const ELECTION_TITLE = 'Your 401(k) contribution is 2%, not the 4% you chose.';
@@ -77,7 +80,9 @@ describe('CheckInScreen', () => {
     expect(within(row).getByText('Done', { selector: 'span' })).toBeInTheDocument();
     expect(within(row).queryByRole('button', { name: 'Dismiss' })).toBeNull();
     expect(handledBadge(findings)).toHaveTextContent('1 of 9 handled');
-    expect(screen.getByRole('status')).toHaveTextContent(`Marked done: ${ELECTION_TITLE}`);
+    expect(within(findings).getByRole('status')).toHaveTextContent(
+      `Marked done: ${ELECTION_TITLE}`,
+    );
 
     await user.click(undo);
     expect(within(row).getByRole('button', { name: 'Done' })).toHaveFocus();
@@ -167,8 +172,15 @@ describe('CheckInScreen', () => {
       name: '401(k) from pay stubs against plan',
     });
     expect(bar).toHaveAttribute('aria-valuetext', '$54.17 of $108.33 planned');
-    // A line with no plan has no target and no bar.
-    expect(within(card).getByRole('row', { name: /^Flexible/ })).toHaveTextContent('No target');
+    // The API's status, in words beside the actual.
+    expect(within(row).getByText('Under plan')).toBeVisible();
+    expect(within(card).getByRole('row', { name: /^Health premiums/ })).toHaveTextContent(
+      'On plan',
+    );
+    // A line with no plan has no target, no bar and no status.
+    const flexible = within(card).getByRole('row', { name: /^Flexible/ });
+    expect(flexible).toHaveTextContent('No target');
+    expect(flexible).not.toHaveTextContent(/(On|Over|Under) plan/);
     expect(within(card).queryByRole('progressbar', { name: 'Flexible against plan' })).toBeNull();
     expect(within(card).getAllByRole('progressbar')).toHaveLength(4);
     expect(within(card).getByRole('link', { name: 'Open the Spending map' })).toHaveAttribute(
@@ -214,5 +226,55 @@ describe('CheckInScreen', () => {
       'href',
       '/check-in',
     );
+  });
+});
+
+describe('Check in now on a check-in', () => {
+  afterEach(() => vi.useRealTimers());
+
+  const at = (now: string) => vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(now) });
+  const openAt = async () => {
+    const view = render(<CheckInScreen checkInId={NOVEMBER_ID} />, {
+      advanceTimers: vi.advanceTimersByTime,
+    });
+    await screen.findByRole('heading', { level: 1, name: 'November check-in' });
+    await screen.findByRole('region', { name: 'What changed' });
+    return view;
+  };
+
+  it('runs this month’s open check-in again, follows the job and reads it again', async () => {
+    at('2026-11-16T18:00:00Z');
+    scriptJob(checkInJobStates(checkInJobId(1)), () => {
+      checkinDb.checkIns[0]!.updated_at = '2026-11-18T09:00:00Z';
+    });
+    const { user } = await openAt();
+    expect(screen.getByText(/Compared with your plan on Nov 16, 2026/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Check in now' }));
+    expect(await screen.findByRole('progressbar', { name: 'Checking in' })).toBeInTheDocument();
+    await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));
+    await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));
+
+    expect(
+      await screen.findByText('Checked again just now. This page is up to date.'),
+    ).toBeInTheDocument();
+    // The check-in was read again: the date it was compared on moved.
+    expect(await screen.findByText(/Compared with your plan on Nov 18, 2026/)).toBeInTheDocument();
+    // It is this check-in, so there is nothing to open.
+    expect(screen.queryByRole('link', { name: 'Open it' })).toBeNull();
+  });
+
+  it('is not offered on a completed check-in, which a run would leave as it is', async () => {
+    at('2026-11-16T18:00:00Z');
+    checkinDb.checkIns[0] = completedNovemberCheckIn();
+    await openAt();
+    expect(screen.queryByRole('button', { name: 'Check in now' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'All check-ins' })).toBeInTheDocument();
+  });
+
+  it('is not offered on another month’s check-in, since it runs this month’s', async () => {
+    at('2026-12-02T09:00:00Z');
+    await openAt();
+    expect(screen.queryByRole('button', { name: 'Check in now' })).toBeNull();
   });
 });
