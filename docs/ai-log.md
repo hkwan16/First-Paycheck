@@ -442,3 +442,24 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above, in the subagent's branch.
 
 **Time saved or lost:** Not measured.
+
+## 2026-10-22: loan ledgers in the spending summary, and shares of a few cents of income
+
+**Task:** Two walkthrough bugs on Plaid's `user_transactions_dynamic` user. `GET /spending/summary` read every account, so five loans' own ledgers ("Monthly payment" booked as money in, "Interest charged" as money out) drove the tiles, the diagram and the check-in's take-home and left-over lines (`uncategorized_cents` -5,498,010). With 12 cents of income the summary sent `essentials_pct` "304000.0" and the tiles printed it.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Spec 007 first (rule 21a: checking, savings and credit only, the rest reported as `ledger_rows_skipped`; rule 25: a share is null with no income or past 1,000.0), then specs 010 and 015; record the dynamic user and reproduce through the real pipeline; failing calculator, route and web tests; then the code and `make types`.
+
+**What it produced:** A recording of the dynamic user (`api/tests/fixtures/plaid/recorded_dynamic`) that `tests/support/sandbox_history.py` replays through `run_sync` and the seed rules; `SPENDING_ACCOUNT_KINDS` and `LEDGER_ACCOUNT_KINDS` in the spending router with a test that every `AccountKind` is in exactly one; `ledger_rows_skipped` and `account_kinds_counted` on the summary; the share limit in `calc/spending.py`; "n/a, income too small to compare" on the tiles and the diagram's bucket details; a ledger note on Spending and the check-in.
+
+**What was wrong:**
+- The brief's share rule, "null when the share would exceed 1,000.0, a negative bucket still shown", would have kept the reproduction's `flexible_pct` of "-849825.0": the seed rules file the dynamic user's payroll under dining, so flexible is -1,019.79 against 12 cents of income. The rule as written limits the share's size, either sign; a refund-heavy month's -15.0 is still shown.
+- The bug reports from production had loans driving take-home; the no-model reproduction left the loans' rows uncategorized instead, so take-home was unchanged there. The hand-worked loan month labels the loan's payment received `income`, as a model might, so the route and check-in tests fail on take-home (291,500 against 250,000) as production did.
+- Found along the way: a null essentials share made the diagram's Essentials details fall through to the "Debt payments, fees, taxes and other spending" text; the summary card named every active account, loans included, as the accounts its totals covered; a category's popover listed rows the API had not counted.
+
+**How it was caught:** The recording replayed under the old code gave exactly the production figures (`uncategorized_cents` -5,498,010, `essentials_pct` "304000.0"); the route test was written against those rows before the fix.
+
+**Fix:** As above, in the subagent's branch. The dynamic October's expected figures depend on the seed rules, which another branch is changing at the same time (its payroll may become income); that test's numbers will move when the two meet.
+
+**Time saved or lost:** Not measured.
