@@ -39,14 +39,19 @@ export async function openLink(page: Page) {
   await expect(page.getByText('Loading your accounts')).toHaveCount(0);
 }
 
-/** Unlink every institution through the UI, so a run starts from a new user's state. */
+/**
+ * Unlink every institution through the UI, so a run starts from a new user's
+ * state. A linked bank says Unlink; an imported CSV account says Remove.
+ */
 export async function unlinkAll(page: Page) {
-  const unlinkButtons = page.getByRole('button', { name: /^Unlink / });
+  const card = page.getByRole('region', { name: 'Bank accounts' });
+  const unlinkButtons = card.getByRole('button', { name: /^(Unlink|Remove) / });
   while ((await unlinkButtons.count()) > 0) {
     const label = (await unlinkButtons.first().getAttribute('aria-label')) ?? '';
-    const name = label.replace(/^Unlink /, '');
+    const [verb = '', ...rest] = label.split(' ');
+    const name = rest.join(' ');
     await unlinkButtons.first().click();
-    await page.getByRole('button', { name: `Yes, unlink ${name}` }).click();
+    await card.getByRole('button', { name: `Yes, ${verb.toLowerCase()} ${name}` }).click();
     await expect(page.getByRole('button', { name: label, exact: true })).toHaveCount(0, {
       timeout: 30_000,
     });

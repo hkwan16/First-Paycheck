@@ -52,6 +52,12 @@ test('imports the export into a new account and follows both jobs', async ({ pag
   });
   await expectJobsDone(panel);
   await expect(page.getByRole('group', { name: ACCOUNT })).toHaveCount(1);
+
+  // An imported account changes only by import, and is removed, not unlinked.
+  const card = page.getByRole('region', { name: 'Bank accounts' });
+  await expect(card.getByRole('button', { name: `Remove ${BANK}` })).toBeVisible();
+  await expect(card.getByRole('button', { name: `Sync now for ${BANK}` })).toHaveCount(0);
+  await expect(card.getByRole('button', { name: `Unlink ${BANK}` })).toHaveCount(0);
 });
 
 test('importing the same file again adds no second account', async ({ page }) => {
