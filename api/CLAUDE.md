@@ -98,6 +98,11 @@ Rules:
   with `Schema.model_validate_json` (`LLMSchemaError`). `messages.parse` is not
   used: it validates inside the call, so a refusal's non-JSON text raises before
   `stop_reason` is readable and the call's usage is lost.
+- API errors: 429, 5xx, timeouts and connection failures raise
+  `LLMUnavailable` (worth retrying); 401, 403 and 404 (a rejected key, a key
+  without permission, an unknown model id) log at ERROR and raise
+  `LLMMisconfigured`, which callers treat as no model, like a missing key
+  (`LLMNotConfigured`); other 4xx raise plain `LLMError`.
 - Every call writes one `llm_calls` row in its own committed user session
   (counts, cost, status; never prompt or output text). Prices live in
   `llm/cost.py`; a model without a price fails before the call.
@@ -126,8 +131,9 @@ Rules:
   its database session, then calls `enqueue_sync_for_plaid_item` through
   `ServiceSession` (`SET LOCAL ROLE app_api`), the one granted function.
 - `jobs/services.py:default_services` builds the worker's Plaid provider
-  factory and gateway. Missing credentials fail jobs (and retry), never the
-  worker. Handlers are registered in `jobs/registry.py`.
+  factory and gateway. Missing Plaid credentials fail sync jobs (and retry),
+  never the worker; a missing or rejected model key is "no model" (spec 003
+  rule 12a). Handlers are registered in `jobs/registry.py`.
 - `sync/categorize.py`: normalization, the `RuleBook`, the `categorize.run`
   job (rules, reuse of earlier LLM labels, then 50 merchants per gateway call)
   and `record_user_label` for `PATCH /transactions/{id}` (spec 003).
@@ -169,10 +175,12 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   Confirm validates the body with `PayStubValues` / `PlanValues`, runs the
   arithmetic gate in `calc/pay_stub.py` (422 `pay_stub_unbalanced` with
   `details`), and stores the body's values, never the proposal's.
-- Refusal, a spent budget or no readable page make the document
-  `manual_entry_required`; schema and API errors retry and the last attempt
-  falls back to manual entry. The handler writes its outcome only while the
-  document is still `extracting` under its job.
+- Refusal, a spent budget, no readable page or no model (no gateway, or
+  `LLMMisconfigured`: the API rejected the key or the model id) make the
+  document `manual_entry_required` on the first attempt; schema and other API
+  errors retry and the last attempt falls back to manual entry. The handler
+  writes its outcome only while the document is still `extracting` under its
+  job.
 - `AppError` takes `details` (machine-readable, e.g. the confirm diff) and
   `headers` (e.g. `Retry-After`). Money types and two-place percentages shared
   by calculators and request models live in `calc/types.py`.

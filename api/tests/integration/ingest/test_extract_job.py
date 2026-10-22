@@ -21,8 +21,9 @@ from jobs import queue
 from jobs.context import Services
 from jobs.registry import default_handlers
 from jobs.worker import Worker
-from llm.gateway import Content, FakeGateway, LLMUnavailable, Reply, Usage
+from llm.gateway import Content, Gateway, LLMUnavailable, Reply, Usage
 from tests.conftest import FixtureUser
+from tests.support.anthropic_api import ErroringApi, api_gateway
 from tests.support.documents import (
     ACME_ACCOUNT,
     ACME_SSN,
@@ -61,7 +62,7 @@ def queue_extract(connection: Connection, user: FixtureUser, document_id: uuid.U
     return job_id
 
 
-def run_worker(connection: Connection, gateway: FakeGateway | None) -> None:
+def run_worker(connection: Connection, gateway: Gateway | None) -> None:
     worker = Worker(
         handlers=default_handlers(),
         services=Services(extractor=gateway),
@@ -349,3 +350,54 @@ def test_without_a_model_the_document_goes_to_manual_entry(
     assert row["proposal"]["fields"]
     assert all(field["value"] is None for field in row["proposal"]["fields"])
     assert row["redaction_count"] >= 1
+
+
+def llm_call_statuses(connection: Connection, user: FixtureUser) -> list[str]:
+    rows = connection.execute(
+        text("SELECT status::text FROM llm_calls WHERE user_id = :u ORDER BY created_at"),
+        {"u": user.id},
+    )
+    return [status for (status,) in rows]
+
+
+@pytest.mark.parametrize("status", [401, 403, 404])
+def test_a_rejected_key_or_model_goes_to_manual_entry_at_once(
+    empty_queue: Connection, user_a: FixtureUser, status: int
+) -> None:
+    """The API rejects the key (401), its permissions (403) or the model id (404).
+
+    Retrying cannot fix configuration, so the first attempt hands the document
+    to the user exactly as a worker with no model does (spec 005 rule 12),
+    instead of leaving it ``extracting`` through half an hour of backoff.
+    """
+    document = make_document(empty_queue, user_a.id, data=STUB_PDF)
+    job_id = queue_extract(empty_queue, user_a, document)
+    api = ErroringApi(status)
+    run_worker(empty_queue, api_gateway(empty_queue, api))
+
+    job = job_row(empty_queue, job_id)
+    assert (job["status"], job["attempts"], job["last_error"]) == ("succeeded", 1, None)
+    assert job["result"]["status"] == "manual_entry_required"
+    row = document_row(empty_queue, document)
+    assert (row["status"], row["status_reason"]) == ("manual_entry_required", "no_model")
+    assert (row["redaction_count"], row["page_count"]) == (2, 1)
+    assert all(field["value"] is None for field in row["proposal"]["fields"])
+    assert len(row["proposal"]["source_lines"]) == len(ACME_STUB_LINES)
+    # One request, and the failed call is still on the ledger.
+    assert api.requests == 1
+    assert llm_call_statuses(empty_queue, user_a) == ["api_error"]
+
+
+@pytest.mark.parametrize("status", [429, 500, 529])
+def test_a_transient_api_error_still_retries(
+    empty_queue: Connection, user_a: FixtureUser, status: int
+) -> None:
+    document = make_document(empty_queue, user_a.id, data=STUB_PDF)
+    job_id = queue_extract(empty_queue, user_a, document)
+    run_worker(empty_queue, api_gateway(empty_queue, ErroringApi(status)))
+
+    job = job_row(empty_queue, job_id)
+    assert (job["status"], job["attempts"]) == ("queued", 1)
+    assert "LLMUnavailable" in job["last_error"]
+    assert document_row(empty_queue, document)["status"] == "extracting"
+    assert llm_call_statuses(empty_queue, user_a) == ["api_error"]

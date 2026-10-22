@@ -44,8 +44,8 @@ Turn the redacted pages of spec 004 into a proposal the user reviews field by fi
 9. `POST /docs/{id}/extract` locks the document row, and returns the current job's id when the document is `extracting` and that job is still `queued` or `running` (idempotent while running). Otherwise it queues a new `ingest.extract` job with payload `{document_id}`, sets `status = extracting`, `extract_job_id` and clears `status_reason`, and returns `{job_id}` (202). A confirmed or deleted document is 409; an `offer_letter` is 422 `extraction_unsupported`.
 10. The job reads the blob in one short user session, then runs `prepare_document` (spec 004) and the gateway call with no transaction open, then writes the outcome in one user session, only while the document is still `extracting` under this job.
 11. **Proposed.** With at least one usable page and a valid model answer, the document becomes `proposed` with `proposal`, `redaction_count` and `page_count`.
-12. **Manual entry.** No usable page (`no_readable_page`), a refusal (`refused`) or a spent daily budget (`budget`) makes the document `manual_entry_required` without retrying, keeping `redaction_count` and `page_count` and a proposal with the redacted source lines and no fields filled.
-13. A schema error or an API error raises so the queue retries (spec 002 rule 34); on the fifth and last attempt the job instead marks the document `manual_entry_required` (`extraction_failed`) and succeeds.
+12. **Manual entry.** No usable page (`no_readable_page`), a refusal (`refused`), a spent daily budget (`budget`), or no model (`no_model`: the worker has no gateway, or the call raised `LLMMisconfigured` because the API rejected the key or the model id, spec 003 rule 24) makes the document `manual_entry_required` without retrying, keeping `redaction_count` and `page_count` and a proposal with the redacted source lines and no fields filled.
+13. A schema error or any other API error (rate limit, 5xx, timeout, connection failure, other 4xx) raises so the queue retries (spec 002 rule 34); on the fifth and last attempt the job instead marks the document `manual_entry_required` (`extraction_failed`) and succeeds.
 14. An unreadable file (spec 004 rule 9) marks the document `failed` (`unreadable_file`) without retrying. A document with no blob (deleted meanwhile) ends the job with `{"status": "skipped"}`.
 15. The gateway never receives page text or images that were not redacted: text pages carry `redact_text` output and image pages the `redact_image` output; withheld pages are not sent.
 
@@ -95,6 +95,7 @@ Line items: `FED W/H 29,776 tax field=federal_withholding_cents`, `CA SDI 3,250 
 - Benefits text over 400 words becomes several chunks; under it, one; a benefits document with no readable text writes no chunks.
 - `POST /docs/{id}/extract` on a `failed` (unreadable) document queues another attempt while the blob exists; after retention deletes the blob it is 409.
 - A refused document can be re-extracted (the user may try again later) or confirmed by hand.
+- A key the API rejects (an unfunded account answers 401) sends the document to manual entry (`no_model`) on the job's first attempt, with one `api_error` row; once the key works, the user can extract it again.
 
 ## Out of scope
 

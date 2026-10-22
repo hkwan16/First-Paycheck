@@ -29,6 +29,7 @@ from llm.gateway import (
     LLMBudgetExceeded,
     LLMError,
     LLMGateway,
+    LLMMisconfigured,
     LLMNotConfigured,
     LLMRefused,
     LLMSchemaError,
@@ -295,13 +296,40 @@ def test_connection_failures_are_unavailable(
     assert [row["status"] for row in ledger(db_connection, user_a)] == ["api_error"]
 
 
+@pytest.mark.parametrize(
+    ("status", "kind"),
+    [(401, "authentication_error"), (403, "permission_error"), (404, "not_found_error")],
+)
+def test_a_rejected_key_or_model_is_misconfigured(
+    db_connection: Connection,
+    user_a: FixtureUser,
+    caplog: pytest.LogCaptureFixture,
+    status: int,
+    kind: str,
+) -> None:
+    """Configuration no retry can fix (spec 003 rule 24); still on the ledger."""
+    error = {"type": "error", "error": {"type": kind, "message": "invalid x-api-key"}}
+    with caplog.at_level("ERROR", logger="llm.gateway"), pytest.raises(LLMMisconfigured) as failure:
+        gateway(db_connection, Api(httpx2.Response(status, json=error))).categorize(
+            user_a.id, ITEMS
+        )
+    assert isinstance(failure.value, LLMError)
+    assert not isinstance(failure.value, LLMUnavailable)
+    assert f"HTTP {status}" in str(failure.value)
+    [row] = ledger(db_connection, user_a)
+    assert (row["status"], row["cost_microcents"]) == ("api_error", 0)
+    [record] = [r for r in caplog.records if r.levelname == "ERROR"]
+    assert f"HTTP {status}" in record.getMessage()
+    assert "sk-ant-test" not in record.getMessage()
+
+
 def test_other_client_errors_are_plain_llm_errors(
     db_connection: Connection, user_a: FixtureUser
 ) -> None:
     error = {"type": "error", "error": {"type": "invalid_request_error", "message": "bad"}}
     with pytest.raises(LLMError) as failure:
         gateway(db_connection, Api(httpx2.Response(400, json=error))).categorize(user_a.id, ITEMS)
-    assert not isinstance(failure.value, LLMUnavailable)
+    assert not isinstance(failure.value, LLMUnavailable | LLMMisconfigured)
     assert "sk-ant-test" not in str(failure.value)
 
 

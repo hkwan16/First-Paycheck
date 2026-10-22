@@ -22,6 +22,7 @@ from llm.schemas import CategoryAssignment, CategoryBatch
 from sync.categories import Category
 from sync.categorize import categorize_user, record_user_label
 from tests.conftest import FixtureUser
+from tests.support.anthropic_api import ErroringApi, api_gateway
 from tests.support.factories import make_account, make_item, make_transaction
 
 
@@ -479,3 +480,48 @@ def test_the_worker_runs_categorize_without_a_labeler(
     assert status == "succeeded"
     assert result["stopped"] == "no_model"
     assert labels(seeded_rules, user_a)["safeway"] == [("groceries", "rule", None)]
+
+
+@pytest.mark.parametrize("status", [401, 403, 404])
+def test_a_rejected_key_or_model_stops_at_no_model_without_retrying(
+    seeded_rules: Connection, user_a: FixtureUser, account: uuid.UUID, status: int
+) -> None:
+    """The API rejects the key, its permissions or the model id (spec 003 rule 12a).
+
+    Retrying cannot fix configuration: the job keeps what the rules labeled,
+    makes no further calls and succeeds as a worker with no model would.
+    """
+    make_transaction(seeded_rules, user_a.id, account, merchant_raw="SAFEWAY #1234")
+    for name in shop_names(51):  # two batches
+        make_transaction(seeded_rules, user_a.id, account, merchant_raw=name.upper())
+    seeded_rules.execute(text("DELETE FROM jobs"))
+    with user_session_for(user_a.id, bind=seeded_rules) as session:
+        job_id = queue.enqueue(session, user_id=user_a.id, kind=JobKind.CATEGORIZE_RUN, payload={})
+    api = ErroringApi(status)
+    worker = Worker(
+        handlers=default_handlers(),
+        services=Services(labeler=api_gateway(seeded_rules, api)),
+        queue_bind=seeded_rules,
+        user_bind=seeded_rules,
+    )
+    assert worker.run_once()
+
+    job_status, attempts, last_error, result = seeded_rules.execute(
+        text("SELECT status::text, attempts, last_error, result FROM jobs WHERE id = :id"),
+        {"id": job_id},
+    ).one()
+    assert (job_status, attempts, last_error) == ("succeeded", 1, None)
+    assert result == {
+        "rule_labeled": 1,
+        "reused": 0,
+        "llm_labeled": 0,
+        "unresolved": 51,
+        "batches": 1,
+        "stopped": "no_model",
+    }
+    assert labels(seeded_rules, user_a)["safeway"] == [("groceries", "rule", None)]
+    assert api.requests == 1
+    statuses = seeded_rules.execute(
+        text("SELECT status::text FROM llm_calls WHERE user_id = :u"), {"u": user_a.id}
+    ).scalars()
+    assert list(statuses) == ["api_error"]
