@@ -128,7 +128,9 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
 ## Rules
 
 - Metrics are scores in [0, 1], higher is better.
-- Deterministic suites (`llm=False`) tolerate no drop; LLM suites tolerate 2 points.
+- Deterministic suites (`llm=False`) tolerate no drop; LLM suites tolerate 2 points
+  (`run.DETERMINISTIC_TOLERANCE`, `run.LLM_TOLERANCE`; `test_run.py` checks both
+  through the CLI). A metric above its baseline passes.
 - A new suite needs a registry entry and a baseline entry (a test checks both).
 - Update the baseline only with `--update-baseline`, in a commit of its own, with
   the reason in the message.

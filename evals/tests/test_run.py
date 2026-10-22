@@ -166,6 +166,45 @@ def test_report_is_written_as_json(tmp_path: Path) -> None:
     assert data["suites"]["calc"]["regressions"] == []
 
 
+def run_one(tmp_path: Path, suite: Suite, baseline: float) -> int:
+    """The CLI's exit code for ``suite`` against a baseline of ``baseline``."""
+    path = write_baseline(tmp_path / "baseline.json", {suite.name: {"score": baseline}})
+    argv = ["--suite", suite.name, "--max-cost-cents", "0", "--baseline", str(path)]
+    return run.main(argv, registry={suite.name: suite})
+
+
+def test_cli_holds_deterministic_suites_at_tolerance_zero(tmp_path: Path) -> None:
+    """The plan: deterministic suites are compared with tolerance 0."""
+    assert run.DETERMINISTIC_TOLERANCE == 0.0
+    assert run_one(tmp_path, fixed("rules", score=0.9), baseline=0.9) == 0
+    assert run_one(tmp_path, fixed("rules", score=0.9), baseline=0.9001) == 1
+    # An improvement passes; the baseline is raised in its own commit.
+    assert run_one(tmp_path, fixed("rules", score=0.95), baseline=0.9) == 0
+
+
+def test_cli_gives_llm_suites_two_points(tmp_path: Path) -> None:
+    """The plan: LLM suites are compared with a tolerance of 2 points."""
+    assert run.LLM_TOLERANCE == 0.02
+    assert run_one(tmp_path, fixed("judge", llm=True, score=0.88), baseline=0.9) == 0
+    assert run_one(tmp_path, fixed("judge", llm=True, score=0.8799), baseline=0.9) == 1
+    # The same drop in a deterministic suite is a regression.
+    assert run_one(tmp_path, fixed("rules", score=0.88), baseline=0.9) == 1
+
+
+def test_a_stopped_run_still_writes_its_report(tmp_path: Path) -> None:
+    """The nightly workflow reads the report even when the cap stops the run."""
+    baseline = write_baseline(
+        tmp_path / "baseline.json", {"calc": {"pass_rate": 1.0}, "pricey": {"accuracy": 1.0}}
+    )
+    report = tmp_path / "report.json"
+    registry = {"calc": REGISTRY["calc"], "pricey": spending("pricey", cents=50)}
+    argv = ["--suite", "all", "--max-cost-cents", "10", "--baseline", str(baseline)]
+    assert run.main([*argv, "--report", str(report)], registry=registry) == 2
+    data = json.loads(report.read_text())
+    assert data["suites"]["calc"]["regressions"] == []
+    assert data["stopped"] == "pricey: stopped, spent 50.00 cents, cap is 10.00 cents"
+
+
 def test_the_committed_baseline_covers_every_registered_suite() -> None:
     baseline = json.loads(run.DEFAULT_BASELINE.read_text())
     assert set(baseline) == set(run.SUITES)
