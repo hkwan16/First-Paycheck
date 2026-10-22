@@ -709,6 +709,31 @@ def update_finding_through_own_check_in(
     )
 
 
+def check_in_now(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    """A has this month's check-in and its queued job; B's request sees neither."""
+    month = dt.datetime.now(dt.UTC).date().replace(day=1)
+    make_check_in(connection, USER_A.id, period=month)
+    response = client_as(USER_A).post("/check-ins")
+    assert response.status_code == 202, response.text
+    a_job = response.json()["job_id"]
+    created: list[str] = []
+
+    def body(data: Any) -> None:
+        created.append(data["job_id"])
+        assert data["job_id"] != a_job
+        assert data["check_in_id"] is None
+
+    def after(conn: Connection) -> None:
+        owner = conn.execute(
+            text("SELECT user_id FROM jobs WHERE id = :id"), {"id": created[0]}
+        ).scalar_one()
+        assert owner == USER_B.id
+        assert count(conn, "jobs", USER_A) == 1
+        assert count(conn, "check_ins", USER_B) == 0
+
+    return Case("POST", "/check-ins", 202, body=body, after=after)
+
+
 def get_net_worth(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
     account = a_account(connection)
     make_snapshot(connection, USER_A.id, account, balance_cents=500_000)
@@ -751,6 +776,7 @@ def delete_account(connection: Connection, client_as: Callable[[FixtureUser], Te
 ROUTE_CASES: dict[tuple[str, str], Builder] = {
     ("DELETE", "/me"): delete_account,
     ("GET", "/check-ins"): list_check_ins,
+    ("POST", "/check-ins"): check_in_now,
     ("GET", "/check-ins/{check_in_id}"): get_check_in,
     ("PATCH", "/check-ins/{check_in_id}/findings/{finding_id}"): update_finding,
     ("GET", "/net-worth"): get_net_worth,

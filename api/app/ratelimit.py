@@ -22,6 +22,7 @@ from app.errors import AppError
 from db.models import RateLimitCounter
 
 __all__ = [
+    "CHECK_INS",
     "COUNTER_RETENTION",
     "CSV_IMPORTS",
     "DECISIONS",
@@ -60,6 +61,8 @@ EXTRACTIONS = Limit(bucket="docs.extract", limit=20, window=HOUR)
 DECISIONS = Limit(bucket="decisions.save", limit=60, window=HOUR)
 # Each queues a WeasyPrint render and stores a PDF for 7 days.
 PLAN_EXPORTS = Limit(bucket="plan.export", limit=10, window=HOUR)
+# Each queues a check-in run: the finders, the reconcile and their writes.
+CHECK_INS = Limit(bucket="checkins.run", limit=10, window=HOUR)
 # Plaid calls billed or rate limited per client id, not per user.
 LINK_TOKENS = Limit(bucket="sync.link_token", limit=30, window=HOUR)
 LINKS = Limit(bucket="sync.link", limit=10, window=HOUR)
@@ -79,6 +82,7 @@ WRITE_ROUTE_POLICIES: dict[str, Limit | str] = {
     "explain": EXPLAIN_RUNS,
     "save_decision": DECISIONS,
     "export_plan": PLAN_EXPORTS,
+    "check_in_now": CHECK_INS,
     "create_link_token": LINK_TOKENS,
     "link_item": LINKS,
     "sync_item": MANUAL_SYNCS,

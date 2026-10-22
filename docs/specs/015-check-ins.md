@@ -1,12 +1,12 @@
 # 015: Monthly check-ins, net worth and holdings
 
-Status: Implemented, M8. Every example is a test; the finder scenarios are also the `checkin` eval suite.
+Status: Implemented, M8; `POST /check-ins` (rule 23) and plan line status (rule 19a) in M10. Every example is a test; the finder scenarios are also the `checkin` eval suite.
 
 ## Goal
 
-Once a month, and again whenever a sync lands new data that month, compare the user's newest data with the plan they saved and say what changed: an election that did not reach the pay stub, a savings goal that fell behind, a new, repriced or stopped recurring charge, a change in pay or in a deduction, and a dated checkpoint coming up. Each change is a typed **finding** with a severity, the decision it affects, and a payload of plain numbers the client prints without adding anything. The user marks a finding done or dismissed, or undoes that. The check-in screen also shows the month's cash flow next to the plan's targets, the user's net worth by month, and their newest investment holdings.
+Once a month, again whenever a sync lands new data that month, and whenever the user asks to check in now, compare the user's newest data with the plan they saved and say what changed: an election that did not reach the pay stub, a savings goal that fell behind, a new, repriced or stopped recurring charge, a change in pay or in a deduction, and a dated checkpoint coming up. Each change is a typed **finding** with a severity, the decision it affects, and a payload of plain numbers the client prints without adding anything. The user marks a finding done or dismissed, or undoes that. The check-in screen also shows the month's cash flow next to the plan's targets, the user's net worth by month, and their newest investment holdings.
 
-Code: pure finders in `api/checkin/findings.py` (one function per kind, `f(facts) -> list[Finding]`), the facts loader in `api/checkin/facts.py`, the engine (pure reconciliation plus the writer) in `api/checkin/engine.py`, the `checkin.monthly` handler in `api/jobs/handlers/checkin.py`, the monthly enqueue in `api/jobs/scheduler.py`, the sync-triggered refresh in `api/jobs/handlers/recurring.py`, routes in `api/app/routers/checkins.py` and `api/app/routers/net_worth.py`, money math in `api/calc/checkin.py`, `api/calc/cashflow.py` (`against_plan`) and `api/calc/net_worth.py`, migration `0012_checkin_findings`, eval suite `evals/suites/checkin.py`.
+Code: pure finders in `api/checkin/findings.py` (one function per kind, `f(facts) -> list[Finding]`), the facts loader in `api/checkin/facts.py`, the engine (pure reconciliation plus the writer) in `api/checkin/engine.py`, the `checkin.monthly` handler in `api/jobs/handlers/checkin.py`, the monthly enqueue in `api/jobs/scheduler.py`, the on-demand enqueue `queue_check_in_now` in `api/checkin/engine.py`, the sync-triggered refresh in `api/jobs/handlers/recurring.py`, routes in `api/app/routers/checkins.py` and `api/app/routers/net_worth.py`, money math in `api/calc/checkin.py`, `api/calc/cashflow.py` (`against_plan`, `plan_status`) and `api/calc/net_worth.py`, migration `0012_checkin_findings`, eval suite `evals/suites/checkin.py`.
 
 ## Inputs
 
@@ -29,6 +29,7 @@ Code: pure finders in `api/checkin/findings.py` (one function per kind, `f(facts
 | Route | Input |
 |---|---|
 | `GET /check-ins` | none |
+| `POST /check-ins` | none (no body); the month is the request clock's UTC month |
 | `GET /check-ins/{id}` | path id |
 | `PATCH /check-ins/{id}/findings/{fid}` | `{"user_action": "done" \| "dismissed" \| null}`, the field required, nothing else allowed |
 | `GET /net-worth` | `months`, 1-60, default 12: how many calendar months, ending with the current one |
@@ -57,6 +58,7 @@ Code: pure finders in `api/checkin/findings.py` (one function per kind, `f(facts
 - `GET /check-ins`: `CheckInSummary` items, newest `period` first: `id`, `period`, `triggered_by`, `status` (`open`, `completed`), `completed_at`, `finding_count`, `handled_count` (findings with a user action), `created_at`, `updated_at`.
 - `GET /check-ins/{id}`: `CheckInDetail`, the summary plus `findings` (ordered by severity `alert`, `warning`, `info`, then kind in enum order, then `created_at`, `id`) and `cash_flow`: `CheckInCashFlow` with `cash_flow` (exactly what `GET /cashflow` returns for `start = period`, `end = min(last day of period, today)`) and `plan`, a list of `PlanLine` (`key`, `label`, `actual_cents`, `plan_cents` or null, `difference_cents` = actual minus plan, or null, `status` `on_plan`, `over` or `under`, or null with no plan; rule 19a).
 - `PATCH /check-ins/{id}/findings/{fid}`: the updated `FindingOut`.
+- `POST /check-ins`: 202 `CheckInQueued`: `job_id` (the `checkin.monthly` job that will create or refresh this month's check-in; poll `GET /jobs/{job_id}`, whose `result` carries `check_in_id`) and `check_in_id` (this month's check-in when it exists at request time, else null).
 - Job result of `checkin.monthly`: `{"outcome": "created" | "refreshed" | "skipped", "check_in_id", "inserted", "updated", "retracted", "dropped", "marked_active"}`.
 
 ### Net worth and holdings
@@ -106,6 +108,12 @@ Each finder is `f(facts) -> list[Finding]`, with no I/O and no clock. `all_findi
 20. **Net worth** (`calc/net_worth.py:net_worth`, pure). Active accounts only. A snapshot counts on its UTC date. Each month's cutoff is its last day, or today for the current month; an account contributes its newest snapshot on or before the cutoff, and nothing before its first snapshot. `checking`, `savings`, `investment` and `retirement` are assets; `credit` is a liability whose balance is the amount owed (spec 001 rule 22). A month in which no account has a snapshot is left out of the series. The current figures use each account's newest snapshot on or before today.
 21. **Holdings** (`calc/net_worth.py:holdings`, pure). For each `investment` or `retirement` account, the holdings on its newest `as_of` date, by value descending, then name. `gain = value - cost basis` when the basis is known. An account's or the total's `cost_basis_cents` and `gain_cents` are null when any holding in it lacks a basis, so a partial basis is never shown as a whole one.
 22. `GET /calendar` keeps spec 007 rule 19 (`upcoming` only, by `due_at`, then `created_at`) and filters `from <= due_at <= to` when given.
+23. **Check in now** (`POST /check-ins`, `checkin/engine.py:queue_check_in_now`). In the request's RLS session, for the request clock's UTC month with first day `P` and the payload `{"period": P, "trigger": "schedule"}` (the scheduled job's, rule 14):
+    1. When the user has no job with the key `checkin.monthly:{YYYY-MM}` yet, queue one with that key, so the month's tick (rule 14) queues nothing more for this user and two concurrent requests still make one job.
+    2. Otherwise return the user's waiting (`queued`) `checkin.monthly` job with the same payload, which is the keyed job until it starts, or queue a new one without a key (`enqueue_unless_queued`), so the user can refresh a check-in the keyed job already built and repeated requests share one waiting job.
+    3. The job then follows rule 8: it creates the month's check-in or refreshes the open one; a completed check-in is not refreshed (outcome `skipped`, the edge case below).
+    4. The response is 202 with `job_id` and `check_in_id`, the month's check-in when it exists, else null. Its `triggered_by` stays `schedule`: this is the month's one check-in run early, not a second one (the `manual` trigger stays unused).
+    5. Limited to 10 requests per user per clock hour (`app/ratelimit.py:CHECK_INS`, 429 `rate_limited`); every request counts, including one that returns a waiting job. Another user's jobs and check-ins are invisible (RLS), so their keyed job or check-in never answers this user's request.
 
 ## Hand-worked examples
 
@@ -169,7 +177,7 @@ Arithmetic:
 | 6 | `test_refresh_keeps_actions_and_retracts_cleared_conditions` | Row 2, mark the 401(k) finding `done`; the goal reaches 290,000; a `sync` refresh | 401(k) finding still `done`; `goal_off_pace` gone |
 | 7 | `test_sync_refresh_never_creates_a_check_in` | No check-in; a `sync` job | outcome `skipped`, no row |
 
-### Routes (`api/tests/integration/checkin/test_checkin_routes.py`, `test_net_worth.py`)
+### Routes (`api/tests/integration/checkin/test_checkin_routes.py`, `test_net_worth.py`, `test_check_in_now.py`)
 
 | # | Test | Setup | Expected |
 |---|---|---|---|
@@ -180,6 +188,10 @@ Arithmetic:
 | 5 | `test_net_worth_by_month` | Accounts and snapshots below; today 2026-11-16; `months=3` | Series Sep 450,000, Oct 465,000, Nov 547,754; change 97,754; assets 607,754, liabilities 60,000 |
 | 6 | `test_holdings_newest_per_account` | Holdings below | Retirement 21,710, basis 21,668, gain 42; brokerage 128,000 with null basis and gain; totals 149,710, null, null |
 | 7 | `test_calendar_window` | Events due 2026-10-30, 2026-11-20, 2027-01-31 | `from=2026-11-01` lists two; `to=2026-11-30` two; both lists one; `from` after `to` is 422 |
+| 8 | `test_check_in_now_queues_the_months_job` | The November user, no jobs; now 2026-11-16 12:00 UTC | 202, `check_in_id` null, one job with key `checkin.monthly:2026-11` and payload `{"period": "2026-11-01", "trigger": "schedule"}`; a second request returns the same job; a tick then queues nothing; running the job creates the November check-in (`schedule`, `open`) with row 2 of the job table's findings |
+| 9 | `test_check_in_now_refreshes_the_open_check_in` | Row 8 after its job ran; the goal reaches 290,000 | 202 with a new, unkeyed job and the November check-in's id; a second request returns that job; running it: outcome `refreshed` on the same check-in, `goal_off_pace` retracted |
+| 10 | `test_check_in_now_leaves_a_completed_check_in` | A completed November check-in | 202 with its id; the job's outcome is `skipped` and the check-in stays `completed` |
+| 11 | `test_rate_limits.py` (`check_in_now`) | 10 requests counted this hour | The 11th is 429 `rate_limited` with `Retry-After`; no job is queued |
 
 Row 2: September gross `2 * 270,833 = 541,666`; `541,666 * 4 / 100 = 21,666.64`, so 21,667. Health `6,250 * 2 = 12,500`. The actuals are spec 007's.
 
@@ -220,10 +232,12 @@ Route row 2 adds these statuses: `essentials`, `savings` and `retirement` `under
 - A check-in completed by the user is not refreshed; whatever appears afterwards waits for next month's check-in (new and changed charges stay flagged until then).
 - A job that runs after its month ended is dated the period's last day, so it never judges another month's data as this one's.
 - `GET /net-worth` with no snapshots returns zeros, `as_of` null and an empty series.
+- `POST /check-ins` while the keyed job is running queues a refresh after it, because the running job may have read the data before the change the user is checking for.
+- `POST /check-ins` on the last day of a month just before midnight UTC queues that month's job; the job is dated by its own clock capped at the period's last day (rule 16), so it judges that month even when it runs after midnight.
 
 ## Out of scope
 
-- `POST /check-ins` (run a check-in on demand) and the `manual` trigger.
+- The `manual` trigger: an on-demand check-in is the month's check-in (rule 23), never a second one.
 - Explaining a finding (`POST /explain` with `finding_id`).
 - Marking calendar events done from a finding, and a new decision version from a finding (`decisions.check_in_id`).
 - Holdings history and investment transactions.

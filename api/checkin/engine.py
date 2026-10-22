@@ -1,10 +1,11 @@
-"""The check-in engine (spec 015 rules 8-15).
+"""The check-in engine (spec 015 rules 8-15 and 23).
 
 ``reconcile`` is pure: given what a check-in holds, what the finders found and
 which keys other check-ins already reported, it says what to insert, update,
 retract and drop. ``run_check_in`` is the thin writer the ``checkin.monthly``
 job calls in one user session, under RLS. ``queue_refresh`` is how a finished
-recurring detection asks for a refresh. ``settle_status`` keeps a check-in's
+recurring detection asks for a refresh, and ``queue_check_in_now`` how the
+user does (``POST /check-ins``). ``settle_status`` keeps a check-in's
 status in step with its findings, for the engine and ``PATCH``.
 """
 
@@ -30,7 +31,7 @@ from db.enums import (
     RecurringStatus,
     RecurringUserStatus,
 )
-from db.models import CheckIn, CheckInFinding, RecurringCharge
+from db.models import CheckIn, CheckInFinding, Job, RecurringCharge
 from jobs import queue
 
 __all__ = [
@@ -39,7 +40,10 @@ __all__ = [
     "CheckInRun",
     "Existing",
     "Trigger",
+    "checkin_key",
     "month_end",
+    "monthly_payload",
+    "queue_check_in_now",
     "queue_refresh",
     "reconcile",
     "run_check_in",
@@ -146,6 +150,16 @@ class CheckInRun:
             "dropped": self.dropped,
             "marked_active": self.marked_active,
         }
+
+
+def checkin_key(period: dt.date) -> str:
+    """The idempotency key of a user's scheduled check-in job for ``period``'s month."""
+    return f"checkin.monthly:{period:%Y-%m}"
+
+
+def monthly_payload(period: dt.date, trigger: Trigger) -> dict[str, str]:
+    """The ``checkin.monthly`` payload (rule 16)."""
+    return {"period": period.isoformat(), "trigger": trigger}
 
 
 def month_end(period: dt.date) -> dt.date:
@@ -308,5 +322,29 @@ def queue_refresh(session: Session, user_id: uuid.UUID, today: dt.date) -> uuid.
         session,
         user_id=user_id,
         kind=JobKind.CHECKIN_MONTHLY,
-        payload={"period": period.isoformat(), "trigger": "sync"},
+        payload=monthly_payload(period, "sync"),
+    )
+
+
+def queue_check_in_now(session: Session, user_id: uuid.UUID, period: dt.date) -> uuid.UUID:
+    """Rule 23: the month's scheduled job, queued early, or a refresh after it.
+
+    The first request of the month queues the keyed job the tick would have
+    queued (and two concurrent ones still make one). After that, the user's
+    waiting job with the same payload answers (the keyed one until it starts),
+    else a new unkeyed job refreshes the check-in the keyed one built.
+    """
+    payload = monthly_payload(period, "schedule")
+    key = checkin_key(period)
+    keyed = session.scalar(select(Job.id).where(Job.user_id == user_id, Job.idempotency_key == key))
+    if keyed is None:
+        return queue.enqueue(
+            session,
+            user_id=user_id,
+            kind=JobKind.CHECKIN_MONTHLY,
+            payload=payload,
+            idempotency_key=key,
+        )
+    return queue.enqueue_unless_queued(
+        session, user_id=user_id, kind=JobKind.CHECKIN_MONTHLY, payload=payload
     )

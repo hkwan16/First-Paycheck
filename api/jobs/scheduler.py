@@ -23,6 +23,7 @@ from typing import Any, Literal
 from sqlalchemy import Connection, text
 
 from app.ratelimit import prune_counters
+from checkin.engine import checkin_key, monthly_payload
 from db.enums import JobKind, JobStatus
 from export import store as export_store
 from ingest import store
@@ -89,11 +90,6 @@ _QUEUE_CHECK_INS = text(
 )
 
 
-def checkin_key(month: dt.date) -> str:
-    """The idempotency key of a user's scheduled check-in job for ``month``."""
-    return f"checkin.monthly:{month:%Y-%m}"
-
-
 def _queue_check_ins(connection: Connection, now: dt.datetime) -> int:
     """Spec 015 rule 14: one ``checkin.monthly`` job per user and UTC month.
 
@@ -103,7 +99,7 @@ def _queue_check_ins(connection: Connection, now: dt.datetime) -> int:
     the privileged connection.
     """
     month = now.astimezone(dt.UTC).date().replace(day=1)
-    payload = json.dumps({"period": month.isoformat(), "trigger": "schedule"}, sort_keys=True)
+    payload = json.dumps(monthly_payload(month, "schedule"), sort_keys=True)
     queued: int = connection.execute(
         _QUEUE_CHECK_INS, {"payload": payload, "key": checkin_key(month)}
     ).rowcount

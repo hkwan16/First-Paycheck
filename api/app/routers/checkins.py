@@ -1,9 +1,10 @@
 """Monthly check-ins: the list, one check-in with its findings and the month's cash
-flow against the plan, and the user's action on a finding (spec 015 rules 13, 17-19).
+flow against the plan, the user's action on a finding, and checking in now
+(spec 015 rules 13, 17-19 and 23).
 
 The ``checkin.monthly`` job writes check-ins and findings; these routes read
-them and record only what belongs to the user: ``done``, ``dismissed`` or an
-undo. Every query runs in the request's RLS session.
+them, queue that job on request, and record only what belongs to the user:
+``done``, ``dismissed`` or an undo. Every query runs in the request's RLS session.
 """
 
 from __future__ import annotations
@@ -12,17 +13,19 @@ import datetime as dt
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import ratelimit
+from app.auth import CurrentUser
 from app.deps import Now, UserSession
 from app.errors import NotFound, error_responses
 from app.routers.cashflow import CashFlow, cash_flow_for
 from app.types import UtcDateTime
 from calc.cashflow import PlanLine, SpendingActuals, against_plan
-from checkin.engine import month_end, settle_status
+from checkin.engine import month_end, queue_check_in_now, settle_status
 from checkin.facts import plan_targets
 from checkin.findings import FindingPayload
 from db.enums import (
@@ -87,6 +90,14 @@ class CheckInDetail(CheckInSummary):
     cash_flow: CheckInCashFlow
 
 
+class CheckInQueued(BaseModel):
+    # The checkin.monthly job that creates or refreshes this month's check-in;
+    # its result carries check_in_id once it has run.
+    job_id: uuid.UUID
+    # This month's check-in when it already exists, else null.
+    check_in_id: uuid.UUID | None
+
+
 class FindingPatch(BaseModel):
     """``done`` or ``dismissed``, or null to undo."""
 
@@ -145,6 +156,20 @@ def list_check_ins(session: UserSession) -> list[CheckInSummary]:
         .order_by(CheckIn.period.desc(), CheckIn.created_at.desc(), CheckIn.id)
     ).all()
     return [_summary(check_in, total, handled) for check_in, total, handled in rows]
+
+
+@router.post("", status_code=status.HTTP_202_ACCEPTED, responses=error_responses(401, 429))
+def check_in_now(session: UserSession, user: CurrentUser, now: Now) -> CheckInQueued:
+    """Create or refresh this month's check-in: queue its job, or return the waiting one."""
+    ratelimit.consume(session, user.id, ratelimit.CHECK_INS, now=now)
+    period = now.astimezone(dt.UTC).date().replace(day=1)
+    job_id = queue_check_in_now(session, user.id, period)
+    check_in_id = session.scalar(
+        select(CheckIn.id).where(
+            CheckIn.period == period, CheckIn.triggered_by == CheckinTrigger.SCHEDULE
+        )
+    )
+    return CheckInQueued(job_id=job_id, check_in_id=check_in_id)
 
 
 def _cash_flow(session: Session, check_in: CheckIn, today: dt.date) -> CheckInCashFlow:

@@ -57,6 +57,10 @@ def plan_export(connection: Connection, user: FixtureUser, client: TestClient) -
     return Call("POST", "/plan/export", 202)
 
 
+def check_in_now(connection: Connection, user: FixtureUser, client: TestClient) -> Call:
+    return Call("POST", "/check-ins", 202)
+
+
 def link_token(connection: Connection, user: FixtureUser, client: TestClient) -> Call:
     return Call("POST", "/sync/link-token", 200)
 
@@ -84,6 +88,7 @@ CASES: dict[str, tuple[ratelimit.Limit, Setup]] = {
     "extract_document": (ratelimit.EXTRACTIONS, extract),
     "save_decision": (ratelimit.DECISIONS, decision),
     "export_plan": (ratelimit.PLAN_EXPORTS, plan_export),
+    "check_in_now": (ratelimit.CHECK_INS, check_in_now),
     "create_link_token": (ratelimit.LINK_TOKENS, link_token),
     "link_item": (ratelimit.LINKS, link_item),
     "sync_item": (ratelimit.MANUAL_SYNCS, manual_sync),

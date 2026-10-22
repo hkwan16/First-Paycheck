@@ -845,6 +845,33 @@
         "title": "CheckInDetail",
         "type": "object"
       },
+      "CheckInQueued": {
+        "properties": {
+          "check_in_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check In Id"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "check_in_id"
+        ],
+        "title": "CheckInQueued",
+        "type": "object"
+      },
       "CheckInSummary": {
         "properties": {
           "completed_at": {
@@ -7001,6 +7028,51 @@
           }
         ],
         "summary": "List Check Ins",
+        "tags": [
+          "check-ins"
+        ]
+      },
+      "post": {
+        "description": "Create or refresh this month's check-in: queue its job, or return the waiting one.",
+        "operationId": "check_in_now",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckInQueued"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Check In Now",
         "tags": [
           "check-ins"
         ]
