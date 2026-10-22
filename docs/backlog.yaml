@@ -1410,3 +1410,65 @@ issues:
     # 0015), the Plaid mapping, net worth as a liability like credit, and the
     # "Loan" label. Stored loans become loan on their item's next sync; the
     # migration cannot tell a stored loan from a credit card.
+  - title: "A spending rule applies to money out only; a paycheck at a restaurant merchant is never dining"
+    body: >-
+      Found on October 22 on production with Plaid's user_transactions_dynamic
+      sandbox user. The salary arrives weekly as "Sweetgreen inc payroll ppd
+      id", money in, and the seed rule "sweetgreen, prefix, dining" wins by
+      prefix, so the paycheck lands in the flexible bucket as a negative
+      (flexible -101,979 cents in October) while income stays at the 12 cents
+      of interest. The categorizer never looks at the sign. Change spec 003
+      first: a rule for a spending category applies to money out only; a
+      money-in row that only a spending rule matches stays uncategorized for
+      the model or the user; and a seed rule for income or transfer may match
+      anywhere in the description ("payroll", "ppd id", "direct dep") for
+      money in. Failing test first with that row. Done when the dynamic
+      user's paychecks read as income on production.
+    labels: ["area:api", "area:data", "type:bug"]
+    milestone: M10
+    priority: High
+    status: todo
+  - title: "Seed rules for generic bank descriptors (monthly payment, interest charged, payment, cash deposit)"
+    body: >-
+      Found on October 22 with user_transactions_dynamic: 260 of 331 rows are
+      uncategorized with rules only, and the biggest are bank language, not
+      merchants: "Monthly payment" (132 rows), "Interest charged" (68),
+      "Payment" (3), "Interest" (3), "CASH DEPOSIT". Add exact seed rules for
+      these (a loan or card payment is a transfer; interest charged is a cost)
+      so a history without a model is mostly categorized. Failing test first
+      from the recorded sandbox rows. Done when those descriptors are
+      categorized on production.
+    labels: ["area:api", "area:data", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: todo
+  - title: "The spending summary skips loan, investment and retirement ledgers"
+    body: >-
+      Found on October 22 with user_transactions_dynamic: five loan accounts
+      carry 250 ledger rows ("Monthly payment" received, "Interest charged")
+      and the summary includes every account, so uncategorized_cents is
+      -5,498,010 for October and the loans' own bookkeeping drives the tiles.
+      A loan payment is the counterpart of the transfer that already left
+      checking, and accrued interest is not cash leaving an account. Change
+      spec 007 first: the summary, the cash-flow diagram and the check-in's
+      cash flow read checking, savings and credit accounts only; rows on
+      loan, investment and retirement accounts are excluded and the summary
+      reports what it skipped. Failing test first. Done when the dynamic
+      user's October summary on production has no loan rows in it.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: High
+    status: todo
+  - title: "No share of income when income is too small to divide by"
+    body: >-
+      Found on October 22 with user_transactions_dynamic: with 12 cents of
+      income the summary reports essentials_pct 304000.0 and the tiles would
+      print it. Change spec 007 first: a share is null when income is zero or
+      when the share would exceed 1,000% (income under a tenth of the bucket),
+      and the Spending tiles, the diagram badge and the check-in's cash flow
+      show "n/a" with a short reason instead of a number. Failing test first.
+      Done when a near-zero income month shows no share anywhere.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: todo
