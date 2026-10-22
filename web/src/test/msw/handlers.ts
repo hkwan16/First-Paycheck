@@ -34,7 +34,7 @@ import {
 import { samplePayStub } from '../fixtures/documents';
 import { sampleJob, SAMPLE_NOW, SAMPLE_SYNCED_AT } from '../fixtures/sample';
 import { checkinHandlers } from './checkin-handlers';
-import { db } from './db';
+import { db, emptyDb } from './db';
 import {
   planningCalculators,
   planningHandlers,
@@ -550,6 +550,12 @@ export const handlers = [
   http.get(apiUrl('/pay-stubs'), () => HttpResponse.json(db.payStubs)),
 
   http.get(apiUrl('/profile'), () => HttpResponse.json(db.profile)),
+
+  // Spec 017: every row the user owns goes with the account; a repeat is 204 too.
+  http.delete(apiUrl('/me'), () => {
+    emptyDb();
+    return new HttpResponse(null, { status: 204 });
+  }),
 
   http.put<never, ProfileIn>(apiUrl('/profile'), async ({ request }) => {
     const body = await request.json();

@@ -3,6 +3,7 @@
  * here; every request goes through the bearer-token middleware in client.ts.
  * Conventions are in web/CLAUDE.md ("Data layer").
  */
+export * from './account';
 export * from './accounts';
 export * from './benefits';
 export * from './calc';

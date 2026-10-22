@@ -146,14 +146,7 @@ export function AuthForm({ mode, next, linkError }: AuthFormProps) {
   };
 
   return (
-    <Card
-      as="form"
-      padding={24}
-      aria-labelledby="signin-title"
-      noValidate
-      onSubmit={onSubmit}
-      className="flex-[0_1_400px]"
-    >
+    <Card as="form" padding={24} aria-labelledby="signin-title" noValidate onSubmit={onSubmit}>
       <h2 id="signin-title" className="m-0 text-headline tracking-[-0.012em]">
         {copy.title}
       </h2>

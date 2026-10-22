@@ -9,16 +9,19 @@ export interface SignInParams {
   next: string | null;
   /** /auth/callback reported a failed email link. */
   linkError: boolean;
+  /** The account was just deleted (`?deleted=1`, spec 017). */
+  deleted: boolean;
 }
 
 /** A query parameter given exactly once; a repeated one is ignored. */
 const single = (value: string | string[] | undefined) => (typeof value === 'string' ? value : null);
 
-/** The sign-in page's `?mode=sign-up`, `?next=<path>` and `?error=link`. */
+/** The sign-in page's `?mode=sign-up`, `?next=<path>`, `?error=link` and `?deleted=1`. */
 export function parseSignInParams(params: SearchParams): SignInParams {
   return {
     mode: single(params.mode) === 'sign-up' ? 'sign-up' : 'sign-in',
     next: safeNextPath(single(params.next)),
     linkError: single(params.error) === 'link',
+    deleted: single(params.deleted) === '1',
   };
 }
