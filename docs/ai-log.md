@@ -367,3 +367,23 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above. Production walkthrough issue closed on the board; the alpha document's screenshot table now says what each shot shows without a model key.
 
 **Time saved or lost:** Not measured. Six capture runs before all 18 passed; each failure was a real difference between a deployed product and the local stack.
+
+## 2026-10-22: income below zero on a sandbox history
+
+**Task:** The production walkthrough's Spending tiles read "Income -$5,845.78", the diagram "Spent beyond income -$7,535.41" and the check-in's "Take-home pay" the same negative figure. The Plaid sandbox books its GUSTO PAY payroll as money out (585,000) and the seed rules label it income; `calc/spending.py` netted the income bucket and flipped its sign.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Change spec 007 first so income counts money in only and an income-labeled outflow is ignored and reported; reproduce with a sandbox-shaped fixture; fix the calculator and whatever follows; gate on `make lint`, `make test` and `pnpm --dir web e2e`.
+
+**What it produced:** Spec 007 rule 22a with two hand-worked examples (a small month and the sandbox's October), notes in specs 010 and 015; `CategorySum` with money out and money in as separate magnitudes, the SQL `FILTER` aggregates that feed it, and `income_outflows_ignored_cents` on the summary; `tests/support/sandbox_history.py`, which runs the recorded sandbox item through `PlaidProvider`, `run_sync` and the seed rules; route tests for `GET /spending/summary`, `GET /cashflow` and the check-in's take-home line; a web fixture of the API's sandbox month.
+
+**What was wrong:**
+- The income bucket was the negated net of every income row, so one income-labeled outflow could push it below zero, and `left_over_cents` and the shares inherited the error.
+- Fixing that exposed a second bug: with income 4.22 and no stub, the diagram scaled 4.22 to 400 px and drew Savings about 94,800 px tall. Before, a negative income meant no scale at all, which hid it. `flowScale` now sizes the tallest node it draws to 400 px.
+
+**How it was caught:** The walkthrough's screenshots. The reproduction synced the recorded sandbox responses through the real pipeline and seed rules and asked the route for October: income -584,578 and left over -753,541, the production figures to the cent. The diagram's scale came out of writing the screen test for the fixed numbers.
+
+**Fix:** In the subagent's branch. The sandbox October now reads income 422, `income_outflows_ignored_cents` 585,000, `transfers_ignored_cents` 210,350 and left over -168,541; "Spent beyond income" still shows because that month really did spend 1,689.63 against 4.22 deposited.
+
+**Time saved or lost:** Not measured.
