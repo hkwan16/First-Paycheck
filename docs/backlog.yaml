@@ -1348,3 +1348,48 @@ issues:
     # Delete account sits under Sign out in the user menu with a typed
     # confirmation; DELETE /me, a local sign-out and /sign-in?deleted=1 follow,
     # and a write under the old token is a 401 account_deleted.
+  - title: "Income counts money in only; an income-labeled outflow never makes income negative"
+    body: >-
+      Found on the October 22 production walkthrough as a new user. Plaid's
+      sandbox books the GUSTO PAY payroll as money out (amount_cents 585000)
+      while the seed rule labels it income, so the spending summary's
+      income_cents is -584578: the Spending tiles read "Income -$5,845.78", the
+      diagram draws "Spent beyond income -$7,535.41", and the check-in's
+      "Take-home pay" line shows the same negative figure. Change spec 007 so
+      the income bucket sums inflows only and an income-labeled outflow counts
+      as a transfer that is ignored (and reported in the summary), then the
+      calculator, then the screens; a summary can then never show income below
+      zero. Failing test first with a sandbox-shaped fixture. Done when the
+      e2e user's October summary on production shows income of $0.00 or more
+      and the diagram's "Spent beyond income" node is never negative.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: High
+    status: todo
+  - title: "Prefilled figures are values, not placeholders, on the decision cards"
+    body: >-
+      Found on the October 22 production walkthrough. The 401(k) plan details
+      form shows the salary the stub implies (65,000.00) as a placeholder, so
+      "Save plan details" fails with "Enter your yearly salary" until the same
+      number is typed; the emergency fund's monthly transfer shows 300.00 the
+      same way and says "Enter a monthly transfer to see your numbers". Where
+      a figure is derived from confirmed data (salary from the stub's gross and
+      frequency), fill the input with it; where it is only an example, make the
+      placeholder read as one ("for example 65,000.00"). Failing test first.
+      Done when a new user with a confirmed stub can save the plan details
+      without retyping the salary.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: todo
+  - title: "Net worth lists loans under the right kind, not \"Credit card\""
+    body: >-
+      Found on the October 22 production walkthrough: the net worth card shows
+      "Plaid Auto Loan ··9003, Credit card · owed" and the same for the
+      mortgage, student loan and home equity line. Map Plaid's loan subtypes
+      to a loan kind with its own label, keeping them on the liabilities side.
+      Failing test first. Done when each sandbox loan reads as a loan.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+    status: todo
