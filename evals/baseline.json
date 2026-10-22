@@ -7,6 +7,10 @@
   "calc": {
     "pass_rate": 1.0
   },
+  "categorization": {
+    "accuracy": 0.9,
+    "llm_accuracy": 0.8
+  },
   "categorization-rules": {
     "rules_coverage": 0.808,
     "rules_precision": 0.9702970297029703
@@ -26,7 +30,7 @@
   },
   "extraction": {
     "document_accuracy": 0.7,
-    "field_accuracy": 0.9,
+    "field_accuracy": 0.95,
     "redaction_recall": 1.0
   },
   "extraction-smoke": {
