@@ -4227,6 +4227,22 @@
               }
             ],
             "title": "Plan Cents"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "on_plan",
+                  "over",
+                  "under"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
           }
         },
         "required": [
@@ -4234,7 +4250,8 @@
           "label",
           "actual_cents",
           "plan_cents",
-          "difference_cents"
+          "difference_cents",
+          "status"
         ],
         "title": "PlanLine",
         "type": "object"

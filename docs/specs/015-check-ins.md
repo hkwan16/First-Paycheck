@@ -55,7 +55,7 @@ Code: pure finders in `api/checkin/findings.py` (one function per kind, `f(facts
 ### Check-ins
 
 - `GET /check-ins`: `CheckInSummary` items, newest `period` first: `id`, `period`, `triggered_by`, `status` (`open`, `completed`), `completed_at`, `finding_count`, `handled_count` (findings with a user action), `created_at`, `updated_at`.
-- `GET /check-ins/{id}`: `CheckInDetail`, the summary plus `findings` (ordered by severity `alert`, `warning`, `info`, then kind in enum order, then `created_at`, `id`) and `cash_flow`: `CheckInCashFlow` with `cash_flow` (exactly what `GET /cashflow` returns for `start = period`, `end = min(last day of period, today)`) and `plan`, a list of `PlanLine` (`key`, `label`, `actual_cents`, `plan_cents` or null, `difference_cents` = actual minus plan, or null).
+- `GET /check-ins/{id}`: `CheckInDetail`, the summary plus `findings` (ordered by severity `alert`, `warning`, `info`, then kind in enum order, then `created_at`, `id`) and `cash_flow`: `CheckInCashFlow` with `cash_flow` (exactly what `GET /cashflow` returns for `start = period`, `end = min(last day of period, today)`) and `plan`, a list of `PlanLine` (`key`, `label`, `actual_cents`, `plan_cents` or null, `difference_cents` = actual minus plan, or null, `status` `on_plan`, `over` or `under`, or null with no plan; rule 19a).
 - `PATCH /check-ins/{id}/findings/{fid}`: the updated `FindingOut`.
 - Job result of `checkin.monthly`: `{"outcome": "created" | "refreshed" | "skipped", "check_in_id", "inserted", "updated", "retracted", "dropped", "marked_active"}`.
 
@@ -102,6 +102,7 @@ Each finder is `f(facts) -> list[Finding]`, with no I/O and no clock. `all_findi
 17. `GET /check-ins/{id}` and `PATCH` read under RLS; another user's check-in, a finding of another check-in, or another user's finding is 404.
 18. **PATCH.** `done` or `dismissed` sets `user_action` and `user_action_at` to the request time; the same action again changes nothing. `null` clears both (undo, spec amendment 14). Then rule 13. Recurring charges keep the status rule 11 gave them.
 19. **Cash flow against the plan** (`calc/cashflow.py:against_plan`, pure). Lines, in order, with actuals from the period's cash flow: `take_home` (the spending summary's `income_cents`), `essentials`, `flexible`, `other`, `savings` (spending buckets), `retirement` and `health` (the summed stub lines `retirement_contribution` and `medical_premium`), `left_over` (the summary's). Plans: `essentials` is the current `emergency_fund` decision's `monthly_essentials_cents`; `savings` is the emergency-fund goal's `monthly_contribution_cents` when the goal is `active`; `retirement` is `round_half_up(period gross * contribution_pct / 100)` from the current `k401_match` decision; `health` is the selected plan's `premium_per_period_cents * paycheck_count`. Every other plan is null, and a missing decision makes its plan null. Plans are monthly figures; for the current month the actuals run only to today.
+19a. **Plan line status** (`calc/cashflow.py:plan_status`, pure). A line with a plan has a tolerance of `max(round_half_up(plan * 5 / 100), 2,500)`: 5% of the plan or $25, whichever is larger, so a small plan is not flagged for a few dollars and a large one is not flagged for a rounding-sized slip. `on_plan` when `|actual - plan| <= tolerance`, `over` when `actual - plan > tolerance`, `under` when `plan - actual > tolerance`; null when the plan is null. The status says only which side of the plan the month is on: whether that is good depends on the line (over on `essentials` is spending more, over on `savings` is saving more), and the client colours it by line. For the current month the actuals run only to today, so a line can read `under` until the month ends.
 20. **Net worth** (`calc/net_worth.py:net_worth`, pure). Active accounts only. A snapshot counts on its UTC date. Each month's cutoff is its last day, or today for the current month; an account contributes its newest snapshot on or before the cutoff, and nothing before its first snapshot. `checking`, `savings`, `investment` and `retirement` are assets; `credit` is a liability whose balance is the amount owed (spec 001 rule 22). A month in which no account has a snapshot is left out of the series. The current figures use each account's newest snapshot on or before today.
 21. **Holdings** (`calc/net_worth.py:holdings`, pure). For each `investment` or `retirement` account, the holdings on its newest `as_of` date, by value descending, then name. `gain = value - cost basis` when the basis is known. An account's or the total's `cost_basis_cents` and `gain_cents` are null when any holding in it lacks a basis, so a partial basis is never shown as a whole one.
 22. `GET /calendar` keeps spec 007 rule 19 (`upcoming` only, by `due_at`, then `created_at`) and filters `from <= due_at <= to` when given.
@@ -185,6 +186,29 @@ Row 2: September gross `2 * 270,833 = 541,666`; `541,666 * 4 / 100 = 21,666.64`,
 Row 5: checking (snapshots 2026-09-20 250,000, 10-20 280,000, 11-15 312,044), savings (200,000, 230,000, 274,000 on the same days), credit (10-20 45,000, 11-15 60,000 owed), retirement (11-15 21,710). September: `250,000 + 200,000 = 450,000`. October: `280,000 + 230,000 - 45,000 = 465,000`. November: `312,044 + 274,000 + 21,710 = 607,754` assets, `- 60,000 = 547,754`. Change `547,754 - 450,000 = 97,754`.
 
 Row 6: retirement on 2026-11-15, one target-date fund, 14.21 shares, value 21,710, basis 21,668 (an older 2026-11-14 row is ignored); brokerage on 2026-11-15, VTI value 98,000 basis 90,000 and VXUS value 30,000 with no basis.
+
+### Plan line status (`api/tests/unit/calc/test_cashflow.py`)
+
+| # | Plan | Actual | Tolerance | Status |
+|---|---|---|---|---|
+| 1 | 250,000 (essentials, route row 2) | 180,000 | 12,500 | `under` (-70,000) |
+| 2 | 50,000 (savings, route row 2) | 40,000 | 2,500 | `under` (-10,000) |
+| 3 | 21,667 (retirement, route row 2) | 0 | 2,500 | `under` (-21,667) |
+| 4 | 12,500 (health, route row 2) | 12,500 | 2,500 | `on_plan` (0) |
+| 5 | 250,000 | 262,500 | 12,500 | `on_plan` (+12,500, on the edge) |
+| 6 | 250,000 | 262,501 | 12,500 | `over` (+12,501) |
+| 7 | 250,000 | 237,500 | 12,500 | `on_plan` (-12,500, on the edge) |
+| 8 | 250,000 | 237,499 | 12,500 | `under` (-12,501) |
+| 9 | 10,000 | 12,500 | 2,500 | `on_plan` (the $25 floor) |
+| 10 | 10,000 | 7,499 | 2,500 | `under` (-2,501) |
+| 11 | 0 | 2,501 | 2,500 | `over` (a plan of 0 still has the floor) |
+| 12 | 250,010 | 262,511 | 12,501 | `on_plan` (+12,501) |
+| 13 | 250,010 | 262,512 | 12,501 | `over` (+12,502) |
+| 14 | null (take-home, flexible, other, left over) | any | none | null |
+
+Arithmetic: `250,000 * 5% = 12,500` (above the 2,500 floor); `50,000 * 5% = 2,500`, equal to the floor; `21,667 * 5% = 1,083.35`, so 1,083 and the floor 2,500 wins; `12,500 * 5% = 625` and `10,000 * 5% = 500`, both below the floor; `250,010 * 5% = 12,500.5`, half up to 12,501.
+
+Route row 2 adds these statuses: `essentials`, `savings` and `retirement` `under`, `health` `on_plan`, every line without a plan null.
 
 ## Edge cases
 
