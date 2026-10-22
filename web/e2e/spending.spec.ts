@@ -55,7 +55,17 @@ test('the cash flow and the summary tiles show the same totals from the API', as
     test.info().annotations.push({ type: 'note', description: 'No money in the default period' });
     return;
   }
-  await expect(card.getByText(/^Scale: 1 px is about \$[\d,]+$/)).toBeVisible();
+  // The scale comes from gross pay, or from the income deposited when no pay
+  // stub is confirmed (layoutCashFlow). This project depends on Link only, so
+  // whether a stub is confirmed depends on what else ran; and the sandbox
+  // bank may deposit nothing in the period. With neither, every amount is
+  // still drawn, but there is nothing to scale bands by, so no badge.
+  const scale = card.getByText(/^Scale: 1 px is about \$[\d,]+$/);
+  const pay = card.getByRole('button', {
+    name: /^(Gross pay, \d+ stubs?|Income deposited) \$(?!0\.00$)/,
+  });
+  if ((await pay.count()) > 0) await expect(scale).toBeVisible();
+  else await expect(scale).toHaveCount(0);
   // Both routes compute the period with the same code (spec 010 rule 5):
   // every bucket the diagram draws matches its tile.
   for (const bucket of ['Essentials', 'Flexible', 'Savings']) {
@@ -94,7 +104,9 @@ test('choosing another period reloads the totals and the diagram together', asyn
   const after = await loadedSummary(page);
   await expect(after.getByRole('heading', { level: 2 })).not.toHaveText(heading ?? '');
   await expect(flowCard(page)).not.toHaveAttribute('aria-busy', 'true');
-  await expect(page.getByRole('alert')).toHaveCount(0);
+  // No card failed. Scoped to the page's content: Next's route announcer is an
+  // empty role="alert" it appends to <body> on every page.
+  await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0);
 });
 
 test('a category fix is saved as a rule and survives a reload', async ({ page }) => {

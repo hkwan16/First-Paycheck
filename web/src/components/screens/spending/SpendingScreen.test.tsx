@@ -233,6 +233,30 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
     );
   });
 
+  it('draws spending with no pay stub or income, with no scale to give', async () => {
+    // What the e2e sandbox user's September looks like: a few charges, no deposits.
+    const flow = emptyCashflow('2026-09-01', '2026-09-30');
+    flow.spending = {
+      ...flow.spending,
+      essentials_cents: 633,
+      flexible_cents: 50_000,
+      left_over_cents: -50_633,
+      transaction_count: 3,
+      categories: [
+        { category: 'transport', bucket: 'essentials', total_cents: 633, count: 1 },
+        { category: 'travel', bucket: 'flexible', total_cents: 50_000, count: 2 },
+      ],
+    };
+    spendingDb.cashflow = flow;
+    await renderSpending({ showSankey: true });
+    expect(await within(card()).findByRole('button', { name: 'Essentials $6.33' })).toBeVisible();
+    expect(node('No confirmed pay stub $0.00')).toBeInTheDocument();
+    expect(node('Income deposited $0.00')).toBeInTheDocument();
+    expect(node('Flexible $500.00')).toBeInTheDocument();
+    expect(node('Spent beyond income -$506.33')).toBeInTheDocument();
+    expect(within(card()).queryByText(/1 px is about/)).not.toBeInTheDocument();
+  });
+
   it('says there is nothing to draw for an empty period', async () => {
     spendingDb.cashflow = emptyCashflow('2026-10-01', '2026-10-17');
     await renderSpending({ showSankey: true });
