@@ -18,7 +18,7 @@ export function Select({ size, invalid, className, ...rest }: SelectProps) {
       aria-invalid={invalid || undefined}
       className={cn(
         fieldClasses({ size }),
-        'select-chevron appearance-none forced-colors:appearance-auto forced-colors:bg-none',
+        'appearance-none select-chevron forced-colors:appearance-auto forced-colors:bg-none',
         size === 'sm' ? 'pr-8' : 'pr-9',
         className,
       )}
