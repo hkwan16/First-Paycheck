@@ -9,7 +9,7 @@ import { JobProgress } from '@/components/ui/JobProgress';
 import { Notice } from '@/components/ui/Notice';
 import { Seg } from '@/components/ui/Seg';
 import { Select } from '@/components/ui/Select';
-import { maskLabel } from '@/lib/accounts';
+import { ACCOUNT_KIND_LABELS, maskLabel } from '@/lib/accounts';
 import { apiErrorMessage } from '@/lib/api/errors';
 import { useAccounts, useImportCsv, useJob } from '@/lib/api/hooks';
 import type { AccountKind, AmountSign, CsvImport as CsvImported } from '@/lib/api/types';
@@ -18,13 +18,7 @@ import { formatNumber } from '@/lib/money';
 
 const CSV_ACCEPT = '.csv,text/csv';
 
-const KINDS: readonly { value: AccountKind; label: string }[] = [
-  { value: 'checking', label: 'Checking' },
-  { value: 'savings', label: 'Savings' },
-  { value: 'credit', label: 'Credit card' },
-  { value: 'investment', label: 'Investment' },
-  { value: 'retirement', label: 'Retirement' },
-];
+const KINDS = Object.entries(ACCOUNT_KIND_LABELS) as [AccountKind, string][];
 
 const SIGNS = [
   { value: 'negative_is_out', label: 'Negative' },
@@ -214,9 +208,9 @@ export function CsvImport({ id }: { id?: string }) {
                 value={kind}
                 onChange={(event) => setKind(event.currentTarget.value as AccountKind)}
               >
-                {KINDS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
+                {KINDS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
                   </option>
                 ))}
               </Select>
@@ -232,7 +226,7 @@ export function CsvImport({ id }: { id?: string }) {
                 size="sm"
                 maxLength={100}
                 value={name}
-                placeholder={`${KINDS.find((k) => k.value === kind)?.label ?? 'Account'} (CSV)`}
+                placeholder={`${ACCOUNT_KIND_LABELS[kind]} (CSV)`}
                 onChange={(event) => setName(event.currentTarget.value)}
               />
             </div>
