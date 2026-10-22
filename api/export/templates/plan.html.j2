@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>First Paycheck plan</title>
+<style>
+/* The Ledger palette, print-safe: ink on white, hairlines, no fills (spec 016 rule 12). */
+@page {
+  size: Letter;
+  margin: 0.6in 0.6in 0.7in;
+  @bottom-left { content: "First Paycheck plan"; font-family: "DejaVu Sans", "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 7.5pt; color: #5B6370; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font-family: "DejaVu Sans", "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 7.5pt; color: #5B6370; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #FFFFFF; color: #16181D; }
+body {
+  font-family: "DejaVu Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 8.5pt;
+  line-height: 1.4;
+}
+h1 { font-size: 17pt; line-height: 1.2; margin: 0; letter-spacing: -0.01em; }
+h2 {
+  font-size: 7.5pt;
+  font-weight: bold;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5B6370;
+  margin: 0 0 4pt;
+  padding-bottom: 3pt;
+  border-bottom: 0.75pt solid #16181D;
+}
+h3 { font-size: 9pt; margin: 0 0 2pt; }
+p { margin: 0 0 4pt; }
+section { margin: 0 0 12pt; }
+.eyebrow { font-size: 7.5pt; font-weight: bold; letter-spacing: 0.06em; text-transform: uppercase; color: #5B6370; margin: 0 0 2pt; }
+.meta { color: #3F4650; margin: 3pt 0 14pt; }
+.muted { color: #5B6370; }
+.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+td { padding: 2.5pt 0; vertical-align: top; border-top: 0.5pt solid #D0D3D9; }
+tr:first-child td { border-top: 0; }
+td.label { width: 31%; color: #3F4650; padding-right: 8pt; }
+td.num { width: 16%; }
+td.gap { width: 6%; border-top: 0; }
+.decision { margin: 0 0 8pt; page-break-inside: avoid; }
+.decision-head { display: flex; justify-content: space-between; border-bottom: 0.5pt solid #D0D3D9; padding-bottom: 2pt; margin-bottom: 2pt; }
+.decision-head .name { font-weight: bold; font-size: 9pt; }
+.status { font-size: 7.5pt; color: #3F4650; margin: 2pt 0 0; }
+.status::before { content: ""; display: inline-block; width: 5pt; height: 5pt; border: 0.75pt solid #16181D; border-radius: 50%; margin-right: 4pt; vertical-align: 0; }
+.status.verified::before { background: #16181D; }
+.calendar td.date { width: 76pt; font-weight: bold; white-space: nowrap; }
+.calendar td.what { color: #3F4650; }
+.why { margin: 0 0 9pt; page-break-inside: avoid; }
+.why .concept { font-style: italic; color: #3F4650; }
+.sources { margin: 3pt 0 0; padding: 0; list-style: none; }
+.sources li { margin: 0 0 2pt; color: #3F4650; }
+.url { word-break: break-all; color: #16181D; }
+.page-break { break-before: page; }
+.footnote { font-size: 7.5pt; color: #5B6370; border-top: 0.5pt solid #D0D3D9; padding-top: 4pt; }
+</style>
+</head>
+<body>
+<header>
+  <p class="eyebrow">First Paycheck</p>
+  <h1>First Paycheck plan</h1>
+  <p class="meta">{% if plan.pay_stub and plan.pay_stub.employer_name %}{{ plan.pay_stub.employer_name }} &#183; {% endif %}Prepared {{ prepared_on | long_date }}</p>
+</header>
+
+<section>
+  <h2>Your paycheck</h2>
+{% if plan.pay_stub %}
+{% set stub = plan.pay_stub %}
+  <table>
+    <tr><td class="label">Pay date</td><td class="num">{{ stub.pay_date | long_date }}</td><td class="gap"></td><td class="label">Gross pay</td><td class="num">{{ stub.gross_cents | money }}</td></tr>
+    <tr><td class="label">Federal income tax</td><td class="num">{{ stub.federal_withholding_cents | money }}</td><td class="gap"></td><td class="label">Social Security</td><td class="num">{{ stub.social_security_cents | money }}</td></tr>
+    <tr><td class="label">Medicare</td><td class="num">{{ stub.medicare_cents | money }}</td><td class="gap"></td><td class="label">State tax</td><td class="num">{{ stub.state_tax_cents | money }}</td></tr>
+    <tr><td class="label">401(k) contribution</td><td class="num">{{ stub.retirement_contribution_cents | money }}</td><td class="gap"></td><td class="label">Medical premium</td><td class="num">{{ stub.medical_premium_cents | money }}</td></tr>
+    <tr><td class="label">Other deductions</td><td class="num">{{ stub.other_deductions_cents | money }}</td><td class="gap"></td><td class="label"><strong>Net pay</strong></td><td class="num"><strong>{{ stub.net_cents | money }}</strong></td></tr>
+  </table>
+  <p class="muted">From your newest confirmed pay stub.</p>
+{% else %}
+  <p class="muted">No confirmed pay stub yet.</p>
+{% endif %}
+</section>
+
+<section>
+  <h2>Decisions</h2>
+{% for decision in plan.decisions %}
+  <div class="decision">
+    <div class="decision-head"><span class="name">{{ loop.index }}. {{ calculator_titles[decision.calculator] }}</span><span class="muted">Version {{ decision.version }}</span></div>
+    <table>
+{% for pair in decision.figures | batch(2) %}
+      <tr>{% for figure in pair %}{% if not loop.first %}<td class="gap"></td>{% endif %}<td class="label">{{ figure.label }}</td><td class="num">{{ figure | figure }}</td>{% endfor %}{% if pair | length == 1 %}<td class="gap"></td><td></td><td></td>{% endif %}</tr>
+{% endfor %}
+    </table>
+    <p class="status {{ decision.explanation.status }}">{{ explanation_labels[decision.explanation.status] }}</p>
+  </div>
+{% else %}
+  <p class="muted">No decisions saved yet.</p>
+{% endfor %}
+{% if plan.completeness.missing %}
+  <p class="muted">Not saved yet: {% for kind in plan.completeness.missing %}{{ calculator_titles[kind] }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>
+{% endif %}
+</section>
+
+<section>
+  <h2>Goals</h2>
+{% for goal in plan.goals %}
+  <table>
+    <tr><td class="label"><strong>{{ goal_titles[goal.kind] }}</strong></td><td class="num">{{ goal_statuses[goal.status] }}</td><td class="gap"></td><td class="label">Target</td><td class="num">{{ goal.target_amount_cents | money }}</td></tr>
+    <tr><td class="label">Monthly contribution</td><td class="num">{{ goal.monthly_contribution_cents | money }}</td><td class="gap"></td><td class="label">Saved so far</td><td class="num">{% if goal.current_balance_cents is not none %}{{ goal.current_balance_cents | money }} ({{ goal.progress_pct | pct }}){% else %}No linked account{% endif %}</td></tr>
+{% if goal.target_date %}
+    <tr><td class="label">On pace for</td><td class="num">{{ goal.target_date | long_date }}</td><td class="gap"></td><td></td><td></td></tr>
+{% endif %}
+  </table>
+{% else %}
+  <p class="muted">No goals yet.</p>
+{% endfor %}
+</section>
+
+<p class="footnote">Every amount comes from First Paycheck's calculators and your confirmed pay stub. Federal income tax only; state tax is not computed. Not tax advice.</p>
+
+<section class="page-break">
+  <h2>Decision calendar</h2>
+{% if plan.calendar %}
+  <table class="calendar">
+{% for event in plan.calendar %}
+    <tr><td class="date">{{ event.due_at | long_date }}</td><td>{{ event.title }}{% if event.decision_id in decision_calculators %} <span class="what">&#183; {{ calculator_titles[decision_calculators[event.decision_id]] }}</span>{% endif %}</td></tr>
+{% endfor %}
+  </table>
+  <p class="muted">Upcoming through {{ plan.calendar_through | long_date }}.</p>
+{% else %}
+  <p class="muted">Nothing is due in the next 90 days.</p>
+{% endif %}
+</section>
+
+<section>
+  <h2>Why, with sources</h2>
+{% set explained = plan.decisions | selectattr("explanation.status", "ne", "none") | list %}
+{% for decision in explained %}
+  <div class="why">
+    <h3>{{ calculator_titles[decision.calculator] }}</h3>
+    <p class="status {{ decision.explanation.status }}">{{ explanation_labels[decision.explanation.status] }}</p>
+    <p class="concept">{{ decision.explanation.concept }}</p>
+{% for paragraph in decision.explanation.text.split("\n\n") %}
+    <p>{{ paragraph }}</p>
+{% endfor %}
+{% if decision.explanation.citations %}
+    <ul class="sources">
+{% for citation in decision.explanation.citations %}
+      <li>{{ citation.title }} ({{ citation.source }}): <span class="url">{{ citation.url }}</span></li>
+{% endfor %}
+    </ul>
+{% endif %}
+  </div>
+{% else %}
+  <p class="muted">No explanations yet.</p>
+{% endfor %}
+</section>
+</body>
+</html>

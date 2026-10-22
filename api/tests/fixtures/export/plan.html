@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>First Paycheck plan</title>
+<style>
+/* The Ledger palette, print-safe: ink on white, hairlines, no fills (spec 016 rule 12). */
+@page {
+  size: Letter;
+  margin: 0.6in 0.6in 0.7in;
+  @bottom-left { content: "First Paycheck plan"; font-family: "DejaVu Sans", "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 7.5pt; color: #5B6370; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font-family: "DejaVu Sans", "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 7.5pt; color: #5B6370; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #FFFFFF; color: #16181D; }
+body {
+  font-family: "DejaVu Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 8.5pt;
+  line-height: 1.4;
+}
+h1 { font-size: 17pt; line-height: 1.2; margin: 0; letter-spacing: -0.01em; }
+h2 {
+  font-size: 7.5pt;
+  font-weight: bold;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5B6370;
+  margin: 0 0 4pt;
+  padding-bottom: 3pt;
+  border-bottom: 0.75pt solid #16181D;
+}
+h3 { font-size: 9pt; margin: 0 0 2pt; }
+p { margin: 0 0 4pt; }
+section { margin: 0 0 12pt; }
+.eyebrow { font-size: 7.5pt; font-weight: bold; letter-spacing: 0.06em; text-transform: uppercase; color: #5B6370; margin: 0 0 2pt; }
+.meta { color: #3F4650; margin: 3pt 0 14pt; }
+.muted { color: #5B6370; }
+.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+td { padding: 2.5pt 0; vertical-align: top; border-top: 0.5pt solid #D0D3D9; }
+tr:first-child td { border-top: 0; }
+td.label { width: 31%; color: #3F4650; padding-right: 8pt; }
+td.num { width: 16%; }
+td.gap { width: 6%; border-top: 0; }
+.decision { margin: 0 0 8pt; page-break-inside: avoid; }
+.decision-head { display: flex; justify-content: space-between; border-bottom: 0.5pt solid #D0D3D9; padding-bottom: 2pt; margin-bottom: 2pt; }
+.decision-head .name { font-weight: bold; font-size: 9pt; }
+.status { font-size: 7.5pt; color: #3F4650; margin: 2pt 0 0; }
+.status::before { content: ""; display: inline-block; width: 5pt; height: 5pt; border: 0.75pt solid #16181D; border-radius: 50%; margin-right: 4pt; vertical-align: 0; }
+.status.verified::before { background: #16181D; }
+.calendar td.date { width: 76pt; font-weight: bold; white-space: nowrap; }
+.calendar td.what { color: #3F4650; }
+.why { margin: 0 0 9pt; page-break-inside: avoid; }
+.why .concept { font-style: italic; color: #3F4650; }
+.sources { margin: 3pt 0 0; padding: 0; list-style: none; }
+.sources li { margin: 0 0 2pt; color: #3F4650; }
+.url { word-break: break-all; color: #16181D; }
+.page-break { break-before: page; }
+.footnote { font-size: 7.5pt; color: #5B6370; border-top: 0.5pt solid #D0D3D9; padding-top: 4pt; }
+</style>
+</head>
+<body>
+<header>
+  <p class="eyebrow">First Paycheck</p>
+  <h1>First Paycheck plan</h1>
+  <p class="meta">Acme Corp &#183; Prepared Oct 21, 2026</p>
+</header>
+
+<section>
+  <h2>Your paycheck</h2>
+  <table>
+    <tr><td class="label">Pay date</td><td class="num">Oct 15, 2026</td><td class="gap"></td><td class="label">Gross pay</td><td class="num">$2,708.33</td></tr>
+    <tr><td class="label">Federal income tax</td><td class="num">$297.76</td><td class="gap"></td><td class="label">Social Security</td><td class="num">$167.92</td></tr>
+    <tr><td class="label">Medicare</td><td class="num">$39.27</td><td class="gap"></td><td class="label">State tax</td><td class="num">$98.14</td></tr>
+    <tr><td class="label">401(k) contribution</td><td class="num">$0.00</td><td class="gap"></td><td class="label">Medical premium</td><td class="num">$62.50</td></tr>
+    <tr><td class="label">Other deductions</td><td class="num">$46.70</td><td class="gap"></td><td class="label"><strong>Net pay</strong></td><td class="num"><strong>$1,996.04</strong></td></tr>
+  </table>
+  <p class="muted">From your newest confirmed pay stub.</p>
+</section>
+
+<section>
+  <h2>Decisions</h2>
+  <div class="decision">
+    <div class="decision-head"><span class="name">1. Emergency fund</span><span class="muted">Version 1</span></div>
+    <table>
+      <tr><td class="label">Target</td><td class="num">$5,469.00</td><td class="gap"></td><td class="label">Monthly contribution</td><td class="num">$300.00</td></tr>
+      <tr><td class="label">Per paycheck</td><td class="num">$150.00</td><td class="gap"></td><td class="label">Months to target</td><td class="num">12</td></tr>
+      <tr><td class="label">Funded today</td><td class="num">39.13%</td><td class="gap"></td><td></td><td></td></tr>
+    </table>
+    <p class="status none">Not explained yet</p>
+  </div>
+  <div class="decision">
+    <div class="decision-head"><span class="name">2. 401(k) contribution</span><span class="muted">Version 2</span></div>
+    <table>
+      <tr><td class="label">Your contribution</td><td class="num">4%</td><td class="gap"></td><td class="label">Contribution for the full match</td><td class="num">4%</td></tr>
+      <tr><td class="label">Employer match a year</td><td class="num">$2,600.00</td><td class="gap"></td><td class="label">Match missed a year</td><td class="num">$0.00</td></tr>
+    </table>
+    <p class="status verified">Verified against the calculator</p>
+  </div>
+  <div class="decision">
+    <div class="decision-head"><span class="name">3. Health plan</span><span class="muted">Version 1</span></div>
+    <table>
+      <tr><td class="label">Plan</td><td class="num">Bronze HSA</td><td class="gap"></td><td class="label">Expected cost a year at medium use</td><td class="num">$1,810.00</td></tr>
+      <tr><td class="label">Premiums a year</td><td class="num">$600.00</td><td class="gap"></td><td class="label">Worst case a year</td><td class="num">$3,850.00</td></tr>
+    </table>
+    <p class="status fallback">Plain calculator summary (the written explanation did not pass the check)</p>
+  </div>
+  <div class="decision">
+    <div class="decision-head"><span class="name">4. Form W-4</span><span class="muted">Version 1</span></div>
+    <table>
+      <tr><td class="label">Federal withholding per paycheck</td><td class="num">$218.17</td><td class="gap"></td><td class="label">Projected federal tax for 2026</td><td class="num">$5,236.00</td></tr>
+      <tr><td class="label">Projected refund (negative is owed)</td><td class="num">$0.08</td><td class="gap"></td><td></td><td></td></tr>
+    </table>
+    <p class="status verified">Verified against the calculator</p>
+  </div>
+</section>
+
+<section>
+  <h2>Goals</h2>
+  <table>
+    <tr><td class="label"><strong>Emergency fund</strong></td><td class="num">Active</td><td class="gap"></td><td class="label">Target</td><td class="num">$5,469.00</td></tr>
+    <tr><td class="label">Monthly contribution</td><td class="num">$300.00</td><td class="gap"></td><td class="label">Saved so far</td><td class="num">$2,140.00 (39.13%)</td></tr>
+    <tr><td class="label">On pace for</td><td class="num">Sep 30, 2027</td><td class="gap"></td><td></td><td></td></tr>
+  </table>
+</section>
+
+<p class="footnote">Every amount comes from First Paycheck's calculators and your confirmed pay stub. Federal income tax only; state tax is not computed. Not tax advice.</p>
+
+<section class="page-break">
+  <h2>Decision calendar</h2>
+  <table class="calendar">
+    <tr><td class="date">Oct 31, 2026</td><td>Check that your next pay stub shows your new 401(k) contribution <span class="what">&#183; 401(k) contribution</span></td></tr>
+    <tr><td class="date">Oct 31, 2026</td><td>Make your first emergency fund contribution <span class="what">&#183; Emergency fund</span></td></tr>
+    <tr><td class="date">Oct 31, 2026</td><td>Give your employer your updated Form W-4 <span class="what">&#183; Form W-4</span></td></tr>
+    <tr><td class="date">Nov 14, 2026</td><td>Health plan enrollment deadline <span class="what">&#183; Health plan</span></td></tr>
+  </table>
+  <p class="muted">Upcoming through Jan 19, 2027.</p>
+</section>
+
+<section>
+  <h2>Why, with sources</h2>
+  <div class="why">
+    <h3>401(k) contribution</h3>
+    <p class="status verified">Verified against the calculator</p>
+    <p class="concept">Your employer matches what you put into your 401(k), up to a limit.</p>
+    <p>Contributing 4% earns the full employer match of $2,600.00 a year, so no match is left on the table.</p>
+    <ul class="sources">
+      <li>Matching contributions help you save more for retirement (IRS, Retirement Plans): <span class="url">https://www.irs.gov/retirement-plans/matching-contributions-help-you-save-more-for-retirement</span></li>
+      <li>2026 limit on 401(k) elective deferrals (IRS Notice 2025-67): <span class="url">https://www.irs.gov/pub/irs-drop/n-25-67.pdf</span></li>
+    </ul>
+  </div>
+  <div class="why">
+    <h3>Health plan</h3>
+    <p class="status fallback">Plain calculator summary (the written explanation did not pass the check)</p>
+    <p class="concept">Comparing health plans by what each costs you in a year.</p>
+    <p>The calculator&#39;s comparison of your two plans, without commentary.</p>
+    <ul class="sources">
+      <li>2026 limit on HSA contributions (Rev. Proc. 2025-19): <span class="url">https://www.irs.gov/pub/irs-drop/rp-25-19.pdf</span></li>
+    </ul>
+  </div>
+  <div class="why">
+    <h3>Form W-4</h3>
+    <p class="status verified">Verified against the calculator</p>
+    <p class="concept">Your Form W-4 sets the federal tax taken from each paycheck.</p>
+    <p>With your 401(k) and premium counted, the withholding covers the year.</p>
+    <ul class="sources">
+      <li>How employers figure withholding from Form W-4 (IRS Publication 15-T (2026), section 1): <span class="url">https://www.irs.gov/publications/p15t</span></li>
+    </ul>
+  </div>
+</section>
+</body>
+</html>

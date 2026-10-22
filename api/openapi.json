@@ -2015,7 +2015,8 @@
           "ingest.extract",
           "recurring.detect",
           "checkin.monthly",
-          "schedule.tick"
+          "schedule.tick",
+          "plan.export"
         ],
         "title": "JobKind",
         "type": "string"
@@ -3052,6 +3053,20 @@
           "citations"
         ],
         "title": "PlanExplanation",
+        "type": "object"
+      },
+      "PlanExportQueued": {
+        "properties": {
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "PlanExportQueued",
         "type": "object"
       },
       "PlanFigure": {
@@ -6560,6 +6575,113 @@
           }
         ],
         "summary": "Get Plan Calendar",
+        "tags": [
+          "plan"
+        ]
+      }
+    },
+    "/plan/export": {
+      "post": {
+        "description": "Queue the plan PDF; a second request while one is waiting returns the same job.",
+        "operationId": "export_plan",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanExportQueued"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Export Plan",
+        "tags": [
+          "plan"
+        ]
+      }
+    },
+    "/plan/export/{job_id}": {
+      "get": {
+        "description": "The PDF once its job succeeded; 404 before then, after 7 days and for anyone else.",
+        "operationId": "download_plan_export",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Download Plan Export",
         "tags": [
           "plan"
         ]

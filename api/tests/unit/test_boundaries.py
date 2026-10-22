@@ -215,6 +215,11 @@ WORKER_ONLY_MODULES = {
     "pypdfium2",
     "pytesseract",
     "PIL",
+    # The plan PDF (spec 016 rule 13): WeasyPrint loads pango, so only the worker renders.
+    "export.html",
+    "export.pdf",
+    "jinja2",
+    "weasyprint",
 }
 
 
@@ -321,7 +326,8 @@ def test_the_api_process_does_not_load_ocr_or_parsers() -> None:
     probe = (
         "import sys, app.main; "
         "print(','.join(sorted(m for m in ('pytesseract', 'pdfplumber', 'pypdfium2', 'PIL',"
-        " 'ingest.ocr', 'ingest.reader', 'ingest.pipeline') if m in sys.modules)))"
+        " 'ingest.ocr', 'ingest.reader', 'ingest.pipeline', 'weasyprint', 'jinja2',"
+        " 'export.html', 'export.pdf') if m in sys.modules)))"
     )
     result = subprocess.run(
         [sys.executable, "-c", probe],
