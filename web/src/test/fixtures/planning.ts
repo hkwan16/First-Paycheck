@@ -1,5 +1,6 @@
 import type {
   BenefitsPlan,
+  BenefitsValues,
   CalendarEvent,
   Decision,
   EmergencyFundInput,
@@ -335,4 +336,20 @@ export const sampleBenefitsProposal: Proposal = {
   ].map(sourceLine),
   withheld_pages: [],
   notes: null,
+};
+
+/** The sample summary's values as the Confirm screen sends them once every field is confirmed. */
+export const sampleBenefitsValues: BenefitsValues = {
+  plans: [BRONZE_HSA, GOLD_PPO].map((plan) => ({
+    ...plan,
+    coinsurance_pct: String(plan.coinsurance_pct),
+    enrollment_deadline: ENROLLMENT_DEADLINE,
+  })),
+  retirement: {
+    match_tiers: [
+      { employee_pct_upto: '3.00', employer_pct: '100.00' },
+      { employee_pct_upto: '5.00', employer_pct: '50.00' },
+    ],
+    vesting_years: 3,
+  },
 };

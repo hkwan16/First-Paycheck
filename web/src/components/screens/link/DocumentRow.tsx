@@ -82,6 +82,9 @@ export function DocumentRow({ doc, jobId, starting, onRead, onReplace }: Documen
   const reason = statusReasonText(doc.status_reason);
   const reading = doc.status === 'extracting' || starting;
   const read = doc.page_count !== null;
+  // A benefits summary nothing could be read from is not typed in on Confirm:
+  // the decision cards take its plans and match (isReviewable).
+  const unreadBenefits = doc.type === 'benefits' && doc.status === 'manual_entry_required';
   const pages =
     doc.page_count === null
       ? null
@@ -115,9 +118,9 @@ export function DocumentRow({ doc, jobId, starting, onRead, onReplace }: Documen
               <RelativeTime value={doc.uploaded_at} />
             </div>
             {reason && <p className="m-0 text-small text-ink-2">{reason}</p>}
-            {doc.type === 'benefits' && doc.status === 'proposed' && (
+            {unreadBenefits && (
               <p className="m-0 text-small text-ink-2">
-                Benefits are reviewed with your health plan decision, after alpha.
+                Enter its plans on the health plan card and its match in your 401(k) plan details.
               </p>
             )}
           </div>
@@ -139,6 +142,11 @@ export function DocumentRow({ doc, jobId, starting, onRead, onReplace }: Documen
               aria-label={doc.status === 'proposed' ? `Review ${lower}` : `Enter ${lower} fields`}
             >
               {doc.status === 'proposed' ? 'Review' : 'Enter fields'}
+            </Button>
+          )}
+          {!reading && unreadBenefits && (
+            <Button size="sm" href="/setup/decisions">
+              Go to decisions
             </Button>
           )}
           {!reading && doc.status === 'uploaded' && READABLE_TYPES.has(doc.type) && (

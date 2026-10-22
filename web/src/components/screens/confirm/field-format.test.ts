@@ -14,7 +14,15 @@ describe('fieldDisplay', () => {
     expect(fieldDisplay({ kind: 'money', value: 0 }, false)).toBe('$0.00');
     expect(fieldDisplay({ kind: 'date', value: '2026-10-15' }, false)).toBe('Oct 15, 2026');
     expect(fieldDisplay({ kind: 'text', value: 'Acme Corp' }, false)).toBe('Acme Corp');
-    expect(fieldDisplay({ kind: 'percent', value: '20.00' }, false)).toBe('20.00%');
+    expect(fieldDisplay({ kind: 'percent', value: '20.00' }, false)).toBe('20%');
+    expect(fieldDisplay({ kind: 'percent', value: '12.50' }, false)).toBe('12.5%');
+    expect(fieldDisplay({ kind: 'number', value: 3 }, false)).toBe('3');
+    expect(
+      fieldDisplay(
+        { kind: 'number', value: 3, choices: [{ value: '3', label: '3 years' }] },
+        false,
+      ),
+    ).toBe('3 years');
     expect(
       fieldDisplay({ kind: 'text', value: 'semimonthly', choices: PAY_FREQUENCY_CHOICES }, false),
     ).toBe('Twice a month');
