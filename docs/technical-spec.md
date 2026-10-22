@@ -117,7 +117,7 @@ PostgreSQL with row-level security on every table; every user row carries `user_
 | `decisions` | Every chosen calculator result, versioned and immutable | calculator, inputs, result, version, supersedes_id, check_in_id, created_at |
 | `explanations` | Each explanation attempt | decision_id or finding_id, text, citations, prompt_version, verified, fallback, verification counts |
 | `check_ins` | One per monthly review or data-triggered review | period, triggered_by (schedule, sync, manual), status, completed_at |
-| `check_in_findings` | Typed findings for one check-in | check_in_id, kind, severity, decision_id, payload, user_action (acknowledged, acted, dismissed, or null) |
+| `check_in_findings` | Typed findings for one check-in | check_in_id, kind, severity, decision_id, payload, user_action (done, dismissed, or null) |
 | `calendar_events` | Dated checkpoints derived from decisions and plans | kind, due_at, decision_id, status |
 | `jobs` | Background work queue | kind, status, progress, payload, result, attempts, run_after, heartbeat_at, idempotency_key |
 | `llm_calls` | One row per Claude call: the cost ledger and the source of the fallback-rate metric | purpose, model, prompt_version, input_tokens, output_tokens, cache_read_tokens, cost_microcents, latency_ms, status, job_id |
@@ -204,7 +204,7 @@ Categorization runs as a background job queued by every sync. Rules and user cor
 | `GET /check-ins` | → list of check-ins with finding counts | No |
 | `GET /check-ins/{id}` | → findings, each with the decision it affects and the current calculator result | No |
 | `POST /check-ins` | → runs a check-in now against the latest data | No |
-| `PATCH /check-ins/{id}/findings/{fid}` | user_action (acknowledged, acted, dismissed, or null to undo) → updated finding | No |
+| `PATCH /check-ins/{id}/findings/{fid}` | user_action (done, dismissed, or null to undo) → updated finding | No |
 | `GET /calendar` | → upcoming checkpoints from decisions and plans | No |
 | `GET /plan`, `GET /plan/export` | → saved decisions with reasoning and decision calendar; one-page PDF plan | No |
 

@@ -99,7 +99,7 @@ Every job handler, after the privileged dequeue, opens a user-scoped session wit
 | `checkin_status` | `open`, `completed` |
 | `finding_kind` | `election_mismatch`, `goal_off_pace`, `recurring_new`, `recurring_changed`, `recurring_stopped`, `pay_change`, `deduction_change`, `upcoming_deadline` |
 | `finding_severity` | `info`, `warning`, `alert` |
-| `finding_action` | `acknowledged`, `acted`, `dismissed` |
+| `finding_action` | `done`, `dismissed` (`0012_checkin_findings` replaced the original `acknowledged`, `acted`, `dismissed`, spec 015) |
 | `calendar_kind` | `enrollment_deadline`, `tax_season`, `open_enrollment`, `goal_target` |
 | `calendar_status` | `upcoming`, `done`, `dismissed` |
 | `job_kind` | `sync.initial`, `sync.incremental`, `categorize.run`, `ingest.extract`, `recurring.detect`, `checkin.monthly`, `schedule.tick` |
@@ -359,8 +359,9 @@ Indexes: `(decision_id, created_at DESC)`, `(finding_id, created_at DESC)`. The 
 | `kind` | `finding_kind` | `NOT NULL` |
 | `severity` | `finding_severity` | `NOT NULL` |
 | `decision_id` | `uuid` | Nullable; FK `-> decisions` |
-| `payload` | `jsonb` | `NOT NULL`; shape per finding kind, set by the check-in spec (M8) |
-| `user_action` | `finding_action` | Nullable; `PATCH` with `null` undoes (spec amendment 14) |
+| `key` | `text` | `NOT NULL`, `CHECK (key <> '')`; what the finding reports (spec 015 rule 12); `UNIQUE (check_in_id, key)`, index `(user_id, key)` (added in `0012`) |
+| `payload` | `jsonb` | `NOT NULL`; shape per finding kind, set by spec 015 |
+| `user_action` | `finding_action` | Nullable (`done` or `dismissed`); `PATCH` with `null` undoes (spec amendment 14) |
 | `user_action_at` | `timestamptz` | `CHECK ((user_action IS NULL) = (user_action_at IS NULL))` |
 
 ### `calendar_events`
@@ -437,6 +438,7 @@ Reference data, no `user_id` (RLS exception).
 | `0005_checkins` | `recurring_charges`, `check_ins`, `check_in_findings`, and the deferred foreign keys `decisions.check_in_id` and `explanations.finding_id` |
 | `0006_webhook_fn` | `enqueue_sync_for_plaid_item(text)` |
 | `0007_lock_alembic_version` | Nothing new. Revokes Supabase's default grants to `anon` and `authenticated` from `alembic_version` and the `public` functions, which `enable_rls` never touched, then grants back only what 0001, 0002 and 0006 intended. The test auth shim copies those defaults so a future object that skips its revoke fails `test_migrations` |
+| `0012_checkin_findings` | Nothing new. `check_in_findings.key` with `UNIQUE (check_in_id, key)` and an index on `(user_id, key)`; `finding_action` rebuilt as `done`, `dismissed` (spec 015) |
 
 CI runs upgrade, downgrade, upgrade and `alembic check` on every pull request.
 

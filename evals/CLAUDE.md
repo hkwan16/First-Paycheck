@@ -106,6 +106,13 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   `fields_exact` (typical amount and overdue flag of the matches). The baseline
   records one known miss: a utility bill swinging about 22% around its median
   falls partly outside the 15% series (spec 009, edge cases).
+- `suites/checkin.py` (`checkin`, free): spec 015's finders
+  (`checkin.findings.all_findings`) over `fixtures/checkin/scenarios.json`,
+  one case per row of the spec's finder table (`spec-015-<test name>`; a test
+  fails when a row has no case). Each case holds the facts with fixed ids and
+  the expected findings typed in from the spec's arithmetic, only the payload
+  fields the spec states. No database. `precision`, `recall` (matched by
+  kind and key) and `fields_exact` (severity and the labeled payload fields).
 - `baseline.json`: the committed metrics every run is compared with.
 
 ## Rules

@@ -230,8 +230,9 @@ class FindingSeverity(StrEnum):
 
 
 class FindingAction(StrEnum):
-    ACKNOWLEDGED = "acknowledged"
-    ACTED = "acted"
+    """What the user did with a finding; null undoes it (0012_checkin_findings, spec 015)."""
+
+    DONE = "done"
     DISMISSED = "dismissed"
 
 

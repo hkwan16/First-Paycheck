@@ -218,6 +218,66 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/check-ins': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Check Ins
+     * @description The user's check-ins, newest month first, with finding counts.
+     */
+    get: operations['list_check_ins'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/check-ins/{check_in_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Check In
+     * @description One check-in: its findings and the month's cash flow against the plan.
+     */
+    get: operations['get_check_in'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/check-ins/{check_in_id}/findings/{finding_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update Finding
+     * @description Mark a finding done or dismissed, or undo that with null.
+     */
+    patch: operations['update_finding'];
+    trace?: never;
+  };
   '/decisions': {
     parameters: {
       query?: never;
@@ -447,6 +507,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/holdings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Holdings
+     * @description The newest holdings of each investment and retirement account, with gains.
+     */
+    get: operations['get_holdings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/jobs/{job_id}': {
     parameters: {
       query?: never;
@@ -459,6 +539,26 @@ export interface paths {
      * @description One of the user's jobs.
      */
     get: operations['get_job'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/net-worth': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Net Worth
+     * @description Assets minus liabilities now and at the end of each month, from balance snapshots.
+     */
+    get: operations['get_net_worth'];
     put?: never;
     post?: never;
     delete?: never;
@@ -700,6 +800,60 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /** AccountBalanceOut */
+    AccountBalanceOut: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string;
+      /**
+       * Balance As Of
+       * Format: date
+       */
+      balance_as_of: string;
+      /** Balance Cents */
+      balance_cents: number;
+      /** Institution Name */
+      institution_name: string | null;
+      kind: components['schemas']['AccountKind'];
+      /** Mask */
+      mask: string | null;
+      /** Name */
+      name: string;
+      role: components['schemas']['AccountRole'] | null;
+      /**
+       * Side
+       * @enum {string}
+       */
+      side: 'asset' | 'liability';
+    };
+    /** AccountHoldingsOut */
+    AccountHoldingsOut: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string;
+      /**
+       * As Of
+       * Format: date
+       */
+      as_of: string;
+      /** Cost Basis Cents */
+      cost_basis_cents: number | null;
+      /** Gain Cents */
+      gain_cents: number | null;
+      /** Holdings */
+      holdings: components['schemas']['PositionValue'][];
+      kind: components['schemas']['AccountKind'];
+      /** Mask */
+      mask: string | null;
+      /** Name */
+      name: string;
+      /** Value Cents */
+      value_cents: number;
+    };
     /**
      * AccountKind
      * @enum {string}
@@ -952,6 +1106,87 @@ export interface components {
       /** Total Cents */
       total_cents: number;
     };
+    /** CheckInCashFlow */
+    CheckInCashFlow: {
+      cash_flow: components['schemas']['CashFlow'];
+      /** Plan */
+      plan: components['schemas']['PlanLine'][];
+    };
+    /** CheckInDetail */
+    CheckInDetail: {
+      cash_flow: components['schemas']['CheckInCashFlow'];
+      /** Completed At */
+      completed_at: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Finding Count */
+      finding_count: number;
+      /** Findings */
+      findings: components['schemas']['FindingOut'][];
+      /** Handled Count */
+      handled_count: number;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Period
+       * Format: date
+       */
+      period: string;
+      status: components['schemas']['CheckinStatus'];
+      triggered_by: components['schemas']['CheckinTrigger'];
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
+    /** CheckInSummary */
+    CheckInSummary: {
+      /** Completed At */
+      completed_at: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Finding Count */
+      finding_count: number;
+      /** Handled Count */
+      handled_count: number;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Period
+       * Format: date
+       */
+      period: string;
+      status: components['schemas']['CheckinStatus'];
+      triggered_by: components['schemas']['CheckinTrigger'];
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
+    /**
+     * CheckinStatus
+     * @enum {string}
+     */
+    CheckinStatus: 'open' | 'completed';
+    /**
+     * CheckinTrigger
+     * @enum {string}
+     */
+    CheckinTrigger: 'schedule' | 'sync' | 'manual';
     /** CitationOut */
     CitationOut: {
       /** Key */
@@ -1086,6 +1321,56 @@ export interface components {
       /** Version */
       version: number;
     };
+    /** DeductionChangePayload */
+    DeductionChangePayload: {
+      /** Affects */
+      affects: ('k401_match' | 'health_plans' | 'emergency_fund' | 'w4' | 'spending') | null;
+      /** Amount Cents */
+      amount_cents: number;
+      /** Change Cents */
+      change_cents: number;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'deduction_change';
+      /** Label */
+      label: string;
+      /**
+       * Line
+       * @enum {string}
+       */
+      line:
+        | 'federal_withholding'
+        | 'social_security'
+        | 'medicare'
+        | 'state_tax'
+        | 'retirement_contribution'
+        | 'medical_premium'
+        | 'other_deductions';
+      /**
+       * Pay Date
+       * Format: date
+       */
+      pay_date: string;
+      /**
+       * Pay Stub Id
+       * Format: uuid
+       */
+      pay_stub_id: string;
+      /** Previous Cents */
+      previous_cents: number;
+      /**
+       * Previous Pay Date
+       * Format: date
+       */
+      previous_pay_date: string;
+      /**
+       * Previous Pay Stub Id
+       * Format: uuid
+       */
+      previous_pay_stub_id: string;
+    };
     /** DocumentCreated */
     DocumentCreated: {
       /**
@@ -1167,6 +1452,43 @@ export interface components {
      * @enum {string}
      */
     DocumentType: 'pay_stub' | 'offer_letter' | 'benefits';
+    /** ElectionMismatchPayload */
+    ElectionMismatchPayload: {
+      /** Actual Cents */
+      actual_cents: number;
+      /** Actual Pct */
+      actual_pct?: string | null;
+      /** Affects */
+      affects: ('k401_match' | 'health_plans' | 'emergency_fund' | 'w4' | 'spending') | null;
+      /**
+       * Calculator
+       * @enum {string}
+       */
+      calculator: 'k401_match' | 'health_plans';
+      /** Difference Cents */
+      difference_cents: number;
+      /** Elected Pct */
+      elected_pct?: string | null;
+      /** Expected Cents */
+      expected_cents: number;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'election_mismatch';
+      /**
+       * Pay Date
+       * Format: date
+       */
+      pay_date: string;
+      /**
+       * Pay Stub Id
+       * Format: uuid
+       */
+      pay_stub_id: string;
+      /** Plan Name */
+      plan_name?: string | null;
+    };
     /**
      * EmergencyFundInput
      * @description The calculator's inputs, exactly as spec 011 lists them.
@@ -1308,10 +1630,121 @@ export interface components {
      */
     FilingStatus: 'single' | 'married_filing_jointly' | 'head_of_household';
     /**
+     * FindingAction
+     * @description What the user did with a finding; null undoes it (0012_checkin_findings, spec 015).
+     * @enum {string}
+     */
+    FindingAction: 'done' | 'dismissed';
+    /**
+     * FindingKind
+     * @enum {string}
+     */
+    FindingKind:
+      | 'election_mismatch'
+      | 'goal_off_pace'
+      | 'recurring_new'
+      | 'recurring_changed'
+      | 'recurring_stopped'
+      | 'pay_change'
+      | 'deduction_change'
+      | 'upcoming_deadline';
+    /** FindingOut */
+    FindingOut: {
+      /**
+       * Check In Id
+       * Format: uuid
+       */
+      check_in_id: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Decision Id */
+      decision_id: string | null;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Key */
+      key: string;
+      kind: components['schemas']['FindingKind'];
+      /** Payload */
+      payload:
+        | components['schemas']['ElectionMismatchPayload']
+        | components['schemas']['GoalOffPacePayload']
+        | components['schemas']['RecurringPayload']
+        | components['schemas']['PayChangePayload']
+        | components['schemas']['DeductionChangePayload']
+        | components['schemas']['UpcomingDeadlinePayload'];
+      severity: components['schemas']['FindingSeverity'];
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+      user_action: components['schemas']['FindingAction'] | null;
+      /** User Action At */
+      user_action_at: string | null;
+    };
+    /**
+     * FindingPatch
+     * @description ``done`` or ``dismissed``, or null to undo.
+     */
+    FindingPatch: {
+      /** @description null undoes the action */
+      user_action: components['schemas']['FindingAction'] | null;
+    };
+    /**
+     * FindingSeverity
+     * @enum {string}
+     */
+    FindingSeverity: 'info' | 'warning' | 'alert';
+    /**
      * GoalKind
      * @enum {string}
      */
     GoalKind: 'emergency_fund' | 'custom';
+    /** GoalOffPacePayload */
+    GoalOffPacePayload: {
+      /** Affects */
+      affects: ('k401_match' | 'health_plans' | 'emergency_fund' | 'w4' | 'spending') | null;
+      /**
+       * Balance As Of
+       * Format: date
+       */
+      balance_as_of: string;
+      /** Balance Cents */
+      balance_cents: number;
+      /** Expected Cents */
+      expected_cents: number;
+      /**
+       * Goal Id
+       * Format: uuid
+       */
+      goal_id: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'goal_off_pace';
+      /** Monthly Contribution Cents */
+      monthly_contribution_cents: number;
+      /** Months Elapsed */
+      months_elapsed: number;
+      /** Shortfall Cents */
+      shortfall_cents: number;
+      /** Start Balance Cents */
+      start_balance_cents: number;
+      /**
+       * Started On
+       * Format: date
+       */
+      started_on: string;
+      /** Target Amount Cents */
+      target_amount_cents: number;
+    };
     /** GoalOut */
     GoalOut: {
       /** Account Id */
@@ -1518,6 +1951,17 @@ export interface components {
      * @enum {string}
      */
     HealthcareUsage: 'low' | 'medium' | 'high';
+    /** HoldingsOut */
+    HoldingsOut: {
+      /** Accounts */
+      accounts: components['schemas']['AccountHoldingsOut'][];
+      /** Cost Basis Cents */
+      cost_basis_cents: number | null;
+      /** Gain Cents */
+      gain_cents: number | null;
+      /** Value Cents */
+      value_cents: number;
+    };
     /**
      * JobKind
      * @enum {string}
@@ -1636,6 +2080,21 @@ export interface components {
       /** Per Paycheck Cost Delta Cents */
       per_paycheck_cost_delta_cents: number;
     };
+    /** KindTotal */
+    KindTotal: {
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'checking' | 'savings' | 'credit' | 'investment' | 'retirement';
+      /**
+       * Side
+       * @enum {string}
+       */
+      side: 'asset' | 'liability';
+      /** Total Cents */
+      total_cents: number;
+    };
     /**
      * LineItem
      * @description One printed line of the stub's current-period column (spec 005 rule 3).
@@ -1726,6 +2185,44 @@ export interface components {
       /** Employer Pct */
       employer_pct: string;
     };
+    /** NetWorthOut */
+    NetWorthOut: {
+      /** Accounts */
+      accounts: components['schemas']['AccountBalanceOut'][];
+      /** As Of */
+      as_of: string | null;
+      /** Assets Cents */
+      assets_cents: number;
+      /** By Kind */
+      by_kind: components['schemas']['KindTotal'][];
+      /** Change Cents */
+      change_cents: number | null;
+      /** Liabilities Cents */
+      liabilities_cents: number;
+      /** Net Worth Cents */
+      net_worth_cents: number;
+      /** Series */
+      series: components['schemas']['NetWorthPoint'][];
+    };
+    /** NetWorthPoint */
+    NetWorthPoint: {
+      /**
+       * As Of
+       * Format: date
+       */
+      as_of: string;
+      /** Assets Cents */
+      assets_cents: number;
+      /** Liabilities Cents */
+      liabilities_cents: number;
+      /**
+       * Month
+       * Format: date
+       */
+      month: string;
+      /** Net Worth Cents */
+      net_worth_cents: number;
+    };
     /**
      * NumberClaim
      * @description A figure the explanation states, for the UI to show beside the text.
@@ -1749,6 +2246,48 @@ export interface components {
     OtherJob: {
       /** Annual Wages Cents */
       annual_wages_cents: number;
+    };
+    /** PayChangePayload */
+    PayChangePayload: {
+      /** Affects */
+      affects: ('k401_match' | 'health_plans' | 'emergency_fund' | 'w4' | 'spending') | null;
+      /** Gross Cents */
+      gross_cents: number;
+      /** Gross Change Cents */
+      gross_change_cents: number;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'pay_change';
+      /** Net Cents */
+      net_cents: number;
+      /** Net Change Cents */
+      net_change_cents: number;
+      /**
+       * Pay Date
+       * Format: date
+       */
+      pay_date: string;
+      /**
+       * Pay Stub Id
+       * Format: uuid
+       */
+      pay_stub_id: string;
+      /** Previous Gross Cents */
+      previous_gross_cents: number;
+      /** Previous Net Cents */
+      previous_net_cents: number;
+      /**
+       * Previous Pay Date
+       * Format: date
+       */
+      previous_pay_date: string;
+      /**
+       * Previous Pay Stub Id
+       * Format: uuid
+       */
+      previous_pay_stub_id: string;
     };
     /**
      * PayFrequency
@@ -1912,6 +2451,30 @@ export interface components {
      * @enum {string}
      */
     PlanKind: 'hdhp' | 'ppo' | 'hmo';
+    /** PlanLine */
+    PlanLine: {
+      /** Actual Cents */
+      actual_cents: number;
+      /** Difference Cents */
+      difference_cents: number | null;
+      /**
+       * Key
+       * @enum {string}
+       */
+      key:
+        | 'take_home'
+        | 'essentials'
+        | 'flexible'
+        | 'other'
+        | 'savings'
+        | 'retirement'
+        | 'health'
+        | 'left_over';
+      /** Label */
+      label: string;
+      /** Plan Cents */
+      plan_cents: number | null;
+    };
     /** PlanPair */
     PlanPair: {
       /**
@@ -1957,6 +2520,23 @@ export interface components {
       oop_max_cents: number;
       /** Premium Per Period Cents */
       premium_per_period_cents: number;
+    };
+    /** PositionValue */
+    PositionValue: {
+      /** Cost Basis Cents */
+      cost_basis_cents: number | null;
+      /** Gain Cents */
+      gain_cents: number | null;
+      /** Name */
+      name: string;
+      /** Quantity */
+      quantity: string;
+      /** Security Id */
+      security_id: string;
+      /** Ticker */
+      ticker: string | null;
+      /** Value Cents */
+      value_cents: number;
     };
     /**
      * ProfileIn
@@ -2114,6 +2694,41 @@ export interface components {
        */
       merchant_clean?: string | null;
       user_status?: components['schemas']['RecurringUserStatus'] | null;
+    };
+    /** RecurringPayload */
+    RecurringPayload: {
+      /** Affects */
+      affects: ('k401_match' | 'health_plans' | 'emergency_fund' | 'w4' | 'spending') | null;
+      cadence: components['schemas']['RecurringCadence'];
+      /** Change Cents */
+      change_cents?: number | null;
+      /**
+       * First Seen
+       * Format: date
+       */
+      first_seen: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'recurring_changed' | 'recurring_new' | 'recurring_stopped';
+      /**
+       * Last Seen
+       * Format: date
+       */
+      last_seen: string;
+      /** Merchant */
+      merchant: string;
+      /** Previous Amount Cents */
+      previous_amount_cents?: number | null;
+      /**
+       * Recurring Charge Id
+       * Format: uuid
+       */
+      recurring_charge_id: string;
+      /** Typical Amount Cents */
+      typical_amount_cents: number;
+      user_status: components['schemas']['RecurringUserStatus'] | null;
     };
     /**
      * RecurringStatus
@@ -2339,6 +2954,31 @@ export interface components {
       items: components['schemas']['TransactionOut'][];
       /** Next Cursor */
       next_cursor: string | null;
+    };
+    /** UpcomingDeadlinePayload */
+    UpcomingDeadlinePayload: {
+      /** Affects */
+      affects: ('k401_match' | 'health_plans' | 'emergency_fund' | 'w4' | 'spending') | null;
+      /**
+       * Calendar Event Id
+       * Format: uuid
+       */
+      calendar_event_id: string;
+      calendar_kind: components['schemas']['CalendarKind'];
+      /** Days Until */
+      days_until: number;
+      /**
+       * Due At
+       * Format: date
+       */
+      due_at: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'upcoming_deadline';
+      /** Title */
+      title: string;
     };
     /** ValidationError */
     ValidationError: {
@@ -2924,7 +3564,12 @@ export interface operations {
   };
   list_calendar: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Earliest due date, inclusive */
+        from?: string | null;
+        /** @description Latest due date, inclusive */
+        to?: string | null;
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -2942,6 +3587,15 @@ export interface operations {
       };
       /** @description Unauthorized */
       401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
         headers: {
           [name: string]: unknown;
         };
@@ -2976,6 +3630,138 @@ export interface operations {
       };
       /** @description Unauthorized */
       401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  list_check_ins: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CheckInSummary'][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  get_check_in: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        check_in_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CheckInDetail'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  update_finding: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        check_in_id: string;
+        finding_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FindingPatch'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FindingOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -3628,6 +4414,35 @@ export interface operations {
       };
     };
   };
+  get_holdings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldingsOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
   get_job: {
     parameters: {
       query?: never;
@@ -3659,6 +4474,47 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  get_net_worth: {
+    parameters: {
+      query?: {
+        /** @description Months in the series, ending this month */
+        months?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NetWorthOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
         headers: {
           [name: string]: unknown;
         };

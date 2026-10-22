@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 from sqlalchemy import Connection, func, select, table, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 
 from app.db import user_session_for
 from db.enums import CHECKIN_ENUMS
@@ -69,13 +69,18 @@ def check_in(
 def finding(
     connection: Connection, user: FixtureUser, check_in_id: uuid.UUID, **fields: Any
 ) -> uuid.UUID:
-    values = {"user_action": None, "user_action_at": None, **fields}
+    values = {
+        "user_action": None,
+        "user_action_at": None,
+        "key": f"recurring_new:{uuid.uuid4()}",
+        **fields,
+    }
     row_id: uuid.UUID = as_user(
         connection,
         user,
-        "INSERT INTO check_in_findings (user_id, check_in_id, kind, severity, payload,"
+        "INSERT INTO check_in_findings (user_id, check_in_id, kind, severity, key, payload,"
         " user_action, user_action_at)"
-        " VALUES (:u, :c, 'recurring_new', 'info', '{}', :user_action, :user_action_at)"
+        " VALUES (:u, :c, 'recurring_new', 'info', :key, '{}', :user_action, :user_action_at)"
         " RETURNING id",
         u=user.id,
         c=check_in_id,
@@ -231,6 +236,29 @@ def test_findings_cascade_with_their_check_in(
     as_user(db_connection, user_a, "DELETE FROM check_ins WHERE id = :id", id=made)
     assert visible(db_connection, user_a, "check_in_findings") == 0
     assert visible(db_connection, user_a, "explanations") == 0
+
+
+def test_finding_key_is_unique_per_check_in(db_connection: Connection, user_a: FixtureUser) -> None:
+    # Spec 015 rule 12 (migration 0012): one finding per key and check-in.
+    first, second = check_in(db_connection, user_a), check_in(db_connection, user_a, "2026-11-01")
+    finding(db_connection, user_a, first, key="pay_change:x")
+    finding(db_connection, user_a, second, key="pay_change:x")
+    with pytest.raises(IntegrityError, match="uq_check_in_findings_check_in_id_key"):
+        finding(db_connection, user_a, first, key="pay_change:x")
+
+
+def test_finding_key_is_not_empty(db_connection: Connection, user_a: FixtureUser) -> None:
+    with pytest.raises(IntegrityError, match="key_not_empty"):
+        finding(db_connection, user_a, check_in(db_connection, user_a), key="")
+
+
+def test_finding_actions_are_done_and_dismissed(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    made = check_in(db_connection, user_a)
+    finding(db_connection, user_a, made, user_action="done", user_action_at="2026-10-21")
+    with pytest.raises(DataError, match="finding_action"):
+        finding(db_connection, user_a, made, user_action="acted", user_action_at="2026-10-21")
 
 
 def test_finding_cannot_join_another_users_check_in(

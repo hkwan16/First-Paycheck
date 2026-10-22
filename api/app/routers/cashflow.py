@@ -15,6 +15,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.deps import Now, UserSession
 from app.errors import error_responses
@@ -71,6 +72,11 @@ def get_cashflow(
     """Gross-to-net lines of each pay stub and the spending summary; the last full UTC
     month by default."""
     first, last = period(start, end, now.date())
+    return cash_flow_for(session, first, last)
+
+
+def cash_flow_for(session: Session, first: dt.date, last: dt.date) -> CashFlow:
+    """The cash flow of an already validated period (the check-in detail shares it)."""
     stubs = list(
         session.scalars(
             select(PayStub)

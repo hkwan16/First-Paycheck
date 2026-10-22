@@ -24,8 +24,8 @@ llm/        gateway.py (the only anthropic import), schemas.py, cost.py, prompts
 retrieval/  IRS citations, benefits full-text search, context.py (what explain sends)
 verify/     numbers, allowed, verify (checks), flow (draft-verify-retry-fallback), fallback
 jobs/       queue.py, worker.py, scheduler.py, registry.py, services.py, context.py,
-            handlers/ (sync, categorize, recurring, ingest_extract)
-checkin/    engine and one pure function per finding kind
+            handlers/ (sync, categorize, recurring, ingest_extract, checkin)
+checkin/    findings (one pure function per finding kind), facts (RLS reads), engine
 export/     plan PDF (WeasyPrint, worker only), calendar
 tests/      unit/ (no DB, no network), integration/ (real Postgres), rls/ (cross-user
             route cases), support/ (fakes, factories), fixtures/ (plaid, llm)
@@ -364,6 +364,47 @@ adds the `calendar_kind` label `w4_submit`; no new table or function.
   Citations: `db/seed/irs_citations/w4.yaml` (Pub 15-T web edition, the 2026
   Form W-4, IR-2025-103, the 401(k) Resource Guide). The verifier skips Form
   W-4 step numbers ("Step 2", "Steps 3") the way it skips "Form 1040".
+
+## Check-ins, net worth and holdings (from M8)
+
+Spec 015. Migration `0012_checkin_findings` (revises `0009_w4_calendar_kind`)
+adds `check_in_findings.key` (`UNIQUE (check_in_id, key)`, index `(user_id,
+key)`) and rebuilds `finding_action` as `done`, `dismissed`. No new table or
+function.
+
+- **Finders** (`checkin/findings.py`) are pure, one per `finding_kind`,
+  `f(Facts) -> list[Finding]`; `all_findings` runs them in rule order. Facts
+  and payloads are Pydantic models; the payload union is discriminated by
+  `kind` and is what `FindingOut.payload` returns. Amounts come from
+  `calc/checkin.py`; finders only compare cents and do date arithmetic.
+  `checkin/facts.py` loads the facts (and the plan targets) under RLS.
+- **Keys.** A finding's `key` names the event it reports. The engine
+  (`checkin/engine.py`) reconciles a refresh by key: a key on another of the
+  user's check-ins is dropped (reported once), a key already here is updated
+  in place (the user's action stays), a condition (`election_mismatch`,
+  `goal_off_pace`, `upcoming_deadline`) nobody produces any more is retracted
+  unless handled, events are kept. Surfacing sets `new`/`changed` recurring
+  charges `active`; the engine holds `checkin:{user}` then
+  `recurring.detect:{user}` advisory locks so it never interleaves with
+  detection.
+- **Jobs.** `checkin.monthly` (`jobs/handlers/checkin.py`), payload `{"period":
+  "YYYY-MM-01", "trigger": "schedule" | "sync"}`, dated `min(clock, last day of
+  period)`. `schedule.tick` queues one per `auth.users` row and UTC month with
+  key `checkin.monthly:YYYY-MM` (result `checkins_queued`); `recurring.detect`
+  queues a `sync` refresh after writing when the month's check-in is open.
+  A `sync` job never creates a check-in, and a completed one is not refreshed.
+- **Routes.** `GET /check-ins`, `GET /check-ins/{id}` (findings by severity,
+  `cash_flow`: `GET /cashflow`'s body for the month to date via
+  `routers/cashflow.py:cash_flow_for`, plus `calc/cashflow.py:against_plan`
+  lines), `PATCH /check-ins/{id}/findings/{fid}` (`done | dismissed | null`;
+  `settle_status` completes or reopens the check-in), `GET /net-worth?months=`
+  and `GET /holdings` (`routers/net_worth.py`, sums in `calc/net_worth.py`),
+  `GET /calendar?from=&to=`.
+- Tests: `tests/unit/checkin/` (finders from the spec table, reconcile),
+  `tests/integration/checkin/` (job, tick, refresh, routes) on the November
+  user in `tests/support/november.py`; factories `make_decision` (with a
+  chosen `created_at`), `make_goal`, `make_check_in`, `make_finding`,
+  `make_calendar_event`.
 
 ## Testing
 
