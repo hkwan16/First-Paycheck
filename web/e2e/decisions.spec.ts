@@ -3,11 +3,14 @@ import { e2eApiUrl, NO_E2E_API } from './support/api';
 import { e2eUser, NO_E2E_USER, waitForHydration } from './support/auth';
 
 /*
- * The 401(k) decision against the real API with the saved e2e session, after
- * confirm.spec.ts has confirmed a pay stub: fill in the plan details if the
- * profile lacks any (the birth year included), calculate, save a version,
- * change it and save the next one over it, then open its explanation. The e2e
- * user keeps its decisions between runs (they cannot be deleted), so the test
+ * The decisions against the real API with the saved e2e session, after
+ * confirm.spec.ts has confirmed a pay stub. The 401(k): fill in the plan
+ * details if the profile lacks any (the birth year included), calculate, save
+ * a version, change it and save the next one over it, then open its
+ * explanation. The emergency fund: save a version and pause and resume its
+ * goal. The health plan: type two synthetic plans when no benefits summary is
+ * confirmed, choose one and save it with an enrollment deadline. The e2e user
+ * keeps its decisions between runs (they cannot be deleted), so each test
  * reads which version is current instead of assuming v1.
  */
 
@@ -80,4 +83,109 @@ test('calculates, saves a version, saves the next one over it and opens why', as
   await expect(
     verified.or(fallback).or(page.getByText('Explanations are not available yet.')),
   ).toBeVisible({ timeout: 90_000 });
+});
+
+/** The save button's version after a save: "Saved as v3" is 3. */
+async function savedVersion(save: Locator) {
+  await expect(save).toHaveText(/^Saved as v\d+$/, { timeout: 15_000 });
+  return Number(/v(\d+)/.exec((await save.textContent()) ?? '')![1]);
+}
+
+/** Type an amount into an empty field; a prefilled one keeps what the API gave it. */
+async function fillIfEmpty(field: Locator, text: string) {
+  if ((await field.inputValue()) === '') await field.fill(text);
+}
+
+test('saves an emergency fund version and pauses and resumes its goal', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto('/setup/decisions');
+  await waitForHydration(page);
+  const fund = page.getByRole('region', { name: 'Emergency fund' });
+  const transfer = fund.getByLabel('Monthly transfer to savings');
+  await expect(transfer).toBeVisible({ timeout: 30_000 });
+
+  // Essentials come from the spending summary and savings from the emergency
+  // fund account when the e2e user has them; otherwise they are typed.
+  await fillIfEmpty(fund.getByLabel('Essential spending per month'), '1,800.00');
+  await fillIfEmpty(fund.getByLabel('Saved so far'), '2,000.00');
+  // Move away from whatever is saved, so there is a version to save.
+  await transfer.fill((await transfer.inputValue()) === '300.00' ? '250.00' : '300.00');
+
+  const result = fund.getByRole('group', { name: 'Calculator result' });
+  await expect(result).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
+  await expect(result).toContainText(/Target \$/);
+  const save = fund.getByRole('button', { name: /^Save|^Saved as v/ });
+  await expect(save).toBeEnabled();
+  await save.click();
+  await savedVersion(save);
+
+  const goal = fund.getByRole('group', { name: 'Your emergency fund goal' });
+  await expect(goal).toBeVisible({ timeout: 15_000 });
+  // A goal marked reached earlier goes back to active first.
+  const notReached = goal.getByRole('button', { name: 'Not reached yet' });
+  if (await notReached.isVisible()) await notReached.click();
+  const resume = goal.getByRole('button', { name: 'Resume' });
+  if (await resume.isVisible()) await resume.click();
+  await goal.getByRole('button', { name: 'Pause' }).click();
+  await expect(goal.getByRole('button', { name: 'Resume' })).toBeVisible({ timeout: 15_000 });
+  await goal.getByRole('button', { name: 'Resume' }).click();
+  await expect(goal.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 15_000 });
+});
+
+test('compares health plans, chooses one and saves it with its deadline', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto('/setup/decisions');
+  await waitForHydration(page);
+  const health = page.getByRole('region', { name: 'Health plan' });
+  const form = health.getByRole('form', { name: 'Your health plan options' });
+  const usage = health.getByRole('group', { name: 'Expected healthcare use' });
+  await expect(form.or(usage)).toBeVisible({ timeout: 30_000 });
+
+  if (await form.isVisible()) {
+    // Synthetic plans, typed as a person would from a benefits summary.
+    const plans = [
+      ['Bronze HSA', 'High deductible (HDHP)', '31.25', '1,800.00', '20', '3,500.00'],
+      ['Gold PPO', 'PPO', '62.50', '250.00', '10', '3,000.00'],
+    ] as const;
+    for (const [index, [name, kind, premium, deductible, coinsurance, oop]] of plans.entries()) {
+      if (
+        index > 0 &&
+        !(await form.getByRole('group', { name: `Plan ${index + 1}` }).isVisible())
+      ) {
+        await form.getByRole('button', { name: 'Add a plan' }).click();
+      }
+      const plan = form.getByRole('group', { name: `Plan ${index + 1}` });
+      await plan.getByLabel('Plan name').fill(name);
+      await plan.getByLabel('Plan type').selectOption({ label: kind });
+      await plan.getByLabel('Premium per paycheck').fill(premium);
+      await plan.getByLabel('Deductible').fill(deductible);
+      await plan.getByLabel('Coinsurance, %').fill(coinsurance);
+      await plan.getByLabel('Out-of-pocket maximum').fill(oop);
+    }
+    await form.getByRole('button', { name: 'Compare these plans' }).click();
+  }
+
+  const table = health.getByRole('table', { name: 'Expected yearly cost by plan' });
+  await expect(table).toBeVisible({ timeout: 15_000 });
+  // Choose the plan that is not chosen now, so there is a version to save.
+  const choice = health.getByRole('group', { name: 'The plan you will enroll in' });
+  const options = choice.getByRole('button');
+  const firstChosen = (await options.first().getAttribute('aria-pressed')) === 'true';
+  const next = firstChosen ? options.nth(1) : options.first();
+  await next.click();
+  await expect(next).toHaveAttribute('aria-pressed', 'true');
+
+  const deadline = `${new Date().getFullYear() + 1}-11-14`;
+  await health.getByLabel('Enrollment deadline').fill(deadline);
+  const result = health.getByRole('group', { name: 'Calculator result' });
+  await expect(result).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
+  await expect(result).toContainText('costs the least');
+
+  const save = health.getByRole('button', { name: /^Save|^Saved as v/ });
+  await expect(save).toBeEnabled();
+  await save.click();
+  await savedVersion(save);
+  await expect(health.getByText(/ is on your calendar for /)).toBeVisible({
+    timeout: 15_000,
+  });
 });
