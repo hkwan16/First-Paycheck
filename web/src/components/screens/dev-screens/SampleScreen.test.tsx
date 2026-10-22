@@ -73,6 +73,16 @@ describe('SampleScreen', () => {
     expect(requests).toEqual([]);
   });
 
+  it('renders the benefits summary review, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="confirm-benefits" />);
+    const fields = await screen.findByRole('region', { name: 'Plans and 401(k) match' });
+    expect(fields).toHaveTextContent('0 of 21 confirmed');
+    expect(within(fields).getByRole('heading', { name: 'Plan 2: Gold PPO' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Redacted benefits summary' })).toBeInTheDocument();
+    expect(requests).toEqual([]);
+  });
+
   it('renders the manual entry variant with every field open, with no requests', async () => {
     const requests = countRequests();
     render(<SampleScreen screen="confirm-manual" />);
@@ -89,7 +99,7 @@ describe('SampleScreen after Confirm', () => {
     server.events.removeAllListeners();
   });
 
-  it('renders the Decisions screen on the saved 401(k) decision, with no requests', async () => {
+  it('renders the Decisions screen on the saved decisions, with no requests', async () => {
     const requests = countRequests();
     render(<SampleScreen screen="decisions" />);
     const card = await screen.findByRole('region', { name: '401(k) match' });
@@ -97,8 +107,22 @@ describe('SampleScreen after Confirm', () => {
       'You capture the full $2,600 match',
     );
     expect(within(card).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
-    expect(screen.getByText(/of 4 saved/)).toHaveTextContent('1 of 4 saved');
-    expect(screen.getAllByText('After alpha')).toHaveLength(3);
+
+    const fund = screen.getByRole('region', { name: 'Emergency fund' });
+    expect(within(fund).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
+    expect(
+      within(fund).getByRole('group', { name: 'Your emergency fund goal' }),
+    ).toBeInTheDocument();
+    const health = screen.getByRole('region', { name: 'Health plan' });
+    expect(within(health).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
+    expect(
+      within(health).getByRole('table', { name: 'Expected yearly cost by plan' }),
+    ).toBeInTheDocument();
+
+    expect(screen.getByText(/of 4 saved/)).toHaveTextContent('3 of 4 saved');
+    expect(screen.getByRole('region', { name: 'W-4, federal only' })).toHaveTextContent(
+      'Coming in a later milestone.',
+    );
     expect(screen.getByRole('link', { name: 'Decisions' })).toHaveAttribute('aria-current', 'page');
     await act(() => vi.advanceTimersByTimeAsync(1_000));
     expect(requests).toEqual([]);
@@ -131,7 +155,7 @@ describe('SampleScreen after Confirm', () => {
 describe('seededClient', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it.each(['link', 'decisions', 'why', 'why-fallback'] as const)(
+  it.each(['link', 'confirm-benefits', 'decisions', 'why', 'why-fallback'] as const)(
     'seeds every %s query at the sample time without reading the clock',
     (name) => {
       // It runs while the page renders: next dev prerenders the route to

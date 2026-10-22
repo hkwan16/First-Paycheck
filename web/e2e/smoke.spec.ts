@@ -34,6 +34,12 @@ const SCREENS: readonly Screen[] = [
     sample: true,
   },
   {
+    path: '/dev/screens/confirm/benefits',
+    name: 'confirm-benefits',
+    heading: 'Check what we read from your benefits summary',
+    sample: true,
+  },
+  {
     path: '/dev/screens/spending',
     name: 'spending',
     heading: "Where October's money went",

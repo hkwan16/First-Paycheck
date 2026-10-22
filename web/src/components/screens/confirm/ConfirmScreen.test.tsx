@@ -446,7 +446,8 @@ describe('ConfirmScreen benefits summary', () => {
     expect(
       within(pane).getByRole('list', { name: 'Redacted benefits summary' }),
     ).toBeInTheDocument();
-    expect(within(pane).getByRole('img', { name: 'Redacted' })).toBeInTheDocument();
+    expect(within(pane).getByText('0 items redacted')).toBeInTheDocument();
+    expect(within(pane).getByText('ACME CORP 2027 BENEFITS SUMMARY')).toBeInTheDocument();
     expect(pane).toHaveTextContent('Find each value in these lines');
     expect(highlighted()).toHaveLength(0);
   });

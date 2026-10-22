@@ -317,7 +317,7 @@ export const sampleBenefitsProposal: Proposal = {
   vesting_years: field(['vesting_years', 'Years to full vesting', 'number', 3, 0.88]),
   source_lines: [
     'ACME CORP 2027 BENEFITS SUMMARY',
-    'EMPLOYEE RIVERA, J   MEMBER ID [REDACTED]',
+    'PLAN YEAR JANUARY 1 TO DECEMBER 31, 2027',
     'MEDICAL PLANS, EMPLOYEE-ONLY COVERAGE',
     'BRONZE HSA (HIGH DEDUCTIBLE)',
     'PREMIUM PER PAYCHECK 31.25',
