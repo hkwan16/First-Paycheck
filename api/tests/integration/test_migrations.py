@@ -215,3 +215,37 @@ def test_0012_keys_old_findings_and_maps_their_actions(
             text("SELECT user_action::text FROM check_in_findings ORDER BY 1 NULLS LAST")
         ).scalars()
         assert list(actions) == ["acted", "acted", "dismissed", None]
+
+
+def role_rows(engine: Engine) -> tuple[str, str | None]:
+    """The catalog row versions behind app_api and its membership of authenticated."""
+    with engine.connect() as connection:
+        role = connection.execute(
+            text("SELECT xmin::text FROM pg_authid WHERE rolname = 'app_api'")
+        ).scalar_one()
+        member = connection.execute(
+            text(
+                "SELECT m.xmin::text FROM pg_auth_members m "
+                "JOIN pg_roles r ON r.oid = m.roleid JOIN pg_roles g ON g.oid = m.member "
+                "WHERE r.rolname = 'authenticated' AND g.rolname = 'app_api'"
+            )
+        ).scalar_one_or_none()
+    return role, member
+
+
+def test_0001_leaves_the_cluster_wide_role_alone_once_it_is_set_up(
+    scratch_database: tuple[str, Engine],
+) -> None:
+    """Roles are shared by every database on the cluster, so two test runs (or
+    two worktrees) migrate at the same time. Rewriting the role row on every
+    upgrade, or revoking its membership on every downgrade, collides with
+    "tuple concurrently updated"; after the first setup, 0001 must not write.
+    """
+    url, engine = scratch_database
+    upgrade(url, "head")
+    before = role_rows(engine)
+
+    downgrade(url, "base")
+    assert role_rows(engine) == before
+    upgrade(url, "head")
+    assert role_rows(engine) == before
