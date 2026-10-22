@@ -271,8 +271,7 @@ describe('spending and recurring keys', () => {
     expect(invalidated(keys.cashflow)).toBe(false);
   });
 
-  it('recurring detection refreshes the list; a CSV import refreshes accounts and spending', async () => {
-    expect(JOB_INVALIDATES['recurring.detect']).toEqual([queryKeys.recurring()]);
+  it('a CSV import refreshes accounts and spending, not recurring charges', async () => {
     const { client, keys, invalidated } = seededSpending();
     await invalidateLinkedData(client);
     expect(invalidated(keys.accounts)).toBe(true);
@@ -332,6 +331,18 @@ describe('check-in, net worth and holdings keys', () => {
     expect(invalidated(keys.holdings)).toBe(false);
   });
 
+  it('recurring detection refreshes the charges and every check-in, whose findings it settles', async () => {
+    const { client, keys, invalidated } = seededCheckIns();
+    const recurring = $api.queryOptions('get', '/recurring').queryKey;
+    client.setQueryData(recurring, []);
+    await invalidateForJob(client, 'recurring.detect');
+    expect(invalidated(recurring)).toBe(true);
+    expect(invalidated(keys.list)).toBe(true);
+    expect(invalidated(keys.one)).toBe(true);
+    expect(invalidated(keys.other)).toBe(true);
+    expect(invalidated(keys.netWorth)).toBe(false);
+  });
+
   it('a sync refreshes net worth and holdings (new balances and positions)', async () => {
     const { client, keys, invalidated } = seededCheckIns();
     await invalidateForJob(client, 'sync.incremental');
@@ -342,14 +353,14 @@ describe('check-in, net worth and holdings keys', () => {
 });
 
 describe('invalidateAfterUnlink', () => {
-  it('refreshes what an institution fed: accounts, spending, recurring, check-ins, balances', async () => {
+  it('refreshes what an institution fed: accounts, spending, check-ins, balances', async () => {
     const client = new QueryClient();
     const keys = {
       accounts: queryKeys.accounts(),
       page: queryKeys.transactionPages({ limit: 50 }),
       cashflow: $api.queryOptions('get', '/cashflow').queryKey,
       summary: $api.queryOptions('get', '/spending/summary').queryKey,
-      recurring: queryKeys.recurring(),
+      // A check-in's cash flow is read from the transactions left.
       checkIns: queryKeys.checkIns(),
       checkIn: queryKeys.checkIn('c1'),
       netWorth: $api.queryOptions('get', '/net-worth', { params: { query: { months: 12 } } })
@@ -360,17 +371,21 @@ describe('invalidateAfterUnlink', () => {
       // Kept on unlink (spec 017 rule 16): decisions and documents.
       decisions: queryKeys.decisions(),
       documents: queryKeys.documents(),
+      // Changed only by the recurring.detect job the unlink queued, which
+      // useUnlinkItem follows (JOB_INVALIDATES reads them when it ends).
+      recurring: queryKeys.recurring(),
     };
     for (const key of Object.values(keys)) client.setQueryData(key, {});
     const invalidated = (key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
 
     await invalidateAfterUnlink(client);
 
-    const { decisions, documents, ...refreshed } = keys;
+    const { decisions, documents, recurring, ...refreshed } = keys;
     for (const [name, key] of Object.entries(refreshed)) {
       expect(invalidated(key), name).toBe(true);
     }
     expect(invalidated(decisions)).toBe(false);
     expect(invalidated(documents)).toBe(false);
+    expect(invalidated(recurring)).toBe(false);
   });
 });

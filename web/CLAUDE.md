@@ -171,10 +171,13 @@ next is a real disabled button, never a dead link).
   with keys spelled at call sites. `useTransactions` is an infinite query under
   `queryKeys.transactionPages(filters)`; the trailing `'pages'` keeps its `InfiniteData` apart
   from plain reads under the same prefix. After an unlink, `invalidateAfterUnlink` reads again
-  everything an institution fed (spec 017 rules 12-14): accounts, transactions, summary, cash flow,
-  recurring charges, check-ins, net worth, holdings, goals and the plan. `DELETE /sync/items/{id}`
-  returns no id for the `recurring.detect` job it queues, so recurring charges and check-ins are
-  read once now and again whenever their screens next fetch.
+  everything the institution's rows fed (spec 017 rules 12-14): accounts, transactions, summary,
+  cash flow, check-ins (their cash flow), net worth, holdings, goals and the plan.
+  `DELETE /sync/items/{id}` answers `{ recurring_job_id }`, the `recurring.detect` job it queued
+  (or the one already waiting); `useUnlinkItem` follows it with `useJob` (`unlink.recurringJob`),
+  and its `JOB_INVALIDATES` row reads recurring charges and check-ins again when it ends. The
+  detection then queues a `checkin.monthly` refresh of an open check-in, whose id the client never
+  sees: findings it retracts show on the check-in's next read.
   Documents: `invalidateDocuments` after an upload or extraction, `invalidateAfterConfirm`
   (documents, pay stubs, benefits plans, the profile and the plan) after a confirm. Decisions: `invalidateDecisions` (the list and every
   `GET /decisions/{id}`) and `invalidateAfterDecision` (also calendar, plan and goals) after a save.
@@ -311,7 +314,10 @@ next is a real disabled button, never a dead link).
   Downloads in jsdom: `watchDownloads()` (`src/test/fake-download.ts`) records each saved file;
   call `restore()` and `vi.restoreAllMocks()` in `afterEach`.
 - `scriptJob(states, onSucceeded)` scripts what `GET /jobs/{id}` returns poll by poll;
-  `syncJobStates(id)` is queued, running at 40%, succeeded. Drive polling with
+  `syncJobStates(id)` is queued, running at 40%, succeeded. `DELETE /sync/items/{id}` hands out
+  `recurringJobId(n)` for the n-th unlink (the same id again while that job is still queued); one
+  nothing scripted has already succeeded, and `scriptJob(recurringJobStates(recurringJobId(1)))`
+  before the click shows queued, running and succeeded. Drive polling with
   `vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) })` and
   `await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS))`, and render with
   `renderWithProviders(ui, { advanceTimers: vi.advanceTimersByTime })` so userEvent keeps up.

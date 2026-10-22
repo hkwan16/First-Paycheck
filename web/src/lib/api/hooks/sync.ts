@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchClient } from '../client';
 import { invalidateAfterUnlink } from '../keys';
+import { useJob } from './jobs';
 import { unwrap } from './request';
 
 /** Plaid's sandbox First Platypus Bank, linked without Plaid Link (non-production only). */
@@ -62,15 +63,20 @@ export function useTriggerSync() {
  * `DELETE /sync/items/{id}`: unlink an institution with its accounts and
  * transactions (a CSV import's account included). Not optimistic: the rows
  * leave when the server says they are gone; then everything they fed is read
- * again (`invalidateAfterUnlink`).
+ * again (`invalidateAfterUnlink`). The API answers with the `recurring.detect`
+ * job the unlink queued (or the one already waiting); `recurringJob` follows
+ * it with `useJob`, which reads recurring charges and check-ins again once it
+ * ends.
  */
 export function useUnlinkItem() {
   const queryClient = useQueryClient();
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: (itemId: string) =>
       unwrap(
         fetchClient.DELETE('/sync/items/{item_id}', { params: { path: { item_id: itemId } } }),
       ),
     onSuccess: () => invalidateAfterUnlink(queryClient),
   });
+  const recurringJob = useJob(mutation.data?.recurring_job_id);
+  return { ...mutation, recurringJob };
 }

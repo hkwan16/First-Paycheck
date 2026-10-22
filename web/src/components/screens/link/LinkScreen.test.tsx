@@ -12,7 +12,13 @@ import {
 } from '@/test/fixtures/documents';
 import { CHASE_ITEM_ID, CHECKING_ID, SAMPLE_NOW, sampleJob } from '@/test/fixtures/sample';
 import { db, emptyDb, emptyDocuments } from '@/test/msw/db';
-import { apiUrl, createDocument, scriptJob } from '@/test/msw/handlers';
+import {
+  apiUrl,
+  createDocument,
+  recurringJobId,
+  recurringJobStates,
+  scriptJob,
+} from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { act, renderWithProviders, screen, userEvent, waitFor, within } from '@/test/render';
 import { LinkScreen } from './LinkScreen';
@@ -225,6 +231,27 @@ describe('LinkScreen accounts', () => {
       'Could not unlink Chase. Database is busy',
     );
     expect(screen.getByRole('group', { name: 'Chase Total Checking' })).toBeInTheDocument();
+  });
+
+  it('follows the recurring detection the unlink queued until it ends', async () => {
+    const jobId = scriptJob(recurringJobStates(recurringJobId(1)));
+    const jobReads = requests('GET', `/jobs/${jobId}`);
+    const { user } = renderLink();
+    await screen.findByRole('group', { name: 'Chase Total Checking' });
+    await user.click(screen.getByRole('button', { name: 'Unlink Chase' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, unlink Chase' }));
+
+    const done = await within(accountsCard()).findByRole('status');
+    await waitFor(() => expect(jobReads).toHaveLength(1));
+    await poll();
+    await poll();
+    expect(jobReads).toHaveLength(3);
+    // Succeeded: nothing more to read, and the done notice stays as it was.
+    await poll();
+    expect(jobReads).toHaveLength(3);
+    expect(done).toHaveTextContent(
+      'Unlinked Chase. Its 2 accounts and their transactions were deleted.',
+    );
   });
 
   it('shows an empty state and holds the next step until an account exists', async () => {
