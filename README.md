@@ -2,7 +2,7 @@
 
 First Paycheck guides a new salaried employee through their first-month money decisions (W-4, health plan, 401(k) contribution, emergency fund and safe spending) using their own pay stub, benefits documents and linked bank accounts, then checks in every month to see whether those decisions took effect and what changed. All financial math runs in deterministic, tested code in `api/calc/`. Claude only extracts fields from redacted documents, categorizes unknown merchants and writes explanations, and every explanation is checked against the calculator's numbers and cites an IRS or plan source. Nothing the model produces reaches a calculator until the user confirms it.
 
-**Status:** M0 (scaffold, spec amendments, CI, deployed hello world) in progress. Alpha due November 5, 2026. See the [build plan](docs/plan.md).
+**Status:** the API and web screens for M0 to M9 are on `main` and the API is deployed; the production web deploy, the alpha screenshots and parts of M10 are open. Alpha due November 5, 2026. See the [build plan](docs/plan.md) and the [board](https://github.com/users/hkwan16/projects/1).
 
 ## Docs
 

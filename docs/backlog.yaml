@@ -2,8 +2,13 @@
 #
 # Source: the build plan (docs/plan.md). scripts/sync_backlog.py creates these
 # as GitHub issues idempotently with `gh`, keyed by title, assigns the repo
-# owner, sets the milestone and labels, and sets the Priority field on the
-# GitHub Project.
+# owner, sets the milestone and labels, sets the Priority and Status fields on
+# the GitHub Project, and closes an issue whose status is done.
+#
+# `status` is todo (the default), in_progress or done. An issue is done only
+# when its work is on main and tested. A comment under an issue explains a
+# status that is not obvious from its body. Statuses were last reviewed
+# against main at 744c7b0 (2026-10-21), reading the code, tests and guides.
 #
 # Priorities for M0-M4 come from the plan. The plan gives none for M5-M10, so
 # those default to Medium (Low for the stretch item) and are groomed in M4.
@@ -11,37 +16,37 @@
 milestones:
   M0:
     title: "Scaffold, spec amendments, CI, deployed hello world"
-    due: "2026-10-22"
+    due_on: 2026-10-22
   M1:
     title: "Data model, auth, Plaid sandbox sync, categorization, design system"
-    due: "2026-10-26"
+    due_on: 2026-10-26
   M2:
     title: "Upload, ingest, redact, extract, confirm"
-    due: "2026-10-30"
+    due_on: 2026-10-30
   M3:
     title: "401(k) calculator, decisions, citations, explain, verify"
-    due: "2026-11-02"
+    due_on: 2026-11-02
   M4:
     title: "Alpha hardening and deliverable"
-    due: "2026-11-05"
+    due_on: 2026-11-05
   M5:
     title: "Sankey, CSV import, spending summary, recurring detection"
-    due: "2026-11-12"
+    due_on: 2026-11-12
   M6:
     title: "Emergency fund, goals, health plans, benefits extraction"
-    due: "2026-11-19"
+    due_on: 2026-11-19
   M7:
     title: "W-4"
-    due: "2026-11-26"
+    due_on: 2026-11-26
   M8:
     title: "Check-ins, calendar, cash flow, net worth, holdings"
-    due: "2026-12-03"
+    due_on: 2026-12-03
   M9:
     title: "Plan export"
-    due: "2026-12-07"
+    due_on: 2026-12-07
   M10:
     title: "Hardening"
-    due: "2026-12-11"
+    due_on: 2026-12-11
 
 issues:
   # M0: scaffold, spec amendments, CI, deployed hello world
@@ -55,6 +60,9 @@ issues:
     labels: ["area:docs", "area:data"]
     milestone: M0
     priority: High
+    status: done
+    # Both files are merged. Spec 001's own status line still says Draft because
+    # it lists open questions; the migrations were built from it.
   - title: "Move docs into docs/, commit the mockup, write the plan and start the AI log"
     body: >-
       Move the spec, proposal and alpha brief under docs/, commit Mockup B under
@@ -63,6 +71,7 @@ issues:
     labels: ["area:docs"]
     milestone: M0
     priority: Medium
+    status: done
   - title: "Monorepo scaffold: uv workspace, pnpm web, Makefile, pre-commit, CLAUDE.md files"
     body: >-
       Create the uv workspace (api, evals), web/ with pnpm, the Makefile targets,
@@ -72,6 +81,7 @@ issues:
     labels: ["area:infra"]
     milestone: M0
     priority: High
+    status: done
   - title: "FastAPI skeleton with /health, settings, error shape and OpenAPI export"
     body: >-
       Add the app factory, typed settings, one JSON error shape, and
@@ -82,6 +92,7 @@ issues:
     labels: ["area:api"]
     milestone: M0
     priority: High
+    status: done
   - title: "Alembic wiring and 0001_roles; test conftest creates the auth shim"
     body: >-
       Wire Alembic with revision 0001_roles (role app_api, current_user_id(),
@@ -91,6 +102,7 @@ issues:
     labels: ["area:data", "area:api"]
     milestone: M0
     priority: High
+    status: done
   - title: "Supabase project, app_api role, pooler URLs and JWKS URL in Render and .env"
     body: >-
       Create the hosted Supabase project with asymmetric JWT signing, create
@@ -100,6 +112,9 @@ issues:
     labels: ["area:infra", "area:data"]
     milestone: M0
     priority: High
+    status: done
+    # Checked 2026-10-21: the deployed /health answers through the pooler with
+    # alembic revision 0014_delete_account_fn and worker ok.
   - title: "Next.js scaffold with design tokens, test runners and lint rules"
     body: >-
       Scaffold web/ with the Tailwind v4 @theme token block from the mockup, base
@@ -110,6 +125,7 @@ issues:
     labels: ["area:web"]
     milestone: M0
     priority: High
+    status: done
   - title: "CI: lint, migrations, api tests, web unit and build, types drift"
     body: >-
       Add ci.yml with lint (ruff, mypy, eslint, tsc, em-dash grep), migrations
@@ -119,6 +135,7 @@ issues:
     labels: ["area:infra"]
     milestone: M0
     priority: High
+    status: done
   - title: "Render Blueprint for API and worker with Dockerfile and deploy hooks"
     body: >-
       Add render.yaml (API web service and worker, shared env group, autoDeploy
@@ -129,6 +146,11 @@ issues:
     labels: ["area:infra"]
     milestone: M0
     priority: High
+    status: done
+    # Render Free has no background workers or pre-deploy command, so
+    # render.yaml runs the API and worker in one service (python -m app.serve)
+    # and deploy.yml migrates and seeds before calling the hook. /health reports
+    # the deployed SHA.
   - title: "Vercel project on web/ with env vars and preview deploys"
     body: >-
       Create the Vercel project rooted at web/ with NEXT_PUBLIC_API_URL, the
@@ -138,6 +160,11 @@ issues:
     labels: ["area:infra", "area:web"]
     milestone: M0
     priority: High
+    status: in_progress
+    # web/ builds in CI with these variables, but no production URL is recorded
+    # (docs/alpha/README.md says TODO) and no Vercel deployment is visible from
+    # the repo. The web issues below that say 'on production' were verified
+    # against the local real-API stack instead.
   - title: "GitHub Project, labels, milestones, backlog.yaml and sync_backlog.py"
     body: >-
       Create the GitHub Project with a Priority field, the area labels and
@@ -147,6 +174,9 @@ issues:
     labels: ["area:infra", "area:docs"]
     milestone: M0
     priority: Medium
+    status: done
+    # The sync also sets Status, closes done issues and fixes milestone due
+    # dates.
 
   # M1: data model, auth, Plaid sandbox sync, categorization, design system
   - title: "Migration 0002_core with RLS, enums and indexes"
@@ -158,6 +188,7 @@ issues:
     labels: ["area:data", "area:api"]
     milestone: M1
     priority: High
+    status: done
   - title: "JWT verification and UserSession"
     body: >-
       Verify Supabase JWTs with PyJWKClient (ES256/RS256, audience
@@ -167,6 +198,7 @@ issues:
     labels: ["area:api"]
     milestone: M1
     priority: High
+    status: done
   - title: "Route-wide RLS cross-user harness with coverage meta-test"
     body: >-
       Add tests/rls/test_cross_user.py, parametrized over every registered route,
@@ -176,6 +208,7 @@ issues:
     labels: ["area:api"]
     milestone: M1
     priority: High
+    status: done
   - title: "Sync provider interface and pipeline with upserts and cursor rules"
     body: >-
       Define the SyncProvider Protocol and pipeline.run_sync (upsert accounts and
@@ -186,6 +219,7 @@ issues:
     labels: ["area:api"]
     milestone: M1
     priority: High
+    status: done
   - title: "Plaid client, link token, item exchange, token encryption, sandbox item route"
     body: >-
       Add the Plaid client, POST /sync/link-token, POST /sync/items with Fernet
@@ -195,6 +229,7 @@ issues:
     labels: ["area:api"]
     milestone: M1
     priority: High
+    status: done
   - title: "Jobs queue, worker, registry, heartbeat, backoff and GET /jobs/{id}"
     body: >-
       Build the Postgres queue with FOR UPDATE SKIP LOCKED, backoff of
@@ -205,6 +240,7 @@ issues:
     labels: ["area:api"]
     milestone: M1
     priority: High
+    status: done
   - title: "Plaid webhook with signature verification and SECURITY DEFINER enqueue (0006)"
     body: >-
       Verify webhooks by JWT signature and body SHA-256, then call
@@ -215,6 +251,7 @@ issues:
     labels: ["area:api", "area:data"]
     milestone: M1
     priority: High
+    status: done
   - title: "Manual sync route POST /sync/items/{id}/sync"
     body: >-
       Queue an incremental sync on demand and return the job id. Done when the
@@ -223,6 +260,7 @@ issues:
     labels: ["area:api"]
     milestone: M1
     priority: Medium
+    status: done
   - title: "Accounts and transactions routes with filters, pagination and rule writes"
     body: >-
       Add GET /accounts, PATCH /accounts/{id}, GET /transactions (filters and
@@ -231,6 +269,7 @@ issues:
     labels: ["area:api"]
     milestone: M1
     priority: High
+    status: done
   - title: "Categorization: normalization, rules precedence, seed CSV, Haiku batching"
     body: >-
       Implement normalize_merchant, the precedence user exact > user prefix >
@@ -241,6 +280,7 @@ issues:
     labels: ["area:api", "area:data"]
     milestone: M1
     priority: High
+    status: done
   - title: "LLM gateway core, prompt loader, llm_calls ledger and daily budget"
     body: >-
       Build llm/gateway.py with structured outputs, refusal handling, prompt
@@ -251,6 +291,7 @@ issues:
     labels: ["area:api"]
     milestone: M1
     priority: High
+    status: done
   - title: "Record Plaid sandbox fixtures"
     body: >-
       Write scripts/record_plaid_fixtures.py to capture sandbox responses for
@@ -259,6 +300,7 @@ issues:
     labels: ["area:api", "area:evals"]
     milestone: M1
     priority: Medium
+    status: done
   - title: "Web design system, chrome, layouts and /dev/kit gallery"
     body: >-
       Build tone.ts, every components/ui primitive, the chrome, icons, and the
@@ -269,6 +311,7 @@ issues:
     labels: ["area:web"]
     milestone: M1
     priority: High
+    status: done
   - title: "Web auth: Supabase clients, session refresh, guard and sign-in screen"
     body: >-
       Add browser and server Supabase clients, session refresh middleware, the
@@ -278,6 +321,7 @@ issues:
     labels: ["area:web"]
     milestone: M1
     priority: High
+    status: done
   - title: "Web data layer: generated types, client, hooks and MSW fixtures"
     body: >-
       Add gen:api and check:api, the bearer middleware, $api, Providers, useJob,
@@ -288,6 +332,21 @@ issues:
     labels: ["area:web"]
     milestone: M1
     priority: High
+    status: done
+  - title: "Lock down Supabase's default grants (0007_lock_alembic_version)"
+    body: >-
+      Supabase grants every new table and function in public to anon and
+      authenticated, so alembic_version and three SECURITY DEFINER functions
+      were reachable with the publishable key. Make the test auth shim copy
+      those defaults so the leak reproduces locally, add
+      0007_lock_alembic_version to revoke them and grant back only what each
+      function needs, and fail test_migrations on any public object still
+      granted to anon. Done when the hosted project's anon probes return 401 and
+      the test guards every later migration.
+    labels: ["area:data", "area:api"]
+    milestone: M1
+    priority: High
+    status: done
 
   # M2: upload, ingest, redact, extract, confirm
   - title: "Migration 0003_documents"
@@ -299,6 +358,7 @@ issues:
     labels: ["area:data"]
     milestone: M2
     priority: High
+    status: done
   - title: "POST /docs upload with limits, blob store, GET /docs and GET /docs/{id}"
     body: >-
       Accept multipart uploads with size and type limits, store bytes through
@@ -308,6 +368,7 @@ issues:
     labels: ["area:api"]
     milestone: M2
     priority: High
+    status: done
   - title: "PDF reader, rasterizer, OCR with word boxes, text and image redaction"
     body: >-
       Read words with boxes via pdfplumber, rasterize with pypdfium2 at 200 dpi,
@@ -318,6 +379,7 @@ issues:
     labels: ["area:api"]
     milestone: M2
     priority: High
+    status: done
   - title: "Extraction: spec 005, schema, prompt v1, ingest.extract job, extract route"
     body: >-
       Write spec 005, the PayStubExtraction schema and prompt v1, the gateway
@@ -328,6 +390,7 @@ issues:
     labels: ["area:api"]
     milestone: M2
     priority: High
+    status: done
   - title: "Confirm route with arithmetic 422, GET /pay-stubs and profile routes"
     body: >-
       POST /docs/{id}/confirm writes pay_stubs, deletes the blob and returns 422
@@ -338,6 +401,7 @@ issues:
     labels: ["area:api"]
     milestone: M2
     priority: High
+    status: done
   - title: "Synthetic pay stub generator, 10 labeled fixtures and extraction eval"
     body: >-
       Generate 10 labeled stubs (PDF and PNG, some noisy scans), add the
@@ -346,6 +410,11 @@ issues:
     labels: ["area:evals"]
     milestone: M2
     priority: High
+    status: in_progress
+    # The generator, the fixtures (30 since M10) and the extraction suite are on
+    # main, and the free extraction-smoke suite passes. The extraction suite
+    # needs ANTHROPIC_API_KEY and has never run live, so baseline.json holds
+    # spec 005's targets, not a measured accuracy.
   - title: "Pin tesseract in the Dockerfile and run ingest tests in the image in CI"
     body: >-
       Pin the Debian tesseract package and add the ingest-in-docker CI job, so
@@ -354,6 +423,9 @@ issues:
     labels: ["area:infra"]
     milestone: M2
     priority: Medium
+    status: in_progress
+    # Tesseract is pinned and the ingest-in-docker job runs on every pull
+    # request, but main has no branch protection, so no check is required.
   - title: "Web Link screen with Plaid Link, uploads and job polling"
     body: >-
       Build the accounts list with role select, the documents list,
@@ -364,6 +436,7 @@ issues:
     labels: ["area:web"]
     milestone: M2
     priority: High
+    status: done
   - title: "Web Spending screen, alpha version without the Sankey"
     body: >-
       Build summary tiles, the transaction table with source badges, the
@@ -373,6 +446,7 @@ issues:
     labels: ["area:web"]
     milestone: M2
     priority: High
+    status: done
   - title: "Web Confirm screen with confirmReducer and the arithmetic gate"
     body: >-
       Port the Confirm logic into confirmReducer, with field rows, confidence
@@ -383,6 +457,7 @@ issues:
     labels: ["area:web"]
     milestone: M2
     priority: High
+    status: done
 
   # M3: 401(k) calculator, decisions, citations, explain, verify
   - title: "Spec 006 401(k) match with hand-worked examples"
@@ -394,6 +469,7 @@ issues:
     labels: ["area:docs", "area:api"]
     milestone: M3
     priority: High
+    status: done
   - title: "calc/money.py, calc/k401.py, calc/data/2026.json and POST /calc/401k-match"
     body: >-
       Implement the calculator from spec 006 with integer cents, Decimal
@@ -404,6 +480,7 @@ issues:
     labels: ["area:api"]
     milestone: M3
     priority: High
+    status: done
   - title: "Migration 0004_decisions with versioning constraints and immutability trigger"
     body: >-
       Create decisions, goals, calendar_events, explanations and irs_citations as
@@ -412,6 +489,7 @@ issues:
     labels: ["area:data"]
     milestone: M3
     priority: High
+    status: done
   - title: "POST /decisions, GET /decisions with history, GET /decisions/{id}/explanation"
     body: >-
       Save decisions with supersedes_id, list the current decision per
@@ -422,6 +500,7 @@ issues:
     labels: ["area:api"]
     milestone: M3
     priority: High
+    status: done
   - title: "Seed irs_citations/k401.yaml and retrieval/citations.py"
     body: >-
       Seed the 401(k) passages (402(g) limit, employer match basics, pre-tax
@@ -431,6 +510,7 @@ issues:
     labels: ["area:data", "area:api"]
     milestone: M3
     priority: High
+    status: done
   - title: "Explain prompt, verifier with retry and fallback, explain eval suite"
     body: >-
       Add explain prompt v1, the ExplanationDraft schema and POST /explain, with
@@ -441,6 +521,10 @@ issues:
     labels: ["area:api", "area:evals"]
     milestone: M3
     priority: High
+    status: done
+    # The flow is built and tested, and the free explain-smoke suite checks it
+    # on every CI run. The live explain suite waits for a key; see 'Run the LLM
+    # eval suites live and commit measured baselines' in M10.
   - title: "Web Decisions screen with the 401(k) card and placeholders"
     body: >-
       Build the DecisionCard frame, decisionSaveState, Match401kCard on useCalc
@@ -451,6 +535,7 @@ issues:
     labels: ["area:web"]
     milestone: M3
     priority: High
+    status: done
   - title: "Web Why screen with verified and fallback layouts"
     body: >-
       Render the explanation response, with the verified and fallback layouts,
@@ -460,6 +545,7 @@ issues:
     labels: ["area:web"]
     milestone: M3
     priority: High
+    status: done
 
   # M4: alpha hardening and deliverable
   - title: "Full alpha end-to-end Playwright spec green in CI"
@@ -471,6 +557,10 @@ issues:
     labels: ["area:web", "area:infra"]
     milestone: M4
     priority: High
+    status: in_progress
+    # alpha.spec.ts passes in the e2e workflow, but Actions has no Plaid
+    # secrets, so the stack sets E2E_PLAID_SANDBOX=0 and the link steps are
+    # skipped in CI. The whole path runs locally with make e2e-full.
   - title: "Visual and axe checks for the alpha screens at 1280 and 390"
     body: >-
       Add screens.visual.spec.ts with animations disabled and dates masked, and
@@ -479,6 +569,7 @@ issues:
     labels: ["area:web"]
     milestone: M4
     priority: Medium
+    status: done
   - title: "Production walkthrough with a fresh account; file and fix bugs"
     body: >-
       Walk the alpha path on production with a new account, reproduce each bug
@@ -487,6 +578,8 @@ issues:
     labels: ["area:web", "area:api"]
     milestone: M4
     priority: High
+    status: todo
+    # Not run: the web app has no production deployment yet.
   - title: "Rate limits on /docs and /explain"
     body: >-
       Limit /docs to 10 per hour and /explain to 30 per hour per user, returning
@@ -494,6 +587,7 @@ issues:
     labels: ["area:api"]
     milestone: M4
     priority: Medium
+    status: done
   - title: "Observability minimum: JSON logs, Render log drain, Sentry"
     body: >-
       Emit JSON logs with request and user ids, configure the Render log drain,
@@ -502,6 +596,10 @@ issues:
     labels: ["area:infra"]
     milestone: M4
     priority: Medium
+    status: in_progress
+    # JSON logs with request ids, worker health and env-gated Sentry are built
+    # and tested. A Render log drain, SENTRY_DSN in production and a forced
+    # production error reaching Sentry are not verified.
   - title: "Alpha release document"
     body: >-
       Complete docs/alpha/README.md with the demo description, the functional vs
@@ -511,6 +609,10 @@ issues:
     labels: ["area:docs"]
     milestone: M4
     priority: High
+    status: in_progress
+    # docs/alpha/README.md has every section of the brief, but the production
+    # URL, screenshots, recording and board screenshot are placeholders, and its
+    # feature table predates M5 to M10.
   - title: "Groom M5-M10 issues with priorities on the board"
     body: >-
       Review every post-alpha issue, set its priority and order on the Project,
@@ -519,6 +621,33 @@ issues:
     labels: ["area:docs"]
     milestone: M4
     priority: High
+    status: done
+    # M5 to M10 landed before grooming was needed; the sync now gives every
+    # issue a status and priority.
+  - title: "Local real-API end-to-end stack (make e2e-full) and the e2e workflow"
+    body: >-
+      scripts/e2e_stack.py starts a disposable migrated and seeded database, a
+      stand-in for Supabase Auth that signs ES256 tokens and serves its JWKS,
+      and the API and worker with the fake model, then runs Playwright's
+      real-API projects against it; .github/workflows/e2e.yml runs the same on
+      every pull request and push. Done when the alpha and authenticated
+      projects pass in CI.
+    labels: ["area:infra", "area:web"]
+    milestone: M4
+    priority: High
+    status: done
+  - title: "Rules-only categorization and manual entry when no model is configured"
+    body: >-
+      Without ANTHROPIC_API_KEY the worker failed every categorize and extract
+      job, so production had no categories and lost every upload. The categorize
+      job now applies the rules and earlier labels and succeeds with stopped
+      no_model; an upload goes to manual entry with the no_model reason
+      (migration 0011_no_model_reason), its pages read and redacted so the user
+      can type the fields. Done when job tests cover both paths with no gateway.
+    labels: ["area:api"]
+    milestone: M4
+    priority: High
+    status: done
 
   # M5: Sankey, CSV import, spending summary, recurring detection
   - title: "Sankey layout: layoutCashFlow and rendering"
@@ -531,6 +660,7 @@ issues:
     labels: ["area:web"]
     milestone: M5
     priority: Medium
+    status: done
   - title: "Sankey popover and keyboard navigation"
     body: >-
       Add useFlowPopover (hover grace, focus, pin, outside and Escape close with
@@ -540,6 +670,7 @@ issues:
     labels: ["area:web"]
     milestone: M5
     priority: Medium
+    status: done
   - title: "Stacked Sankey variant under 640 px"
     body: >-
       Render a stacked Bar variant showing the same amounts below 640 px, with
@@ -548,6 +679,7 @@ issues:
     labels: ["area:web"]
     milestone: M5
     priority: Medium
+    status: done
   - title: "CSV import POST /accounts/import"
     body: >-
       Parse a CSV into the shared pipeline through csv_provider.py, normalizing
@@ -557,6 +689,7 @@ issues:
     labels: ["area:api"]
     milestone: M5
     priority: Medium
+    status: done
   - title: "GET /spending/summary with bucket mapping and per-category totals"
     body: >-
       Return totals per category, the category-to-bucket mapping, monthly
@@ -566,6 +699,7 @@ issues:
     labels: ["area:api"]
     milestone: M5
     priority: Medium
+    status: done
   - title: "GET /cashflow with withholding lines per pay stub"
     body: >-
       Return the month's income, essentials, flexible, savings and left over
@@ -575,6 +709,7 @@ issues:
     labels: ["area:api"]
     milestone: M5
     priority: Medium
+    status: done
   - title: "Recurring charge detection in sync/recurring.py"
     body: >-
       Detect weekly (6-8 d), monthly (27-33 d) and yearly (350-380 d) cadences
@@ -584,6 +719,7 @@ issues:
     labels: ["area:api"]
     milestone: M5
     priority: Medium
+    status: done
   - title: "GET and PATCH /recurring"
     body: >-
       List recurring charges with status and accept user_status confirmed,
@@ -591,6 +727,7 @@ issues:
     labels: ["area:api"]
     milestone: M5
     priority: Medium
+    status: done
   - title: "Migration 0005_checkins"
     body: >-
       Create recurring_charges, check_ins and check_in_findings, and add the
@@ -599,6 +736,7 @@ issues:
     labels: ["area:data"]
     milestone: M5
     priority: Medium
+    status: done
   - title: "Recurring detection eval on the Plaid custom sandbox user"
     body: >-
       Seed a custom sandbox user with known subscriptions and add the recurring
@@ -607,6 +745,53 @@ issues:
     labels: ["area:evals"]
     milestone: M5
     priority: Medium
+    status: done
+    # The custom sandbox user is committed
+    # (evals/fixtures/recurring/custom_user.json) and run offline by the free
+    # recurring suite (precision 1.0, recall 0.95, baseline committed), not
+    # pulled from a live sandbox item.
+  - title: "Spec 009 recurring charges"
+    body: >-
+      Write docs/specs/009-recurring-charges.md with Goal, Inputs, Outputs,
+      numbered Rules, hand-worked examples, edge cases and out of scope, so the
+      tests can be written from it alone. Done when the spec is marked
+      Implemented in docs/specs/README.md and every example row is a test.
+    labels: ["area:docs", "area:api"]
+    milestone: M5
+    priority: Medium
+    status: done
+  - title: "Spec 010 cash flow and CSV import"
+    body: >-
+      Write docs/specs/010-cash-flow-and-csv-import.md with Goal, Inputs,
+      Outputs, numbered Rules, hand-worked examples, edge cases and out of
+      scope, so the tests can be written from it alone. Done when the spec is
+      marked Implemented in docs/specs/README.md and every example row is a
+      test.
+    labels: ["area:docs", "area:api"]
+    milestone: M5
+    priority: Medium
+    status: done
+  - title: "Web CSV import on the Link screen"
+    body: >-
+      Add CsvImport to the Link screen: upload a bank export over XHR with
+      progress into a new or existing CSV account, list the row errors of a 422
+      csv_invalid, offer Try again on 409 import_conflict and follow the
+      import's jobs. Tests first with fake XHR. Done when import.spec.ts imports
+      the synthetic export twice without a second account against the real API.
+    labels: ["area:web"]
+    milestone: M5
+    priority: Medium
+    status: done
+  - title: "Web recurring charges card on Spending"
+    body: >-
+      Show GET /recurring on the Spending screen with cadence, status badges for
+      new, changed and stopped, and optimistic PATCHes to confirm, ignore,
+      cancel or rename a charge, rolled back on refusal. Done when the card's
+      tests and the Spending visual snapshots pass.
+    labels: ["area:web"]
+    milestone: M5
+    priority: Medium
+    status: done
 
   # M6: emergency fund, goals, health plans, benefits extraction
   - title: "Emergency fund calculator and POST /calc/emergency-fund"
@@ -617,6 +802,7 @@ issues:
     labels: ["area:api"]
     milestone: M6
     priority: Medium
+    status: done
   - title: "Health plan calculator and POST /calc/health-plans"
     body: >-
       Write the spec, then calc/health_plans.py comparing n plans by expected
@@ -625,6 +811,7 @@ issues:
     labels: ["area:api"]
     milestone: M6
     priority: Medium
+    status: done
   - title: "POST /decisions creates goals and calendar events"
     body: >-
       When a saved decision implies a goal or a dated checkpoint, create the
@@ -633,6 +820,7 @@ issues:
     labels: ["area:api"]
     milestone: M6
     priority: Medium
+    status: done
   - title: "GET and PATCH /goals with progress from balance snapshots"
     body: >-
       Return goals with progress computed from the linked account's snapshots
@@ -641,6 +829,7 @@ issues:
     labels: ["area:api"]
     milestone: M6
     priority: Medium
+    status: done
   - title: "GET /benefits-plans"
     body: >-
       List the user's confirmed health plan options. Done when the route passes
@@ -648,6 +837,7 @@ issues:
     labels: ["area:api"]
     milestone: M6
     priority: Medium
+    status: done
   - title: "Benefits summary extraction and confirm path"
     body: >-
       Add the benefits extraction schema and prompt, the confirm path writing
@@ -657,6 +847,9 @@ issues:
     labels: ["area:api", "area:evals"]
     milestone: M6
     priority: Medium
+    status: done
+    # The benefits-extraction suite exists and its scoring is unit-tested; its
+    # baseline holds spec 013's targets until a live run (see M10).
   - title: "Benefits text retrieval in explanations"
     body: >-
       Feed full-text search results from benefits_chunks into the explain
@@ -665,6 +858,7 @@ issues:
     labels: ["area:api"]
     milestone: M6
     priority: Medium
+    status: done
   - title: "Web EmergencyFundCard"
     body: >-
       Replace the placeholder with the emergency fund card on useCalc, saving
@@ -672,6 +866,7 @@ issues:
     labels: ["area:web"]
     milestone: M6
     priority: Medium
+    status: done
   - title: "Web HealthPlanCard"
     body: >-
       Replace the placeholder with the health plan card reading confirmed plans
@@ -680,6 +875,7 @@ issues:
     labels: ["area:web"]
     milestone: M6
     priority: Medium
+    status: done
   - title: "Web benefits confirm path"
     body: >-
       Extend the Confirm screen to benefits summaries, one plan option at a
@@ -687,6 +883,37 @@ issues:
     labels: ["area:web"]
     milestone: M6
     priority: Medium
+    status: done
+  - title: "Spec 011 emergency fund calculator, goals and their calendar"
+    body: >-
+      Write docs/specs/011-emergency-fund.md with Goal, Inputs, Outputs,
+      numbered Rules, hand-worked examples, edge cases and out of scope, so the
+      tests can be written from it alone. Done when the spec is marked
+      Implemented in docs/specs/README.md and every example row is a test.
+    labels: ["area:docs", "area:api"]
+    milestone: M6
+    priority: Medium
+    status: done
+  - title: "Spec 012 health plan comparison calculator"
+    body: >-
+      Write docs/specs/012-health-plans.md with Goal, Inputs, Outputs, numbered
+      Rules, hand-worked examples, edge cases and out of scope, so the tests can
+      be written from it alone. Done when the spec is marked Implemented in
+      docs/specs/README.md and every example row is a test.
+    labels: ["area:docs", "area:api"]
+    milestone: M6
+    priority: Medium
+    status: done
+  - title: "Spec 013 benefits extraction: health plans, the 401(k) match and vesting"
+    body: >-
+      Write docs/specs/013-benefits-extraction.md with Goal, Inputs, Outputs,
+      numbered Rules, hand-worked examples, edge cases and out of scope, so the
+      tests can be written from it alone. Done when the spec is marked
+      Implemented in docs/specs/README.md and every example row is a test.
+    labels: ["area:docs", "area:api"]
+    milestone: M6
+    priority: Medium
+    status: done
 
   # M7: W-4
   - title: "Pub 15-T 2026 tables in calc/data/pub15t_2026.json"
@@ -696,6 +923,10 @@ issues:
     labels: ["area:api", "area:data"]
     milestone: M7
     priority: Medium
+    status: done
+    # Pub 15-T (2026) prints no percentage-method example, so spec 014's first
+    # example checks Worksheet 1A against a printed wage bracket row, and a test
+    # rebuilds every table row from Rev. Proc. 2025-32.
   - title: "W-4 calculator and POST /calc/w4"
     body: >-
       Write the W-4 spec, then calc/w4.py projecting the federal refund or
@@ -705,6 +936,7 @@ issues:
     labels: ["area:api"]
     milestone: M7
     priority: Medium
+    status: done
   - title: "Seed W-4 IRS citations"
     body: >-
       Seed the Pub 15-T and W-4 passages the calculator cites, each verified
@@ -713,6 +945,7 @@ issues:
     labels: ["area:data"]
     milestone: M7
     priority: Medium
+    status: done
   - title: "Web W4Card reading saved decisions"
     body: >-
       Replace the placeholder with the W-4 card, taking the saved 401(k) and
@@ -721,6 +954,17 @@ issues:
     labels: ["area:web"]
     milestone: M7
     priority: Medium
+    status: done
+  - title: "Spec 014 W-4 withholding calculator"
+    body: >-
+      Write docs/specs/014-w4.md with Goal, Inputs, Outputs, numbered Rules,
+      hand-worked examples, edge cases and out of scope, so the tests can be
+      written from it alone. Done when the spec is marked Implemented in
+      docs/specs/README.md and every example row is a test.
+    labels: ["area:docs", "area:api"]
+    milestone: M7
+    priority: Medium
+    status: done
 
   # M8: check-ins, calendar, cash flow, net worth, holdings
   - title: "Check-in engine and finding model"
@@ -731,6 +975,7 @@ issues:
     labels: ["area:api"]
     milestone: M8
     priority: Medium
+    status: done
   - title: "Finding: 401(k) election mismatch"
     body: >-
       Flag when the latest pay stub's retirement contribution does not match the
@@ -739,6 +984,7 @@ issues:
     labels: ["area:api"]
     milestone: M8
     priority: Medium
+    status: done
   - title: "Finding: goal off pace"
     body: >-
       Flag a goal whose balance is behind its contribution schedule. Done when
@@ -746,6 +992,7 @@ issues:
     labels: ["area:api"]
     milestone: M8
     priority: Medium
+    status: done
   - title: "Findings: recurring charge new, changed and stopped"
     body: >-
       Turn recurring status changes into findings. Done when seeded scenarios
@@ -753,6 +1000,7 @@ issues:
     labels: ["area:api"]
     milestone: M8
     priority: Medium
+    status: done
   - title: "Findings: pay change and deduction change"
     body: >-
       Compare the latest pay stub with the one the plan was built on. Done when
@@ -760,6 +1008,7 @@ issues:
     labels: ["area:api"]
     milestone: M8
     priority: Medium
+    status: done
   - title: "Finding: upcoming deadline"
     body: >-
       Flag calendar events due before the next check-in. Done when a seeded
@@ -767,6 +1016,7 @@ issues:
     labels: ["area:api"]
     milestone: M8
     priority: Medium
+    status: done
   - title: "Check-in routes"
     body: >-
       Add GET /check-ins, GET /check-ins/{id}, POST /check-ins and PATCH
@@ -775,6 +1025,7 @@ issues:
     labels: ["area:api"]
     milestone: M8
     priority: Medium
+    status: done
   - title: "Monthly check-in enqueue from schedule.tick"
     body: >-
       Queue checkin.monthly for every active user once per month under an
@@ -783,6 +1034,7 @@ issues:
     labels: ["area:api"]
     milestone: M8
     priority: Medium
+    status: done
   - title: "Sync-triggered check-ins"
     body: >-
       Run a check-in when a sync lands new data. Done when a sandbox sync with
@@ -790,6 +1042,9 @@ issues:
     labels: ["area:api"]
     milestone: M8
     priority: Medium
+    status: done
+    # Spec 015 rules 8 and 15 settled that a sync refreshes the month's open
+    # check-in (trigger sync) rather than creating one; tests cover both.
   - title: "GET /net-worth"
     body: >-
       Return the balance time series per account kind and the total, with
@@ -797,6 +1052,7 @@ issues:
     labels: ["area:api"]
     milestone: M8
     priority: Medium
+    status: done
   - title: "GET /holdings"
     body: >-
       Return the latest positions per investment and retirement account from
@@ -804,6 +1060,7 @@ issues:
     labels: ["area:api"]
     milestone: M8
     priority: Medium
+    status: done
   - title: "GET /calendar"
     body: >-
       Return upcoming checkpoints from decisions and plans. Done when a seeded
@@ -811,6 +1068,7 @@ issues:
     labels: ["area:api"]
     milestone: M8
     priority: Medium
+    status: done
   - title: "Web Check-in screen with findingsReducer"
     body: >-
       Build the findings list with done, dismiss and undo as optimistic PATCHes.
@@ -819,6 +1077,7 @@ issues:
     labels: ["area:web"]
     milestone: M8
     priority: Medium
+    status: done
   - title: "Web cash flow vs plan card"
     body: >-
       Show the month's cash flow against the plan's targets from GET /cashflow.
@@ -826,6 +1085,7 @@ issues:
     labels: ["area:web"]
     milestone: M8
     priority: Medium
+    status: done
   - title: "Web net worth with holdings"
     body: >-
       Show the net worth series with Recharts and the retirement holdings. Done
@@ -833,6 +1093,40 @@ issues:
     labels: ["area:web"]
     milestone: M8
     priority: Medium
+    status: done
+  - title: "Spec 015 monthly check-ins, net worth and holdings"
+    body: >-
+      Write docs/specs/015-check-ins.md with Goal, Inputs, Outputs, numbered
+      Rules, hand-worked examples, edge cases and out of scope, so the tests can
+      be written from it alone. Done when the spec is marked Implemented in
+      docs/specs/README.md and every example row is a test.
+    labels: ["area:docs", "area:api"]
+    milestone: M8
+    priority: Medium
+    status: done
+  - title: "Plan line status on the check-in cash flow"
+    body: >-
+      Give each line of a check-in's cash flow against the plan a status of
+      on_plan, over or under, within the larger of 5% of the plan and $25,
+      computed in calc/cashflow.py:plan_status, and null without a plan, so the
+      client draws a status without comparing amounts. Done when unit tests
+      cover the band's edges and GET /check-ins/{id} returns it.
+    labels: ["area:api"]
+    milestone: M8
+    priority: Medium
+    status: done
+  - title: "Web plan line status and a Check in now button"
+    body: >-
+      The API now returns each plan line's status and has POST /check-ins (202
+      with a job id), but web/ still says neither exists. Draw the line's status
+      on the Check-in screen's plan card, and add a Check in now button that
+      queues the run and follows its job. Tests first with MSW. Done when both
+      work against the real API and the guide no longer says the routes are
+      missing.
+    labels: ["area:web"]
+    milestone: M8
+    priority: Medium
+    status: todo
 
   # M9: plan export
   - title: "Plan PDF with WeasyPrint in the worker"
@@ -843,6 +1137,7 @@ issues:
     labels: ["area:api"]
     milestone: M9
     priority: Medium
+    status: done
   - title: "GET /plan and GET /plan/export"
     body: >-
       Return saved decisions with reasoning and the decision calendar, and the
@@ -850,6 +1145,7 @@ issues:
     labels: ["area:api"]
     milestone: M9
     priority: Medium
+    status: done
   - title: "Web Plan screen"
     body: >-
       Build the one-page plan and decision history from GET /plan. Done when it
@@ -857,6 +1153,7 @@ issues:
     labels: ["area:web"]
     milestone: M9
     priority: Medium
+    status: done
   - title: "Calendar card with client-side .ics"
     body: >-
       Generate an .ics file of the decision calendar in the browser. Done when
@@ -864,6 +1161,10 @@ issues:
     labels: ["area:web"]
     milestone: M9
     priority: Medium
+    status: done
+    # Spec 016 moved the .ics to the API (GET /plan/calendar.ics, RFC 5545 in
+    # export/calendar.py, checked against a hand-written fixture); the Plan
+    # screen downloads it.
   - title: "Plan PDF download in the web app"
     body: >-
       Download the exported PDF from the Plan screen. Done when the download
@@ -871,6 +1172,17 @@ issues:
     labels: ["area:web"]
     milestone: M9
     priority: Medium
+    status: done
+  - title: "Spec 016 the plan, its calendar file and the PDF export"
+    body: >-
+      Write docs/specs/016-plan-and-export.md with Goal, Inputs, Outputs,
+      numbered Rules, hand-worked examples, edge cases and out of scope, so the
+      tests can be written from it alone. Done when the spec is marked
+      Implemented in docs/specs/README.md and every example row is a test.
+    labels: ["area:docs", "area:api"]
+    milestone: M9
+    priority: Medium
+    status: done
 
   # M10: hardening
   - title: "Unlink path"
@@ -881,6 +1193,7 @@ issues:
     labels: ["area:api"]
     milestone: M10
     priority: Medium
+    status: done
   - title: "Account deletion path"
     body: >-
       Let a user delete their account and every row they own, resolving spec
@@ -889,6 +1202,9 @@ issues:
     labels: ["area:api", "area:data"]
     milestone: M10
     priority: Medium
+    status: done
+    # DELETE /me in the API; the web has no control for it yet (its own issue
+    # below).
   - title: "30-fixture extraction eval set at target"
     body: >-
       Extend the extraction fixtures to 30 labeled stubs, offers and benefit
@@ -896,6 +1212,10 @@ issues:
     labels: ["area:evals"]
     milestone: M10
     priority: Medium
+    status: in_progress
+    # The 30 labeled stubs are on main; the 95% target is unmeasured until the
+    # extraction suite runs live. There are no offer or benefits stubs in this
+    # set; benefits summaries have their own suite.
   - title: "500-transaction categorization eval set at target"
     body: >-
       Label 500 transactions and add the categorization suite. Done when
@@ -903,6 +1223,10 @@ issues:
     labels: ["area:evals"]
     milestone: M10
     priority: Medium
+    status: in_progress
+    # The 500 labeled transactions and both suites are on main. The free rules
+    # suite measures 97% precision at 81% coverage; overall accuracy is
+    # unmeasured until the categorization suite runs live.
   - title: "Nightly evals workflow"
     body: >-
       Run every eval suite nightly and open an issue on regression. Done when a
@@ -910,6 +1234,10 @@ issues:
     labels: ["area:evals", "area:infra"]
     milestone: M10
     priority: Medium
+    status: done
+    # nightly.yml runs every suite (the free ones without a key) and opens or
+    # updates one issue on a regression; the issue body is unit-tested, but no
+    # regression has been forced on GitHub.
   - title: "Full accessibility audit"
     body: >-
       Audit every screen by keyboard, screen reader and axe at both widths, and
@@ -917,6 +1245,10 @@ issues:
     labels: ["area:web"]
     milestone: M10
     priority: Medium
+    status: in_progress
+    # axe runs on every screen at 1280 and 390 px in CI with no serious or
+    # critical violations; the keyboard and screen reader passes are not
+    # recorded.
   - title: "Error boundaries per card"
     body: >-
       Wrap each card in an error boundary so one failing card never blanks a
@@ -925,6 +1257,8 @@ issues:
     labels: ["area:web"]
     milestone: M10
     priority: Medium
+    status: todo
+    # No error boundary exists in web/src yet.
   - title: "User test with 5-8 people and the before/after quiz"
     body: >-
       Run the setup flow with 5-8 people, timing sittings and giving the
@@ -933,6 +1267,7 @@ issues:
     labels: ["area:docs"]
     milestone: M10
     priority: Medium
+    status: todo
   - title: "Plaid production application (stretch)"
     body: >-
       Apply for Plaid production access for real institutions. Done when the
@@ -941,3 +1276,61 @@ issues:
     labels: ["area:infra"]
     milestone: M10
     priority: Low
+    status: todo
+  - title: "Spec 017 account deletion and unlinking"
+    body: >-
+      Write docs/specs/017-account-deletion-and-unlink.md with Goal, Inputs,
+      Outputs, numbered Rules, hand-worked examples, edge cases and out of
+      scope, so the tests can be written from it alone. Done when the spec is
+      marked Implemented in docs/specs/README.md and every example row is a
+      test.
+    labels: ["area:docs", "area:api", "area:data"]
+    milestone: M10
+    priority: Medium
+    status: done
+  - title: "Rate limits and body-size limits on every write route"
+    body: >-
+      Give every non-GET route an entry in WRITE_ROUTE_POLICIES, a per-user
+      hourly limit or the reason it needs none, with a test that fails on a
+      write route without one, and cap every request body (10 MB for uploads and
+      CSV imports, 1 MB otherwise) including chunked bodies with no
+      Content-Length. Done when each limit has a test for the 429 and the body
+      limit refuses an oversized streamed body.
+    labels: ["area:api"]
+    milestone: M10
+    priority: Medium
+    status: done
+  - title: "Eval tolerance: no drop for deterministic suites, 2 points for LLM suites"
+    body: >-
+      Compare each eval metric with its baseline with no tolerance for
+      deterministic suites and 0.02 for LLM suites, so model noise does not fail
+      a run while a real regression does. Done when test_run.py checks both
+      through the CLI.
+    labels: ["area:evals"]
+    milestone: M10
+    priority: Medium
+    status: done
+  - title: "Run the LLM eval suites live and commit measured baselines"
+    body: >-
+      The extraction, benefits-extraction, categorization and explain suites
+      hold their specs' targets as baselines because no ANTHROPIC_API_KEY has
+      been available. Run make eval-llm under the cost cap, record what each
+      suite measures, and commit the measured baselines on their own with the
+      run's numbers in the message. Done when baseline.json holds measured
+      values for every LLM suite and the nightly workflow has the key.
+    labels: ["area:evals"]
+    milestone: M10
+    priority: Medium
+    status: todo
+  - title: "Web account deletion"
+    body: >-
+      DELETE /me exists, but nothing in the web app calls it. Add a delete
+      account action to the user menu with a confirmation that names what is
+      removed (linked banks, documents, decisions and check-ins), call the
+      route, sign out locally and land on the sign-in screen. Tests first. Done
+      when an e2e run deletes a fresh user and that user's token gets 401
+      account_deleted.
+    labels: ["area:web"]
+    milestone: M10
+    priority: Medium
+    status: todo

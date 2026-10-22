@@ -2,7 +2,7 @@
 
 This is the repo copy of the First Paycheck build plan, condensed. The product is defined in [`technical-spec.md`](technical-spec.md) and [`proposal.md`](proposal.md); the look and interactions are settled by Mockup B in [`mockup/`](mockup/README.md); feature-level detail lives in [`specs/`](specs/README.md). Every issue below is in [`backlog.yaml`](backlog.yaml) and on the GitHub Project.
 
-- Backlog board: [GitHub Project "First Paycheck"](https://github.com/users/hkwan16/projects/1), 104 issues across milestones M0 to M10, synced from `backlog.yaml` by `scripts/sync_backlog.py --project 1 --owner hkwan16`.
+- Backlog board: [GitHub Project "First Paycheck"](https://github.com/users/hkwan16/projects/1), 124 issues across milestones M0 to M10, each with a status, synced from `backlog.yaml` by `scripts/sync_backlog.py --project 1 --owner hkwan16`, which also closes the done ones.
 - AI tool log: [`ai-log.md`](ai-log.md).
 
 ## Context
@@ -29,19 +29,21 @@ These are settled and not reopened during the build.
 
 Backend and frontend land together in each milestone, in sequence. Each milestone leaves a deployed product.
 
+Status is `main` on October 21; the board has the detail per issue.
+
 | Milestone | Dates | Scope | Status |
 |---|---|---|---|
-| M0 | Oct 20-22 | Scaffold, spec amendments, CI, deployed hello world | In progress |
-| M1 | Oct 23-26 | Data model, auth, Plaid sandbox sync, categorization, design system | Not started |
-| M2 | Oct 27-30 | Upload, ingest, redact, extract, confirm | Not started |
-| M3 | Oct 31-Nov 2 | 401(k) calculator, decisions, citations, explain, verify | Not started |
-| M4 | Nov 3-5 | Alpha hardening and the alpha document | Not started |
-| M5 | Nov 6-12 | Sankey, CSV import, spending summary, recurring detection | Not started |
-| M6 | Nov 13-19 | Emergency fund, goals, health plans, benefits extraction | Not started |
-| M7 | Nov 20-26 | W-4 | Not started |
-| M8 | Nov 27-Dec 3 | Check-ins, calendar, cash flow, net worth, holdings | Not started |
-| M9 | Dec 4-7 | Plan export | Not started |
-| M10 | Dec 8-11 | Hardening: deletion paths, eval sets at target, nightly evals, accessibility, user test | Not started |
+| M0 | Oct 20-22 | Scaffold, spec amendments, CI, deployed hello world | Done except the Vercel production deploy |
+| M1 | Oct 23-26 | Data model, auth, Plaid sandbox sync, categorization, design system | Done |
+| M2 | Oct 27-30 | Upload, ingest, redact, extract, confirm | Done; the extraction eval awaits a live model run |
+| M3 | Oct 31-Nov 2 | 401(k) calculator, decisions, citations, explain, verify | Done |
+| M4 | Nov 3-5 | Alpha hardening and the alpha document | In progress: production web, walkthrough, screenshots |
+| M5 | Nov 6-12 | Sankey, CSV import, spending summary, recurring detection | Done |
+| M6 | Nov 13-19 | Emergency fund, goals, health plans, benefits extraction | Done |
+| M7 | Nov 20-26 | W-4 | Done |
+| M8 | Nov 27-Dec 3 | Check-ins, calendar, cash flow, net worth, holdings | Done except the web's check-in-now button and plan line status |
+| M9 | Dec 4-7 | Plan export | Done |
+| M10 | Dec 8-11 | Hardening: deletion paths, eval sets at target, nightly evals, accessibility, user test | In progress: live eval baselines, accessibility audit, error boundaries, web account deletion, user test |
 
 Definitions of done, per milestone:
 
