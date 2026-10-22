@@ -10,6 +10,7 @@ import {
   isQuietFlow,
   isStatus,
   toneFill,
+  toneMark,
   toneSoft,
   toneSolid,
   toneText,
@@ -89,5 +90,18 @@ describe('flow colors', () => {
 
   it('marks the greys as quiet, so their bands are drawn lighter', () => {
     expect(FLOW_COLORS.filter(isQuietFlow)).toEqual(['ink-2', 'flow-tax', 'flow-idle']);
+  });
+});
+
+describe('toneMark', () => {
+  it('colors a chart series drawn in currentColor by hue only, never a status', () => {
+    expect(toneMark).toEqual({
+      blue: 'text-blue',
+      coral: 'text-coral',
+      teal: 'text-teal',
+      plum: 'text-plum',
+      neutral: 'text-ink-3',
+    });
+    expect(Object.keys(toneMark)).toEqual([...HUES]);
   });
 });

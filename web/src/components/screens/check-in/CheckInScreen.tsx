@@ -12,6 +12,7 @@ import { formatDate } from '@/lib/dates';
 import { checkInTitle } from './checkin-format';
 import { DeadlinesCard } from './DeadlinesCard';
 import { FindingsCard } from './FindingsCard';
+import { NetWorthCard } from './NetWorthCard';
 import { PlanLinesCard } from './PlanLinesCard';
 
 const allCheckIns = (
@@ -23,7 +24,8 @@ const allCheckIns = (
 /**
  * `/check-in/[checkInId]`, from docs/mockup/CheckIn.dc.html: what changed
  * since the plan was saved (each finding marked done, dismissed or undone),
- * the month's cash flow against the plan, and the dates coming up.
+ * the month's cash flow against the plan beside net worth and holdings (where
+ * the mockup puts them), and the dates coming up.
  */
 export function CheckInScreen({ checkInId }: { checkInId: string }) {
   const checkIn = useCheckIn(checkInId);
@@ -70,6 +72,7 @@ export function CheckInScreen({ checkInId }: { checkInId: string }) {
       <FindingsCard checkIn={data} />
       <div className="flex flex-wrap items-start gap-6">
         <PlanLinesCard cashFlow={data.cash_flow} className="flex-[1_1_440px]" />
+        <NetWorthCard className="flex-[1_1_320px]" />
       </div>
       <DeadlinesCard period={data.period} />
     </>

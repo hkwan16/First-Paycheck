@@ -30,6 +30,9 @@ describe('SampleScreen check-in screens', () => {
     const nav = screen.getByRole('link', { name: 'Monthly check-in' });
     expect(nav).toHaveAttribute('aria-current', 'page');
     expect(nav).toHaveAttribute('href', `/check-in/${NOVEMBER_ID}`);
+    const netWorth = screen.getByRole('region', { name: 'Net worth' });
+    expect(within(netWorth).getByText('As of Nov 15, 2026')).toBeInTheDocument();
+    expect(within(netWorth).getByRole('table', { name: 'Holdings' })).toBeInTheDocument();
     const coming = screen.getByRole('region', { name: 'Coming up' });
     expect(within(coming).getAllByRole('listitem')).toHaveLength(3);
     expect(requests).toEqual([]);

@@ -177,6 +177,13 @@ describe('CheckInScreen', () => {
     );
   });
 
+  it('shows net worth and holdings beside the cash flow, as the mockup places them', async () => {
+    await open();
+    const card = await screen.findByRole('region', { name: 'Net worth' });
+    expect(await within(card).findByText('As of Nov 15, 2026')).toBeInTheDocument();
+    expect(await within(card).findByRole('table', { name: 'Holdings' })).toBeInTheDocument();
+  });
+
   it('lists the dates due from the first of the month to the end of the next', async () => {
     db.calendar = [
       ...novemberCalendar(),

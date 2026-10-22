@@ -9,6 +9,7 @@ import { SideNav, type NavKey } from '@/components/chrome/SideNav';
 import { CheckInIndexScreen } from '@/components/screens/check-in/CheckInIndexScreen';
 import { CheckInScreen } from '@/components/screens/check-in/CheckInScreen';
 import { checkInWindow } from '@/components/screens/check-in/checkin-format';
+import { NET_WORTH_MONTHS } from '@/components/screens/check-in/NetWorthCard';
 import { ConfirmScreen } from '@/components/screens/confirm/ConfirmScreen';
 import { DecisionsScreen } from '@/components/screens/decisions/DecisionsScreen';
 import { LinkScreen } from '@/components/screens/link/LinkScreen';
@@ -28,6 +29,8 @@ import {
   novemberCalendar,
   novemberCheckIn,
   octoberCheckIn,
+  sampleHoldings,
+  sampleNetWorth,
   summaryOf,
 } from '@/test/fixtures/checkins';
 import {
@@ -117,6 +120,12 @@ function seedCheckIns(seed: Seed, november: CheckInDetail) {
     params: { query: checkInWindow(NOVEMBER_PERIOD) },
   });
   seed(queryKey, novemberCalendar());
+  seed(
+    $api.queryOptions('get', '/net-worth', { params: { query: { months: NET_WORTH_MONTHS } } })
+      .queryKey,
+    sampleNetWorth(),
+  );
+  seed(queryKeys.holdings(), sampleHoldings());
 }
 
 const CHECK_IN_HREFS = { checkIn: checkInRoute(NOVEMBER_ID) };

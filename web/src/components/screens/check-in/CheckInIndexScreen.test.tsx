@@ -39,6 +39,13 @@ describe('CheckInIndexScreen', () => {
     expect(screen.queryByRole('list', { name: 'Check-ins' })).toBeNull();
   });
 
+  it('shows net worth even before the first check-in', async () => {
+    checkinDb.checkIns = [];
+    render(<CheckInIndexScreen />);
+    const card = screen.getByRole('region', { name: 'Net worth' });
+    expect(await within(card).findByText('As of Nov 15, 2026')).toBeInTheDocument();
+  });
+
   it('says when the list could not load', async () => {
     server.use(
       http.get(apiUrl('/check-ins'), () =>

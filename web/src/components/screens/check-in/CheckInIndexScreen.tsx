@@ -15,6 +15,7 @@ import { formatDate } from '@/lib/dates';
 import { formatNumber } from '@/lib/money';
 import { checkInRoute } from '@/lib/routes';
 import { checkInMonth, handledText } from './checkin-format';
+import { NetWorthCard } from './NetWorthCard';
 
 function statusText(checkIn: CheckInSummary): string {
   return checkIn.status === 'completed' && checkIn.completed_at
@@ -22,7 +23,10 @@ function statusText(checkIn: CheckInSummary): string {
     : 'Open';
 }
 
-/** `/check-in`: every monthly check-in, newest first, each with how much of it is handled. */
+/**
+ * `/check-in`: every monthly check-in, newest first, each with how much of it
+ * is handled, and net worth, which does not wait for the first check-in.
+ */
 export function CheckInIndexScreen() {
   const checkIns = useCheckIns();
   const items = checkIns.data;
@@ -90,6 +94,7 @@ export function CheckInIndexScreen() {
         lead="Each month, and whenever new data arrives, your pay stubs and transactions are compared with the plan you saved."
       />
       {body}
+      <NetWorthCard />
     </>
   );
 }
