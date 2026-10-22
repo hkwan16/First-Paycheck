@@ -3,11 +3,12 @@
 import { PageTitle } from '@/components/chrome/PageTitle';
 import { StepFooter } from '@/components/chrome/StepFooter';
 import { Badge } from '@/components/ui/Badge';
+import { CardErrorBoundary } from '@/components/ui/CardErrorBoundary';
 import { Num } from '@/components/ui/Money';
 import { useDecisions } from '@/lib/api/hooks';
 import { CALCULATORS, features, type CalculatorId } from '@/lib/features';
 import type { ComponentType } from 'react';
-import { PlaceholderCard } from './DecisionCard';
+import { calculatorTitle, PlaceholderCard } from './DecisionCard';
 import { EmergencyFundCard } from './EmergencyFundCard';
 import { HealthPlanCard } from './HealthPlanCard';
 import { Match401kCard } from './Match401kCard';
@@ -55,7 +56,9 @@ export function DecisionsScreen({ calculators = features.calculators }: Decision
         {ORDER.map((calculator) => {
           const Card = CARDS[calculator];
           return live.has(calculator) ? (
-            <Card key={calculator} />
+            <CardErrorBoundary key={calculator} title={calculatorTitle(calculator)}>
+              <Card />
+            </CardErrorBoundary>
           ) : (
             <PlaceholderCard key={calculator} calculator={calculator} />
           );

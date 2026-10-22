@@ -5,6 +5,7 @@ import { PageTitle } from '@/components/chrome/PageTitle';
 import { TrendIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
+import { CardErrorBoundary } from '@/components/ui/CardErrorBoundary';
 import { IconTile } from '@/components/ui/IconTile';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -94,7 +95,9 @@ export function CheckInIndexScreen() {
         lead="Each month, and whenever new data arrives, your pay stubs and transactions are compared with the plan you saved."
       />
       {body}
-      <NetWorthCard />
+      <CardErrorBoundary title="Net worth">
+        <NetWorthCard />
+      </CardErrorBoundary>
     </>
   );
 }

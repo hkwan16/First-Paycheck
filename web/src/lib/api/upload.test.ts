@@ -110,11 +110,9 @@ describe('uploadDocument', () => {
     mocks.auth.signOut.mockResolvedValue({ error: null });
     const done = uploadDocument({ file: pdf(), type: 'pay_stub' });
     await flush();
-    xhr
-      .last()
-      .respond(401, {
-        error: { code: 'account_deleted', message: 'This account has been deleted' },
-      });
+    xhr.last().respond(401, {
+      error: { code: 'account_deleted', message: 'This account has been deleted' },
+    });
     await expect(done).rejects.toMatchObject({ status: 401, code: 'account_deleted' });
     expect(xhr.requests).toHaveLength(1);
     expect(mocks.auth.refreshSession).not.toHaveBeenCalled();
