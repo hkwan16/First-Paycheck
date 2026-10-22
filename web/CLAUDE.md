@@ -466,6 +466,12 @@ alpha" placeholder. Cards share `DecisionCard`, `SaveButton`, `AmountField` and 
   and swaps its body: skeleton, error, a link to Confirm when there is no confirmed pay stub,
   `PlanDetailsForm` when the profile has no salary, match tiers or birth year (saved with
   `PUT /profile`, so each is asked for once; the mockup has no such form), or the calculator.
+  The form fills each field the profile already has. A new user's yearly salary and birth year
+  start empty: the API reports no yearly salary for a pay stub (gross times pay periods is
+  arithmetic, so it would belong in `api/calc/`, not here), so their placeholders are examples
+  that say so (`examplePlaceholder`: "for example 65,000.00", "for example 1996"), from the same
+  `SALARY_EXAMPLE` and `BIRTH_YEAR_EXAMPLE` as what to fix ("like 65,000.00"). Never show a bare
+  figure as a placeholder: a person reads it as a value already entered.
   Inputs come from the confirmed pay stub and profile; the contribution starts from the saved
   decision. The calculator still takes `age`, which is `ageAtYearEnd(tax_year, birth_year)`
   (`lib/decisions.ts`), a difference of years.
@@ -477,7 +483,9 @@ alpha" placeholder. Cards share `DecisionCard`, `SaveButton`, `AmountField` and 
   came first.
 - **`EmergencyFundCard`** (spec 011): essentials start from the spending summary's essentials,
   savings from the one account with the `emergency_fund` role (no route sums balances), else
-  typed; target months on a 3 to 12 range; a typed monthly transfer. The result (target,
+  typed; target months on a 3 to 12 range; a typed monthly transfer, from the saved decision
+  once there is one, else empty with the placeholder "for example 300.00"
+  (`CONTRIBUTION_EXAMPLE`, also the example in what to fix). The result (target,
   shortfall, funded bar, months to target or "not within 10 years", per paycheck) is the
   calculator's. After a save, `EmergencyGoal` shows the goal with Pause or Resume, Mark reached
   and Change contribution (`useUpdateGoal`). There is no "Why" link: spec 011 has no explanation.

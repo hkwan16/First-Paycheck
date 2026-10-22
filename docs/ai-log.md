@@ -367,3 +367,24 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above. Production walkthrough issue closed on the board; the alpha document's screenshot table now says what each shot shows without a model key.
 
 **Time saved or lost:** Not measured. Six capture runs before all 18 passed; each failure was a real difference between a deployed product and the local stack.
+
+## 2026-10-22: example figures that read as values on the decision cards
+
+**Task:** The walkthrough's bug "Prefilled figures are values, not placeholders, on the decision cards": a new user's 401(k) plan details form showed "65,000.00" in Yearly salary and the emergency fund card "300.00" in Monthly transfer to savings, both as placeholders, so saving said to enter the number already on screen.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Fill each field with the API's value where confirmed data gives it without client arithmetic, else make the placeholder read as an example; failing tests first in the cards' tests; web only.
+
+**What it produced:** `examplePlaceholder` ("for example 65,000.00") in `decision-format.ts`; `SALARY_EXAMPLE` and `BIRTH_YEAR_EXAMPLE` in `plan-details.ts` and `CONTRIBUTION_EXAMPLE` in `emergency-fund-format.ts`, each shared by its placeholder and its "like ..." error so the two cannot drift; the birth year field widened to fit its example. Tests: a new user with a confirmed stub and no profile salary (both fields empty, placeholders that `parseMoney` cannot read, the errors on save), and the emergency fund with no transfer typed.
+
+**What was wrong:**
+- The salary placeholder was a bare figure, and the e2e Acme stub (2,708.33 twice a month) implies almost exactly $65,000 a year, so on the walkthrough it looked like the stub's own salary already filled in.
+- No field could be filled instead: `PayStubOut` has `gross_cents` and `pay_frequency` but no yearly salary, and `ProfileOut.salary_cents` is empty for a new user. Gross times pay periods is money math, which belongs in `api/calc/`, so the backlog's "save without retyping the salary" needs an API field first and was left for an API change. The monthly transfer has nothing to come from before the first save.
+- The birth year's "1996" placeholder had the same fault and was fixed with them. The HSA field's "0.00" was kept: an empty HSA amount is read as $0, so that placeholder shows what empty means.
+
+**How it was caught:** The production walkthrough; reproduced in the card tests with MSW, which failed on the bare placeholders before the change.
+
+**Fix:** As above.
+
+**Time saved or lost:** Not measured.
