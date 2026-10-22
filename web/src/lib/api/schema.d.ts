@@ -2439,6 +2439,11 @@ export interface components {
     /** PayStubOut */
     PayStubOut: {
       /**
+       * Annual Salary Cents
+       * @description Gross pay times the pay periods a year for pay_frequency, exact (spec 005 rule 24a); null without a pay frequency. Computed on read, never stored.
+       */
+      readonly annual_salary_cents: number | null;
+      /**
        * Created At
        * Format: date-time
        */

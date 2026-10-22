@@ -1,6 +1,6 @@
 # 005: Pay stub and benefits extraction, review and confirm
 
-Status: Implemented, M2. The live Sonnet path (`llm_live`) and the `extraction` eval suite are written but have not been run against the Anthropic API, because no key was available when they were built; the suite's baseline holds the M2 targets until the first live run replaces it.
+Status: Implemented, M2. The live Sonnet path (`llm_live`) and the `extraction` eval suite are written but have not been run against the Anthropic API, because no key was available when they were built; the suite's baseline holds the M2 targets until the first live run replaces it. Rule 24a (`annual_salary_cents` on the stub output) added in M10.
 
 ## Goal
 
@@ -21,7 +21,7 @@ Turn the redacted pages of spec 004 into a proposal the user reviews field by fi
 - `documents.proposal` (jsonb): `{fields, line_items, plans, source_lines, withheld_pages, notes}`, returned by `GET /docs/{id}` when the status is `proposed` or `manual_entry_required` (the redacted lines to type from), and null otherwise.
 - `jobs.result` for `ingest.extract`: `{document_id, status, page_count, redaction_count, withheld_pages}`. Ids and counts only, never extracted text (spec 001 rule 28).
 - On confirm (200): one `pay_stubs` row, or `benefits_plans` rows plus `benefits_chunks`; the blob deleted; `documents.status = confirmed`, `confirmed_at` and `deleted_at` set. The response is `{document, pay_stub, plans}`: the document as `GET /docs` lists it and what was stored.
-- `GET /pay-stubs`: confirmed stubs, newest pay date first. `GET /profile`, `PUT /profile`: the profile.
+- `GET /pay-stubs`: confirmed stubs, newest pay date first, each with `annual_salary_cents` (integer cents or null, rule 24a). `GET /profile`, `PUT /profile`: the profile.
 
 ## Rules
 
@@ -66,6 +66,7 @@ Turn the redacted pages of spec 004 into a proposal the user reviews field by fi
 ### Reads and profile
 
 24. `GET /pay-stubs` returns the user's stubs ordered by `pay_date DESC, created_at DESC`, every column including the generated `tax_year`.
+24a. **Yearly salary the stub implies.** Every stub output (`PayStubOut`: `GET /pay-stubs` and the confirm response's `pay_stub`) carries `annual_salary_cents`: `gross_cents` times the pay periods a year for its `pay_frequency` (weekly 52, biweekly 26, semimonthly 24, monthly 12), from `calc/pay_stub.py:annual_salary_cents`. It is an integer product of integer cents, so no rounding is applied and it need not be a round figure. A stub with no `pay_frequency` gives null. It is computed on read, never stored, and it is not written to the profile: the client offers it as the starting salary in the plan details form, which the user saves with `PUT /profile` (the profile's own `salary_cents` wins when set). Gross on one stub can include overtime or a bonus, which is why it is a starting value the user can change, not a confirmed salary.
 25. `GET /profile` returns the saved profile, or the defaults (nulls, empty lists, `dependents = 0`) when none is saved. `PUT /profile` replaces it: `salary_cents` strict int > 0 or null; `pay_frequency`, `filing_status`, `expected_healthcare_usage` enums or null; `other_jobs` a list of up to 5 `{annual_wages_cents > 0}`; `dependents` 0-20; `start_date` a date or null; `match_tiers` up to 5 tiers `{employee_pct_upto, employer_pct}` with both in (0, 100] and `employee_pct_upto` strictly ascending (spec 006); `vesting_years` 0-10 or null. Percentages are decimals with at most 2 places, sent and returned as JSON strings.
 
 ### Evals
@@ -84,6 +85,16 @@ Turn the redacted pages of spec 004 into a proposal the user reviews field by fi
 | 3 | `test_no_deductions` | 100,000 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 100,000 | 0 |
 
 Working for row 1 (the Confirm mockup's stub): deductions = 29,776 + 16,792 + 3,927 + 9,814 + 0 + 6,250 + 4,670 = 71,229 cents; 270,833 - 71,229 = 199,604 = net, so the difference is 0. `other_deductions_cents` 4,670 is CA SDI 3,250 plus dental and vision 1,420, two line items with no column of their own. Row 2: the expected net is still 199,604, so a net of 199,606 gives 199,604 - 199,606 = -2 and confirm answers 422 with `difference_cents = -2`.
+
+### Yearly salary (`tests/unit/calc/test_pay_stub.py`, rule 24a)
+
+| # | Test | Gross | Pay frequency | Periods | `annual_salary_cents` |
+|---|---|---|---|---|---|
+| 1 | `test_annual_salary_semimonthly_mockup_stub` | 270,833 | semimonthly | 24 | 6,499,992 |
+| 2 | `test_annual_salary_every_frequency` | 250,000 | weekly, biweekly, semimonthly, monthly | 52, 26, 24, 12 | 13,000,000; 6,500,000; 6,000,000; 3,000,000 |
+| 3 | `test_annual_salary_without_frequency` | 270,833 | null | none | null |
+
+Working for row 1 (the Acme stub, $2,708.33 twice a month): 270,833 x 24 = 6,499,992 cents, $64,999.92. Not $65,000.00: the product is exact and nothing rounds it to the salary the stub was made from. Row 2: 250,000 x 52 = 13,000,000; x 26 = 6,500,000; x 24 = 6,000,000; x 12 = 3,000,000. The route test `tests/integration/test_pay_stubs.py::test_every_column_is_returned` reads row 1 back from `GET /pay-stubs`.
 
 ### Other deductions (`tests/unit/ingest/test_proposal.py::test_other_deductions_sum_unassigned_lines`)
 

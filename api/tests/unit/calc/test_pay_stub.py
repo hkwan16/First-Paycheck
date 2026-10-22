@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from calc.pay_stub import Balance, PayStubAmounts, balance, total_cents
+from calc.pay_stub import Balance, PayStubAmounts, annual_salary_cents, balance, total_cents
 
 MOCKUP = {
     "gross_cents": 270_833,
@@ -54,3 +54,19 @@ def test_amounts_are_strict_integers() -> None:
 def test_total_cents_sums_integers() -> None:
     assert total_cents([3_250, 1_420]) == 4_670
     assert total_cents([]) == 0
+
+
+def test_annual_salary_semimonthly_mockup_stub() -> None:
+    # 270,833 x 24, exact: not rounded to the $65,000 the stub was made from.
+    assert annual_salary_cents(270_833, "semimonthly") == 6_499_992
+
+
+def test_annual_salary_every_frequency() -> None:
+    assert annual_salary_cents(250_000, "weekly") == 13_000_000
+    assert annual_salary_cents(250_000, "biweekly") == 6_500_000
+    assert annual_salary_cents(250_000, "semimonthly") == 6_000_000
+    assert annual_salary_cents(250_000, "monthly") == 3_000_000
+
+
+def test_annual_salary_without_frequency() -> None:
+    assert annual_salary_cents(270_833, None) is None

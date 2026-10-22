@@ -65,10 +65,23 @@ def test_every_column_is_returned(
         "other_deductions_cents",
         "net_cents",
         "created_at",
+        "annual_salary_cents",
     }
     assert only["gross_cents"] == 270_833
     assert only["pay_frequency"] == "semimonthly"
     assert only["pay_date"] == "2026-10-15"
+    # Spec 005 rule 24a, row 1: 270,833 x 24, exact.
+    assert only["annual_salary_cents"] == 6_499_992
+
+
+def test_annual_salary_is_null_without_a_pay_frequency(
+    db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    document = make_document(db_connection, user_a.id, with_blob=False)
+    make_pay_stub(db_connection, user_a.id, document, pay_frequency=None)
+    (only,) = client_as(user_a).get("/pay-stubs").json()
+    assert only["pay_frequency"] is None
+    assert only["annual_salary_cents"] is None
 
 
 def test_no_stubs(client_as: Client, user_a: FixtureUser) -> None:
