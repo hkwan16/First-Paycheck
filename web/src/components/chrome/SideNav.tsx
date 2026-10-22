@@ -36,7 +36,7 @@ const PATHS: readonly [RegExp, NavKey][] = [
   [/^\/setup\/decisions$/, 'decisions'],
   [/^\/why(?:\/[^/]+)?$/, 'why'],
   [/^\/plan$/, 'plan'],
-  [/^\/check-in\/[^/]+$/, 'checkIn'],
+  [/^\/check-in(?:\/[^/]+)?$/, 'checkIn'],
 ];
 
 /** Which nav item a pathname belongs to. */

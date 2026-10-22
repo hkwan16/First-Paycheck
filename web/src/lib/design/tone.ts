@@ -90,6 +90,19 @@ export const toneWash: Record<Tone, string> = {
   off: 'bg-red-tint/60',
 };
 
+/**
+ * A chart series' color (the net-worth lines), set as `color` so the marks
+ * draw in currentColor. Hues only: a series is a kind of thing, and the
+ * status colors stay reserved for states.
+ */
+export const toneMark: Record<Hue, string> = {
+  blue: 'text-blue',
+  coral: 'text-coral',
+  teal: 'text-teal',
+  plum: 'text-plum',
+  neutral: 'text-ink-3',
+};
+
 /*
  * Flow colors: the cash-flow diagram's keys (components/sankey and the
  * legend swatches). Each is a token name; the hues keep their meanings

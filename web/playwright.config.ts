@@ -84,6 +84,14 @@ export default defineConfig({
       dependencies: ['authenticated-confirm'],
       use: { ...desktop, storageState: STORAGE_STATE },
     },
+    // Reads the check-ins the worker's monthly tick made and marks a finding
+    // done and undone, leaving it as it was; needs only the saved session.
+    {
+      name: 'authenticated-check-in',
+      testMatch: 'check-in.spec.ts',
+      dependencies: ['setup'],
+      use: { ...desktop, storageState: STORAGE_STATE },
+    },
     // Spending reads the bank Link linked, so it needs Plaid's sandbox.
     ...(plaidSandbox
       ? [

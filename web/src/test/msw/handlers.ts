@@ -33,6 +33,7 @@ import {
 } from '../fixtures/decisions';
 import { samplePayStub } from '../fixtures/documents';
 import { sampleJob, SAMPLE_NOW, SAMPLE_SYNCED_AT } from '../fixtures/sample';
+import { checkinHandlers } from './checkin-handlers';
 import { db } from './db';
 import {
   planningCalculators,
@@ -604,13 +605,21 @@ export const handlers = [
 
   http.post(apiUrl('/explain'), ({ request }) => explain(request)),
 
-  http.get(apiUrl('/calendar'), () =>
-    HttpResponse.json(
+  // Spec 015 rule 22: `from` and `to` bound `due_at`, each on its own.
+  http.get(apiUrl('/calendar'), ({ request }) => {
+    const query = new URL(request.url).searchParams;
+    const from = query.get('from');
+    const to = query.get('to');
+    if (from !== null && to !== null && from > to) return invalid('from must not be after to');
+    return HttpResponse.json(
       db.calendar
         .filter((event) => event.status === 'upcoming')
+        .filter(
+          (event) => (from === null || event.due_at >= from) && (to === null || event.due_at <= to),
+        )
         .sort((a, b) => a.due_at.localeCompare(b.due_at)),
-    ),
-  ),
+    );
+  }),
 
   http.get<{ id: string }>(apiUrl('/jobs/:id'), ({ params }) => {
     const script = jobScripts.get(params.id);
@@ -629,6 +638,7 @@ export const handlers = [
   }),
 
   ...spendingHandlers,
+  ...checkinHandlers,
 ];
 
 /** Forget scripted job states (called with resetDb after every test). */

@@ -125,6 +125,7 @@ describe('navKeyForPath', () => {
     ['/why', 'why'],
     ['/plan', 'plan'],
     ['/check-in/ci_1', 'checkIn'],
+    ['/check-in', 'checkIn'],
     ['/sign-in', undefined],
     ['/setup/linked', undefined],
   ])('%s is %s', (path, key) => {

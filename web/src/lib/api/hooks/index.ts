@@ -6,6 +6,7 @@
 export * from './accounts';
 export * from './benefits';
 export * from './calc';
+export * from './checkins';
 export * from './debounce';
 export * from './decisions';
 export * from './documents';
@@ -14,6 +15,7 @@ export * from './goals';
 export * from './health';
 export * from './imports';
 export * from './jobs';
+export * from './net-worth';
 export * from './profile';
 export * from './recurring';
 export * from './setup';

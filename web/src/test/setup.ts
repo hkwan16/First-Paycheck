@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll } from 'vitest';
+import { resetCheckinDb } from './msw/checkin-handlers';
 import { resetDb } from './msw/db';
 import { resetJobScripts } from './msw/handlers';
 import { resetPlanningDb } from './msw/planning-handlers';
@@ -16,5 +17,6 @@ afterEach(() => {
   resetJobScripts();
   resetSpendingDb();
   resetPlanningDb();
+  resetCheckinDb();
 });
 afterAll(() => server.close());

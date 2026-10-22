@@ -1,10 +1,15 @@
 'use client';
 
 import { QueryClient, QueryClientProvider, type QueryKey } from '@tanstack/react-query';
+import type { Route } from 'next';
 import { useState, type ReactNode } from 'react';
 import { Header } from '@/components/chrome/Header';
 import { Shell } from '@/components/chrome/Shell';
 import { SideNav, type NavKey } from '@/components/chrome/SideNav';
+import { CheckInIndexScreen } from '@/components/screens/check-in/CheckInIndexScreen';
+import { CheckInScreen } from '@/components/screens/check-in/CheckInScreen';
+import { checkInWindow } from '@/components/screens/check-in/checkin-format';
+import { NET_WORTH_MONTHS } from '@/components/screens/check-in/NetWorthCard';
 import { ConfirmScreen } from '@/components/screens/confirm/ConfirmScreen';
 import { DecisionsScreen } from '@/components/screens/decisions/DecisionsScreen';
 import { LinkScreen } from '@/components/screens/link/LinkScreen';
@@ -14,13 +19,25 @@ import { WhyScreen } from '@/components/screens/why/WhyScreen';
 import { $api } from '@/lib/api/client';
 import { ACCOUNT_COUNT_LIMIT, TRANSACTIONS_PAGE_SIZE } from '@/lib/api/hooks';
 import { queryKeys } from '@/lib/api/keys';
-import type { Decision } from '@/lib/api/types';
+import type { CheckInDetail, Decision } from '@/lib/api/types';
+import { checkInRoute } from '@/lib/routes';
 import {
   SAMPLE_PERIOD,
   sampleCashflow,
   sampleRecurring,
   sampleSpendingSummary,
 } from '@/test/fixtures/cashflow';
+import {
+  completedNovemberCheckIn,
+  NOVEMBER_ID,
+  NOVEMBER_PERIOD,
+  novemberCalendar,
+  novemberCheckIn,
+  octoberCheckIn,
+  sampleHoldings,
+  sampleNetWorth,
+  summaryOf,
+} from '@/test/fixtures/checkins';
 import {
   DECISION_V1_ID,
   sampleCalendarEvent,
@@ -72,7 +89,10 @@ export type SampleScreenName =
   | 'decisions'
   | 'why'
   | 'why-fallback'
-  | 'why-index';
+  | 'why-index'
+  | 'check-in'
+  | 'check-in-complete'
+  | 'check-in-index';
 
 /** The manual-entry variant's document: the same stub, which the AI declined to read. */
 const MANUAL_DOC_ID = '4d000000-0000-4000-8000-0000000000aa';
@@ -131,9 +151,33 @@ function seedAllDecided(seed: Seed) {
   seed(queryKeys.calc('/calc/w4', w4.inputs), w4.result);
 }
 
+/** Spec 015's November user, a month after the decisions: one check-in open (or done), October's done. */
+function seedCheckIns(seed: Seed, november: CheckInDetail) {
+  seed(queryKeys.checkIns(), [summaryOf(november), summaryOf(octoberCheckIn())]);
+  seed(queryKeys.checkIn(NOVEMBER_ID), november);
+  const { queryKey } = $api.queryOptions('get', '/calendar', {
+    params: { query: checkInWindow(NOVEMBER_PERIOD) },
+  });
+  seed(queryKey, novemberCalendar());
+  seed(
+    $api.queryOptions('get', '/net-worth', { params: { query: { months: NET_WORTH_MONTHS } } })
+      .queryKey,
+    sampleNetWorth(),
+  );
+  seed(queryKeys.holdings(), sampleHoldings());
+}
+
+const CHECK_IN_HREFS = { checkIn: checkInRoute(NOVEMBER_ID) };
+
 const SCREENS: Record<
   SampleScreenName,
-  { nav: NavKey; render: () => ReactNode; seed?: (seed: Seed) => void }
+  {
+    nav: NavKey;
+    render: () => ReactNode;
+    seed?: (seed: Seed) => void;
+    /** Id-bound nav links, as AppSideNav gives them from API data. */
+    hrefs?: Partial<Record<NavKey, Route>>;
+  }
 > = {
   link: { nav: 'link', render: () => <LinkScreen showSandboxLink={false} /> },
   confirm: { nav: 'confirm', render: () => <ConfirmScreen documentId={PAY_STUB_DOC_ID} /> },
@@ -171,6 +215,24 @@ const SCREENS: Record<
     },
   },
   'why-index': { nav: 'why', render: () => <WhyIndexScreen />, seed: seedDecided },
+  'check-in': {
+    nav: 'checkIn',
+    render: () => <CheckInScreen checkInId={NOVEMBER_ID} />,
+    seed: (seed) => seedCheckIns(seed, novemberCheckIn()),
+    hrefs: CHECK_IN_HREFS,
+  },
+  'check-in-complete': {
+    nav: 'checkIn',
+    render: () => <CheckInScreen checkInId={NOVEMBER_ID} />,
+    seed: (seed) => seedCheckIns(seed, completedNovemberCheckIn()),
+    hrefs: CHECK_IN_HREFS,
+  },
+  'check-in-index': {
+    nav: 'checkIn',
+    render: () => <CheckInIndexScreen />,
+    seed: (seed) => seedCheckIns(seed, novemberCheckIn()),
+    hrefs: CHECK_IN_HREFS,
+  },
 };
 
 /**
@@ -227,7 +289,7 @@ export function seededClient(screen: SampleScreenName = 'link') {
 
 export function SampleScreen({ screen }: { screen: SampleScreenName }) {
   const [client] = useState(() => seededClient(screen));
-  const { nav, render } = SCREENS[screen];
+  const { nav, render, hrefs } = SCREENS[screen];
   return (
     <QueryClientProvider client={client}>
       <Shell
@@ -236,7 +298,7 @@ export function SampleScreen({ screen }: { screen: SampleScreenName }) {
             chips={[`${SAMPLE_USER.employer} · ${SAMPLE_USER.frequency}`, SAMPLE_USER.name]}
           />
         }
-        nav={<SideNav current={nav} />}
+        nav={<SideNav current={nav} hrefs={hrefs} />}
       >
         {render()}
       </Shell>
