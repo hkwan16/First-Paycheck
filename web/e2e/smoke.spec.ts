@@ -58,6 +58,24 @@ const SCREENS: readonly Screen[] = [
     sample: true,
   },
   { path: '/dev/screens/why-index', name: 'why-index', heading: 'Why each decision', sample: true },
+  {
+    path: '/dev/screens/check-in',
+    name: 'check-in',
+    heading: 'November check-in',
+    sample: true,
+  },
+  {
+    path: '/dev/screens/check-in/complete',
+    name: 'check-in-complete',
+    heading: 'November check-in',
+    sample: true,
+  },
+  {
+    path: '/dev/screens/check-in-index',
+    name: 'check-in-index',
+    heading: 'Monthly check-ins',
+    sample: true,
+  },
 ];
 
 /** Collect console errors and uncaught exceptions for the life of the page. */
@@ -199,4 +217,32 @@ test('the CSV import panel opens next to the bank link and stays accessible', as
   expect(await blockingViolations(page)).toEqual([]);
   await expect(panel).toHaveScreenshot('link-csv-import.png');
   expect(errors).toEqual([]);
+});
+
+test.describe('the net-worth card', () => {
+  test('reads out every series for a month on hover, stays accessible, and matches its baseline', async ({
+    page,
+  }) => {
+    const errors = watchErrors(page);
+    await tallWindow(page);
+    await open(page, screenAt('/dev/screens/check-in'));
+    const card = page.getByRole('region', { name: 'Net worth' });
+    const chart = card.getByRole('figure', { name: 'Net worth by month' });
+    await expect(card).toHaveScreenshot('net-worth-card.png');
+
+    // The last month sits at the plot's right edge.
+    const plot = chart.locator('.recharts-surface');
+    const box = (await plot.boundingBox())!;
+    await page.mouse.move(box.x + box.width - 14, box.y + box.height / 2);
+    const tooltip = chart.locator('.recharts-tooltip-wrapper');
+    await expect(tooltip).toContainText('Nov 2026');
+    await expect(tooltip).toContainText('$5,477.54');
+    await expect(tooltip).toContainText('$6,077.54');
+    await expect(tooltip).toContainText('$600.00');
+    expect(await blockingViolations(page)).toEqual([]);
+
+    await card.getByText('Monthly figures').click();
+    await expect(card.getByRole('table', { name: 'Net worth by month' })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
 });
