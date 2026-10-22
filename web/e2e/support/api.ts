@@ -28,15 +28,20 @@ export function plaidSandboxAvailable(): boolean {
   return process.env.E2E_PLAID_SANDBOX?.trim() !== '0';
 }
 
-/** The first setup step, hydrated and done loading accounts. */
+/**
+ * The first setup step, hydrated and done loading accounts. The first read of
+ * a deployed API can take a while (a service waking up takes up to a minute), so
+ * the loading state gets far more than the 5 s default.
+ */
 export async function openLink(page: Page) {
   await page.goto('/setup/link');
   await waitForHydration(page);
   await expect(page.getByRole('region', { name: 'Bank accounts' })).not.toHaveAttribute(
     'aria-busy',
     'true',
+    { timeout: 60_000 },
   );
-  await expect(page.getByText('Loading your accounts')).toHaveCount(0);
+  await expect(page.getByText('Loading your accounts')).toHaveCount(0, { timeout: 60_000 });
 }
 
 /**

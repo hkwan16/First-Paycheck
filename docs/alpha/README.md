@@ -20,9 +20,9 @@ The alpha was scoped as milestones M0 to M4 (sign in, link a bank, confirm a pay
 8. **Plan.** Every saved decision with its figures and explanation status, the paycheck, goals and the next 90 days of dates, a PDF made by the worker and a calendar file (.ics).
 9. **Monthly check-in.** What changed since the plan was saved (an election that did not reach the pay stub, a goal behind pace, a new or repriced charge, a pay or deduction change, a date coming up), each marked done or dismissed, or undone. The month's cash flow against the plan, each line said as on plan, over or under. Net worth by month and investment holdings. "Check in now" runs this month's check-in without waiting for the monthly tick.
 
-Production: the API and worker run on Render at `https://first-paycheck-api.onrender.com`; its `/health` reports the deployed commit of `main` (`6785ba4` when this was written), migration `0014_delete_account_fn` and a live worker. The web app's Vercel production deploy is still open (an M0 issue in progress), so the walkthrough and screenshots run on the local stack (`make e2e-full`) until it lands. Recording (90 seconds): TODO (`screenshots/alpha-demo.mp4` or a link).
+Production: the web app is at `https://first-paycheck-silk.vercel.app` (Vercel); the API and worker run on Render at `https://first-paycheck-api.onrender.com`, and its `/health` reports the deployed commit of `main` (`aa266f0` when the screenshots were taken), migration `0014_delete_account_fn`, a live worker and whether Plaid is configured. The walkthrough below ran on that deployment on October 22 as the synthetic test user: the Plaid sandbox bank linked through the API's sandbox route (14 accounts, 48 transactions, 13 holdings synced by the worker), the Acme pay stub uploaded, typed in and confirmed, the four decisions saved, the plan exported as a PDF by the worker, and this month's check-in run with "Check in now". The same run is `web/playwright.capture.config.ts`: the product's own real-API specs (`decisions`, `plan`, `check-in`) between two capture specs, against the deployed web app and API. Recording (90 seconds): TODO (`screenshots/alpha-demo.mp4` or a link).
 
-**Production and the Anthropic key.** Production has no `ANTHROPIC_API_KEY` yet. That is a supported mode, not a failure (spec 004 rule 22, migration `0011_no_model_reason`): categorization runs the rules only and leaves the rest "Not labeled"; an uploaded document goes straight to manual entry with "Automatic reading is off right now, so type the fields from the lines shown." beside the redacted lines; "Why" shows a calm "not available yet" notice with the calculator's result; and the health plan card takes typed plans instead of a read benefits summary. Setting the key turns on AI labels, extraction and verified explanations with no other change.
+**Production and the Anthropic key.** Production has no `ANTHROPIC_API_KEY` yet (a rejected key was set for a while, which the walkthrough found: see the AI log, "a rejected model key retried for half an hour"). That is a supported mode, not a failure (spec 004 rule 22, migration `0011_no_model_reason`): categorization runs the rules only and leaves the rest "Not labeled"; an uploaded document goes straight to manual entry with "Automatic reading is off right now, so type the fields from the lines shown." beside the redacted lines; "Why" shows a calm "not available yet" notice with the calculator's result; and the health plan card takes typed plans instead of a read benefits summary. Setting the key turns on AI labels, extraction and verified explanations with no other change.
 
 ### Functional and placeholder features
 
@@ -42,7 +42,7 @@ Production: the API and worker run on Render at `https://first-paycheck-api.onre
 | Cash-flow diagram (Sankey) | M5 | Functional behind the `sankey` feature flag, with a stacked view under 640 px and full keyboard navigation. |
 | Recurring charges | M5 | Functional: detected weekly, monthly or yearly; rename, or mark not recurring and undo that. |
 | 401(k) match calculator | Alpha | Functional. Every figure comes from `POST /calc/401k-match`. |
-| Emergency fund, health plans, W-4 calculators | M6, M7 | Built and functional. The alpha build's `calculators=401k_match` flag shows them as "After alpha" placeholders; leaving the flag unset turns all four on. |
+| Emergency fund, health plans, W-4 calculators | M6, M7 | Built and functional, and live in production since October 22, when the alpha's `calculators=401k_match` flag was dropped from the Vercel build (the flag still exists for an alpha-shaped build). |
 | Versioned decisions (v1, then v2 over it) | Alpha | Functional, for every calculator. |
 | Verified explanation with an IRS citation | Alpha | Functional with a model for the 401(k), health plan and W-4 (an emergency fund has no IRS source, so none). Without one, a calm notice and the calculator's result. |
 | Plan screen, PDF export, calendar file | M9 | Functional |
@@ -62,27 +62,26 @@ Behind the screens: row-level security on every user table with a cross-user tes
 
 ### Screenshots
 
-Screenshots go in [`screenshots/`](screenshots/), at 1280 px wide and, where marked, 390 px for phone, from a fresh account. Each file below is a named placeholder until it is captured.
+Screenshots are in [`screenshots/`](screenshots/), at 1280 px wide and, where marked, 390 px for phone, taken from the production web app and API on October 22 as the test user, with no model key set: the Confirm screen is the manual entry path over the redacted lines, categories come from the rules, and Why shows the calculator's result with the "not available yet" notice. Two were not captured: the sync in progress, because Plaid Link's iframe is not driven by automation (the bank was linked through the API's sandbox route, so there is no moment to capture), and the board, which needs a signed-in GitHub session.
 
 | File | Shows |
 |---|---|
 | `01-sign-in.png` | The sign-in screen |
-| `02-link-syncing.png` | Linking First Platypus Bank, with the sync job's progress bar |
-| `03-link-linked.png` | The linked accounts with their roles, and the pay stub row with its "N items redacted" badge |
-| `04-spending-transactions.png` | Transactions with Rule, AI and You badges |
+| `03-link-linked.png` | The 14 linked accounts with their roles and balances, and the pay stub rows with their "1 item redacted" badges |
+| `04-spending-transactions.png` | Transactions with their Rule badges (no AI labels without a model key) |
 | `05-spending-rule-notice.png` | A category fix and its "Saved as a rule." notice |
-| `06-confirm-review.png` | The Confirm screen: fields beside the redacted source, "The math checks out." |
+| `06-confirm-review.png` | The Confirm screen in manual entry: the fields to type beside the redacted source lines |
 | `07-spending-tiles.png` | The Spending summary tiles |
-| `08-spending-sankey.png` | The cash-flow diagram with a node's popover open |
-| `09-decisions-v1.png` | The 401(k) card at 4%, "Saved as v1" |
-| `10-decisions-v2.png` | The card after a change, "Saved as v2" |
-| `11-why-verified.png` | The explanation, "Verified against calculator", with its IRS source |
+| `08-spending-sankey.png` | October's cash-flow diagram, gross pay from the confirmed stubs to categories, with a node's popover open |
+| `09-decisions-v1.png` | The 401(k) card with its saved version |
+| `10-decisions-v2.png` | The card after a change, saved as the next version |
+| `11-why-verified.png` | Why, as production shows it without a model key: the calculator's result and the "not available yet" notice |
 | `12-plan.png` | The Plan screen with its decisions, goals and next 90 days |
 | `13-check-in.png` | A check-in: findings, the cash flow against the plan with its statuses, net worth |
 | `14-check-in-now.png` | The list of check-ins after Check in now |
 | `15-confirm-phone.png` | The Confirm screen at 390 px |
 | `16-decisions-phone.png` | The Decisions screen at 390 px |
-| `backlog.png` | The GitHub Project board |
+| `backlog.png` | The GitHub Project board (to capture from a signed-in session) |
 
 ## Documented backlog
 
@@ -91,7 +90,7 @@ The backlog is a GitHub Project. Every issue has a title, a description (its bod
 - Project board: https://github.com/users/hkwan16/projects/1 (issues: https://github.com/hkwan16/First-Paycheck/issues)
 - Board screenshot: `screenshots/backlog.png` (to capture)
 
-`backlog.yaml` holds 124 issues: 113 done, 7 in progress and 4 to do (46 High, 77 Medium, 1 Low priority), across milestones M0 to M10 in dependency order, each leaving a deployed product.
+`backlog.yaml` holds 124 issues: 114 done, 7 in progress and 3 to do (46 High, 77 Medium, 1 Low priority), across milestones M0 to M10 in dependency order, each leaving a deployed product.
 
 | Milestone | Scope | Done | In progress | To do |
 |---|---|---|---|---|
@@ -99,7 +98,7 @@ The backlog is a GitHub Project. Every issue has a title, a description (its bod
 | M1 | Data model, auth, Plaid sandbox sync, categorization, design system | 16 | 0 | 0 |
 | M2 | Upload, ingest, redact, extract, confirm | 8 | 2 (extraction eval with a live model, tesseract-in-Docker as a required check) | 0 |
 | M3 | 401(k) calculator, decisions, citations, explain, verify | 8 | 0 | 0 |
-| M4 | Alpha hardening and this document | 5 | 3 (alpha e2e in CI, observability, this document) | 1 (production walkthrough) |
+| M4 | Alpha hardening and this document | 6 | 3 (alpha e2e in CI, observability, this document) | 0 |
 | M5 | Sankey, CSV import, spending summary, recurring charges | 14 | 0 | 0 |
 | M6 | Emergency fund, goals, health plans, benefits extraction | 13 | 0 | 0 |
 | M7 | W-4 | 5 | 0 | 0 |
@@ -107,7 +106,7 @@ The backlog is a GitHub Project. Every issue has a title, a description (its bod
 | M9 | Plan export | 6 | 0 | 0 |
 | M10 | Hardening, evals, accessibility, user test | 9 | 2 (two eval sets at target, which need a live model) | 3 (user test, Plaid production, live LLM evals) |
 
-Those statuses are from the sync at commit 54b76bb (October 21), after the M8 web item, the error boundaries, web account deletion and the accessibility audit were merged. The open items are the ones that need something from outside the repo: a live model for the eval sets and baselines, the Plaid secrets in GitHub Actions for the alpha spec's link steps, Sentry and a log drain in production, people for the user test, and the production walkthrough once bank linking is configured there.
+Those statuses are from the sync at commit 54b76bb (October 21), after the M8 web item, the error boundaries, web account deletion and the accessibility audit were merged. The open items are the ones that need something from outside the repo: a live model for the eval sets and baselines, the Plaid secrets in GitHub Actions for the alpha spec's link steps, Sentry and a log drain in production, and people for the user test.
 
 ## Brief reflection on AI tool integration
 

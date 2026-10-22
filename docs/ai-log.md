@@ -343,3 +343,27 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** In the subagent's branch: the new exception and the two handlers, with tests that run the worker on 401, 403 and 404 (job succeeded on attempt 1, document `no_model`, one request, one `api_error` row) and on 429, 500 and 529 (still `queued` for a retry). A new `status_reason` was not added: from the user's side a rejected key is the same as no key, and `web/src/lib/documents.ts` already says "Automatic reading is off right now". The ERROR log, which Sentry's logging integration turns into an event, is the operator's signal. `GET /health` was left alone: a "key is set" field would have read fine during this very incident.
 
 **Time saved or lost:** Not measured.
+
+## 2026-10-22: the production walkthrough and its screenshots
+
+**Task:** Run the alpha path on the deployed product (Vercel, Render, hosted Supabase, the Plaid sandbox) as the synthetic test user and capture the alpha document's screenshots from it.
+
+**Tool:** Claude Code in the main session, with Opus 5.5 subagents for the two fixes it turned up.
+
+**Prompt or skill:** The real-API Playwright projects, first against the production API from a local `next dev`, then from the deployed web app through a second Playwright config (`web/playwright.capture.config.ts`) that runs two capture specs around the product's own `decisions`, `plan` and `check-in` specs.
+
+**What it produced:** 15 screenshots in `docs/alpha/screenshots/`, the walkthrough passing end to end on production (18 of 18), and the findings below.
+
+**What was wrong:**
+- A local web app cannot drive the production API: its CORS allows the Vercel origin only, so every read failed with "Could not load your accounts". The capture had to run from the deployed web app itself.
+- Plaid Link's iframe stopped on a disabled Continue that nine minutes of generic clicking never enabled. The bank is linked through the API's sandbox route instead, and the "sync in progress" screenshot was dropped rather than faked.
+- Production had an Anthropic key that the API rejected (401). The extraction job treated that as a transient error and retried with backoff for about half an hour; the categorize job died the same way. A subagent reproduced it through the worker with a mocked 401 and made a rejected key end the job at once as "no model" (the log entry above).
+- Three e2e helpers assumed a warm local server: sign-in's redirect, the Link screen's first read and the documents list each got the 5 s default. On a deployment that was waking up, every API request hung with no answer at all (the trace shows status -1 for all of them). They now wait up to a minute, and the capture spec waits for the documents list before deciding whether to upload.
+- The Vercel project still carried the alpha flag `calculators=401k_match`, so three calculators were "After alpha" placeholders in production until the flag was changed to `sankey` and redeployed.
+- The capture counted documents before the list had loaded and uploaded a second stub, then picked the newest row (still reading) instead of the one waiting for review. It now filters rows by their status text, without regex anchors in `hasText`, which match the whole row's text.
+
+**How it was caught:** Each from the failing run's trace or page snapshot, then the hosted `jobs` table for the retry loop (`last_error` named the 401) and `/health`'s new `plaid.missing` field for the missing token key.
+
+**Fix:** As above. Production walkthrough issue closed on the board; the alpha document's screenshot table now says what each shot shows without a model key.
+
+**Time saved or lost:** Not measured. Six capture runs before all 18 passed; each failure was a real difference between a deployed product and the local stack.

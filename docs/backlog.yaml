@@ -577,8 +577,14 @@ issues:
     labels: ["area:web", "area:api"]
     milestone: M4
     priority: High
-    status: todo
-    # Not run: the web app has no production deployment yet.
+    status: done
+    # Run on October 22 on Vercel and Render as the synthetic test user, by
+    # web/playwright.capture.config.ts: link (through the API's sandbox route),
+    # upload, manual confirm, the four decisions, the plan PDF and a check-in.
+    # It found three bugs, each fixed with a failing test first: a rejected
+    # model key retried for half an hour (now manual entry at once), and two
+    # e2e helpers that gave a waking deployment 5 s (sign-in and the Link
+    # screen's first read).
   - title: "Rate limits on /docs and /explain"
     body: >-
       Limit /docs to 10 per hour and /explain to 30 per hour per user, returning

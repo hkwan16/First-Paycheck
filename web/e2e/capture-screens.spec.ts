@@ -13,6 +13,14 @@ test.skip(!e2eUser(), NO_E2E_USER);
 test('04, 05, 07 and 08 the Spending screen', async ({ page }) => {
   await page.goto('/setup/spending');
   await settled(page);
+  // The period with the confirmed stub: the capture confirms the Acme stub,
+  // paid October 15, so the diagram draws its withholding for October.
+  const picker = page.getByRole('combobox', { name: 'Period' });
+  const october = picker.locator('option', { hasText: /^Oct/ });
+  if ((await october.count()) > 0) {
+    await picker.selectOption({ label: (await october.first().textContent()) ?? '' });
+    await settled(page);
+  }
   const table = page.getByRole('table', { name: 'Transactions' });
   await expect(table.getByRole('row').nth(1)).toBeVisible({ timeout: 60_000 });
   const summary = page.getByRole('region', { name: /^\w+ \d+.* to .+ · \d+ paychecks?$/ });
