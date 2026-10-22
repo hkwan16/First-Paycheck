@@ -53,6 +53,7 @@ import {
   sampleAccounts,
   sampleTransactions,
 } from '@/test/fixtures/sample';
+import { sampleW4Decision, sampleW4Event } from '@/test/fixtures/w4';
 
 /*
  * A setup screen in the app frame, rendered from the mockup's sample data
@@ -109,21 +110,25 @@ function seedDecided(seed: Seed) {
 }
 
 /**
- * Every live calculator saved: the 401(k) at 4%, the emergency fund at three
- * months with its goal, and the Gold PPO from the confirmed benefits summary.
- * Each card's result is seeded under the inputs it builds from these.
+ * Every calculator saved: the 401(k) at 4%, the emergency fund at three
+ * months with its goal, the Gold PPO from the confirmed benefits summary, and
+ * the W-4 reading those two. Each card's result is seeded under the inputs it
+ * builds from these.
  */
 function seedAllDecided(seed: Seed) {
   seedDecided(seed);
   const fund = sampleEmergencyDecision();
   const health = sampleHealthDecision();
-  seed(queryKeys.decisions(), decisionList([sampleDecision(), fund, health]));
-  seed(queryKeys.calendar(), [sampleCalendarEvent(), ...samplePlanningEvents()]);
+  const w4 = sampleW4Decision();
+  seed(queryKeys.decisions(), decisionList([sampleDecision(), fund, health, w4]));
+  // Upcoming events in `GET /calendar` order: by due date.
+  seed(queryKeys.calendar(), [sampleCalendarEvent(), sampleW4Event(), ...samplePlanningEvents()]);
   seed(queryKeys.spendingSummary(), sampleSpendingSummary);
   seed(queryKeys.goals(), [sampleGoal()]);
   seed(queryKeys.benefitsPlans(), [...sampleBenefitsPlans]);
   seed(queryKeys.calc('/calc/emergency-fund', fund.inputs), fund.result);
   seed(queryKeys.calc('/calc/health-plans', health.inputs), health.result);
+  seed(queryKeys.calc('/calc/w4', w4.inputs), w4.result);
 }
 
 const SCREENS: Record<
@@ -141,7 +146,7 @@ const SCREENS: Record<
     nav: 'spending',
     render: () => <SpendingScreen showSankey initialPeriod={SAMPLE_PERIOD} />,
   },
-  // Every calculator live: three saved, and the W-4 not built yet.
+  // Every calculator live and saved.
   decisions: {
     nav: 'decisions',
     render: () => (

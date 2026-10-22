@@ -11,15 +11,17 @@ import { PlaceholderCard } from './DecisionCard';
 import { EmergencyFundCard } from './EmergencyFundCard';
 import { HealthPlanCard } from './HealthPlanCard';
 import { Match401kCard } from './Match401kCard';
+import { W4Card } from './W4Card';
 
 /** The mockup's card order: emergency fund, 401(k), health plan, W-4. */
 const ORDER: readonly CalculatorId[] = ['emergency_fund', '401k_match', 'health_plan', 'w4'];
 
-/** The card of each calculator built so far; the rest render as placeholders. */
-const CARDS: Partial<Record<CalculatorId, ComponentType>> = {
+/** Each calculator's card; one off in this build renders as a placeholder. */
+const CARDS: Record<CalculatorId, ComponentType> = {
   emergency_fund: EmergencyFundCard,
   '401k_match': Match401kCard,
   health_plan: HealthPlanCard,
+  w4: W4Card,
 };
 
 export interface DecisionsScreenProps {
@@ -51,11 +53,11 @@ export function DecisionsScreen({ calculators = features.calculators }: Decision
       />
       <div className="grid grid-cols-2 items-start gap-6 max-wide:grid-cols-1">
         {ORDER.map((calculator) => {
-          const Card = live.has(calculator) ? CARDS[calculator] : undefined;
-          return Card ? (
+          const Card = CARDS[calculator];
+          return live.has(calculator) ? (
             <Card key={calculator} />
           ) : (
-            <PlaceholderCard key={calculator} calculator={calculator} live={live.has(calculator)} />
+            <PlaceholderCard key={calculator} calculator={calculator} />
           );
         })}
       </div>

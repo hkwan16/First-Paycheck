@@ -300,10 +300,10 @@ offer letter states).
 ## Decisions screen
 
 `/setup/decisions` (`DecisionsScreen`) shows one card per calculator in the mockup's order
-(emergency fund, 401(k), health plan, W-4) with an "n of 4 saved" badge. The W-4 card is not
-built; a calculator off in `features.calculators` is a muted "After alpha" placeholder, and one
-that is on but not built says "Coming in a later milestone." Cards share `DecisionCard`,
-`SaveButton`, `AmountField` and `saveErrorText` (`decision-format.ts`).
+(emergency fund, 401(k), health plan, W-4) with an "n of 4 saved" badge that counts every saved
+calculator. Every calculator has a card; one off in `features.calculators` is a muted "After
+alpha" placeholder. Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
+(`decision-format.ts`).
 
 - **`Match401kCard`** always renders the same `DecisionCard` frame (a region named by its title)
   and swaps its body: skeleton, error, a link to Confirm when there is no confirmed pay stub,
@@ -330,6 +330,20 @@ that is on but not built says "Coming in a later milestone." Cards share `Decisi
   with break-even notes, the HSA tax effect and the HDHP notice from the result. Saving needs a
   chosen plan (a 422 `plan_not_selected` says so); an enrollment deadline adds a calendar event,
   shown under the card.
+- **`W4Card`** (spec 014): salary and pay schedule from the profile and the confirmed pay stub,
+  the age from the birth year (null without one: no catch-up), and, read-only under "From your
+  decisions", the saved 401(k) decision's `contribution_pct` and the saved health plan's chosen
+  plan's premium per paycheck (`fromDecisions` in `w4-format.ts`). Either one not saved is sent
+  as zero, the card says so, and links to that card. The person sets the filing status (from
+  the profile until changed), Step 2(c), the other jobs' wages and withholding, Steps 3 and
+  4(a)-(c) and the deductions they expect to claim (empty means the Step 4(b) entry). The result
+  is the calculator's: a balance due takes the `off` tone, a refund stays neutral (never
+  `confirmed`). "Apply suggestion" copies `suggested_extra_withholding_cents` and
+  `suggested_deductions_cents` into Steps 4(c) and 4(b) (`appliedEntries`); when Step 4(b) grows
+  and no expected deductions are set, the old Step 4(b) entry becomes them (spec 014 rule 13).
+  Always send every input, `k401_contribution_pct` as `"0.00"` when there is no 401(k)
+  decision: the API stores its unset default as `"0"`, which would never compare equal. A save
+  adds the `w4_submit` reminder, shown under the card; "Why this decision" opens `/why/[id]`.
 
 ## Why screen
 

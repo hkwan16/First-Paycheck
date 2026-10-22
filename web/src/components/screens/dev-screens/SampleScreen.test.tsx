@@ -119,10 +119,19 @@ describe('SampleScreen after Confirm', () => {
       within(health).getByRole('table', { name: 'Expected yearly cost by plan' }),
     ).toBeInTheDocument();
 
-    expect(screen.getByText(/of 4 saved/)).toHaveTextContent('3 of 4 saved');
-    expect(screen.getByRole('region', { name: 'W-4, federal only' })).toHaveTextContent(
-      'Coming in a later milestone.',
+    const w4 = screen.getByRole('region', { name: 'W-4, federal only' });
+    expect(within(w4).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
+    expect(within(w4).getByRole('group', { name: 'From your decisions' })).toHaveTextContent(
+      '$62.50, Gold PPO',
     );
+    expect(within(w4).getByRole('group', { name: 'Calculator result' })).toHaveTextContent(
+      'A $0.08 refund at tax time',
+    );
+    expect(w4).toHaveTextContent(
+      'Give your employer your updated Form W-4 is on your calendar for Oct 31, 2026.',
+    );
+
+    expect(screen.getByText(/of 4 saved/)).toHaveTextContent('4 of 4 saved');
     expect(screen.getByRole('link', { name: 'Decisions' })).toHaveAttribute('aria-current', 'page');
     await act(() => vi.advanceTimersByTimeAsync(1_000));
     expect(requests).toEqual([]);

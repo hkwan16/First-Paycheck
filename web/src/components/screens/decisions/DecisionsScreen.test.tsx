@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
 import { decisionsReady, savedDecision } from '@/test/msw/db';
-import { benefitsConfirmed, savedEmergencyFund } from '@/test/msw/planning-handlers';
+import {
+  benefitsConfirmed,
+  savedEmergencyFund,
+  savedHealthPlan,
+  savedW4,
+} from '@/test/msw/planning-handlers';
 import { server } from '@/test/msw/server';
 import { renderWithProviders, screen, waitFor, within } from '@/test/render';
 import { DecisionsScreen } from './DecisionsScreen';
@@ -43,7 +48,7 @@ describe('DecisionsScreen', () => {
     expect(await screen.findByRole('region', { name: '401(k) match' })).toBeInTheDocument();
   });
 
-  it('renders the emergency fund and health plan cards when live, and the W-4 as coming later', async () => {
+  it('renders every card when every calculator is live', async () => {
     decisionsReady();
     benefitsConfirmed();
     renderWithProviders(
@@ -59,10 +64,13 @@ describe('DecisionsScreen', () => {
         name: 'Expected healthcare use',
       }),
     ).toBeInTheDocument();
-    const w4 = screen.getByRole('region', { name: 'W-4, federal only' });
-    expect(within(w4).getByText('Coming later')).toBeInTheDocument();
-    expect(w4).toHaveTextContent('Coming in a later milestone.');
+    expect(
+      await within(screen.getByRole('region', { name: 'W-4, federal only' })).findByRole('group', {
+        name: 'Filing status',
+      }),
+    ).toBeInTheDocument();
     expect(screen.queryByText('After alpha')).toBeNull();
+    expect(screen.queryByText('Coming later')).toBeNull();
   });
 
   it('counts every saved calculator in the badge', async () => {
@@ -72,6 +80,31 @@ describe('DecisionsScreen', () => {
       <DecisionsScreen calculators={['401k_match', 'emergency_fund', 'health_plan', 'w4']} />,
     );
     await waitFor(() => expect(screen.getByText(/of 4 saved/)).toHaveTextContent('2 of 4 saved'));
+  });
+
+  it('counts a saved W-4 with the rest: four of four', async () => {
+    savedDecision();
+    savedEmergencyFund();
+    savedHealthPlan();
+    savedW4();
+    renderWithProviders(
+      <DecisionsScreen calculators={['401k_match', 'emergency_fund', 'health_plan', 'w4']} />,
+    );
+    await waitFor(() => expect(screen.getByText(/of 4 saved/)).toHaveTextContent('4 of 4 saved'));
+    expect(
+      await within(screen.getByRole('region', { name: 'W-4, federal only' })).findByText(
+        'Saved v1 · Oct 17',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the W-4 as an After alpha placeholder when the calculators flag leaves it out', async () => {
+    savedDecision();
+    renderWithProviders(<DecisionsScreen calculators={['401k_match']} />);
+    const w4 = screen.getByRole('region', { name: 'W-4, federal only' });
+    expect(within(w4).getByText('After alpha')).toBeInTheDocument();
+    expect(within(w4).queryByRole('group', { name: 'Filing status' })).toBeNull();
+    expect(await screen.findByRole('region', { name: '401(k) match' })).toBeInTheDocument();
   });
 
   it('shows the 401(k) card as a placeholder too when it is off', () => {
