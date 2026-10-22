@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from collections import Counter
 from collections.abc import Callable
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -13,6 +15,7 @@ from sqlalchemy import Connection
 
 from app.db import user_session_for
 from app.deps import get_now
+from db.enums import AccountKind
 from db.models import Account
 from sync.categories import CATEGORIES, CATEGORY_BUCKETS
 from tests.conftest import FixtureUser
@@ -20,8 +23,8 @@ from tests.support.factories import (
     make_account,
     make_item,
 )
-from tests.support.sandbox_history import link_sandbox
-from tests.support.spending_month import september, spend
+from tests.support.sandbox_history import DYNAMIC, link_sandbox
+from tests.support.spending_month import loan_ledger_month, september, spend
 
 Client = Callable[[FixtureUser], TestClient]
 NOW = dt.datetime(2026, 10, 21, 15, 0, tzinfo=dt.UTC)
@@ -69,6 +72,8 @@ def test_the_spec_month(
         "transaction_count": 10,
         "uncategorized_count": 1,
         "paycheck_count": 2,
+        "ledger_rows_skipped": {"count": 0, "net_cents": 0},
+        "account_kinds_counted": ["checking", "savings", "credit"],
         "categories": [
             {"category": "income", "bucket": "income", "total_cents": 399_208, "count": 2},
             {"category": "transfer", "bucket": "transfer", "total_cents": 25_000, "count": 1},
@@ -108,12 +113,15 @@ def test_the_sandbox_october_counts_income_in_only(
         "income_outflows_ignored_cents": 585_000,
         "uncategorized_cents": 50_000,
         "left_over_cents": -168_541,
+        # Rule 25: 68,423 and 100,000 are over ten times the 422 deposited.
         "essentials_pct": "128.0",
-        "flexible_pct": "16214.0",
-        "savings_rate_pct": "23696.7",
+        "flexible_pct": None,
+        "savings_rate_pct": None,
         "transaction_count": 14,
         "uncategorized_count": 1,
         "paycheck_count": 0,
+        "ledger_rows_skipped": {"count": 0, "net_cents": 0},
+        "account_kinds_counted": ["checking", "savings", "credit"],
         "categories": [
             {"category": "income", "bucket": "income", "total_cents": 422, "count": 1},
             {"category": "transfer", "bucket": "transfer", "total_cents": 210_350, "count": 2},
@@ -130,6 +138,130 @@ def test_the_sandbox_october_counts_income_in_only(
             },
         ],
     }
+
+
+def test_loan_and_investment_ledgers_are_skipped(
+    frozen: FastAPI, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    # Spec 007 rule 21a, "A loan ledger": the auto loan books the 40,000 that
+    # left checking as money in (labeled income) and its interest as money out.
+    loan_ledger_month(db_connection, user_a)
+    client = client_as(user_a)
+    body = client.get("/spending/summary", params=SEPTEMBER).json()
+    assert {key: value for key, value in body.items() if key != "category_buckets"} == {
+        "start": "2026-09-01",
+        "end": "2026-09-30",
+        "income_cents": 250_000,
+        "essentials_cents": 140_000,
+        "flexible_cents": 0,
+        "savings_cents": 0,
+        "other_cents": 40_000,
+        "transfers_ignored_cents": 40_000,
+        "income_outflows_ignored_cents": 0,
+        "uncategorized_cents": 0,
+        "left_over_cents": 70_000,
+        "essentials_pct": "56.0",
+        "flexible_pct": "0.0",
+        "savings_rate_pct": "0.0",
+        "transaction_count": 6,
+        "uncategorized_count": 0,
+        "paycheck_count": 0,
+        "ledger_rows_skipped": {"count": 3, "net_cents": -38_000},
+        "account_kinds_counted": ["checking", "savings", "credit"],
+        "categories": [
+            {"category": "income", "bucket": "income", "total_cents": 250_000, "count": 1},
+            {"category": "transfer", "bucket": "transfer", "total_cents": 40_000, "count": 2},
+            {"category": "housing", "bucket": "essentials", "total_cents": 120_000, "count": 1},
+            {"category": "groceries", "bucket": "essentials", "total_cents": 20_000, "count": 1},
+            {"category": "debt_payment", "bucket": "other", "total_cents": 40_000, "count": 1},
+        ],
+    }
+    # Only the money math skips the ledgers: the list still shows every row.
+    listed = client.get("/transactions", params=SEPTEMBER).json()["items"]
+    assert len(listed) == 9
+    assert {row["merchant_raw"] for row in listed} >= {
+        "Monthly payment",
+        "Interest charged",
+        "Dividend",
+    }
+
+
+def test_an_inactive_ledger_is_not_reported(
+    frozen: FastAPI, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    loan = make_account(
+        db_connection, user_a.id, make_item(db_connection, user_a.id), kind=AccountKind.LOAN
+    )
+    spend(db_connection, user_a, loan, -40_000, None)
+    before = client_as(user_a).get("/spending/summary", params=SEPTEMBER).json()
+    assert before["ledger_rows_skipped"] == {"count": 1, "net_cents": -40_000}
+    assert before["transaction_count"] == before["uncategorized_count"] == 0
+    with user_session_for(user_a.id, bind=db_connection) as session:
+        session.get_one(Account, loan).is_active = False
+    after = client_as(user_a).get("/spending/summary", params=SEPTEMBER).json()
+    assert after["ledger_rows_skipped"] == {"count": 0, "net_cents": 0}
+
+
+def test_the_dynamic_sandbox_october_skips_the_loans(
+    frozen: FastAPI, client_as: Client, user_a: FixtureUser, seeded_rules: Connection
+) -> None:
+    # Spec 007 rules 21a and 25 on Plaid's user_transactions_dynamic user,
+    # recorded 2026-10-22 and labeled by the seed rules alone. Before them the
+    # five loans' 165 posted rows made uncategorized_cents -5,498,010, and 12
+    # cents of income made essentials_pct "304000.0".
+    link_sandbox(seeded_rules, user_a, DYNAMIC)
+    client = client_as(user_a)
+    body = client.get("/spending/summary", params=OCTOBER).json()
+    assert {
+        key: body[key]
+        for key in (
+            "income_cents",
+            "essentials_cents",
+            "flexible_cents",
+            "savings_cents",
+            "other_cents",
+            "transfers_ignored_cents",
+            "uncategorized_cents",
+            "uncategorized_count",
+            "left_over_cents",
+            "transaction_count",
+            "ledger_rows_skipped",
+            "essentials_pct",
+            "flexible_pct",
+            "savings_rate_pct",
+        )
+    } == {
+        "income_cents": 12,
+        "essentials_cents": 36_480,
+        "flexible_cents": -101_979,
+        "savings_cents": 0,
+        "other_cents": 0,
+        "transfers_ignored_cents": 301_989,
+        "uncategorized_cents": 121_602,
+        "uncategorized_count": 35,
+        "left_over_cents": 65_511,
+        "transaction_count": 80,
+        "ledger_rows_skipped": {"count": 165, "net_cents": -5_619_612},
+        "essentials_pct": None,
+        "flexible_pct": None,
+        "savings_rate_pct": "0.0",
+    }
+    # GET /transactions is unchanged: the loans' rows are still listed.
+    kinds = {row["id"]: row["kind"] for row in client.get("/accounts").json()}
+    listed: list[dict[str, Any]] = []
+    cursor: str | None = None
+    while True:
+        params: dict[str, str | int] = {**OCTOBER, "limit": 200}
+        if cursor:
+            params["cursor"] = cursor
+        page = client.get("/transactions", params=params).json()
+        listed += page["items"]
+        cursor = page["next_cursor"]
+        if cursor is None:
+            break
+    by_kind = Counter(kinds[row["account_id"]] for row in listed)
+    # Every October row: 165 posted and 12 pending on the loans, 83 on the rest.
+    assert (by_kind["loan"], len(listed)) == (177, 260)
 
 
 def test_defaults_to_the_last_complete_month(

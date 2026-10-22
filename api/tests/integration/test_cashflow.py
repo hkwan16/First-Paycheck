@@ -15,7 +15,7 @@ from app.deps import get_now
 from tests.conftest import FixtureUser
 from tests.support.factories import make_account, make_document, make_item, make_pay_stub
 from tests.support.sandbox_history import link_sandbox
-from tests.support.spending_month import september
+from tests.support.spending_month import loan_ledger_month, september
 
 Client = Callable[[FixtureUser], TestClient]
 NOW = dt.datetime(2026, 10, 21, 15, 0, tzinfo=dt.UTC)
@@ -101,6 +101,23 @@ def test_sandbox_income_is_never_negative(
         spending["income_outflows_ignored_cents"],
         spending["left_over_cents"],
     ) == (422, 585_000, -168_541)
+
+
+def test_loan_ledgers_draw_no_band(
+    frozen: FastAPI, db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    # Spec 010 route row 5: spec 007's loan ledger month.
+    loan_ledger_month(db_connection, user_a)
+    client = client_as(user_a)
+    body = client.get("/cashflow", params=SEPTEMBER).json()
+    assert body["spending"] == client.get("/spending/summary", params=SEPTEMBER).json()
+    spending = body["spending"]
+    assert (
+        spending["income_cents"],
+        spending["other_cents"],
+        spending["left_over_cents"],
+        spending["ledger_rows_skipped"],
+    ) == (250_000, 40_000, 70_000, {"count": 3, "net_cents": -38_000})
 
 
 def test_stub_ids_are_the_users_pay_stubs(

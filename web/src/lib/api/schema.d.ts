@@ -2216,6 +2216,16 @@ export interface components {
       total_cents: number;
     };
     /**
+     * LedgerRowsSkipped
+     * @description Posted rows in the period on active loan, investment and retirement accounts.
+     */
+    LedgerRowsSkipped: {
+      /** Count */
+      count: number;
+      /** Net Cents */
+      net_cents: number;
+    };
+    /**
      * LineItem
      * @description One printed line of the stub's current-period column (spec 005 rule 3).
      */
@@ -3086,6 +3096,8 @@ export interface components {
     };
     /** SpendingSummary */
     SpendingSummary: {
+      /** Account Kinds Counted */
+      account_kinds_counted: components['schemas']['AccountKind'][];
       /** Categories */
       categories: components['schemas']['CategoryTotal'][];
       /** Category Buckets */
@@ -3109,6 +3121,7 @@ export interface components {
       income_cents: number;
       /** Income Outflows Ignored Cents */
       income_outflows_ignored_cents: number;
+      ledger_rows_skipped: components['schemas']['LedgerRowsSkipped'];
       /** Left Over Cents */
       left_over_cents: number;
       /** Other Cents */

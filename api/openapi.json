@@ -3176,6 +3176,25 @@
         "title": "KindTotal",
         "type": "object"
       },
+      "LedgerRowsSkipped": {
+        "description": "Posted rows in the period on active loan, investment and retirement accounts.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "net_cents": {
+            "title": "Net Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count",
+          "net_cents"
+        ],
+        "title": "LedgerRowsSkipped",
+        "type": "object"
+      },
       "LineItem": {
         "additionalProperties": false,
         "description": "One printed line of the stub's current-period column (spec 005 rule 3).",
@@ -5512,6 +5531,13 @@
       },
       "SpendingSummary": {
         "properties": {
+          "account_kinds_counted": {
+            "items": {
+              "$ref": "#/components/schemas/AccountKind"
+            },
+            "title": "Account Kinds Counted",
+            "type": "array"
+          },
           "categories": {
             "items": {
               "$ref": "#/components/schemas/CategoryTotal"
@@ -5576,6 +5602,9 @@
           "income_outflows_ignored_cents": {
             "title": "Income Outflows Ignored Cents",
             "type": "integer"
+          },
+          "ledger_rows_skipped": {
+            "$ref": "#/components/schemas/LedgerRowsSkipped"
           },
           "left_over_cents": {
             "title": "Left Over Cents",
@@ -5644,8 +5673,10 @@
           "transaction_count",
           "uncategorized_count",
           "paycheck_count",
+          "ledger_rows_skipped",
           "categories",
-          "category_buckets"
+          "category_buckets",
+          "account_kinds_counted"
         ],
         "title": "SpendingSummary",
         "type": "object"

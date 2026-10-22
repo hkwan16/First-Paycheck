@@ -1,7 +1,9 @@
 """The spending summary: a month's transactions by bucket (spec 007 part B).
 
-One SQL ``GROUP BY category`` under RLS; the roll-up is the pure
-``calc.spending.summarize``. Read-only.
+One SQL ``GROUP BY category`` under RLS over the cash accounts (rule 21a);
+the roll-up is the pure ``calc.spending.summarize``. Rows on loan, investment
+and retirement accounts are counted and summed by a second query and reported
+apart. Read-only.
 """
 
 from __future__ import annotations
@@ -12,12 +14,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from sqlalchemy import case, func, select
+from sqlalchemy import ColumnElement, case, func, select
 from sqlalchemy.orm import Session
 
 from app.deps import Now, UserSession
 from app.errors import AppError, error_responses
 from calc.spending import Bucket, CategorySum, CategoryTotal, summarize
+from db.enums import AccountKind
 from db.models import Account, PayStub, Transaction
 from sync.categories import CATEGORIES, CATEGORY_BUCKETS
 
@@ -25,6 +28,30 @@ router = APIRouter(prefix="/spending", tags=["spending"])
 
 MAX_SPAN_DAYS = 366
 _CATEGORY_ORDER = {category: index for index, category in enumerate(CATEGORIES)}
+
+# Spec 007 rule 21a, in ``AccountKind`` order. The summary reads the accounts
+# money is spent from and saved in; a loan, investment or retirement account's
+# rows are that account's own bookkeeping (a loan books the payment that left
+# checking as money in, and accrued interest as money out), so they are
+# skipped and reported as ``ledger_rows_skipped``. Every kind is in one set.
+SPENDING_ACCOUNT_KINDS: tuple[AccountKind, ...] = (
+    AccountKind.CHECKING,
+    AccountKind.SAVINGS,
+    AccountKind.CREDIT,
+)
+LEDGER_ACCOUNT_KINDS: tuple[AccountKind, ...] = (
+    AccountKind.LOAN,
+    AccountKind.INVESTMENT,
+    AccountKind.RETIREMENT,
+)
+
+
+class LedgerRowsSkipped(BaseModel):
+    """Posted rows in the period on active loan, investment and retirement accounts."""
+
+    count: int
+    # Their sum, net, positive is money out (like ``uncategorized_cents``).
+    net_cents: int
 
 
 class SpendingSummary(BaseModel):
@@ -40,15 +67,21 @@ class SpendingSummary(BaseModel):
     income_outflows_ignored_cents: int
     uncategorized_cents: int
     left_over_cents: int
-    # One decimal place; null when income is not positive.
+    # One decimal place; null with no income, or when the share's size would
+    # exceed 1,000.0 (income under a tenth of the bucket, spec 007 rule 25).
     essentials_pct: Decimal | None
     flexible_pct: Decimal | None
     savings_rate_pct: Decimal | None
+    # Rows the totals read: checking, savings and credit accounts only.
     transaction_count: int
     uncategorized_count: int
     paycheck_count: int
+    # Loan, investment and retirement ledgers, in no total (spec 007 rule 21a).
+    ledger_rows_skipped: LedgerRowsSkipped
     categories: list[CategoryTotal]
     category_buckets: dict[str, Bucket]
+    # The account kinds whose rows the totals read (rule 21a).
+    account_kinds_counted: list[AccountKind]
 
 
 def last_complete_month(today: dt.date) -> tuple[dt.date, dt.date]:
@@ -76,6 +109,20 @@ def period(start: dt.date | None, end: dt.date | None, today: dt.date) -> tuple[
     return start, end
 
 
+def _account_join() -> ColumnElement[bool]:
+    return (Account.id == Transaction.account_id) & (Account.user_id == Transaction.user_id)
+
+
+def _posted_in(start: dt.date, end: dt.date, kinds: tuple[AccountKind, ...]) -> ColumnElement[bool]:
+    """Posted rows in the period on the user's active accounts of ``kinds``."""
+    return (
+        Transaction.pending.is_(False)
+        & Account.is_active.is_(True)
+        & Account.kind.in_(kinds)
+        & Transaction.posted_at.between(start, end)
+    )
+
+
 def _category_sums(session: Session, start: dt.date, end: dt.date) -> list[CategorySum]:
     money_out = Transaction.amount_cents > 0
     money_in = Transaction.amount_cents < 0
@@ -87,15 +134,8 @@ def _category_sums(session: Session, start: dt.date, end: dt.date) -> list[Categ
             func.count(),
             func.count().filter(money_out),
         )
-        .join(
-            Account,
-            (Account.id == Transaction.account_id) & (Account.user_id == Transaction.user_id),
-        )
-        .where(
-            Transaction.pending.is_(False),
-            Account.is_active.is_(True),
-            Transaction.posted_at.between(start, end),
-        )
+        .join(Account, _account_join())
+        .where(_posted_in(start, end, SPENDING_ACCOUNT_KINDS))
         .group_by(Transaction.category)
         .order_by(case(_CATEGORY_ORDER, value=Transaction.category, else_=len(_CATEGORY_ORDER)))
     )
@@ -109,6 +149,15 @@ def _category_sums(session: Session, start: dt.date, end: dt.date) -> list[Categ
         )
         for category, out_cents, in_cents, count, out_count in rows
     ]
+
+
+def _ledger_rows(session: Session, start: dt.date, end: dt.date) -> LedgerRowsSkipped:
+    count, net_cents = session.execute(
+        select(func.count(), func.coalesce(func.sum(Transaction.amount_cents), 0))
+        .join(Account, _account_join())
+        .where(_posted_in(start, end, LEDGER_ACCOUNT_KINDS))
+    ).one()
+    return LedgerRowsSkipped(count=int(count), net_cents=int(net_cents))
 
 
 @router.get("/summary", responses=error_responses(401, 422))
@@ -133,7 +182,9 @@ def summary_for(session: Session, first: dt.date, last: dt.date) -> SpendingSumm
         start=first,
         end=last,
         paycheck_count=int(paychecks or 0),
+        ledger_rows_skipped=_ledger_rows(session, first, last),
         category_buckets=dict(CATEGORY_BUCKETS),
+        account_kinds_counted=list(SPENDING_ACCOUNT_KINDS),
         **totals.model_dump(exclude={"categories"}),
         categories=totals.categories,
     )

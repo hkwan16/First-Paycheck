@@ -271,8 +271,17 @@ explanation, `GET /calendar` shows the check it implies.
   `income` row that is money out (the Plaid sandbox's GUSTO PAY) is left out
   of every total and reported as `income_outflows_ignored_cents`, so
   `income_cents` is never negative. Spending buckets still net refunds.
-  `tests/support/sandbox_history.py:link_sandbox` runs the recorded sandbox
-  item through `run_sync` and the seed rules for tests that need that shape.
+  Only `checking`, `savings` and `credit` rows are read (rule 21a,
+  `SPENDING_ACCOUNT_KINDS`): a loan's, investment's or retirement account's
+  own ledger (a loan books the payment that left checking as money in, and
+  interest as money out) is in no total and reported as `ledger_rows_skipped`
+  (`count`, `net_cents`); a new `AccountKind` must join one of the two sets.
+  A share of income is null with no income or when its size would exceed
+  1,000.0 (`calc.spending.MAX_SHARE_PCT`, rule 25).
+  `tests/support/sandbox_history.py:link_sandbox` runs a recorded sandbox
+  item through `run_sync` and the seed rules for tests that need that shape:
+  `RECORDED` (`user_good`) or `DYNAMIC` (`user_transactions_dynamic`, five
+  loans; `tests/fixtures/plaid/recorded_dynamic`).
 
 ## Logging and operations (from M4)
 
