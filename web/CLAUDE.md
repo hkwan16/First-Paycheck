@@ -708,6 +708,11 @@ variable above itself, plus `E2E_ALPHA_USER_EMAIL`/`E2E_ALPHA_USER_PASSWORD` and
 `link.spec.ts` and the alpha's link steps and leaves the spending project out.
 `uv run python -m scripts.e2e_stack run -- <command>` runs any command against it (CI's `e2e`
 workflow picks the real-API projects), and `up` keeps it running. Logs go to `.e2e-stack/`.
+On macOS the worker's plan PDF needs Homebrew's pango: run the stack directly (make's shell drops
+`DYLD_*`) with `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib`, which it passes on to the worker,
+or `plan.spec.ts`'s export waits out its budget while the job fails with "cannot load library
+'libpango-1.0-0'" in `.e2e-stack/api.log`. Running beside other stacks, set your own
+`E2E_DATABASE_URL` (a `first_paycheck_e2e_*` name), `E2E_PORT`, `E2E_API_PORT` and `E2E_AUTH_PORT`.
 
 `alpha.spec.ts` (project `alpha`) is the whole alpha as a new user (`E2E_ALPHA_USER_*`, which the
 stack makes per run; against a hosted API, a fresh confirmed user): it signs in through the form,
