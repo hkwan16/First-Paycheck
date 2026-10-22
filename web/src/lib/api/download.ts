@@ -1,5 +1,5 @@
 import { fetchClient } from './client';
-import { isApiErrorBody, type ApiErrorBody } from './errors';
+import { ApiError, parseRetryAfter } from './errors';
 
 /*
  * File downloads from the API (spec 016): the plan's calendar file and its
@@ -19,22 +19,14 @@ export const PLAN_PDF_FALLBACK_FILENAME = 'first-paycheck-plan.pdf';
 export const REVOKE_AFTER_MS = 60_000;
 
 /**
- * A failed download. `status` is 0 when the request never got an answer.
- * `error` mirrors the API body, so `apiErrorMessage(error, fallback)` reads it
- * like any other request's error (as `UploadError` does for uploads).
+ * A failed download: an `ApiError` (`status` 0 when the request never got an
+ * answer), so `apiErrorMessage(error, fallback)` reads it like any other
+ * request's error (as `UploadError` does for uploads).
  */
-export class DownloadError extends Error {
-  readonly status: number;
-  readonly code: string | null;
-  readonly error: ApiErrorBody['error'] | undefined;
-
-  constructor(status: number, body: unknown) {
-    const apiError = isApiErrorBody(body) ? body.error : undefined;
-    super(apiError?.message ?? (status === 0 ? 'Network error' : `Download failed (${status})`));
+export class DownloadError extends ApiError {
+  constructor(status: number, body: unknown, retryAfterSeconds: number | null = null) {
+    super(status, body, retryAfterSeconds);
     this.name = 'DownloadError';
-    this.status = status;
-    this.code = apiError?.code ?? null;
-    this.error = apiError;
   }
 }
 
@@ -91,7 +83,13 @@ async function download(call: () => BlobCall, fallback: string): Promise<string>
     throw new DownloadError(0, null);
   }
   const { data, error, response } = answer;
-  if (error !== undefined || !data) throw new DownloadError(response.status, error);
+  if (error !== undefined || !data) {
+    throw new DownloadError(
+      response.status,
+      error,
+      parseRetryAfter(response.headers.get('Retry-After')),
+    );
+  }
   const filename = filenameFrom(response.headers.get('Content-Disposition'), fallback);
   saveFile(data, filename);
   return filename;

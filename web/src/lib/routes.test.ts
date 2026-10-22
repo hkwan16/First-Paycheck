@@ -55,6 +55,11 @@ describe('signInRoute', () => {
     expect(signInRoute({ error: 'link' })).toBe('/sign-in?error=link');
   });
 
+  it('says the account was deleted, and never keeps a return path with it', () => {
+    expect(signInRoute({ deleted: true })).toBe('/sign-in?deleted=1');
+    expect(signInRoute({ deleted: true, next: '/plan' })).toBe('/sign-in?deleted=1');
+  });
+
   it('drops a return path that is not a safe relative path', () => {
     expect(signInRoute({ next: 'https://evil.example' })).toBe('/sign-in');
   });

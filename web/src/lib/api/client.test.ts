@@ -134,6 +134,24 @@ describe('fetchClient with a Supabase session', () => {
     expect(mocks.hardNavigate).toHaveBeenCalledOnce();
   });
 
+  it('signs out and says so on sign in when the account was deleted (401 account_deleted)', async () => {
+    server.use(
+      http.put(apiUrl('/profile'), () =>
+        HttpResponse.json(
+          { error: { code: 'account_deleted', message: 'This account has been deleted' } },
+          { status: 401 },
+        ),
+      ),
+    );
+    const { response } = await fetchClient.PUT('/profile', {
+      body: { dependents: 0 },
+    });
+    expect(response.status).toBe(401);
+    expect(mocks.auth.refreshSession).not.toHaveBeenCalled();
+    expect(mocks.auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: 'local' });
+    expect(mocks.hardNavigate).toHaveBeenCalledExactlyOnceWith('/sign-in?deleted=1');
+  });
+
   it('leaves other errors alone', async () => {
     server.use(http.get(apiUrl('/health'), () => new HttpResponse(null, { status: 403 })));
     const { response } = await fetchClient.GET('/health');

@@ -38,13 +38,24 @@ export interface SignInRouteOptions {
   next?: string | null;
   /** `link`: an email link failed (expired, used, or opened in another browser). */
   error?: 'link';
+  /**
+   * The account was just deleted (spec 017): the page says so. Nothing of the
+   * account is left to return to, so this drops every other option.
+   */
+  deleted?: boolean;
 }
 
 /**
  * The sign-in page. The return path keeps its slashes (`?next=/setup/link`)
  * so the URL stays readable; everything else in it is percent-encoded.
  */
-export function signInRoute({ mode = 'sign-in', next, error }: SignInRouteOptions = {}): Route {
+export function signInRoute({
+  mode = 'sign-in',
+  next,
+  error,
+  deleted = false,
+}: SignInRouteOptions = {}): Route {
+  if (deleted) return '/sign-in?deleted=1' as Route;
   const params: string[] = [];
   if (mode === 'sign-up') params.push('mode=sign-up');
   const safe = safeNextPath(next);

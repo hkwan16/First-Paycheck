@@ -1,12 +1,13 @@
 import { API_BASE_URL } from './base-url';
 import { sessionTokens } from './client';
-import { isApiErrorBody, type ApiErrorBody } from './errors';
+import { ApiError, apiErrorCode, parseRetryAfter } from './errors';
 import type { AccountKind, AmountSign, CsvImport, DocumentCreated, DocumentType } from './types';
 
 /*
  * Uploads (`POST /docs`, `POST /accounts/import`) over XMLHttpRequest,
- * because fetch cannot report upload progress. Authentication matches client.ts: the same session tokens, one
- * shared refresh and one resend on a 401, then sign in again.
+ * because fetch cannot report upload progress. Authentication matches
+ * client.ts: the same session tokens, one shared refresh and one resend on a
+ * 401, then sign in again; a 401 `account_deleted` signs out at once.
  */
 
 export interface UploadDocumentOptions {
@@ -18,37 +19,15 @@ export interface UploadDocumentOptions {
 }
 
 /**
- * A failed upload. `status` is 0 when the request never got an answer.
- * `error` mirrors the API body, so `apiErrorMessage(error, fallback)` reads
- * it like any other request's error.
+ * A failed upload: an `ApiError` (`status` 0 when the request never got an
+ * answer; `retryAfterSeconds` from Retry-After on a 429), so
+ * `apiErrorMessage(error, fallback)` reads it like any other request's error.
  */
-export class UploadError extends Error {
-  readonly status: number;
-  readonly code: string | null;
-  /** From Retry-After on a 429, when the browser can read it. */
-  readonly retryAfterSeconds: number | null;
-  readonly error: ApiErrorBody['error'] | undefined;
-
+export class UploadError extends ApiError {
   constructor(status: number, body: unknown, retryAfterSeconds: number | null) {
-    const apiError = isApiErrorBody(body) ? body.error : undefined;
-    super(apiError?.message ?? (status === 0 ? 'Network error' : `Upload failed (${status})`));
+    super(status, body, retryAfterSeconds);
     this.name = 'UploadError';
-    this.status = status;
-    this.code = apiError?.code ?? null;
-    this.error = apiError;
-    this.retryAfterSeconds = retryAfterSeconds;
   }
-}
-
-/** Retry-After as seconds from `now`: delay seconds or an HTTP date; null if unreadable. */
-export function parseRetryAfter(value: string | null, now: Date = new Date()): number | null {
-  if (value === null) return null;
-  const text = value.trim();
-  if (/^\d+$/.test(text)) return Number(text);
-  if (!/[a-z]/i.test(text)) return null;
-  const at = Date.parse(text);
-  if (Number.isNaN(at)) return null;
-  return Math.max(0, Math.ceil((at - now.getTime()) / 1000));
 }
 
 interface Answer {
@@ -117,10 +96,14 @@ async function postForm<T>(
   signal: AbortSignal | undefined,
 ): Promise<T> {
   let answer = await send(path, form(), await sessionTokens.current(), onProgress, signal);
+  const deleted = () => answer.status === 401 && apiErrorCode(answer.body) === 'account_deleted';
   if (answer.status === 401 && sessionTokens.enabled()) {
-    const token = await sessionTokens.refreshed();
-    if (token) answer = await send(path, form(), token, onProgress, signal);
-    if (answer.status === 401) await sessionTokens.expire();
+    if (!deleted()) {
+      const token = await sessionTokens.refreshed();
+      if (token) answer = await send(path, form(), token, onProgress, signal);
+    }
+    if (deleted()) await sessionTokens.accountDeleted();
+    else if (answer.status === 401) await sessionTokens.expire();
   }
 
   if (answer.status >= 200 && answer.status < 300) return answer.body as T;

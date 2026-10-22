@@ -644,7 +644,7 @@ describe('LinkScreen documents', () => {
     );
     const alert = await within(docsCard()).findByRole('alert');
     expect(alert).toHaveTextContent(
-      'acme.pdf was not uploaded. You have reached the upload limit for now. Try again in about 20 minutes.',
+      'acme.pdf was not uploaded. You have reached the limit for now. Try again in about 20 minutes.',
     );
     expect(within(docsCard()).queryByRole('progressbar')).toBeNull();
     await user.click(within(alert).getByRole('button', { name: 'Dismiss' }));

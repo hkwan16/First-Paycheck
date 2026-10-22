@@ -50,7 +50,8 @@ describe('useLinkToken', () => {
     const { result } = renderHookWithClient(() => useLinkToken());
     act(() => result.current.mutate());
     await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(result.current.error).toEqual({
+    expect(result.current.error).toMatchObject({
+      status: 503,
       error: { code: 'plaid_unavailable', message: 'Plaid is unavailable; try again shortly' },
     });
   });

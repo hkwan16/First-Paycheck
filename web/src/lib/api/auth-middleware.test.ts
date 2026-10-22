@@ -29,14 +29,24 @@ function fakeAuth(): SessionAuth & { [K in keyof SessionAuth]: ReturnType<typeof
   } as never;
 }
 
-function clientWith(auth: SessionAuth, onSessionExpired = vi.fn()) {
+function clientWith(auth: SessionAuth, onSessionExpired = vi.fn(), onAccountDeleted = vi.fn()) {
   const client = createFetchClient<Paths>({
     baseUrl: BASE,
     fetch: (request) => globalThis.fetch(request),
   });
-  client.use(createAuthMiddleware(createSessionTokens({ getAuth: () => auth, onSessionExpired })));
+  client.use(
+    createAuthMiddleware(
+      createSessionTokens({ getAuth: () => auth, onSessionExpired, onAccountDeleted }),
+    ),
+  );
   return client;
 }
+
+const accountDeleted = () =>
+  HttpResponse.json(
+    { error: { code: 'account_deleted', message: 'This account has been deleted' } },
+    { status: 401 },
+  );
 
 const isFresh = (request: Request) => request.headers.get('authorization') === 'Bearer new';
 
@@ -85,6 +95,53 @@ describe('createAuthMiddleware', () => {
     expect(onSessionExpired).toHaveBeenCalledTimes(2);
   });
 
+  it('signs out without a refresh when the account was deleted (401 account_deleted)', async () => {
+    server.use(http.post(`${BASE}/echo`, accountDeleted));
+    const auth = fakeAuth();
+    const onSessionExpired = vi.fn();
+    const onAccountDeleted = vi.fn();
+    const { error, response } = await clientWith(auth, onSessionExpired, onAccountDeleted).POST(
+      '/echo',
+      { body: { note: 'hello' } },
+    );
+    expect(response.status).toBe(401);
+    expect(error).toEqual({
+      error: { code: 'account_deleted', message: 'This account has been deleted' },
+    });
+    expect(auth.refreshSession).not.toHaveBeenCalled();
+    expect(auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: 'local' });
+    expect(onAccountDeleted).toHaveBeenCalledOnce();
+    expect(onSessionExpired).not.toHaveBeenCalled();
+  });
+
+  it('treats a 401 account_deleted after a refresh the same way', async () => {
+    server.use(
+      http.get(`${BASE}/ping`, ({ request }) =>
+        isFresh(request) ? accountDeleted() : new HttpResponse(null, { status: 401 }),
+      ),
+    );
+    const auth = fakeAuth();
+    const onSessionExpired = vi.fn();
+    const onAccountDeleted = vi.fn();
+    await clientWith(auth, onSessionExpired, onAccountDeleted).GET('/ping');
+    expect(onAccountDeleted).toHaveBeenCalledOnce();
+    expect(onSessionExpired).not.toHaveBeenCalled();
+  });
+
+  it('leaves a 401 account_deleted alone when auth is off', async () => {
+    server.use(http.get(`${BASE}/ping`, accountDeleted));
+    const onAccountDeleted = vi.fn();
+    const client = createFetchClient<Paths>({ baseUrl: BASE, fetch: (r) => globalThis.fetch(r) });
+    client.use(
+      createAuthMiddleware(
+        createSessionTokens({ getAuth: () => null, onSessionExpired: vi.fn(), onAccountDeleted }),
+      ),
+    );
+    const { response } = await client.GET('/ping');
+    expect(response.status).toBe(401);
+    expect(onAccountDeleted).not.toHaveBeenCalled();
+  });
+
   it('still reports the expiry when clearing the session fails', async () => {
     server.use(http.get(`${BASE}/ping`, () => new HttpResponse(null, { status: 401 })));
     const auth = fakeAuth();
@@ -99,14 +156,26 @@ describe('createSessionTokens', () => {
   it('reads the current access token, or null when auth is off or signed out', async () => {
     const auth = fakeAuth();
     expect(
-      await createSessionTokens({ getAuth: () => auth, onSessionExpired: vi.fn() }).current(),
+      await createSessionTokens({
+        getAuth: () => auth,
+        onSessionExpired: vi.fn(),
+        onAccountDeleted: vi.fn(),
+      }).current(),
     ).toBe('old');
     expect(
-      await createSessionTokens({ getAuth: () => null, onSessionExpired: vi.fn() }).current(),
+      await createSessionTokens({
+        getAuth: () => null,
+        onSessionExpired: vi.fn(),
+        onAccountDeleted: vi.fn(),
+      }).current(),
     ).toBeNull();
     auth.getSession.mockResolvedValueOnce({ data: { session: null }, error: null });
     expect(
-      await createSessionTokens({ getAuth: () => auth, onSessionExpired: vi.fn() }).current(),
+      await createSessionTokens({
+        getAuth: () => auth,
+        onSessionExpired: vi.fn(),
+        onAccountDeleted: vi.fn(),
+      }).current(),
     ).toBeNull();
   });
 
@@ -129,7 +198,11 @@ describe('createSessionTokens', () => {
           ),
         ),
     );
-    const tokens = createSessionTokens({ getAuth: () => auth, onSessionExpired: vi.fn() });
+    const tokens = createSessionTokens({
+      getAuth: () => auth,
+      onSessionExpired: vi.fn(),
+      onAccountDeleted: vi.fn(),
+    });
     const client = createFetchClient<Paths>({ baseUrl: BASE, fetch: (r) => globalThis.fetch(r) });
     client.use(createAuthMiddleware(tokens));
     const [read, refreshed] = await Promise.all([client.GET('/ping'), tokens.refreshed()]);
@@ -141,8 +214,37 @@ describe('createSessionTokens', () => {
   it('signs out locally and reports the expiry', async () => {
     const auth = fakeAuth();
     const onSessionExpired = vi.fn();
-    await createSessionTokens({ getAuth: () => auth, onSessionExpired }).expire();
+    await createSessionTokens({
+      getAuth: () => auth,
+      onSessionExpired,
+      onAccountDeleted: vi.fn(),
+    }).expire();
     expect(auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: 'local' });
     expect(onSessionExpired).toHaveBeenCalledOnce();
+  });
+
+  it('signs out locally and reports a deleted account, even when sign-out fails', async () => {
+    const auth = fakeAuth();
+    auth.signOut.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const onAccountDeleted = vi.fn();
+    const onSessionExpired = vi.fn();
+    await createSessionTokens({
+      getAuth: () => auth,
+      onSessionExpired,
+      onAccountDeleted,
+    }).accountDeleted();
+    expect(auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: 'local' });
+    expect(onAccountDeleted).toHaveBeenCalledOnce();
+    expect(onSessionExpired).not.toHaveBeenCalled();
+  });
+
+  it('reports a deleted account when auth is off, with nothing to sign out', async () => {
+    const onAccountDeleted = vi.fn();
+    await createSessionTokens({
+      getAuth: () => null,
+      onSessionExpired: vi.fn(),
+      onAccountDeleted,
+    }).accountDeleted();
+    expect(onAccountDeleted).toHaveBeenCalledOnce();
   });
 });

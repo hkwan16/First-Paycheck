@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { $api, fetchClient } from '../client';
-import { apiErrorCode } from '../errors';
+import { ApiError, apiErrorCode, isApiErrorBody, type ApiErrorBody } from '../errors';
 import { invalidateAfterConfirm, invalidateDocuments } from '../keys';
 import type {
   BenefitsValues,
@@ -12,7 +12,7 @@ import type {
 } from '../types';
 import { uploadDocument } from '../upload';
 import { JOB_POLL_MS } from './jobs';
-import { unwrap } from './request';
+import { apiErrorFrom, unwrap } from './request';
 
 /** Statuses a person can review on the Confirm screen (`api/app/routers/docs.py` REVIEWABLE). */
 const REVIEW_STATUSES: ReadonlySet<DocumentStatus> = new Set(['proposed', 'manual_entry_required']);
@@ -132,23 +132,17 @@ function readBalance(details: unknown): PayStubBalance | null {
   return Object.fromEntries(BALANCE_KEYS.map((key) => [key, record[key]])) as never;
 }
 
-interface ApiErrorBody {
-  error: { code: string; message: string; details?: Record<string, unknown> | null };
-}
-
 /**
- * The server's arithmetic gate refused the values: gross minus deductions is
- * not net. `balance` is the server's own diff, shown as it is; `error` keeps
- * the API body so `apiErrorMessage` reads it like any other error.
+ * The server's arithmetic gate refused the values (a 422): gross minus
+ * deductions is not net. `balance` is the server's own diff, shown as it is;
+ * as an `ApiError` it reads through `apiErrorMessage` like any other error.
  */
-export class PayStubUnbalanced extends Error {
-  readonly error: ApiErrorBody['error'];
+export class PayStubUnbalanced extends ApiError {
   readonly balance: PayStubBalance;
 
   constructor(body: ApiErrorBody, balance: PayStubBalance) {
-    super(body.error.message);
+    super(422, body);
     this.name = 'PayStubUnbalanced';
-    this.error = body.error;
     this.balance = balance;
   }
 }
@@ -181,7 +175,7 @@ export function useConfirmDocument({ onConfirmed }: ConfirmDocumentOptions = {})
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (variables: ConfirmDocumentVariables): Promise<Confirmed> => {
-      const { data, error } = await fetchClient.POST('/docs/{document_id}/confirm', {
+      const { data, error, response } = await fetchClient.POST('/docs/{document_id}/confirm', {
         params: { path: { document_id: variables.documentId } },
         body:
           'benefits' in variables
@@ -189,10 +183,11 @@ export function useConfirmDocument({ onConfirmed }: ConfirmDocumentOptions = {})
             : { pay_stub: variables.values },
       });
       if (error !== undefined) {
-        const body = error as ApiErrorBody;
-        const balance =
-          apiErrorCode(body) === 'pay_stub_unbalanced' ? readBalance(body.error.details) : null;
-        throw balance ? new PayStubUnbalanced(body, balance) : error;
+        if (isApiErrorBody(error) && error.error.code === 'pay_stub_unbalanced') {
+          const balance = readBalance(error.error.details);
+          if (balance) throw new PayStubUnbalanced(error, balance);
+        }
+        throw apiErrorFrom(response, error);
       }
       return data;
     },

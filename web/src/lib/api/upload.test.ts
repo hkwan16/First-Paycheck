@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installFakeXhr } from '@/test/fake-xhr';
 import { API_BASE_URL } from './base-url';
 import { apiErrorMessage } from './errors';
-import { csvProblems, importCsv, parseRetryAfter, UploadError, uploadDocument } from './upload';
+import { csvProblems, importCsv, UploadError, uploadDocument } from './upload';
 
 const mocks = vi.hoisted(() => {
   const auth = { getSession: vi.fn(), refreshSession: vi.fn(), signOut: vi.fn() };
@@ -104,6 +104,24 @@ describe('uploadDocument', () => {
     expect(mocks.hardNavigate).toHaveBeenCalledOnce();
   });
 
+  it('signs out and says the account was deleted on a 401 account_deleted, with no refresh', async () => {
+    mocks.getSupabaseBrowserClient.mockReturnValue({ auth: mocks.auth });
+    mocks.auth.getSession.mockResolvedValue(sessionWith('access-1'));
+    mocks.auth.signOut.mockResolvedValue({ error: null });
+    const done = uploadDocument({ file: pdf(), type: 'pay_stub' });
+    await flush();
+    xhr
+      .last()
+      .respond(401, {
+        error: { code: 'account_deleted', message: 'This account has been deleted' },
+      });
+    await expect(done).rejects.toMatchObject({ status: 401, code: 'account_deleted' });
+    expect(xhr.requests).toHaveLength(1);
+    expect(mocks.auth.refreshSession).not.toHaveBeenCalled();
+    expect(mocks.auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: 'local' });
+    expect(mocks.hardNavigate).toHaveBeenCalledExactlyOnceWith('/sign-in?deleted=1');
+  });
+
   it.each([
     [413, 'file_too_large', 'The file is larger than 10 MB'],
     [415, 'unsupported_media_type', 'Upload a PDF, PNG or JPEG'],
@@ -154,18 +172,6 @@ describe('uploadDocument', () => {
     controller.abort();
     await expect(done).rejects.toMatchObject({ name: 'AbortError' });
     expect(xhr.last().aborted).toBe(true);
-  });
-});
-
-describe('parseRetryAfter', () => {
-  const now = new Date('2026-10-17T16:00:00Z');
-  it('reads delay seconds and HTTP dates, and nothing else', () => {
-    expect(parseRetryAfter('120', now)).toBe(120);
-    expect(parseRetryAfter('Sat, 17 Oct 2026 16:05:00 GMT', now)).toBe(300);
-    expect(parseRetryAfter('Sat, 17 Oct 2026 15:00:00 GMT', now)).toBe(0);
-    expect(parseRetryAfter(null, now)).toBeNull();
-    expect(parseRetryAfter('soon', now)).toBeNull();
-    expect(parseRetryAfter('-5', now)).toBeNull();
   });
 });
 
