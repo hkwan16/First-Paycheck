@@ -96,6 +96,8 @@ export const JOB_INVALIDATES: Record<JobKind, readonly QueryKey[]> = {
   'recurring.detect': [queryKeys.recurring()],
   'checkin.monthly': [queryKeys.checkIns()],
   'schedule.tick': [],
+  // The PDF is read by job id once the job succeeds; no cached read changes.
+  'plan.export': [],
 };
 
 const invalidateAll = (client: QueryClient, keys: readonly QueryKey[]) =>

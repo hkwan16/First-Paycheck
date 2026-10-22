@@ -587,6 +587,86 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/plan': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Plan
+     * @description Every current decision with its figures, the goals, the next 90 days and the pay stub.
+     */
+    get: operations['get_plan'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/plan/calendar.ics': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Plan Calendar
+     * @description Every calendar event, any status, as an iCalendar file to import (RFC 5545).
+     */
+    get: operations['get_plan_calendar'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/plan/export': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Export Plan
+     * @description Queue the plan PDF; a second request while one is waiting returns the same job.
+     */
+    post: operations['export_plan'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/plan/export/{job_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Download Plan Export
+     * @description The PDF once its job succeeded; 404 before then, after 7 days and for anyone else.
+     */
+    get: operations['download_plan_export'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/profile': {
     parameters: {
       query?: never;
@@ -1973,7 +2053,8 @@ export interface components {
       | 'ingest.extract'
       | 'recurring.detect'
       | 'checkin.monthly'
-      | 'schedule.tick';
+      | 'schedule.tick'
+      | 'plan.export';
     /** JobOut */
     JobOut: {
       /**
@@ -2416,6 +2497,13 @@ export interface components {
       /** State Tax Cents */
       state_tax_cents: number;
     };
+    /** PlanCompleteness */
+    PlanCompleteness: {
+      /** Missing */
+      missing: components['schemas']['CalculatorKind'][];
+      /** Saved */
+      saved: components['schemas']['CalculatorKind'][];
+    };
     /** PlanCost */
     PlanCost: {
       /** Annual Premium Cents */
@@ -2446,6 +2534,73 @@ export interface components {
       /** Worst Case Cents */
       worst_case_cents: number;
     };
+    /** PlanDecision */
+    PlanDecision: {
+      calculator: components['schemas']['CalculatorKind'];
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      explanation: components['schemas']['PlanExplanation'];
+      /** Figures */
+      figures: components['schemas']['PlanFigure'][];
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Inputs */
+      inputs: {
+        [key: string]: unknown;
+      };
+      /** Result */
+      result: {
+        [key: string]: unknown;
+      };
+      /** Version */
+      version: number;
+    };
+    /** PlanExplanation */
+    PlanExplanation: {
+      /** Citations */
+      citations: components['schemas']['CitationOut'][];
+      /** Concept */
+      concept: string | null;
+      /** Created At */
+      created_at: string | null;
+      /** Id */
+      id: string | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'verified' | 'fallback' | 'none';
+      /** Text */
+      text: string | null;
+    };
+    /** PlanExportQueued */
+    PlanExportQueued: {
+      /**
+       * Job Id
+       * Format: uuid
+       */
+      job_id: string;
+    };
+    /** PlanFigure */
+    PlanFigure: {
+      /** Key */
+      key: string;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'money' | 'percent' | 'count' | 'text';
+      /** Label */
+      label: string;
+      /** Value */
+      value: number | string | null;
+    };
     /**
      * PlanKind
      * @enum {string}
@@ -2475,6 +2630,27 @@ export interface components {
       /** Plan Cents */
       plan_cents: number | null;
     };
+    /** PlanOut */
+    PlanOut: {
+      /**
+       * As Of
+       * Format: date
+       */
+      as_of: string;
+      /** Calendar */
+      calendar: components['schemas']['CalendarEventOut'][];
+      /**
+       * Calendar Through
+       * Format: date
+       */
+      calendar_through: string;
+      completeness: components['schemas']['PlanCompleteness'];
+      /** Decisions */
+      decisions: components['schemas']['PlanDecision'][];
+      /** Goals */
+      goals: components['schemas']['GoalOut'][];
+      pay_stub: components['schemas']['PlanPayStub'] | null;
+    };
     /** PlanPair */
     PlanPair: {
       /**
@@ -2490,6 +2666,40 @@ export interface components {
       plan_a_index: number;
       /** Plan B Index */
       plan_b_index: number;
+    };
+    /** PlanPayStub */
+    PlanPayStub: {
+      /** Employer Name */
+      employer_name: string | null;
+      /** Federal Withholding Cents */
+      federal_withholding_cents: number;
+      /** Gross Cents */
+      gross_cents: number;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Medical Premium Cents */
+      medical_premium_cents: number;
+      /** Medicare Cents */
+      medicare_cents: number;
+      /** Net Cents */
+      net_cents: number;
+      /** Other Deductions Cents */
+      other_deductions_cents: number;
+      /**
+       * Pay Date
+       * Format: date
+       */
+      pay_date: string;
+      pay_frequency: components['schemas']['PayFrequency'] | null;
+      /** Retirement Contribution Cents */
+      retirement_contribution_cents: number;
+      /** Social Security Cents */
+      social_security_cents: number;
+      /** State Tax Cents */
+      state_tax_cents: number;
     };
     /** PlanProposal */
     PlanProposal: {
@@ -4558,6 +4768,142 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  get_plan: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  get_plan_calendar: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'text/calendar': string;
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  export_plan: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanExportQueued'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  download_plan_export: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/pdf': string;
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };

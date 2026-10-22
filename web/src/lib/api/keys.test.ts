@@ -69,6 +69,7 @@ describe('invalidateForJob', () => {
         'categorize.run',
         'checkin.monthly',
         'ingest.extract',
+        'plan.export',
         'recurring.detect',
         'schedule.tick',
         'sync.incremental',
