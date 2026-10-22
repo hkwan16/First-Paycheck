@@ -1,17 +1,18 @@
 # 003: Categorization, the LLM gateway and transaction routes
 
-Status: Implemented, M1. The live Haiku path (`llm_live`) is written but has not been run against the Anthropic API, because no key was available when it was built.
+Status: Implemented, M1. The live Haiku path (`llm_live`) is written but has not been run against the Anthropic API, because no key was available when it was built. Rules 3a-3c (direction), the `contains` match and the generic bank descriptors (rule 5a) added in M10 after the October 22 production run with Plaid's `user_transactions_dynamic` sandbox user, whose weekly paycheck `Sweetgreen inc payroll ppd id` (money in) was labeled `dining` by the seed rule `sweetgreen` and whose loan ledgers left 256 of 316 rows uncategorized.
 
 ## Goal
 
-Give every synced transaction a spending category the user can trust and correct. Plain-string rules (the user's own, then seeded ones) label most transactions; only merchants no rule knows go to Claude Haiku 5.5, in batches, through the one LLM gateway; a user's correction becomes a rule, relabels the same merchant's other transactions, and keeps that merchant away from the LLM from then on. Code: `api/sync/categorize.py`, `api/sync/categories.py`, `api/llm/` (`gateway.py`, `schemas.py`, `cost.py`, `prompts.py`, `prompts/categorize/v1.md`), `api/db/seed/category_rules.csv`, routes in `api/app/routers/transactions.py`, eval suite `evals/suites/categorization_rules.py`.
+Give every synced transaction a spending category the user can trust and correct. Plain-string rules (the user's own, then seeded ones) label most transactions; only merchants no rule knows go to Claude Haiku 5.5, in batches, through the one LLM gateway; a user's correction becomes a rule, relabels the same merchant's other transactions, and keeps that merchant away from the LLM from then on. Code: `api/sync/categorize.py`, `api/sync/categories.py`, `api/llm/` (`gateway.py`, `schemas.py`, `cost.py`, `prompts.py`, `prompts/categorize/v2.md`), `api/db/seed/category_rules.csv`, routes in `api/app/routers/transactions.py`, eval suite `evals/suites/categorization_rules.py`.
 
 ## Inputs
 
 | Input | Type | Valid range |
 |---|---|---|
 | `merchant_raw` | string | Any provider description, possibly empty |
-| Category rules | rows of `category_rules` (spec 001) | `merchant_norm` non-empty and already normalized; `match` `exact` or `prefix`; `category` from the list below |
+| `amount_cents` | integer | Any; positive is money out, negative money in (spec 001 rule 21) |
+| Category rules | rows of `category_rules` (spec 001) | `merchant_norm` non-empty and already normalized; `match` `exact`, `prefix` or `contains` (`contains` only on a seed row for `income` or `transfer`, rule 3c); `category` from the list below |
 | User correction | `PATCH /transactions/{id}` body `{category}` | One of the categories below |
 | LLM budget | `LLM_DAILY_BUDGET_CENTS` | Integer >= 0, per user per UTC day |
 
@@ -20,7 +21,7 @@ Give every synced transaction a spending category the user can trust and correct
 ## Outputs
 
 - `normalize_merchant(raw) -> str`.
-- `RuleBook.match(merchant_norm) -> CategoryRule | None` (`apply_rules` is the module-level entry point).
+- `RuleBook.match(merchant_norm, *, amount_cents) -> CategoryRule | None` (`apply_rules(merchant_norm, rules, *, amount_cents)` is the module-level entry point).
 - Transactions with `category`, `category_source` (`rule`, `user`, `llm`) and `confidence` (set only for `llm`).
 - `categorize.run` job result: `{"rule": n, "llm": n, "reused": n, "unresolved": n, "llm_calls": n, "stopped": null | "budget" | "refused" | "no_model"}`.
 - One `llm_calls` row per gateway call, including blocked and failed calls.
@@ -35,26 +36,30 @@ Give every synced transaction a spending category the user can trust and correct
 
 ### Rules and precedence
 
-3. A rule is a plain string, never a pattern. An `exact` rule matches when `merchant_norm == rule`. A `prefix` rule matches when `merchant_norm == rule` or `merchant_norm` starts with `rule + " "` (whole tokens only: `uber` matches `uber trip` but not `ubereats` or `uber.com`).
-4. Precedence: user exact, user prefix, seed exact, seed prefix, then the LLM. Among prefix rules of one source the longest wins (`uber eats` beats `uber` for `uber eats order`). The first level that matches decides; lower levels are not consulted.
-5. Matching is done in memory: the categorizer loads the user's rules and the seed rules once per run (RLS shows a user exactly those) and, for each merchant, looks up the exact string and then each of its whole-token prefixes from longest to shortest in hash maps.
+3. A rule is a plain string, never a pattern. An `exact` rule matches when `merchant_norm == rule`. A `prefix` rule matches when `merchant_norm == rule` or `merchant_norm` starts with `rule + " "` (whole tokens only: `uber` matches `uber trip` but not `ubereats` or `uber.com`). A `contains` rule matches when its tokens appear as a run of whole tokens anywhere in `merchant_norm`: equal to it, at its start or end, or between two spaces (`payroll` matches `sweetgreen inc payroll ppd id` and `ppd id` matches it too, but `payroll` does not match `payrolls inc`). Whole tokens, as for `prefix`, so a short word never fires inside a longer one.
+3a. **Direction.** A transaction is money in when `amount_cents < 0` and money out otherwise (a zero amount counts as money out). The money-in categories are `income` and `transfer`, the two whose spec 007 bucket (rule 20) is `income` or `transfer`; every other category is a spending category: the `essentials`, `flexible`, `savings` and `other` buckets (`housing`, `utilities`, `phone_internet`, `groceries`, `dining`, `transport`, `subscriptions`, `insurance`, `healthcare`, `shopping`, `entertainment`, `travel`, `personal_care`, `education`, `gifts_donations`, `fees`, `taxes`, `debt_payment`, `savings_investment`, `other`). `sync/categories.py:MONEY_IN_CATEGORIES` derives the pair from `CATEGORY_BUCKETS`, so the two lists cannot drift.
+3b. **A spending rule applies to money out only.** A rule whose category is a spending category applies only to money-out transactions. An `exact` or `prefix` rule for `income` or `transfer` applies in both directions (the Plaid sandbox's GUSTO PAY payroll is booked as money out and stays `income`, which spec 007 rule 22a then leaves out of income). A `contains` rule applies to money-in transactions only. A rule that does not apply to a transaction's direction is skipped as if it did not exist, so a money-in transaction that only spending rules match stays uncategorized, for the model (rules 9-10) or the user. A paycheck from a restaurant, a store or a gym is never spending because the employer's name starts like a merchant's; a refund at a merchant is not labeled by rules either (the model or the user decides; a user's label on the row nets it, spec 007 rule 22).
+3c. **`contains` is for seed income and transfer rules.** A `contains` rule must be a seed row (`user_id` null, `source = 'seed'`) whose category is `income` or `transfer`. The seed loader refuses any other row (`SeedError`), `RuleBook` refuses one (`ValueError`), and the database refuses one (`ck_category_rules_contains_is_seed_money_in`, migration `0016_rule_match_contains`). A user never writes one: `PATCH /transactions/{id}` takes only a category and always writes an `exact` rule (rule 14), so the route has no match kind to validate.
+4. Precedence: user exact, user prefix, seed exact, seed prefix, seed contains, then the LLM. Only rules that apply to the transaction's direction (rule 3b) take part. Among prefix rules of one source the longest wins (`uber eats` beats `uber` for `uber eats order`); among `contains` rules the one with more tokens wins, then the one that starts further left. The first level with an applicable rule decides; lower levels are not consulted.
+5. Matching is done in memory: the categorizer loads the user's rules and the seed rules once per run (RLS shows a user exactly those) and, for each transaction, looks up the exact string, then each of its whole-token prefixes from longest to shortest, then, for money in only, each run of whole tokens from longest to shortest (leftmost first) in hash maps, skipping rules that do not apply to the direction.
+5a. **Generic bank descriptors.** Banks and loan servicers describe their own ledger entries in plain words, not merchant names. The seed rules label them (`category_rules.csv`): `monthly payment` and `payment` (exact, `transfer`: a loan or card payment received is the other side of money that left the user's checking account); `interest charged` (exact, `fees`: interest is a cost, and `fees` is the category for it, bucket `other`); `interest` (exact, `fees`, and `contains`, `income`); `cash deposit` (exact, `transfer`: cash brought in from outside, not pay); and the `contains` income rules `payroll`, `ppd id`, `direct dep`, `direct deposit`, `salary` and `interest`, beside the `prefix` income rules already there (`payroll`, `direct dep`, `direct deposit`, `interest payment`, ...). **A descriptor with both signs resolves by direction**: `interest` money out (interest accrued on a student loan, which Plaid files under bank fees) matches the seed exact rule `interest -> fees`; `interest` money in (interest earned) skips that spending rule (rule 3b), no prefix rule matches the bare word, and the seed `contains` rule `interest -> income` labels it.
 6. A transaction labeled by any rule gets `category_source = 'rule'` and null confidence.
 
 ### The categorize job (`categorize.run`)
 
 7. It considers only the user's transactions with `category IS NULL`; labeled transactions are never relabeled by the job.
-8. Rules first (rules 3-6). Then, for each remaining non-empty `merchant_norm`, if the user already has a transaction with that `merchant_norm` labeled by the LLM, the newest such label and confidence are copied (`reused`, no call). The rest go to the LLM.
-9. **Batching.** Distinct remaining merchants are sent 50 per call, in alphabetical order. Each item carries only an id (1-50 within the batch), the `merchant_norm`, one sample amount in dollars (`"12.34"`, the newest transaction's `amount_cents / 100`, sign kept) and that transaction's date. No account names, masks, ids or raw descriptions are sent.
-10. The model returns `{"items": [{"id", "category", "confidence"}]}` (`CategoryBatch`). Every uncategorized transaction with that `merchant_norm` gets the category, `category_source = 'llm'` and the confidence rounded half-up to 3 decimals. Ids outside the batch are ignored; merchants the model skipped stay uncategorized.
+8. Rules first (rules 3-6). The unit of the remaining work is a merchant and a direction (rule 3a): a merchant's money-out and money-in transactions are labeled separately, because a merchant's purchases and its deposits are different things. For each remaining pair with a non-empty `merchant_norm`, if the user already has a transaction with that `merchant_norm` and direction labeled by the LLM, with a label allowed for the direction (a money-in label must be `income` or `transfer`), the newest such label and confidence are copied (`reused`, no call). The rest go to the LLM.
+9. **Batching.** Distinct remaining pairs are sent 50 per call, in alphabetical order of `merchant_norm`, money out before money in. Each item carries only an id (1-50 within the batch), the `merchant_norm`, the direction (`"out"` or `"in"`), one sample amount in dollars (`"12.34"`, the newest transaction of that merchant and direction, `amount_cents / 100`, sign kept) and that transaction's date. No account names, masks, ids or raw descriptions are sent. The prompt is `categorize/v2`: it tells the model what the sign and the direction mean and that a money-in item gets `income` or `transfer`, or is left out of the answer when it is neither (a refund, a reversal).
+10. The model returns `{"items": [{"id", "category", "confidence"}]}` (`CategoryBatch`). Every uncategorized transaction with that `merchant_norm` and direction gets the category, `category_source = 'llm'` and the confidence rounded half-up to 3 decimals. Ids outside the batch are ignored, and so is an answer that gives a money-in item a spending category (rule 3b holds for the model as for rules: the schema cannot tie a category to an item's direction, so the code checks); items the model skipped or answered that way stay uncategorized.
 11. LLM labels never become `category_rules` rows. Only user corrections do.
 12. **Stopping.** A budget block stops the job's LLM work (`stopped: "budget"`), and a refusal skips that batch (`stopped: "refused"` if any batch was refused); the job still succeeds and the remaining merchants stay uncategorized. A schema error or an API error fails the job so the queue retries it (spec 002 rule 34); batches already written stay written.
 12a. **No model.** When the worker has no gateway (no `ANTHROPIC_API_KEY` and `LLM_FAKE` off), the job still runs the rules and the reuse steps, makes no batches, and succeeds with `stopped: "no_model"`; the unknown merchants stay uncategorized until a later run has a model. A gateway call that raises `LLMMisconfigured` (rule 24: the API rejected the key or the model id) ends the LLM work the same way: no further batches, batches already written stay written, `stopped: "no_model"`, and the job succeeds on its first attempt. A missing or rejected key never fails a job.
 
 ### User corrections (`PATCH /transactions/{id}`)
 
-13. The transaction gets the new category, `category_source = 'user'` and null confidence.
-14. When its `merchant_norm` is non-empty, the user's `exact` rule for that `merchant_norm` is created or replaced with the new category (`source = 'user'`).
-15. Every other transaction of the user with the same `merchant_norm` and a `category_source` other than `user` is relabeled to the new category with `category_source = 'rule'` and null confidence. Transactions the user labeled individually are left alone.
+13. The transaction gets the new category, `category_source = 'user'` and null confidence, whatever its direction. A user's label on the row itself is not a rule application, so rule 3b does not limit it: a money-in row the user labels `dining` keeps `dining` (spec 007 nets it into its bucket, as a refund).
+14. When its `merchant_norm` is non-empty, the user's `exact` rule for that `merchant_norm` is created or replaced with the new category (`source = 'user'`), whatever the row's direction.
+15. Every other transaction of the user with the same `merchant_norm`, a `category_source` other than `user`, and a direction the new rule applies to (rule 3b) is relabeled to the new category with `category_source = 'rule'` and null confidence: all of them for `income` or `transfer`, the money-out ones for a spending category. Transactions the user labeled individually are left alone, and so are the merchant's money-in transactions when the category is a spending one; a later categorize run skips the user's spending rule for them too and goes on to the seed rules and the model. So a user who labels one weekly paycheck `Sweetgreen inc payroll ppd id` as `dining` gets that one row as `dining`, a user exact rule `sweetgreen inc payroll ppd id -> dining` that only ever labels money out, and the other paychecks stay `income`.
 16. The response carries the updated transaction, the rule (`{merchant_norm, category}` or null) and the number of siblings relabeled. Because the rule is a user exact rule, rule 4 means that merchant never reaches the LLM again.
 
 ### `GET /transactions`
@@ -72,12 +77,12 @@ Give every synced transaction a spending category the user can trust and correct
 24. **Errors.** Rate limits, 5xx, timeouts and connection failures (after the SDK's 2 retries) write an `api_error` row and raise `LLMUnavailable`. A rejected key (401), a key without permission (403) or an unknown model id (404) is configuration that no retry can fix: it writes an `api_error` row, logs at ERROR naming the HTTP status (never the key) and raises `LLMMisconfigured`. Other 4xx write `api_error` and raise `LLMError`.
 25. **Ledger.** Every row records purpose, model, prompt version, `input_tokens` (uncached input plus cache writes), `output_tokens`, `cache_read_tokens`, `cost_microcents`, `latency_ms`, status and the job id. It is written in its own short user session and committed immediately, so a later failure in the caller cannot erase a charge. No prompt or output text is stored.
 26. **Cost.** `llm/cost.py` holds per-model prices in US dollars per million tokens: `claude-haiku-5-5` input 0.10, output 0.50, cache read 0.01, cache write 0.125; `claude-sonnet-5-5` input 2.00, output 10.00, cache read 0.20, cache write 2.50 (Anthropic list prices for prompts up to 100K tokens; cache writes are 1.25x input for the 5-minute TTL). `cost_microcents = round_half_up(sum(tokens * price) * 100)`, computed in `Decimal`. A model missing from the table raises at startup of the call, not silently zero.
-27. **Fake.** `LLM_FAKE=true` selects `FakeGateway`, which runs the same budget check and ledger code and replaces only the HTTP call: it answers from `api/tests/fixtures/llm/categorize.json` (merchant to category and confidence) and labels any other merchant `other` with confidence 0.5. Its rows record model `fake` at zero cost.
+27. **Fake.** `LLM_FAKE=true` selects `FakeGateway`, which runs the same budget check and ledger code and replaces only the HTTP call: it answers from `api/tests/fixtures/llm/categorize.json` (merchant to category and confidence) and labels any other merchant `other` with confidence 0.5. A money-in item gets its fixture category only when that is `income` or `transfer` and is otherwise left out of the answer, as `categorize/v2` asks of the model. Its rows record model `fake` at zero cost.
 
 ### Evals
 
-28. `categorization-rules` (free): the seed rules alone over the 500 labeled rows of `evals/fixtures/transactions.csv` (`evals/gen/transactions.py`, a fixed seed). `rules_precision` is the share of rule-labeled rows labeled correctly; `rules_coverage` the share a rule labels.
-29. `categorization` (LLM, M10): the same 500 rows the way `categorize.run` labels them, with no database: the seed rules first, then each merchant no rule knows (non-empty `merchant_norm`) once, as its newest row (`posted_at`, then `id`, descending), in merchant order, in batches of 50 `CategorizeItem`s through the real `LLMGateway` with an in-memory ledger that charges the run's `--max-cost-cents` budget before the result is read. The merchant's label applies to every row of that merchant (rule 10). A refused batch leaves its merchants unlabeled; any other gateway error is a failure line and the batch is unlabeled. `accuracy` is the share of all rows whose final category equals the label (unlabeled is wrong); `llm_accuracy` the same share over the rows whose merchant went to the model. Targets, held in the baseline until the first live run replaces them: `accuracy` at least 0.90 (the M10 backlog's "500-transaction categorization set at target"), `llm_accuracy` at least 0.80. About 70 merchants go to Haiku in two batches, well under a cent. Without `ANTHROPIC_API_KEY` the suite is unavailable and the runner exits 2. Scoring is unit-tested with a labeler that answers from the labels.
+28. `categorization-rules` (free): the seed rules alone, each row matched with its amount (rules 3a-3b), over the 515 labeled rows of `evals/fixtures/transactions.csv` (`evals/gen/transactions.py`: 500 drawn from a fixed seed, then 15 written by hand for direction and bank language: paychecks from employers named like merchants, `Monthly payment`, `Payment`, `Interest charged`, `Interest` in both directions, `CASH DEPOSIT` and two refunds, whose true label is their spending category and which no rule labels). `rules_precision` is the share of rule-labeled rows labeled correctly; `rules_coverage` the share a rule labels.
+29. `categorization` (LLM, M10): the same 515 rows the way `categorize.run` labels them, with no database: the seed rules first, then each merchant and direction no rule knows (non-empty `merchant_norm`, rule 8) once, as its newest row (`posted_at`, then `id`, descending), in merchant order with money out first, in batches of 50 `CategorizeItem`s through the real `LLMGateway` with an in-memory ledger that charges the run's `--max-cost-cents` budget before the result is read. The label applies to every row of that merchant and direction, and a spending label for a money-in item is dropped (rule 10). A refused batch leaves its merchants unlabeled; any other gateway error is a failure line and the batch is unlabeled. `accuracy` is the share of all rows whose final category equals the label (unlabeled is wrong); `llm_accuracy` the same share over the rows whose merchant went to the model. Targets, held in the baseline until the first live run replaces them: `accuracy` at least 0.90 (the M10 backlog's "500-transaction categorization set at target"), `llm_accuracy` at least 0.80. About 70 merchants go to Haiku in two batches, well under a cent. Without `ANTHROPIC_API_KEY` the suite is unavailable and the runner exits 2. Scoring is unit-tested with a labeler that answers from the labels.
 
 ## Hand-worked examples
 
@@ -100,17 +105,39 @@ Working for row 2: tokens `starbucks`, `store`, `05721`, `seattle`, `wa`; `05721
 
 ### Precedence (`test_precedence`)
 
-Rules: user exact `uber eats order` -> `groceries`; user prefix `uber` -> `travel`; seed exact `uber eats order` -> `dining`; seed prefix `uber` -> `transport`; seed prefix `uber eats` -> `dining`; seed prefix `netflix` -> `subscriptions`.
+Rules: user exact `uber eats order` -> `groceries`; user prefix `uber` -> `travel`; seed exact `uber eats order` -> `dining`; seed prefix `uber` -> `transport`; seed prefix `uber eats` -> `dining`; seed prefix `netflix` -> `subscriptions`; seed prefix `sweetgreen` -> `dining`; seed prefix `zelle` -> `transfer`; seed exact `interest` -> `fees`; seed contains `payroll` -> `income`; seed contains `interest` -> `income`. Amounts in cents, positive is money out.
 
-| `merchant_norm` | Category | Why |
-|---|---|---|
-| `uber eats order` | `groceries` | user exact beats everything |
-| `uber trip` | `travel` | user prefix beats seed rules |
-| `netflix` | `subscriptions` | seed prefix equal to the whole string |
-| `netflix.com` | none (LLM) | `netflix` is not a whole-token prefix of `netflix.com` |
-| `ubereats` | none (LLM) | not a whole-token prefix |
+| `merchant_norm` | Amount | Category | Why |
+|---|---|---|---|
+| `uber eats order` | 2,000 | `groceries` | user exact beats everything |
+| `uber trip` | 1,500 | `travel` | user prefix beats seed rules |
+| `netflix` | 1,549 | `subscriptions` | seed prefix equal to the whole string |
+| `netflix.com` | 1,549 | none (LLM) | `netflix` is not a whole-token prefix of `netflix.com` |
+| `ubereats` | 1,800 | none (LLM) | not a whole-token prefix |
+| `` (empty) | 100 | none | an empty merchant matches nothing (rule 2) |
+| `uber eats order` | -2,000 | none (LLM) | money in: all five rules that match are spending rules, so all are skipped |
+| `netflix` | -1,549 | none (LLM) | a refund: the only rule is a spending rule |
+| `sweetgreen inc payroll ppd id` | -81,000 | `income` | money in: seed prefix `sweetgreen` (dining) is skipped; seed contains `payroll` |
+| `sweetgreen inc payroll ppd id` | 81,000 | `dining` | money out: seed prefix `sweetgreen`; a `contains` rule never applies to money out |
+| `sweetgreen` | -1,450 | none (LLM) | a refund at a restaurant; no money-in rule matches |
+| `acme corp payroll` | 5,000 | none (LLM) | money out: `contains` applies to money in only |
+| `interest` | 10,788 | `fees` | money out: seed exact |
+| `interest` | -12 | `income` | money in: seed exact `interest` (fees) is skipped; seed contains `interest` |
+| `zelle to alex` | 2,000 | `transfer` | seed prefix; a transfer rule applies both ways |
+| `zelle to alex` | -2,000 | `transfer` | the same rule, money in |
+| `uber trip` | 0 | `travel` | a zero amount is money out |
 
 Without the two user rules: `uber eats order` -> `dining` (seed exact), `uber eats pickup` -> `dining` (longest seed prefix `uber eats`), `uber trip` -> `transport`.
+
+Between `contains` rules (`test_contains_precedence`): with seed contains `payroll` -> `income` and `online transfer` -> `transfer`, the money-in `payroll online transfer` is `transfer` (two tokens beat one); with seed contains `payroll` -> `income` and `transfer` -> `transfer`, the money-in `payroll transfer` is `income` (one token each, `payroll` starts further left).
+
+### The dynamic sandbox user (`test_dynamic_sandbox_user_with_rules_only`)
+
+Plaid's `user_transactions_dynamic` (a checking account, a credit card and five loans), recorded on 2026-10-22 in `api/tests/fixtures/plaid/recorded/dynamic/` (316 rows, 15 of them pending), synced through `run_sync` and labeled by the seed rules alone, with no model, as a new user's first sync is.
+
+- Before rules 3a-3c and 5a: 256 rows uncategorized; the five weekly paychecks `Sweetgreen inc payroll ppd id` (-81,000 each, money in) `dining`; `income` only the two `Interest payment` rows (-12 each).
+- After: 52 rows uncategorized. The five paychecks are `income` (seed contains `payroll`), with the two interest payments seven `income` rows. `Monthly payment` (132 rows, money in on the loans) and `Payment` (1, money in on the student loan) are `transfer`; `Interest charged` (68, money out on the loans) and `Interest` (2, money out on the student loan) are `fees`; `CASH DEPOSIT` (1, money in) is `transfer`.
+- What is left are merchant names for the model, none with more than four rows: `fcps myschoolbucks food s` (4), then two rows each of `purchase earnin re sc`, `openai chatgpt subscr`, `x eleven xxxxx` and `town cleaners`.
 
 ### Cost (`test_cost_microcents`)
 
@@ -136,10 +163,13 @@ User A has three `netflix.com` transactions: t1 `llm`/`entertainment` 0.62, t2 `
 - `PATCH /transactions/{id}` with a category outside the list is 422; with another user's id is 404.
 - A transaction patched to the category it already has still becomes `user` and still writes the rule.
 - Seed rows are visible to every user and writable by none (spec 001 example 8).
+- A money-in `interest charged` (a reversal of interest) skips the spending rule `interest charged -> fees` and is labeled `income` by the seed contains rule `interest`. It is rare, and the user's fix keeps it where they put it.
+- A user rule for a spending category never labels money in, even for the merchant the user fixed (rule 15); the merchant's money-in rows go on to the seed rules and the model.
+- The model labels a merchant's money out and money in separately (rule 8), so a merchant with purchases and refunds is two items in a batch.
 
 ## Out of scope
 
 - The Batches API for initial histories over 500 unknown merchants (planned; M1 uses synchronous calls).
 - The category-to-bucket mapping for `/spending/summary` (M5).
 - Deleting or listing a user's rules through the API.
-- Recategorizing already-labeled transactions when seed rules change.
+- Recategorizing already-labeled transactions when seed rules change. The one exception is the change to direction: migration `0016_rule_match_contains` clears the labels rules 3b and 10 no longer allow, the money-in rows with a spending category and `category_source` `rule` or `llm` (a paycheck the old seed rule labeled `dining`), so the categorize run every sync queues (spec 002) labels them again under the new rules. User labels are kept.
