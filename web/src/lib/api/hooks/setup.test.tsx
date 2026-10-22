@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { samplePayStub } from '@/test/fixtures/documents';
 import { db, emptyDb, emptyDocuments, savedDecision } from '@/test/msw/db';
 import { spendingDb } from '@/test/msw/spending-handlers';
+import { emptyPlan, partialPlan } from '@/test/fixtures/plan';
+import { planDb } from '@/test/msw/plan-handlers';
 import { renderHookWithClient } from '@/test/render';
 import { useSetupFacts, useSetupProgress } from './setup';
 
@@ -33,6 +35,7 @@ describe('useSetupFacts', () => {
 describe('useSetupProgress', () => {
   it('marks nothing done for a new user', async () => {
     emptyDb();
+    planDb.plan = emptyPlan();
     const { result } = renderHookWithClient(() => useSetupProgress());
     await waitFor(() =>
       expect(result.current).toEqual({
@@ -40,6 +43,7 @@ describe('useSetupProgress', () => {
         confirm: false,
         spending: false,
         decisions: false,
+        plan: false,
       }),
     );
   });
@@ -74,5 +78,20 @@ describe('useSetupFacts with decisions', () => {
     savedDecision();
     const { result } = renderHookWithClient(() => useSetupFacts());
     await waitFor(() => expect(result.current.savedDecisionCalculators).toEqual(['401k_match']));
+  });
+});
+
+describe('useSetupProgress with the plan', () => {
+  it('counts the decisions the plan says are missing, and marks the plan done at none', async () => {
+    planDb.plan = partialPlan();
+    const { result } = renderHookWithClient(() => useSetupFacts());
+    await waitFor(() => expect(result.current.planMissingCount).toBe(3));
+
+    planDb.plan.completeness = {
+      saved: ['emergency_fund', 'k401_match', 'health_plans', 'w4'],
+      missing: [],
+    };
+    const progress = renderHookWithClient(() => useSetupProgress());
+    await waitFor(() => expect(progress.result.current.plan).toBe(true));
   });
 });

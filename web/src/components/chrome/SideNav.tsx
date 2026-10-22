@@ -3,10 +3,12 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { PlanIcon, QuestionIcon, TrendIcon } from '@/components/icons';
 import { cn } from '@/lib/cn';
-import type { SetupProgress, SetupStep } from '@/lib/setup-progress';
+import type { ProgressKey, SetupProgress, SetupStep } from '@/lib/setup-progress';
 import { NavStep } from './NavStep';
 
 export type NavKey = SetupStep | 'why' | 'plan' | 'checkIn';
+
+const hasDoneMark = (key: NavKey): key is ProgressKey => key !== 'why' && key !== 'checkIn';
 
 interface NavItem {
   key: NavKey;
@@ -46,7 +48,7 @@ export function navKeyForPath(pathname: string): NavKey | undefined {
 
 export interface SideNavProps {
   current?: NavKey;
-  /** Done marks from lib/setup-progress. */
+  /** Done marks from lib/setup-progress: the setup steps and the plan. */
   done?: Partial<SetupProgress>;
   /** Hrefs for id-bound screens (latest document, decision, check-in) or overrides. */
   hrefs?: Partial<Record<NavKey, Route>>;
@@ -117,7 +119,7 @@ function Group({
             key={item.key}
             item={item}
             current={props.current === item.key}
-            done={Boolean(props.done?.[item.key as SetupStep])}
+            done={hasDoneMark(item.key) && Boolean(props.done?.[item.key])}
             href={props.hrefs?.[item.key] ?? item.href}
           />
         ))}

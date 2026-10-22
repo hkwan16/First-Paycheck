@@ -106,6 +106,14 @@ describe('SideNav', () => {
     );
   });
 
+  it('checks off the plan once every decision is in it', () => {
+    render(<SideNav done={{ plan: true }} />);
+    expect(screen.getByRole('link', { name: 'Plan and calendar, done' })).toHaveAttribute(
+      'href',
+      '/plan',
+    );
+  });
+
   it('wraps into a chip row under the nav breakpoint', () => {
     render(<SideNav />);
     for (const list of screen.getAllByRole('list')) {

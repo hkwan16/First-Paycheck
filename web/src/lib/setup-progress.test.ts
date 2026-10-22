@@ -9,6 +9,7 @@ const empty: SetupFacts = {
   categorizationFinished: false,
   liveCalculators: ['401k_match'],
   savedDecisionCalculators: [],
+  planMissingCount: null,
 };
 
 describe('setupProgress', () => {
@@ -18,6 +19,7 @@ describe('setupProgress', () => {
       confirm: false,
       spending: false,
       decisions: false,
+      plan: false,
     });
   });
 
@@ -55,5 +57,11 @@ describe('setupProgress', () => {
 
   it('never marks decisions done when no calculator is live', () => {
     expect(setupProgress({ ...empty, liveCalculators: [] }).decisions).toBe(false);
+  });
+
+  it('marks the plan done once the API says no decision is missing from it', () => {
+    expect(setupProgress({ ...empty, planMissingCount: null }).plan).toBe(false);
+    expect(setupProgress({ ...empty, planMissingCount: 1 }).plan).toBe(false);
+    expect(setupProgress({ ...empty, planMissingCount: 0 }).plan).toBe(true);
   });
 });
