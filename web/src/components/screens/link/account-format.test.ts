@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { sampleAccounts } from '@/test/fixtures/sample';
+import { sampleAccounts, sampleCsvAccount } from '@/test/fixtures/sample';
 import {
   groupByInstitution,
   institutionInitials,
   ownedText,
   patchForRole,
+  removalWords,
   roleValue,
   transactionCountText,
 } from './account-format';
@@ -53,6 +54,34 @@ describe('groupByInstitution', () => {
   it('names an institution without a name', () => {
     const [group] = groupByInstitution([{ ...checking, institution_name: null }]);
     expect(group?.name).toBe('Linked bank');
+  });
+
+  it('carries where the institution came from: a bank link or an imported file', () => {
+    const groups = groupByInstitution([checking, sampleCsvAccount]);
+    expect(groups.map((g) => [g.name, g.provider])).toEqual([
+      ['Chase', 'plaid'],
+      ['Credit union', 'csv'],
+    ]);
+    const [unnamed] = groupByInstitution([{ ...sampleCsvAccount, institution_name: null }]);
+    expect(unnamed?.name).toBe('Imported CSV');
+  });
+});
+
+describe('removalWords', () => {
+  it('unlinks a linked bank, which can be linked again', () => {
+    expect(removalWords('plaid')).toEqual({
+      verb: 'Unlink',
+      done: 'Unlinked',
+      again: 'You can link it again later.',
+    });
+  });
+
+  it('removes an imported account, which can be imported again', () => {
+    expect(removalWords('csv')).toEqual({
+      verb: 'Remove',
+      done: 'Removed',
+      again: 'You can import the file again later.',
+    });
   });
 });
 

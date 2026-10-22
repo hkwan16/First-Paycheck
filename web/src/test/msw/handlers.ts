@@ -472,8 +472,15 @@ export const handlers = [
   }),
 
   http.post<{ id: string }>(apiUrl('/sync/items/:id/sync'), ({ params }) => {
-    if (!db.accounts.some((a) => a.sync_item_id === params.id)) {
-      return notFound('Linked institution not found');
+    const account = db.accounts.find((a) => a.sync_item_id === params.id);
+    if (!account) return notFound('Linked institution not found');
+    if (account.provider !== 'plaid') {
+      // Spec 002 rule 29: an imported account's data arrives only by import.
+      return appError(
+        422,
+        'not_plaid_item',
+        'Only a linked institution can sync; import a new CSV file instead',
+      );
     }
     const jobId = scriptJob(syncJobStates(nextId('5a000000'), 'sync.incremental'));
     return HttpResponse.json({ job_id: jobId }, { status: 202 });

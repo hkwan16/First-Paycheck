@@ -11,6 +11,7 @@ export type Account = Schemas['AccountOut'];
 export type AccountPatch = Schemas['AccountPatch'];
 export type AccountRole = Schemas['AccountRole'];
 export type AccountKind = Schemas['AccountKind'];
+export type SyncProvider = Schemas['SyncProvider'];
 export type Transaction = Schemas['TransactionOut'];
 export type TransactionPage = Schemas['TransactionPage'];
 export type CategoryFix = Schemas['CategoryFix'];

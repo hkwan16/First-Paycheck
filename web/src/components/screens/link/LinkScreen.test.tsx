@@ -10,7 +10,14 @@ import {
   sampleBenefitsDocument,
   sampleDocument,
 } from '@/test/fixtures/documents';
-import { CHASE_ITEM_ID, CHECKING_ID, SAMPLE_NOW, sampleJob } from '@/test/fixtures/sample';
+import {
+  CHASE_ITEM_ID,
+  CHECKING_ID,
+  CREDIT_UNION_ITEM_ID,
+  SAMPLE_NOW,
+  sampleCsvAccount,
+  sampleJob,
+} from '@/test/fixtures/sample';
 import { db, emptyDb, emptyDocuments } from '@/test/msw/db';
 import {
   apiUrl,
@@ -251,6 +258,55 @@ describe('LinkScreen accounts', () => {
     expect(jobReads).toHaveLength(3);
     expect(done).toHaveTextContent(
       'Unlinked Chase. Its 2 accounts and their transactions were deleted.',
+    );
+  });
+
+  it('removes an imported institution: no Sync now, and Remove instead of Unlink', async () => {
+    db.accounts.push(structuredClone(sampleCsvAccount));
+    const deletes = requests('DELETE', `/sync/items/${CREDIT_UNION_ITEM_ID}`);
+    const { user } = renderLink();
+    await screen.findByRole('group', { name: 'Credit union checking' });
+
+    // The linked bank keeps its words and its sync.
+    expect(screen.getByRole('button', { name: 'Sync now for Chase' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unlink Chase' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sync now for Credit union' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Unlink Credit union' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Remove Credit union' }));
+    const confirm = screen.getByRole('group', { name: 'Remove Credit union?' });
+    expect(confirm).toHaveTextContent(
+      'Remove Credit union? Its account and its transactions will be deleted. You can import the file again later.',
+    );
+    expect(within(confirm).getByRole('button', { name: 'Keep Credit union' })).toHaveFocus();
+    await user.click(within(confirm).getByRole('button', { name: 'Yes, remove Credit union' }));
+
+    const done = await within(accountsCard()).findByRole('status');
+    expect(done).toHaveTextContent(
+      'Removed Credit union. Its account and its transactions were deleted.',
+    );
+    expect(done).toHaveFocus();
+    expect(deletes).toHaveLength(1);
+    expect(screen.queryByRole('group', { name: 'Credit union checking' })).toBeNull();
+    expect(screen.getByRole('group', { name: 'Chase Total Checking' })).toBeInTheDocument();
+  });
+
+  it('says why removing an imported institution failed', async () => {
+    db.accounts.push(structuredClone(sampleCsvAccount));
+    server.use(
+      http.delete(apiUrl('/sync/items/:id'), () =>
+        HttpResponse.json(
+          { error: { code: 'internal_error', message: 'Database is busy' } },
+          { status: 500 },
+        ),
+      ),
+    );
+    const { user } = renderLink();
+    await screen.findByRole('group', { name: 'Credit union checking' });
+    await user.click(screen.getByRole('button', { name: 'Remove Credit union' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, remove Credit union' }));
+    expect(await within(accountsCard()).findByRole('alert')).toHaveTextContent(
+      'Could not remove Credit union. Database is busy',
     );
   });
 

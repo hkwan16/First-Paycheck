@@ -1,5 +1,5 @@
 import type { AccountTransactionCount } from '@/lib/api/hooks';
-import type { Account, AccountPatch, AccountRole } from '@/lib/api/types';
+import type { Account, AccountPatch, AccountRole, SyncProvider } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import { formatNumber } from '@/lib/money';
 
@@ -35,6 +35,8 @@ export function patchForRole(value: Exclude<RoleValue, ''>): AccountPatch {
 export interface InstitutionGroup {
   itemId: string;
   name: string;
+  /** A bank linked through Plaid, or a CSV file imported (no sync, removed rather than unlinked). */
+  provider: SyncProvider;
   accounts: Account[];
 }
 
@@ -44,13 +46,35 @@ export function groupByInstitution(accounts: readonly Account[]): InstitutionGro
   for (const account of accounts) {
     const group = groups.get(account.sync_item_id) ?? {
       itemId: account.sync_item_id,
-      name: account.institution_name ?? 'Linked bank',
+      name:
+        account.institution_name ?? (account.provider === 'csv' ? 'Imported CSV' : 'Linked bank'),
+      provider: account.provider,
       accounts: [],
     };
     group.accounts.push(account);
     groups.set(account.sync_item_id, group);
   }
   return [...groups.values()];
+}
+
+export interface RemovalWords {
+  /** The control and the confirmation's question: "Unlink Chase?". */
+  verb: 'Unlink' | 'Remove';
+  /** The done notice: "Unlinked Chase.". */
+  done: 'Unlinked' | 'Removed';
+  /** What the person can do afterwards. */
+  again: string;
+}
+
+/**
+ * The words for taking an institution away: a linked bank is unlinked and can
+ * be linked again; an imported file's account is removed (nothing is
+ * disconnected at a bank) and the file can be imported again.
+ */
+export function removalWords(provider: SyncProvider): RemovalWords {
+  return provider === 'csv'
+    ? { verb: 'Remove', done: 'Removed', again: 'You can import the file again later.' }
+    : { verb: 'Unlink', done: 'Unlinked', again: 'You can link it again later.' };
 }
 
 /** What unlinking an institution with `count` accounts deletes, as a sentence's subject. */

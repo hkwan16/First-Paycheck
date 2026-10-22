@@ -178,6 +178,9 @@ next is a real disabled button, never a dead link).
   and its `JOB_INVALIDATES` row reads recurring charges and check-ins again when it ends. The
   detection then queues a `checkin.monthly` refresh of an open check-in, whose id the client never
   sees: findings it retracts show on the check-in's next read.
+  An imported CSV account (`provider: 'csv'`) has no Sync now (the API answers 422
+  `not_plaid_item`), and its institution is removed, not unlinked (`removalWords` in
+  `components/screens/link/account-format.ts`).
   Documents: `invalidateDocuments` after an upload or extraction, `invalidateAfterConfirm`
   (documents, pay stubs, benefits plans, the profile and the plan) after a confirm. Decisions: `invalidateDecisions` (the list and every
   `GET /decisions/{id}`) and `invalidateAfterDecision` (also calendar, plan and goals) after a save.
@@ -317,7 +320,9 @@ next is a real disabled button, never a dead link).
   `syncJobStates(id)` is queued, running at 40%, succeeded. `DELETE /sync/items/{id}` hands out
   `recurringJobId(n)` for the n-th unlink (the same id again while that job is still queued); one
   nothing scripted has already succeeded, and `scriptJob(recurringJobStates(recurringJobId(1)))`
-  before the click shows queued, running and succeeded. Drive polling with
+  before the click shows queued, running and succeeded. `POST /sync/items/{id}/sync` on a CSV
+  account's item is 422 `not_plaid_item`; `sampleCsvAccount` (fixtures/sample.ts) is one to push
+  onto `db.accounts`. Drive polling with
   `vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) })` and
   `await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS))`, and render with
   `renderWithProviders(ui, { advanceTimers: vi.advanceTimersByTime })` so userEvent keeps up.

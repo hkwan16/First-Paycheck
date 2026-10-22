@@ -7,7 +7,7 @@ import { ListRows } from '@/components/ui/ListRows';
 import { Notice } from '@/components/ui/Notice';
 import { apiErrorMessage } from '@/lib/api/errors';
 import { AccountRow } from './AccountRow';
-import { ownedText, type InstitutionGroup as Group } from './account-format';
+import { ownedText, removalWords, type InstitutionGroup as Group } from './account-format';
 
 export interface InstitutionGroupProps {
   group: Group;
@@ -24,8 +24,10 @@ export interface InstitutionGroupProps {
 
 /**
  * One linked institution: its name with Sync now and Unlink, then its
- * accounts. Unlinking deletes data, so it asks first, inline: focus moves to
- * the safe choice ("Keep"), and returns to Unlink if the person keeps it.
+ * accounts. An imported CSV has no Sync now (its data arrives only by import)
+ * and says Remove instead (`removalWords`). Unlinking deletes data, so it asks
+ * first, inline: focus moves to the safe choice ("Keep"), and returns to
+ * Unlink if the person keeps it.
  */
 export function InstitutionGroup({
   group,
@@ -41,7 +43,9 @@ export function InstitutionGroup({
   const unlinkRef = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef(false);
   const confirmId = useId();
-  const { name, accounts } = group;
+  const { name, accounts, provider } = group;
+  const words = removalWords(provider);
+  const verb = words.verb.toLowerCase();
 
   useEffect(() => {
     if (confirming) keepRef.current?.focus();
@@ -64,23 +68,25 @@ export function InstitutionGroup({
         </h3>
         {!confirming && (
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              aria-label={`Sync now for ${name}`}
-              onClick={onSync}
-              loading={syncPending}
-              disabled={syncDisabled}
-            >
-              <RefreshIcon />
-              Sync now
-            </Button>
+            {provider === 'plaid' && (
+              <Button
+                size="sm"
+                aria-label={`Sync now for ${name}`}
+                onClick={onSync}
+                loading={syncPending}
+                disabled={syncDisabled}
+              >
+                <RefreshIcon />
+                Sync now
+              </Button>
+            )}
             <Button
               ref={unlinkRef}
               size="sm"
-              aria-label={`Unlink ${name}`}
+              aria-label={`${words.verb} ${name}`}
               onClick={() => setConfirming(true)}
             >
-              Unlink
+              {words.verb}
             </Button>
           </div>
         )}
@@ -96,15 +102,17 @@ export function InstitutionGroup({
         >
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <span>
-              <strong id={confirmId}>Unlink {name}?</strong> {ownedText(accounts.length)} will be
-              deleted. You can link it again later.
+              <strong id={confirmId}>
+                {words.verb} {name}?
+              </strong>{' '}
+              {ownedText(accounts.length)} will be deleted. {words.again}
             </span>
             <span className="flex flex-wrap gap-2">
               <Button ref={keepRef} size="sm" onClick={keep} disabled={unlinkPending}>
                 Keep {name}
               </Button>
               <Button size="sm" variant="primary" loading={unlinkPending} onClick={onUnlink}>
-                Yes, unlink {name}
+                Yes, {verb} {name}
               </Button>
             </span>
           </div>
@@ -112,7 +120,7 @@ export function InstitutionGroup({
       )}
       {unlinkError != null && (
         <Notice tone="warning" compact role="alert">
-          Could not unlink {name}.{' '}
+          Could not {verb} {name}.{' '}
           {apiErrorMessage(unlinkError, 'Check your connection and try again.')}
         </Notice>
       )}
