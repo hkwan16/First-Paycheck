@@ -89,8 +89,10 @@ def account_kind(plaid_type: str, subtype: str | None) -> AccountKind | None:
     match plaid_type:
         case "depository":
             return AccountKind.SAVINGS if sub in SAVINGS_SUBTYPES else AccountKind.CHECKING
-        case "credit" | "loan":
+        case "credit":
             return AccountKind.CREDIT
+        case "loan":
+            return AccountKind.LOAN
         case "investment":
             return AccountKind.RETIREMENT if sub in RETIREMENT_SUBTYPES else AccountKind.INVESTMENT
         case _:

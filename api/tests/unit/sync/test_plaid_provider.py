@@ -94,7 +94,12 @@ def test_floats_are_refused() -> None:
         ("depository", "money market", AccountKind.SAVINGS),
         ("depository", "paypal", AccountKind.CHECKING),
         ("credit", "credit card", AccountKind.CREDIT),
-        ("loan", "student", AccountKind.CREDIT),
+        ("loan", "student", AccountKind.LOAN),
+        ("loan", "mortgage", AccountKind.LOAN),
+        ("loan", "auto", AccountKind.LOAN),
+        ("loan", "home equity", AccountKind.LOAN),
+        ("loan", "line of credit", AccountKind.LOAN),
+        ("loan", None, AccountKind.LOAN),
         ("investment", "401k", AccountKind.RETIREMENT),
         ("investment", "roth 401k", AccountKind.RETIREMENT),
         ("investment", "brokerage", AccountKind.INVESTMENT),
@@ -119,7 +124,7 @@ def test_accounts_and_balances_share_one_call() -> None:
     by_name = {account.name: account for account in accounts}
     assert "Plaid Rewards Ledger" not in by_name  # type "other" is skipped
     assert by_name["Plaid 401k"].kind is AccountKind.RETIREMENT
-    assert by_name["Plaid Student Loan"].kind is AccountKind.CREDIT
+    assert by_name["Plaid Student Loan"].kind is AccountKind.LOAN
     assert by_name["Plaid Checking"].mask == "0000"
     cents = {b.provider_account_id: b.balance_cents for b in balances}
     assert cents["BxBXxLj1m4HMXBm9WZZmCWVbPjX16EHwv99vp"] == 11000
@@ -235,7 +240,14 @@ def test_recorded_sandbox_accounts_map_to_every_kind_we_support() -> None:
     assert kinds["Plaid Saving"] is AccountKind.SAVINGS
     assert kinds["Plaid Credit Card"] is AccountKind.CREDIT
     assert kinds["Plaid 401k"] is AccountKind.RETIREMENT
-    assert kinds["Plaid Mortgage"] is AccountKind.CREDIT  # loans map to credit (spec 002)
+    assert kinds["Plaid Business Credit Card"] is AccountKind.CREDIT
+    # Plaid type "loan" is a loan, never a credit card (spec 002 rule 4).
+    assert sorted(name for name, kind in kinds.items() if kind is AccountKind.LOAN) == [
+        "Plaid Auto Loan",
+        "Plaid Home Equity Line of Credit",
+        "Plaid Mortgage",
+        "Plaid Student Loan",
+    ]
     assert all(account.mask is None or account.mask.isdigit() for account in accounts)
     balances = provider(client).fetch_balances()
     assert {b.provider_account_id for b in balances} <= {a.provider_account_id for a in accounts}

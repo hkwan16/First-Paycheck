@@ -46,6 +46,7 @@ class AccountKind(StrEnum):
     CHECKING = "checking"
     SAVINGS = "savings"
     CREDIT = "credit"
+    LOAN = "loan"
     INVESTMENT = "investment"
     RETIREMENT = "retirement"
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 from collections.abc import Callable
 from decimal import Decimal
 
@@ -30,9 +31,8 @@ def at(day: str) -> dt.datetime:
     return dt.datetime.fromisoformat(f"{day}T06:00:00+00:00")
 
 
-def test_net_worth_by_month(
-    frozen: FastAPI, db_connection: Connection, client_as: Client, user_a: FixtureUser
-) -> None:
+def row_five(db_connection: Connection, user_a: FixtureUser) -> uuid.UUID:
+    """Spec 015 route row 5's accounts and snapshots; returns their item."""
     item = make_item(db_connection, user_a.id, institution_name="Chase")
     accounts = {
         name: make_account(db_connection, user_a.id, item, kind=kind, name=name, **extra)
@@ -61,6 +61,13 @@ def test_net_worth_by_month(
         ("Hidden", "2026-11-15", 1_000_000),
     ):
         make_snapshot(db_connection, user_a.id, accounts[name], balance_cents=cents, as_of=at(day))
+    return item
+
+
+def test_net_worth_by_month(
+    frozen: FastAPI, db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    row_five(db_connection, user_a)
 
     response = client_as(user_a).get("/net-worth", params={"months": 3})
 
@@ -96,6 +103,43 @@ def test_net_worth_by_month(
         "liability",
         "2026-11-15",
     )
+
+
+def test_net_worth_counts_a_loan_as_owed(
+    frozen: FastAPI, db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    # Spec 015 route row 12.
+    item = row_five(db_connection, user_a)
+    loan = make_account(
+        db_connection, user_a.id, item, kind=AccountKind.LOAN, name="Student Loan", mask="7777"
+    )
+    for day, cents in (("2026-10-20", 1_210_000), ("2026-11-15", 1_200_000)):
+        make_snapshot(db_connection, user_a.id, loan, balance_cents=cents, as_of=at(day))
+
+    response = client_as(user_a).get("/net-worth", params={"months": 3})
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [p["net_worth_cents"] for p in body["series"]] == [450_000, -745_000, -652_246]
+    assert body["change_cents"] == -1_102_246
+    assert (body["assets_cents"], body["liabilities_cents"], body["net_worth_cents"]) == (
+        607_754,
+        1_260_000,
+        -652_246,
+    )
+    listed = {a["name"]: a for a in body["accounts"]}
+    assert (
+        listed["Student Loan"]["kind"],
+        listed["Student Loan"]["side"],
+        listed["Student Loan"]["balance_cents"],
+    ) == ("loan", "liability", 1_200_000)
+    assert [(k["kind"], k["side"], k["total_cents"]) for k in body["by_kind"]] == [
+        ("checking", "asset", 312_044),
+        ("savings", "asset", 274_000),
+        ("credit", "liability", 60_000),
+        ("loan", "liability", 1_200_000),
+        ("retirement", "asset", 21_710),
+    ]
 
 
 def test_net_worth_without_data(frozen: FastAPI, client_as: Client, user_a: FixtureUser) -> None:
