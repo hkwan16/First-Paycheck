@@ -1,53 +1,68 @@
 # First Paycheck: Alpha Release and Task Backlog
 
-Due Thursday, November 5, 2026. This document follows the three sections of the [alpha brief](../alpha-brief.md).
+Due Thursday, November 5, 2026. This document follows the three sections of the [alpha brief](../alpha-brief.md); the last section points each of the brief's requirements at the place it is met.
 
 ## Early working demo
 
 ### What the alpha does
 
-First Paycheck walks someone through the money decisions of their first salaried month, using their own pay stub and bank data. In the alpha a person signs in, links a bank, uploads a pay stub, checks what was read from it, and decides how much to put into their 401(k), with the numbers worked out by tested code and an explanation that is checked against those numbers before it is shown.
+First Paycheck walks someone through the money decisions of their first salaried month, using their own pay stub, benefits documents and bank data, and then checks in each month to see whether those decisions took effect. Every number is worked out by tested code in `api/calc/`; the model only reads documents, labels transactions and explains, and whatever it produces is a proposal until the person confirms it.
 
-The path through the alpha:
+The alpha was scoped as milestones M0 to M4 (sign in, link a bank, confirm a pay stub, the 401(k) decision and its explanation). The rest of the MVP, planned for November 6 to December 11, was built ahead of schedule, so `main` today runs every milestone through M10. The path through it:
 
-1. **Sign in** with email and password, a magic link, or a new account (Supabase Auth).
-2. **Link a bank.** Plaid's sandbox bank (First Platypus Bank, `user_good` / `pass_good`) is linked through Plaid Link; a background job syncs its accounts and transactions, and the screen follows the job until it finishes.
-3. **See categorized transactions.** Each row has a category and a badge for who chose it: a rule, the AI with its confidence, or you. Changing a category saves a rule for that merchant, and the screen says so.
-4. **Upload a pay stub.** Before any AI sees a page, Social Security and account numbers are blacked out; the document row shows how many items were redacted. The worker then reads the redacted pages.
-5. **Confirm the pay stub.** Every extracted field is a proposal next to the redacted line it came from. The person confirms or edits each one, and the screen checks that gross pay minus deductions equals net pay; the API checks again when the values are saved.
-6. **Spending.** The transactions, with the summary tiles (income, essentials, flexible, savings) above them.
-7. **401(k) decision.** The person enters salary and the employer match once, then moves the contribution slider; the API's calculator returns the match captured or left on the table. Saving stores an immutable version ("Saved as v1"); a change saves v2, which supersedes v1.
-8. **Why.** A plain-language explanation of the saved decision. Every number in it is checked against the calculator's result and it cites a curated IRS passage; if the check fails twice, the screen shows the calculator's own result instead.
+1. **Sign in** with email and password, a magic link, or a new account (Supabase Auth). Signed-out visits to any app screen go to sign-in and come back afterwards.
+2. **Link a bank.** Plaid's sandbox bank (First Platypus Bank, `user_good` / `pass_good`) through Plaid Link, or a CSV export from any bank. A background job syncs accounts and transactions while the screen shows its progress. Each account gets a role (spending, emergency fund, retirement, and so on); an institution can be synced again or unlinked.
+3. **Upload a pay stub** (PDF or image), and optionally a benefits summary. Social Security and account numbers are blacked out before any model sees a page; the document row says how many items were redacted.
+4. **Confirm the pay stub.** Each extracted field sits next to the redacted line it came from. The person confirms or edits every one, and the screen checks that gross pay minus deductions equals net pay; the API checks again when the values are saved. A benefits summary is reviewed the same way (plans, match tiers, vesting).
+5. **Spending.** Transactions with their category and who chose it (a rule, the AI with its confidence, or you); fixing a category saves a rule. Summary tiles, a cash-flow diagram from gross pay to categories, a month picker and the recurring charges, each of which can be renamed or marked not recurring.
+6. **Decisions.** Four calculators: emergency fund (with a savings goal that can be paused, resumed or marked reached), 401(k) match, health plan comparison and W-4 withholding (which reads the saved 401(k) and health plan decisions). Saving stores an immutable version ("Saved as v1"); a change saves v2 over it.
+7. **Why.** A plain-language explanation of a saved decision. Every number in it is checked against the calculator's result and it cites a curated IRS passage; if the check fails twice, the screen shows the calculator's own result instead.
+8. **Plan.** Every saved decision with its figures and explanation status, the paycheck, goals and the next 90 days of dates, a PDF made by the worker and a calendar file (.ics).
+9. **Monthly check-in.** What changed since the plan was saved (an election that did not reach the pay stub, a goal behind pace, a new or repriced charge, a pay or deduction change, a date coming up), each marked done or dismissed, or undone. The month's cash flow against the plan, each line said as on plan, over or under. Net worth by month and investment holdings. "Check in now" runs this month's check-in without waiting for the monthly tick.
 
-Production: web on Vercel (URL: TODO), API and worker on Render at `https://first-paycheck-api.onrender.com`. Recording (90 seconds): TODO (`screenshots/alpha-demo.mp4` or a link).
+Production: the API and worker run on Render at `https://first-paycheck-api.onrender.com`; its `/health` reports the deployed commit of `main` (`6785ba4` when this was written), migration `0014_delete_account_fn` and a live worker. The web app's Vercel production deploy is still open (an M0 issue in progress), so the walkthrough and screenshots run on the local stack (`make e2e-full`) until it lands. Recording (90 seconds): TODO (`screenshots/alpha-demo.mp4` or a link).
+
+**Production and the Anthropic key.** Production has no `ANTHROPIC_API_KEY` yet. That is a supported mode, not a failure (spec 004 rule 22, migration `0011_no_model_reason`): categorization runs the rules only and leaves the rest "Not labeled"; an uploaded document goes straight to manual entry with "Automatic reading is off right now, so type the fields from the lines shown." beside the redacted lines; "Why" shows a calm "not available yet" notice with the calculator's result; and the health plan card takes typed plans instead of a read benefits summary. Setting the key turns on AI labels, extraction and verified explanations with no other change.
 
 ### Functional and placeholder features
 
-"Planned" is the alpha scope from the [build plan](../plan.md). "Actual" is what `main` does today, read from the code and run end to end against a local stack (`make e2e-full`, which uses the fake model and the Plaid sandbox). Production has no `ANTHROPIC_API_KEY` yet, which changes three rows there; those rows say how.
+"Planned" is the scope from the [build plan](../plan.md). "Actual" is what `main` does, read from the code and run end to end against the local stack, which uses the fake model and, when keys are present, the Plaid sandbox.
 
-| Feature | Planned for the alpha | Actual |
+| Feature | Planned | Actual |
 |---|---|---|
-| Sign in (password, magic link, sign-up) | Functional | Functional. Signed-out visits to any app screen go to sign-in and come back afterwards. |
-| Link a Plaid sandbox bank and see synced transactions | Functional | Functional, through Plaid Link. When Plaid has not prepared a new item yet, the sync waits 120 s and tries again, and the screen shows the queued job meanwhile. |
-| Transactions categorized by rules then AI, with the source shown | Functional | Functional with a model configured. Production today: the categorize job needs the model even for the rule step, so it fails and rows show "Not labeled" until the key is set. |
-| Fix a category, which saves a rule | Functional | Functional ("Saved as a rule."). |
-| Upload a pay stub (PDF or image) with redaction before extraction | Functional | Functional with a model configured: text PDFs are redacted as text, scans with OCR and black boxes. Production today: the extract job fails without the model, so the stub never reaches review. |
-| Review and confirm extracted fields, with the gross minus deductions equals net check | Functional | Functional, including manual entry when the model declines a document. |
-| Spending summary tiles and transaction table | Functional | The table is functional. The tiles show loading placeholders: the API's `GET /spending/summary` exists, and the web is being wired to it in parallel with this document. |
-| Spending cash-flow diagram (Sankey) | Not in the alpha (M5) | Not built in the web yet (in progress for M5); the API's `GET /cashflow` exists. |
-| 401(k) match calculator | Functional | Functional. Every figure comes from `POST /calc/401k-match`; the client only formats. |
-| Save a decision, then save a new version that supersedes it | Functional | Functional ("Saved as v1", then "Saved as v2"). The Why index lists each current decision with its version. |
-| "Why" explanation verified against the calculator, with an IRS citation | Functional | Functional with a model configured: "Verified against calculator", an irs.gov source, and next steps from the calendar. Production today: a calm "not available yet" notice with the calculator result. |
-| Emergency fund, health plan and W-4 cards | Placeholder ("After alpha") | Placeholder ("After alpha"), with the alpha's `calculators=401k_match` flag. |
-| CSV import | Not in the alpha (M5) | The API route `POST /accounts/import` exists; the Link screen's button is disabled ("After alpha") while the web part is built. |
-| Plan export and decision calendar | Not in the alpha (M9) | The Plan screen is a placeholder. A saved 401(k) decision already creates its calendar check, which the Why screen shows. |
-| Monthly check-in | Not in the alpha (M8) | Placeholder screen. The tables exist (migration `0005_checkins`). |
+| Sign in (password, magic link, sign-up), sign out | Alpha | Functional |
+| Link a Plaid sandbox bank, follow the sync | Alpha | Functional. When Plaid has not prepared a new item yet, the sync waits 120 s and tries again, and the screen shows the queued job meanwhile. |
+| Account roles, Sync now, unlink an institution | M1, M10 | Functional. Unlinking removes the institution's accounts, transactions and balances and retracts check-in findings about its charges. |
+| CSV import | M5 | Functional: a new CSV account, re-imports without duplicates, row-by-row errors for a broken file. |
+| Categorization by rules then AI, with the source shown; a fix saves a rule | Alpha | Functional with a model. Without one (production today), rules only. |
+| Upload with redaction before extraction | Alpha | Functional with a model: text PDFs redacted as text, scans with OCR and black boxes. Without one, documents go to manual entry. Offer letters are kept but not read. |
+| Confirm the pay stub (gross minus deductions equals net) | Alpha | Functional, including manual entry. |
+| Benefits summary extraction and review | M6 | Functional with a model; the confirmed plans and match feed the calculators. |
+| Spending tiles, transactions, month picker | Alpha, M5 | Functional |
+| Cash-flow diagram (Sankey) | M5 | Functional behind the `sankey` feature flag, with a stacked view under 640 px and full keyboard navigation. |
+| Recurring charges | M5 | Functional: detected weekly, monthly or yearly; rename, or mark not recurring and undo that. |
+| 401(k) match calculator | Alpha | Functional. Every figure comes from `POST /calc/401k-match`. |
+| Emergency fund, health plans, W-4 calculators | M6, M7 | Built and functional. The alpha build's `calculators=401k_match` flag shows them as "After alpha" placeholders; leaving the flag unset turns all four on. |
+| Versioned decisions (v1, then v2 over it) | Alpha | Functional, for every calculator. |
+| Verified explanation with an IRS citation | Alpha | Functional with a model for the 401(k), health plan and W-4 (an emergency fund has no IRS source, so none). Without one, a calm notice and the calculator's result. |
+| Plan screen, PDF export, calendar file | M9 | Functional |
+| Monthly check-in: findings with done, dismiss and undo | M8 | Functional |
+| Cash flow against the plan, coloured and labeled by the API's status | M8 | Functional (on plan, over, under; which side matters depends on the line). |
+| Check in now | M8 | Functional: on the list, and on this month's open check-in. |
+| Net worth by month and holdings | M8 | Functional |
+| Delete the account | M10 | Functional: Plaid items revoked, then every row deleted. |
+| Rate limits and body sizes on every write route | M10 | Functional; a 429 says when to try again. |
+| Error boundaries per card | M10 | Functional: one broken card leaves the rest of the screen working. |
+| Accessibility audit | M10 | Done for every sample screen at 1280 and 390 px: axe at every impact, a keyboard walk, reduced motion. |
+| User test with 5 to 8 people | M10 | Kit written (`docs/user-test/`); the sessions have not run. |
+| Live LLM eval baselines | M10 | Not yet: the deterministic suites run in CI; the LLM suites wait for a key. |
+| Plaid production access | M10 stretch | Not started. |
 
-Behind the screens: per-user rate limits on uploads (10 per hour) and explanation runs (30 per hour), JSON request and job logs with request and user ids, Sentry error reporting on the API and the worker when its DSN is set, and a `/health` that reports the deployed commit, the migration and whether the worker is alive.
+Behind the screens: row-level security on every user table with a cross-user test for every route, per-user rate limits, JSON request and job logs with request and user ids, Sentry on the API and the worker when its DSN is set, nightly evals, and a `/health` that reports the deployed commit, the migration and whether the worker is alive.
 
 ### Screenshots
 
-Screenshots live in [`screenshots/`](screenshots/) and are taken from production with a fresh account, at 1280 px wide and, where marked, 390 px for phone. Each file below is a placeholder until it is captured.
+Screenshots go in [`screenshots/`](screenshots/), at 1280 px wide and, where marked, 390 px for phone, from a fresh account. Each file below is a named placeholder until it is captured.
 
 | File | Shows |
 |---|---|
@@ -58,21 +73,41 @@ Screenshots live in [`screenshots/`](screenshots/) and are taken from production
 | `05-spending-rule-notice.png` | A category fix and its "Saved as a rule." notice |
 | `06-confirm-review.png` | The Confirm screen: fields beside the redacted source, "The math checks out." |
 | `07-spending-tiles.png` | The Spending summary tiles |
-| `08-decisions-v1.png` | The 401(k) card at 4%, "Saved as v1", with the other three cards marked "After alpha" |
-| `09-decisions-v2.png` | The card after a change, "Saved as v2" |
-| `10-why-verified.png` | The explanation, "Verified against calculator", with its IRS source |
-| `11-confirm-phone.png` | The Confirm screen at 390 px |
-| `12-decisions-phone.png` | The Decisions screen at 390 px |
+| `08-spending-sankey.png` | The cash-flow diagram with a node's popover open |
+| `09-decisions-v1.png` | The 401(k) card at 4%, "Saved as v1" |
+| `10-decisions-v2.png` | The card after a change, "Saved as v2" |
+| `11-why-verified.png` | The explanation, "Verified against calculator", with its IRS source |
+| `12-plan.png` | The Plan screen with its decisions, goals and next 90 days |
+| `13-check-in.png` | A check-in: findings, the cash flow against the plan with its statuses, net worth |
+| `14-check-in-now.png` | The list of check-ins after Check in now |
+| `15-confirm-phone.png` | The Confirm screen at 390 px |
+| `16-decisions-phone.png` | The Decisions screen at 390 px |
 | `backlog.png` | The GitHub Project board |
 
 ## Documented backlog
 
-The backlog is a GitHub Project. Every issue has a title, description, status, priority and assignee; the source of truth for issue text is [`docs/backlog.yaml`](../backlog.yaml), synced to GitHub by `scripts/sync_backlog.py`.
+The backlog is a GitHub Project. Every issue has a title, a description (its body, ending with its definition of done), a status (todo, in progress, done), a priority (High, Medium, Low) and an assignee (the repo owner, since this is a solo project), plus its milestone and area labels. The source of truth is [`docs/backlog.yaml`](../backlog.yaml), synced to GitHub by `scripts/sync_backlog.py`, which also closes the done issues.
 
 - Project board: https://github.com/users/hkwan16/projects/1 (issues: https://github.com/hkwan16/First-Paycheck/issues)
 - Board screenshot: `screenshots/backlog.png` (to capture)
 
-The 104 issues are grouped into milestones M0 to M10 in dependency order, and each milestone leaves a deployed product: the foundation and data model first (M0, M1), then documents (M2) and the 401(k) decision (M3), which only needed M1 and so could proceed side by side, then this hardening milestone (M4). Some M5 work is already in: the API for recurring charges, cash flow and CSV import, with the Sankey and the import screen in progress. After the alpha come the emergency fund, health plan and benefits extraction (M6), the W-4 (M7), monthly check-ins (M8), the plan export (M9), and a hardening pass with a user test (M10).
+`backlog.yaml` holds 124 issues: 108 done, 9 in progress and 7 to do (46 High, 77 Medium, 1 Low priority), across milestones M0 to M10 in dependency order, each leaving a deployed product.
+
+| Milestone | Scope | Done | In progress | To do |
+|---|---|---|---|---|
+| M0 | Scaffold, spec amendments, CI, deployed hello world | 10 | 1 (Vercel production deploy) | 0 |
+| M1 | Data model, auth, Plaid sandbox sync, categorization, design system | 16 | 0 | 0 |
+| M2 | Upload, ingest, redact, extract, confirm | 8 | 2 (extraction eval with a live model, tesseract-in-Docker as a required check) | 0 |
+| M3 | 401(k) calculator, decisions, citations, explain, verify | 8 | 0 | 0 |
+| M4 | Alpha hardening and this document | 5 | 3 (alpha e2e in CI, observability, this document) | 1 (production walkthrough) |
+| M5 | Sankey, CSV import, spending summary, recurring charges | 14 | 0 | 0 |
+| M6 | Emergency fund, goals, health plans, benefits extraction | 13 | 0 | 0 |
+| M7 | W-4 | 5 | 0 | 0 |
+| M8 | Check-ins, calendar, cash flow, net worth, holdings | 17 | 0 | 1 (web plan line status and Check in now) |
+| M9 | Plan export | 6 | 0 | 0 |
+| M10 | Hardening, evals, accessibility, user test | 6 | 3 (two eval sets at target, accessibility audit) | 5 (error boundaries, user test, Plaid production, live LLM evals, web account deletion) |
+
+Those statuses are from the last sync (October 21). Work merged since then is ahead of the board: the M10 web merge brought error boundaries per card, web account deletion and the accessibility audit, and this branch brings the M8 web item. They move to done at the next sync.
 
 ## Brief reflection on AI tool integration
 
@@ -80,18 +115,35 @@ Drawn from [`docs/ai-log.md`](../ai-log.md), which records each notable use of a
 
 ### Tools used
 
-Claude Code throughout. A main session planned the work and wrote the specs, then split each milestone into work packages handed to Opus 5.5 subagents, each in its own git worktree with explicit file ownership, and merged their branches. One of the two mockups was built by a subagent with the `apple-design` skill.
+Claude Code throughout. A main session planned the work and wrote the specs, then split each milestone into work packages for Opus 5.5 subagents, each in its own git worktree with a brief naming the specs to read, the files it owned, its own test database and a `&&`-gated command to pass before reporting. Sixteen subagents ran over the build day, two to four at a time, and the main session merged their branches. One of the two mockups was built by a subagent with the `apple-design` skill.
 
 ### How the tools changed the work
 
-The plan was the main lever. Asking for a build plan grounded in the proposal and the technical spec produced seventeen spec amendments before any code, such as integer cents in every money column, a non-production route for linking Plaid's sandbox, and a committed OpenAPI file that the web's types are generated from. Parallel subagents then built the API and the web side by side against that contract, each owning its own files.
+The plan was the main lever. A build plan grounded in the proposal and the technical spec produced seventeen spec amendments before any code: integer cents in every money column, a non-production route for linking Plaid's sandbox, and a committed OpenAPI file the web's types are generated from. Parallel subagents then built the API and the web side by side against that contract. The whole post-alpha plan (M3 to M10, scheduled for November 6 to December 11) landed in one day; over that work, test counts went from 733 to 1922 on the API and from 605 to 1332 on the web, with every merge gated on lint, both suites and the free evals. The cost was orchestration: roughly a third of the main session went to merges and conflict resolution.
 
-The project's rules for the AI are part of the repo (`CLAUDE.md` files): money math only in `api/calc/`, only one module may call Claude, a failing test before every fix, and no output of the model saved without the person confirming it. Those rules are checked by tests and lint, not trusted to the prompt.
+The rules for the AI live in the repo (`CLAUDE.md` files): money math only in `api/calc/`, one module that may call Claude, a failing test before every fix, nothing the model produces saved without the person confirming it. Tests and lint check those rules rather than trusting the prompt.
 
 ### Successes, challenges and surprises
 
-- **Checking the real system beat reading the code.** Asked whether row-level security was set up, the session queried the hosted database and probed Supabase's Data API instead of reading the migrations. It found that Supabase's default grants had left the migration table and a `SECURITY DEFINER` function open to the public key, which a local Postgres could never have shown. The fix included making the test database copy those defaults so the leak reproduced locally first.
-- **Running end to end found what unit tests missed.** The local real-API harness built for M4 turned up a confirm screen that never moved on to Spending, a hydration mismatch on the Link screen, and a spacing bug that hid a status message from the tests. Each passed its unit tests, because the bug needed real timing or a real API to appear.
-- **Humans still caught visual and mathematical errors.** A clipped Sankey column in the chosen mockup was caught by a person looking at the render, not by the AI that drew it. A property in the plan ("no missed match above the full-match percentage") was false when the yearly 402(g) limit binds, and it surfaced only while hand-working the spec's examples.
-- **Defaults are where privacy leaks hide.** Sentry's SDK sends a stack frame's local variables by default; a test that turned them back on showed a request body reaching Sentry through a local even though the body itself was scrubbed.
-- **Open problem.** Without a model key, the worker fails the categorize and extract jobs outright rather than falling back to rules and manual entry. Production needs the key, or that fallback, before the walkthrough.
+- **Checking the real system beat reading the code.** Asked whether row-level security was set up, the session queried the hosted database instead of reading migrations, and found Supabase's default grants had left the migration table and a `SECURITY DEFINER` function open to the public key. The guard test written for it later caught the same gap in another agent's migration.
+- **Running end to end found what unit tests missed.** The local real-API harness turned up a confirm screen that never moved on to Spending (a mutation callback dropped when its component unmounted) and a hydration mismatch on the Link screen; each passed its unit tests. On the API, reproducing an unlink end to end on the November test user showed a check-in finding still pointing at a charge the unlink had deleted.
+- **Definitions of done beat titles.** Syncing statuses showed several issues that looked done but were not by their own definitions: the CI end-to-end run skips the Plaid steps without secrets, the LLM eval baselines still hold targets, and the web has no production deploy.
+- **Hypothesis and hand-worked examples caught wrong specs, not just wrong code.** A W-4 property claimed every suggestion lands within $100 and Hypothesis found the counterexample; a 401(k) property was false when the 402(g) limit binds, found while working the spec's examples by hand.
+- **Parallel agents need a shared map.** Two agents' migrations revised the same parent three times until briefs named the current head; merges conflicted in shared files and two resolutions were wrong until `tsc` in the merge gate caught them. Agents reported API gaps instead of patching across the boundary, and three gaps (an account's provider, plan line status, check in now) became their own packages.
+- **Humans still catch what renders wrong.** A clipped Sankey column in the chosen mockup was caught by a person looking at it, not by the AI that drew it.
+- **Resolved since the first draft.** The worker used to fail categorize and extract jobs outright without a model key; it now falls back to rules and manual entry, so production works before the key is set.
+
+## Where each alpha requirement is met
+
+| Brief requirement | Where |
+|---|---|
+| Description of the current alpha version | [What the alpha does](#what-the-alpha-does) |
+| Screenshots or a short video of key features | [Screenshots](#screenshots) (named placeholders to capture) and the recording TODO under [What the alpha does](#what-the-alpha-does) |
+| Which features are functional and which are placeholders | [Functional and placeholder features](#functional-and-placeholder-features) |
+| Backlog in a task management system | The GitHub Project, under [Documented backlog](#documented-backlog) |
+| Title, description, status, priority and assignee per task | Every issue in [`backlog.yaml`](../backlog.yaml) and on the board; see [Documented backlog](#documented-backlog) |
+| A link or screenshot of the backlog | The board link and `screenshots/backlog.png` |
+| AI/LLM tools used | [Tools used](#tools-used) |
+| How the tools influenced and accelerated development | [How the tools changed the work](#how-the-tools-changed-the-work) |
+| Successes, challenges and unexpected insights | [Successes, challenges and surprises](#successes-challenges-and-surprises) |
+| Clear, organized, about 1-2 pages | Headings and tables throughout; the feature table runs past two pages because the build ran past the alpha's scope |
