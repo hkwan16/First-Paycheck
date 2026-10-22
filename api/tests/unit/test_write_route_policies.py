@@ -1,9 +1,10 @@
 """Every write route has a per-user rate limit or a written reason not to
-(``app/ratelimit.py:WRITE_ROUTE_POLICIES``), and every request body is bounded
-(``app/body_limit.py``)."""
+(``app/ratelimit.py:WRITE_ROUTE_POLICIES``), the API contract says which ones
+can answer 429, and every request body is bounded (``app/body_limit.py``)."""
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 
 import pytest
@@ -12,10 +13,11 @@ from fastapi.testclient import TestClient
 
 from app import ratelimit
 from app.body_limit import DEFAULT_MAX_BODY_BYTES
-from app.config import Settings
+from app.config import REPO_ROOT, Settings
 from app.main import create_app
 
 READS = {"GET", "HEAD"}
+OPENAPI = REPO_ROOT / "api" / "openapi.json"
 
 
 def write_routes() -> set[str]:
@@ -46,6 +48,35 @@ def test_policies_are_limits_or_reasons() -> None:
             assert len(policy) > 20, f"{name}: say why it needs no limit"
     # A bucket counts one kind of request; two routes never share one.
     assert len(buckets) == len(set(buckets))
+
+
+def declared_statuses() -> dict[str, set[str]]:
+    """Each operation's documented response statuses, from the committed
+    ``api/openapi.json`` the web client's types are generated from."""
+    document = json.loads(OPENAPI.read_text())
+    return {
+        operation["operationId"]: set(operation["responses"])
+        for item in document["paths"].values()
+        for operation in item.values()
+    }
+
+
+def test_429_is_declared_exactly_where_a_limit_applies() -> None:
+    """A rate-limited route documents its 429 so the client handles it; a
+    route with no limit never answers 429, so it does not claim to."""
+    declared = declared_statuses()
+    limited = {
+        name
+        for name, policy in ratelimit.WRITE_ROUTE_POLICIES.items()
+        if isinstance(policy, ratelimit.Limit)
+    }
+    # A limited route hidden from the schema would escape the check below.
+    assert limited <= set(declared), f"not in openapi.json: {sorted(limited - set(declared))}"
+    with_429 = {name for name, statuses in declared.items() if "429" in statuses}
+    assert with_429 == limited, (
+        f"limited without a 429 response: {sorted(limited - with_429)}; "
+        f"a 429 response without a limit: {sorted(with_429 - limited)}"
+    )
 
 
 @pytest.fixture

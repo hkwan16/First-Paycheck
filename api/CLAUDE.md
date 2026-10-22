@@ -500,7 +500,9 @@ adds `public.delete_user_account(uuid)`; no new table.
 Every route that is not a GET has an entry in
 `app/ratelimit.py:WRITE_ROUTE_POLICIES`: a `Limit` or the reason it needs none.
 `tests/unit/test_write_route_policies.py` fails on a write route without one,
-and `tests/integration/test_rate_limits.py` checks each limit (one request
+and on an `api/openapi.json` operation whose `429` response does not match its
+policy (declare it with `error_responses(..., 429)` exactly when the route
+consumes a `Limit`), and `tests/integration/test_rate_limits.py` checks each limit (one request
 counts one; a full window is 429 `rate_limited` with `Retry-After` and writes
 nothing). Limits are per user and per clock hour (UTC), counted in
 `rate_limit_counters` inside the request's transaction, so a request that fails
