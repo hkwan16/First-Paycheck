@@ -282,11 +282,20 @@ const SCREENS: Record<
  * Date.now() is reported as an unstable value: each entry is stamped with the
  * sample time (TanStack would stamp it with Date.now()), and `'static'` data
  * is never stale (any number, even Infinity, is compared with Date.now()).
+ * Reads are off unless a hook turns them on itself (`useJob`, `useCalc`):
+ * a hook that polls (`useDocument` while a document is being read) would
+ * otherwise ask an API the sample does not have every 1.5 s.
  */
 export function seededClient(screen: SampleScreenName = 'link') {
   const client = new QueryClient({
     defaultOptions: {
-      queries: { staleTime: 'static', gcTime: Infinity, retry: false, refetchOnMount: false },
+      queries: {
+        enabled: false,
+        staleTime: 'static',
+        gcTime: Infinity,
+        retry: false,
+        refetchOnMount: false,
+      },
       mutations: { retry: 0 },
     },
   });
