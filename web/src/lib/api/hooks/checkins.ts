@@ -30,6 +30,15 @@ export interface UpdateFindingVariables {
   type: 'done' | 'dismiss' | 'undo';
 }
 
+export interface UpdateFindingOptions {
+  /**
+   * Called for every refused change, after the finding is restored. Unlike a
+   * callback passed to `mutate`, it also runs for an earlier change that
+   * fails while a later one is in flight.
+   */
+  onError?: (error: unknown, variables: UpdateFindingVariables) => void;
+}
+
 interface Rollback {
   userAction: FindingAction | null;
   at: string | null;
@@ -43,7 +52,7 @@ interface Rollback {
  * changed meanwhile keeps its change); when the last write in flight
  * settles, the check-in and the list are read again.
  */
-export function useUpdateFinding(checkInId: string) {
+export function useUpdateFinding(checkInId: string, { onError }: UpdateFindingOptions = {}) {
   const queryClient = useQueryClient();
   const key = queryKeys.checkIn(checkInId);
   const mutationKey = ['patch', '/check-ins/{check_in_id}/findings/{finding_id}', checkInId];
@@ -73,20 +82,23 @@ export function useUpdateFinding(checkInId: string) {
           }
         : undefined;
     },
-    onError: (_error, { findingId }, rollback) => {
-      if (!rollback) return;
-      queryClient.setQueryData<CheckInDetail>(
-        key,
-        (detail) =>
-          detail &&
-          findingsReducer(detail, {
-            type: 'restore',
-            findingId,
-            userAction: rollback.userAction,
-            at: rollback.at,
-            completedAt: rollback.completedAt,
-          }),
-      );
+    onError: (error, variables, rollback) => {
+      const { findingId } = variables;
+      if (rollback) {
+        queryClient.setQueryData<CheckInDetail>(
+          key,
+          (detail) =>
+            detail &&
+            findingsReducer(detail, {
+              type: 'restore',
+              findingId,
+              userAction: rollback.userAction,
+              at: rollback.at,
+              completedAt: rollback.completedAt,
+            }),
+        );
+      }
+      onError?.(error, variables);
     },
     onSettled: () => {
       // Reading while another write is in flight would overwrite its optimistic change.

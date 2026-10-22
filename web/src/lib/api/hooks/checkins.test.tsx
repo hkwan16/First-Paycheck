@@ -139,7 +139,7 @@ describe('useUpdateFinding', () => {
     });
   });
 
-  it('rolls back only the refused finding when another one is in flight', async () => {
+  it('rolls back and reports only the refused finding when another one is in flight', async () => {
     const other = 'f1000000-0000-4000-8000-000000000002';
     server.use(
       http.patch(apiUrl('/check-ins/:id/findings/:fid'), async ({ params }) => {
@@ -157,7 +157,13 @@ describe('useUpdateFinding', () => {
         return HttpResponse.json(finding);
       }),
     );
-    const { result } = setup();
+    const refused: unknown[] = [];
+    const { result } = renderHookWithClient(() => ({
+      detail: useCheckIn(NOVEMBER_ID),
+      update: useUpdateFinding(NOVEMBER_ID, {
+        onError: (error, variables) => refused.push([variables.findingId, error]),
+      }),
+    }));
     await waitFor(() => expect(result.current.detail.isSuccess).toBe(true));
 
     act(() => {
@@ -169,6 +175,10 @@ describe('useUpdateFinding', () => {
     const second = result.current.detail.data?.findings.find((f) => f.id === other);
     expect(second?.user_action).toBe('done');
     expect(result.current.detail.data?.handled_count).toBe(1);
+    // The earlier, refused change is reported even though a later one was made.
+    expect(refused).toEqual([
+      [electionId, { error: { code: 'internal_error', message: 'Try again' } }],
+    ]);
   });
 
   it('refreshes that check-in and the list once the server answers', async () => {

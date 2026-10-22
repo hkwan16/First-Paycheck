@@ -1,4 +1,5 @@
 import type { Route } from 'next';
+import type { CheckInSummary } from './api/types';
 import { safeNextPath } from './auth/next-path';
 
 /*
@@ -19,6 +20,15 @@ export const confirmRoute = (documentId: string) =>
 export const whyRoute = (decisionId: string) => `/why/${segment(decisionId)}` as Route;
 
 export const checkInRoute = (checkInId: string) => `/check-in/${segment(checkInId)}` as Route;
+
+/**
+ * Where the nav's "Monthly check-in" goes: the newest check-in still open
+ * (the list is newest first), else the list of check-ins.
+ */
+export function checkInNavHref(checkIns: readonly CheckInSummary[] | undefined): Route {
+  const open = checkIns?.find((checkIn) => checkIn.status === 'open');
+  return open ? checkInRoute(open.id) : '/check-in';
+}
 
 export type AuthMode = 'sign-in' | 'sign-up';
 

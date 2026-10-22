@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { checkInRoute, confirmRoute, signInRoute, whyRoute } from './routes';
+import {
+  completedNovemberCheckIn,
+  novemberCheckIn,
+  octoberCheckIn,
+  summaryOf,
+} from '@/test/fixtures/checkins';
+import { checkInNavHref, checkInRoute, confirmRoute, signInRoute, whyRoute } from './routes';
 
 describe('route builders', () => {
   it('build the id-bound screen paths', () => {
@@ -14,6 +20,20 @@ describe('route builders', () => {
 
   it('reject an empty id', () => {
     expect(() => whyRoute('')).toThrow(RangeError);
+  });
+});
+
+describe('checkInNavHref', () => {
+  it('opens the newest check-in still open', () => {
+    const list = [summaryOf(novemberCheckIn()), summaryOf(octoberCheckIn())];
+    expect(checkInNavHref(list)).toBe(`/check-in/${novemberCheckIn().id}`);
+  });
+
+  it('goes to the list when every check-in is completed, there are none, or none loaded yet', () => {
+    const completed = [summaryOf(completedNovemberCheckIn()), summaryOf(octoberCheckIn())];
+    expect(checkInNavHref(completed)).toBe('/check-in');
+    expect(checkInNavHref([])).toBe('/check-in');
+    expect(checkInNavHref(undefined)).toBe('/check-in');
   });
 });
 

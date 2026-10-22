@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { markPageHydrated, resetPageHydration } from '@/lib/page-hydration';
+import { NOVEMBER_ID } from '@/test/fixtures/checkins';
 import { samplePayStub } from '@/test/fixtures/documents';
 import { db } from '@/test/msw/db';
 import { server } from '@/test/msw/server';
@@ -51,6 +52,31 @@ describe('AppSideNav', () => {
     );
     // Transactions, and a summary (GET /spending/summary) with none uncategorized: step 3 is done.
     expect(await screen.findByRole('link', { name: 'Spending map, done' })).toBeInTheDocument();
+  });
+
+  it('links the monthly check-in to the newest open one once the list arrives', async () => {
+    pathname.current = '/setup/link';
+    render(<AppSideNav />);
+    // Before the list arrives (and on the server), the item opens the list.
+    expect(screen.getByRole('link', { name: 'Monthly check-in' })).toHaveAttribute(
+      'href',
+      '/check-in',
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Monthly check-in' })).toHaveAttribute(
+        'href',
+        `/check-in/${NOVEMBER_ID}`,
+      ),
+    );
+  });
+
+  it('marks the monthly check-in current on the list of check-ins', () => {
+    pathname.current = '/check-in';
+    render(<AppSideNav />);
+    expect(screen.getByRole('link', { name: 'Monthly check-in' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 
   it('marks nothing done before the data arrives', () => {
