@@ -1,6 +1,15 @@
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
+/** The API's error body: `{ error: { code, message, details? } }`. */
+export interface ApiErrorBody {
+  error: { code: string; message: string; details?: Record<string, unknown> | null };
+}
+
+/** A parsed response body in the API's error shape (a request outside `$api` reads one). */
+export const isApiErrorBody = (value: unknown): value is ApiErrorBody =>
+  isRecord(value) && isRecord(value.error) && typeof value.error.message === 'string';
+
 /**
  * The API's machine-readable code for a failed request (`decision_conflict`,
  * `not_found`), or undefined for anything that is not the API's error shape.

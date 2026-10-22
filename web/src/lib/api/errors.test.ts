@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apiErrorCode, apiErrorMessage } from './errors';
+import { apiErrorCode, apiErrorMessage, isApiErrorBody } from './errors';
 
 const FALLBACK = 'Something went wrong. Try again.';
 
@@ -35,4 +35,15 @@ describe('apiErrorCode', () => {
       expect(apiErrorCode(error)).toBeUndefined();
     },
   );
+});
+
+describe('isApiErrorBody', () => {
+  it('accepts the API error shape and nothing else', () => {
+    expect(isApiErrorBody({ error: { code: 'not_found', message: 'Gone' } })).toBe(true);
+    expect(isApiErrorBody({ error: { code: 'x' } })).toBe(false);
+    expect(isApiErrorBody({ error: null })).toBe(false);
+    expect(isApiErrorBody({ detail: [] })).toBe(false);
+    expect(isApiErrorBody(null)).toBe(false);
+    expect(isApiErrorBody('Not Found')).toBe(false);
+  });
 });
