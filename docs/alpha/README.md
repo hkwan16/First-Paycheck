@@ -91,11 +91,11 @@ The backlog is a GitHub Project. Every issue has a title, a description (its bod
 - Project board: https://github.com/users/hkwan16/projects/1 (issues: https://github.com/hkwan16/First-Paycheck/issues)
 - Board screenshot: `screenshots/backlog.png` (to capture)
 
-`backlog.yaml` holds 124 issues: 108 done, 9 in progress and 7 to do (46 High, 77 Medium, 1 Low priority), across milestones M0 to M10 in dependency order, each leaving a deployed product.
+`backlog.yaml` holds 124 issues: 113 done, 7 in progress and 4 to do (46 High, 77 Medium, 1 Low priority), across milestones M0 to M10 in dependency order, each leaving a deployed product.
 
 | Milestone | Scope | Done | In progress | To do |
 |---|---|---|---|---|
-| M0 | Scaffold, spec amendments, CI, deployed hello world | 10 | 1 (Vercel production deploy) | 0 |
+| M0 | Scaffold, spec amendments, CI, deployed hello world | 11 | 0 | 0 |
 | M1 | Data model, auth, Plaid sandbox sync, categorization, design system | 16 | 0 | 0 |
 | M2 | Upload, ingest, redact, extract, confirm | 8 | 2 (extraction eval with a live model, tesseract-in-Docker as a required check) | 0 |
 | M3 | 401(k) calculator, decisions, citations, explain, verify | 8 | 0 | 0 |
@@ -103,11 +103,11 @@ The backlog is a GitHub Project. Every issue has a title, a description (its bod
 | M5 | Sankey, CSV import, spending summary, recurring charges | 14 | 0 | 0 |
 | M6 | Emergency fund, goals, health plans, benefits extraction | 13 | 0 | 0 |
 | M7 | W-4 | 5 | 0 | 0 |
-| M8 | Check-ins, calendar, cash flow, net worth, holdings | 17 | 0 | 1 (web plan line status and Check in now) |
+| M8 | Check-ins, calendar, cash flow, net worth, holdings | 18 | 0 | 0 |
 | M9 | Plan export | 6 | 0 | 0 |
-| M10 | Hardening, evals, accessibility, user test | 6 | 3 (two eval sets at target, accessibility audit) | 5 (error boundaries, user test, Plaid production, live LLM evals, web account deletion) |
+| M10 | Hardening, evals, accessibility, user test | 9 | 2 (two eval sets at target, which need a live model) | 3 (user test, Plaid production, live LLM evals) |
 
-Those statuses are from the last sync (October 21). Work merged since then is ahead of the board: the M10 web merge brought error boundaries per card, web account deletion and the accessibility audit, and this branch brings the M8 web item. They move to done at the next sync.
+Those statuses are from the sync at commit 54b76bb (October 21), after the M8 web item, the error boundaries, web account deletion and the accessibility audit were merged. The open items are the ones that need something from outside the repo: a live model for the eval sets and baselines, the Plaid secrets in GitHub Actions for the alpha spec's link steps, Sentry and a log drain in production, people for the user test, and the production walkthrough once bank linking is configured there.
 
 ## Brief reflection on AI tool integration
 

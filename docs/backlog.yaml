@@ -8,7 +8,7 @@
 # `status` is todo (the default), in_progress or done. An issue is done only
 # when its work is on main and tested. A comment under an issue explains a
 # status that is not obvious from its body. Statuses were last reviewed
-# against main at 744c7b0 (2026-10-21), reading the code, tests and guides.
+# against main at 54b76bb (2026-10-21), reading the code, tests and guides.
 #
 # Priorities for M0-M4 come from the plan. The plan gives none for M5-M10, so
 # those default to Medium (Low for the stretch item) and are groomed in M4.
@@ -160,11 +160,10 @@ issues:
     labels: ["area:infra", "area:web"]
     milestone: M0
     priority: High
-    status: in_progress
-    # web/ builds in CI with these variables, but no production URL is recorded
-    # (docs/alpha/README.md says TODO) and no Vercel deployment is visible from
-    # the repo. The web issues below that say 'on production' were verified
-    # against the local real-API stack instead.
+    status: done
+    # Production is https://first-paycheck-silk.vercel.app, rooted at web/ with
+    # the four variables set and a preview per pull request; the sign-in page
+    # serves with the hosted Supabase tokens and the API URL.
   - title: "GitHub Project, labels, milestones, backlog.yaml and sync_backlog.py"
     body: >-
       Create the GitHub Project with a Priority field, the area labels and
@@ -1126,7 +1125,11 @@ issues:
     labels: ["area:web"]
     milestone: M8
     priority: Medium
-    status: todo
+    status: done
+    # Merged at 54b76bb: plan lines take their tone from the API's status with
+    # the words On, Over and Under plan; Check in now posts POST /check-ins and
+    # follows the job on the list and on this month's open check-in; the real-API
+    # check-in spec drives both.
 
   # M9: plan export
   - title: "Plan PDF with WeasyPrint in the worker"
@@ -1245,10 +1248,10 @@ issues:
     labels: ["area:web"]
     milestone: M10
     priority: Medium
-    status: in_progress
-    # axe runs on every screen at 1280 and 390 px in CI with no serious or
-    # critical violations; the keyboard and screen reader passes are not
-    # recorded.
+    status: done
+    # Every sample screen runs axe at every impact, a Tab walk and a
+    # reduced-motion check at 1280 and 390 px in CI; the findings and fixes are
+    # recorded in web/CLAUDE.md (Accessibility audit).
   - title: "Error boundaries per card"
     body: >-
       Wrap each card in an error boundary so one failing card never blanks a
@@ -1257,8 +1260,10 @@ issues:
     labels: ["area:web"]
     milestone: M10
     priority: Medium
-    status: todo
-    # No error boundary exists in web/src yet.
+    status: done
+    # CardErrorBoundary wraps every card and app/(app)/error.tsx the segment;
+    # card-boundaries.test.tsx throws in one card per screen and checks the rest
+    # still works.
   - title: "User test with 5-8 people and the before/after quiz"
     body: >-
       Run the setup flow with 5-8 people, timing sittings and giving the
@@ -1333,4 +1338,7 @@ issues:
     labels: ["area:web"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Delete account sits under Sign out in the user menu with a typed
+    # confirmation; DELETE /me, a local sign-out and /sign-in?deleted=1 follow,
+    # and a write under the old token is a 401 account_deleted.
