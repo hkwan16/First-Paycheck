@@ -167,3 +167,21 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """The process-wide settings, read once."""
     return Settings()
+
+
+def plaid_missing_settings(settings: Settings) -> list[str]:
+    """The Plaid settings a deployment still lacks, by environment-variable name.
+
+    Bank linking needs the client id and secret (the Plaid client) and the
+    token key (the cipher for stored access tokens). ``GET /health`` reports
+    the names, never the values, so a misconfigured deployment can be read
+    from outside.
+    """
+    missing: list[str] = []
+    if not settings.plaid_client_id:
+        missing.append("PLAID_CLIENT_ID")
+    if settings.plaid_secret is None or not settings.plaid_secret.get_secret_value():
+        missing.append("PLAID_SECRET")
+    if settings.plaid_token_key is None or not settings.plaid_token_key.get_secret_value():
+        missing.append("PLAID_TOKEN_KEY")
+    return missing

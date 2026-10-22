@@ -499,8 +499,9 @@ export interface paths {
     };
     /**
      * Health
-     * @description The running commit, the database's migration revision and whether the
-     *     worker was active in the last 5 minutes. No auth.
+     * @description The running commit, the database's migration revision, whether the
+     *     worker was active in the last 5 minutes and whether Plaid is configured
+     *     (setting names only). No auth.
      */
     get: operations['health'];
     put?: never;
@@ -1926,6 +1927,7 @@ export interface components {
       alembic_revision: string | null;
       /** Git Sha */
       git_sha: string;
+      plaid: components['schemas']['PlaidHealth'];
       /**
        * Status
        * @constant
@@ -2533,6 +2535,16 @@ export interface components {
       social_security_cents: number;
       /** State Tax Cents */
       state_tax_cents: number;
+    };
+    /** PlaidHealth */
+    PlaidHealth: {
+      /**
+       * Env
+       * @enum {string}
+       */
+      env: 'sandbox' | 'production';
+      /** Missing */
+      missing: string[];
     };
     /** PlanCompleteness */
     PlanCompleteness: {

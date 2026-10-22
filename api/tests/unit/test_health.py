@@ -6,20 +6,26 @@ import subprocess
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from app import version
-from app.config import Settings
+from app.config import Settings, get_settings
 from app.db import make_engine
 from app.deps import alembic_revision, worker_state
 from app.errors import AppError
 from app.main import create_app
+from tests.support.env import TEST_PLAID_TOKEN_KEY
 
 
 def client_with(
     revision: str | None, *, git_sha: str = "deadbeef", worker: str = "ok"
 ) -> TestClient:
-    settings = Settings(_env_file=None, git_sha=git_sha)
+    # The test environment pins a PLAID_TOKEN_KEY; drop it so the Plaid report
+    # is deterministic. Routes read settings through get_settings, so it is
+    # overridden too.
+    settings = Settings(_env_file=None, git_sha=git_sha, plaid_token_key=None)
     app = create_app(settings)
+    app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[alembic_revision] = lambda: revision
     app.dependency_overrides[worker_state] = lambda: worker
     return TestClient(app)
@@ -33,7 +39,34 @@ def test_health_reports_sha_and_revision() -> None:
         "git_sha": "deadbeef",
         "alembic_revision": "0001_roles",
         "worker": "ok",
+        # Settings(_env_file=None) carries no Plaid credentials: /health names
+        # what is missing (never a value) so a deployment can be checked from
+        # outside.
+        "plaid": {
+            "env": "sandbox",
+            "missing": ["PLAID_CLIENT_ID", "PLAID_SECRET", "PLAID_TOKEN_KEY"],
+        },
     }
+
+
+def test_health_reports_plaid_configured_without_values() -> None:
+    settings = Settings(
+        _env_file=None,
+        git_sha="deadbeef",
+        plaid_client_id="cid",
+        plaid_secret=SecretStr("sekrit"),
+        plaid_token_key=SecretStr(TEST_PLAID_TOKEN_KEY),
+        plaid_env="production",
+    )
+    app = create_app(settings)
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[alembic_revision] = lambda: "0001_roles"
+    app.dependency_overrides[worker_state] = lambda: "ok"
+    body = TestClient(app).get("/health").text
+    assert '"plaid":{"env":"production","missing":[]}' in body.replace(" ", "")
+    assert "sekrit" not in body
+    assert TEST_PLAID_TOKEN_KEY not in body
+    assert "cid" not in body
 
 
 def test_health_is_200_when_the_worker_is_stale() -> None:

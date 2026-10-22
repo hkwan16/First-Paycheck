@@ -2507,6 +2507,9 @@
             "title": "Git Sha",
             "type": "string"
           },
+          "plaid": {
+            "$ref": "#/components/schemas/PlaidHealth"
+          },
           "status": {
             "const": "ok",
             "title": "Status",
@@ -2525,7 +2528,8 @@
           "status",
           "git_sha",
           "alembic_revision",
-          "worker"
+          "worker",
+          "plaid"
         ],
         "title": "Health",
         "type": "object"
@@ -3902,6 +3906,31 @@
           "net_cents"
         ],
         "title": "PayStubValues",
+        "type": "object"
+      },
+      "PlaidHealth": {
+        "properties": {
+          "env": {
+            "enum": [
+              "sandbox",
+              "production"
+            ],
+            "title": "Env",
+            "type": "string"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing",
+            "type": "array"
+          }
+        },
+        "required": [
+          "env",
+          "missing"
+        ],
+        "title": "PlaidHealth",
         "type": "object"
       },
       "PlanCompleteness": {
@@ -8096,7 +8125,7 @@
     },
     "/health": {
       "get": {
-        "description": "The running commit, the database's migration revision and whether the\nworker was active in the last 5 minutes. No auth.",
+        "description": "The running commit, the database's migration revision, whether the\nworker was active in the last 5 minutes and whether Plaid is configured\n(setting names only). No auth.",
         "operationId": "health",
         "responses": {
           "200": {
