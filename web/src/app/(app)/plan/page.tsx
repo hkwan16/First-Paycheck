@@ -1,14 +1,14 @@
 import type { Metadata } from 'next';
-import { PageTitle } from '@/components/chrome/PageTitle';
+import { PlanScreen } from '@/components/screens/plan/PlanScreen';
 import { HydrationMarker } from '@/app/hydration-marker';
 
 export const metadata: Metadata = { title: 'Plan and calendar' };
 
-/** Placeholder until the Plan and calendar screen lands. */
+/** Your plan: every saved decision, its figures, the next 90 days and the exports. */
 export default function PlanPage() {
   return (
     <>
-      <PageTitle title="Your plan, on one page" lead="This screen is on its way." />
+      <PlanScreen />
       <HydrationMarker />
     </>
   );
