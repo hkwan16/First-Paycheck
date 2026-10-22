@@ -124,6 +124,13 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   fields the spec states. No database. `precision`, `recall` (matched by
   kind and key) and `fields_exact` (severity and the labeled payload fields).
 - `baseline.json`: the committed metrics every run is compared with.
+- `nightly.py` and `.github/workflows/nightly.yml`: every day at 09:17 UTC
+  (and on `workflow_dispatch`) the workflow runs `--suite all` when the
+  `ANTHROPIC_API_KEY` secret is set, else `--suite free` with a notice, capped
+  at `EVAL_MAX_COST_CENTS` (300). On a non-zero exit it renders the report
+  with `python -m evals.nightly` and opens the `nightly-evals` issue ("Nightly
+  evals regressed"), or edits the open one and comments the run link, then
+  fails. Close the issue once fixed; the next regression opens a new one.
 
 ## Rules
 
