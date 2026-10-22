@@ -77,16 +77,21 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
                     documents.ts, decisions.ts, deep-equal.ts, features.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts
-src/app/dev/screens/{link,spending,confirm,confirm/manual,decisions,why,why/fallback}  a screen on
-                    the sample data, no API (development only)
+src/app/dev/screens/{link,spending,confirm,confirm/manual,confirm/benefits,decisions,why,why/fallback}
+                    a screen on the sample data, no API (development only)
 src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fake-xhr.ts,
                     fixtures/sample.ts (the Acme / J. Rivera dataset), fixtures/documents.ts (the
                     Acme pay stub as the API proposes it), fixtures/decisions.ts (profile, 401(k)
                     decision, explanations, calendar event), fixtures/k401-results.json (calculator
-                    results made by api/calc, with make-k401-results.py), fixtures/cashflow.ts (the
-                    sample period's cash flow, spending summary and recurring charges), msw/db.ts
-                    (in-memory API state), msw/handlers.ts (every route, stateful),
-                    msw/spending-handlers.ts (cash flow, summary, recurring; `spendingDb`)
+                    results made by api/calc, with make-k401-results.py), fixtures/planning.ts (the
+                    emergency fund, health plans, goal, benefits plans and benefits proposal; results
+                    from emergency-fund-results.json and health-plans-results.json, made by
+                    make-emergency-fund-results.py and make-health-plans-results.py),
+                    fixtures/cashflow.ts (the sample period's cash flow, spending summary and
+                    recurring charges), msw/db.ts (in-memory API state), msw/handlers.ts (every
+                    route, stateful), msw/spending-handlers.ts (cash flow, summary, recurring;
+                    `spendingDb`), msw/planning-handlers.ts (M6 calculators, goals, benefits
+                    plans, benefits confirm; `planningDb`)
 e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions,
                     import), support/auth.ts, support/api.ts, fixtures/ (synthetic
                     acme-paystub.pdf and the script that makes it, bank-export.csv), baselines
@@ -143,7 +148,7 @@ next is a real disabled button, never a dead link).
   `queryKeys.transactionPages(filters)`; the trailing `'pages'` keeps its `InfiniteData` apart
   from plain reads under the same prefix.
   Documents: `invalidateDocuments` after an upload or extraction, `invalidateAfterConfirm`
-  (documents and pay stubs) after a confirm. Decisions: `invalidateDecisions` (the list and every
+  (documents, pay stubs, benefits plans and the profile) after a confirm. Decisions: `invalidateDecisions` (the list and every
   `GET /decisions/{id}`) and `invalidateAfterDecision` (also calendar, plan and goals) after a save.
 - **Calculators**: `useCalc(path, inputs)` (`hooks/calc.ts`) runs a `POST /calc/*` route as a
   query keyed by its body (`queryKeys.calc(path, body)`), so the same inputs never ask twice. It
@@ -163,6 +168,11 @@ next is a real disabled button, never a dead link).
   structurally (`lib/deep-equal.ts`, so key order and object identity do not matter). The API
   names calculators `k401_match` and `health_plans`; the feature flags say `401k_match` and
   `health_plan`: convert with `calculatorIdOf`.
+- **Goals and plans**: `useGoals()` reads `GET /goals` (a saved emergency fund decision makes or
+  updates one); `useUpdateGoal()` PATCHes `{ goalId, patch }` (status `active`, `paused`,
+  `reached`, or a new `monthly_contribution_cents`), writes the returned goal into the cache, then
+  reads the list again. `useBenefitsPlans()` reads the confirmed plans (`GET /benefits-plans`,
+  newest summary first) that the health plan card compares.
 - **Explanations**: `useExplanation(decisionId)` reads `GET /decisions/{id}/explanation` (a 404
   means none yet); `useExplain()` posts `{ decisionId, force }` to `POST /explain` and writes the
   row it returns into that cache. `POST /explain` answers only once the explanation is final
@@ -204,7 +214,7 @@ next is a real disabled button, never a dead link).
   50 and how many in all); the Link screen's `CsvImport` lists them, offers Try again on 409
   `import_conflict`, and follows the two job ids the import returns. `lib/documents.ts` maps a
   document's status to its badge and reason text; `isReviewable`/`newestReviewable` pick what
-  Confirm opens.
+  Confirm opens: a pay stub first, else a benefits summary that was read.
 - **Money** is formatted only. Transactions keep Plaid's sign (positive is money out):
   `formatTransactionAmount` and `transactionFlow` in `lib/money.ts` turn that into "-$84.12" and
   "+$1,996.04". Counting rows (the source badges) is fine; summing amounts is not.
@@ -241,6 +251,14 @@ next is a real disabled button, never a dead link).
   `uv run --project api python web/src/test/fixtures/make-k401-results.py`, then `pnpm format`.
   `db.llmConfigured = false` makes `POST /explain` a 503; `db.explainOutcomes` scripts whether
   each attempt comes back verified or fallback.
+- M6 routes live in `src/test/msw/planning-handlers.ts` over `planningDb` (goals, benefits plans),
+  reset after every test: `POST /calc/emergency-fund` and `POST /calc/health-plans` answer from
+  `emergency-fund-results.json` and `health-plans-results.json` (made by
+  `make-emergency-fund-results.py` and `make-health-plans-results.py`, run like the 401(k) one; a
+  missing case is a 500), saving either decision applies its effects (the goal and its
+  contribution and review events; the enrollment deadline event), and a benefits confirm writes
+  plans and the profile's match. Helpers: `savedEmergencyFund()`, `savedHealthPlan()`,
+  `benefitsConfirmed()` (the two sample plans), `benefitsWaiting()` (the sample summary proposed).
 - Debounces: measure them on the fake clock instead of asserting "nothing yet at 149 ms", which
   races `shouldAdvanceTime`. Record `Date.now()` when the input stops and when the request starts
   (`request:start`), and assert the difference is at least the debounce. Set inputs with
@@ -248,7 +266,7 @@ next is a real disabled button, never a dead link).
 
 ## Confirm screen
 
-`/setup/confirm` opens the newest pay stub waiting for review; `/setup/confirm/[documentId]`
+`/setup/confirm` opens the newest pay stub waiting for review (else a benefits summary); `/setup/confirm/[documentId]`
 reviews one (`ConfirmScreen`, which also covers the extracting, failed, confirmed, benefits and
 offer letter states).
 
@@ -267,13 +285,24 @@ offer letter states).
   its own.
 - **Source pane**: the redacted lines the AI saw, with redactions drawn as labeled bars
   (`role="img"`, "Redacted") and the selected field's line marked `aria-current`.
+- **Benefits summary** (`BenefitsReview`, spec 013): `initBenefitsState` (`benefits-fields.ts`)
+  lays the proposal's plans, match tiers and vesting out as reducer fields keyed
+  `plans.1.deductible_cents`, `match_tiers.0.employer_pct`, `vesting_years`, each with a `group`
+  ("Plan 2", which accessible names include), `required` (an HSA amount, a deadline and vesting
+  may be empty) and choices (plan type, vesting years). There is no math gate. `benefitsValues`
+  sends `{ plans, retirement }`, with `retirement: null` when the summary shows no match so the
+  profile keeps its own. The screen then shows what was stored (`profile_updated` says the match
+  and vesting changed) and links to Decisions. A benefits summary nothing could be read from is
+  not typed in here: Confirm and Link point to the decision cards. Its lines are not linked to
+  fields, so the source pane highlights nothing (`linked={false}`).
 
 ## Decisions screen
 
 `/setup/decisions` (`DecisionsScreen`) shows one card per calculator in the mockup's order
-(emergency fund, 401(k), health plan, W-4) with an "n of 4 saved" badge. Only the 401(k) card is
+(emergency fund, 401(k), health plan, W-4) with an "n of 4 saved" badge. The W-4 card is not
 built; a calculator off in `features.calculators` is a muted "After alpha" placeholder, and one
-that is on but not built says "Coming in a later milestone."
+that is on but not built says "Coming in a later milestone." Cards share `DecisionCard`,
+`SaveButton`, `AmountField` and `saveErrorText` (`decision-format.ts`).
 
 - **`Match401kCard`** always renders the same `DecisionCard` frame (a region named by its title)
   and swaps its body: skeleton, error, a link to Confirm when there is no confirmed pay stub,
@@ -288,6 +317,18 @@ that is on but not built says "Coming in a later milestone."
 - Save is enabled only when `useCalc` says the result is current. A 422 `result_mismatch`
   refetches the result and asks to save again; a 409 reloads the decisions and says another save
   came first.
+- **`EmergencyFundCard`** (spec 011): essentials start from the spending summary's essentials,
+  savings from the one account with the `emergency_fund` role (no route sums balances), else
+  typed; target months on a 3 to 12 range; a typed monthly transfer. The result (target,
+  shortfall, funded bar, months to target or "not within 10 years", per paycheck) is the
+  calculator's. After a save, `EmergencyGoal` shows the goal with Pause or Resume, Mark reached
+  and Change contribution (`useUpdateGoal`). There is no "Why" link: spec 011 has no explanation.
+- **`HealthPlanCard`** (spec 012): compares the newest confirmed summary's plans (up to
+  `MAX_PLANS`, the API's limit), the saved decision's, or plans typed in `PlanOptionsForm`. Usage
+  low, medium or high; the comparison table marks the cheapest at that usage and the chosen plan,
+  with break-even notes, the HSA tax effect and the HDHP notice from the result. Saving needs a
+  chosen plan (a 422 `plan_not_selected` says so); an enrollment deadline adds a calendar event,
+  shown under the card.
 
 ## Why screen
 
@@ -392,18 +433,12 @@ previews without secrets).
 (git-ignored) for the `authenticated` project, which runs `e2e/auth.spec.ts`. Set these in
 `web/.env.local` or the environment:
 
-| Variable                                                           | Needed for                                                                                                                                                                                                   |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)                                                                                                                                           |
-| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                                                                     |
-| `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                                                             |
-| `E2E_API_URL`                                                      | `link.spec.ts`, `confirm.spec.ts`, `spending.spec.ts` and `decisions.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it |
-| Variable                                                           | Needed for                                                                                                                                                                                                   |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------    |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)                                                                                                                                           |
-| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                                                                     |
-| `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                                                             |
-| `E2E_API_URL`                                                      | `link.spec.ts`, `confirm.spec.ts`, `spending.spec.ts` and `import.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it    |
+| Variable                                                           | Needed for                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)                                                                                                                                                             |
+| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                                                                                       |
+| `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                                                                               |
+| `E2E_API_URL`                                                      | `link.spec.ts`, `confirm.spec.ts`, `spending.spec.ts`, `import.spec.ts` and `decisions.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it |
 
 Missing variables skip those tests with a message saying which to set. The e2e user must be a
 confirmed user: the hosted project requires email confirmation, so create it in the Supabase
@@ -425,7 +460,9 @@ masked account number (regenerate it with `node e2e/fixtures/make-acme-paystub.m
 the read, confirms every field and continues to Spending. `decisions.spec.ts` (project
 `authenticated-decisions`, after confirm) fills in the plan details if the profile has none,
 saves a 401(k) decision, changes it and saves the next version, then opens its explanation and
-accepts verified, fallback, or "not available" when the API has no model. Decisions cannot be
+accepts verified, fallback, or "not available" when the API has no model; it then saves an
+emergency fund version and pauses and resumes its goal, and saves a health plan choice (typing two
+synthetic plans when no benefits summary is confirmed) with an enrollment deadline. Decisions cannot be
 deleted, so it reads the current version instead of assuming v1. Never use a real document as a
 fixture.
 
