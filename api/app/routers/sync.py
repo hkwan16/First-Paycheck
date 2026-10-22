@@ -260,12 +260,19 @@ def delete_item(
 @router.post(
     "/items/{item_id}/sync",
     status_code=status.HTTP_202_ACCEPTED,
-    responses=error_responses(401, 404, 429),
+    responses=error_responses(401, 404, 422, 429),
 )
 def sync_item(item_id: uuid.UUID, user: CurrentUser, session: UserSession, now: Now) -> QueuedJob:
     """Queue an incremental sync, or return the one already waiting."""
     ratelimit.consume(session, user.id, ratelimit.MANUAL_SYNCS, now=now)
     item = _own_item(session, item_id)
+    if item.provider is not SyncProvider.PLAID:
+        # Rule 29: a CSV item's data arrives only by import; a sync job would fail.
+        raise AppError(
+            "Only a linked institution can sync; import a new CSV file instead",
+            code="not_plaid_item",
+            status_code=422,
+        )
     job_id = queue.enqueue_unless_queued(
         session,
         user_id=user.id,

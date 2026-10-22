@@ -293,8 +293,9 @@ Specs 009 and 010. Migration `0005_checkins` adds `recurring_charges`,
   network, so one transaction); a stale cursor is 409 `import_conflict`. Its
   10 MB limit is a `BodyRule` of `BodySizeLimit` in `app/main.py`.
 - `AccountOut.provider` (`plaid` or `csv`, from the account's sync item) lets
-  the client tell an imported account from a linked one: only a Plaid item
-  has `POST /sync/items/{id}/sync`, and unlinking a CSV item is "Remove".
+  the client tell an imported account from a linked one: `POST
+  /sync/items/{id}/sync` on a CSV item is 422 `not_plaid_item` (its sync job
+  could only fail), and unlinking a CSV item is "Remove".
 - `tests/support/spending_month.py` holds spec 007's September month, shared by
   the spending and cash-flow tests.
 
