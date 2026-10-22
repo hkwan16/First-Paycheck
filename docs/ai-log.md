@@ -213,3 +213,27 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above, in the subagent's branch.
 
 **Time saved or lost:** Not measured.
+
+## 2026-10-21: M3 to M10 built by parallel Opus subagents, merged by the main session
+
+**Task:** Implement every milestone after M2 (calculators, decisions, explain and verify, the Sankey and CSV import, recurring charges, emergency fund and health plans, benefits extraction, the W-4, monthly check-ins, net worth, the plan and its exports, hardening) by delegating each package to an Opus 5.5 subagent at high effort in its own git worktree, and merge the results into main from the main session.
+
+**Tool:** Claude Code. Sixteen subagents over the day, two to four running at a time, each with a brief that named the specs to read, the files it owned, the files another agent owned, its own test database name and a `&&`-gated command to pass before reporting.
+
+**Prompt or skill:** One brief per package, written from the build plan's milestone section. Every brief repeated the repository rules (spec first, failing test first, integer cents only in `calc/`, RLS everywhere, no em dashes) and asked for deviations to be reported with reasons.
+
+**What it produced:** Specs 006 to 017, migrations 0004 to 0014, every route in the technical spec's API, the web screens for Decisions, Why, Plan, Check-in and the Sankey, a local real-API end-to-end harness, four new workflows (e2e, nightly), and the alpha document. Test counts went from 733 to 1922 on the API and 605 to 1332 on the web, with every merge gated on lint, the full suites and the free evals.
+
+**What was wrong:**
+- Supabase's default grants left `alembic_version` and three functions reachable with the publishable key (its own entry above). The guard test written for it then caught the same gap in the next migration an agent wrote.
+- Two agents' migrations revised the same parent; three re-chains were needed at merge time (0004 onto 0007, 0012 onto 0009, 0013 told to revise 0012). Telling later agents the current head in their brief removed the problem.
+- Migration 0001 rewrote the cluster-wide role on every run, so two worktrees' test suites collided with "tuple concurrently updated". Fixed in 0001 with a test that the role rows do not change once set up.
+- The worker failed categorize and extract jobs outright without an Anthropic key, which production did not have; found by the alpha e2e work, fixed with rules-only categorization and manual entry.
+- Each web merge after the first had conflicts in the shared files (the web guide, the MSW index, the sample screens, the API types), resolved by hand; two were resolved wrongly at first (a duplicate type alias, a missed `page-hydration.ts` line) and caught by `tsc` in the gate.
+- Agents reported API gaps instead of patching across the boundary; three were real (no `provider` on accounts, no plan-line status, no way to run a check-in now) and became their own packages.
+
+**How it was caught:** The merge gate (lint, both test suites, the free evals, `pnpm check:api`) after every merge, the migration guard test, and the agents' own real-API runs through the e2e harness.
+
+**Fix:** As listed, each in its own commit on main.
+
+**Time saved or lost:** Not measured. The whole post-alpha plan (M3 to M10, scheduled for November 6 to December 11) landed in one day; the cost was the orchestration itself, roughly a third of the main session's time on merges and conflict resolution.
