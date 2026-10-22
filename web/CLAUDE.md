@@ -61,7 +61,7 @@ baselines in that same image (mount `web/` read-only, copy it without `node_modu
 ```
 src/app/            routes. (auth)/sign-in; (app)/setup/{link,confirm,confirm/[documentId],spending,decisions},
                     (app)/why (index of saved decisions), (app)/why/[decisionId], (app)/plan,
-                    (app)/check-in/[checkInId]; dev/kit
+                    (app)/check-in (list of check-ins), (app)/check-in/[checkInId]; dev/kit
 src/app/auth/callback/route.ts  exchanges the email-link code for a session
 src/proxy.ts        Next 16 proxy (formerly middleware): refreshes the Supabase session, sends
                     signed-out requests for (app) screens to /sign-in, forwards the requested path
@@ -75,10 +75,11 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     upload.ts, keys.ts, errors.ts, hooks/), auth/ (next-path, protected,
                     validation, errors, account), supabase/ (env, client, server, proxy),
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
-                    documents.ts, decisions.ts, deep-equal.ts, features.ts, periods.ts,
+                    documents.ts, decisions.ts, deep-equal.ts, features.ts, findings.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts,
                     page-hydration.ts
-src/app/dev/screens/{link,spending,confirm,confirm/manual,decisions,why,why/fallback,why-index}  a screen on
+src/app/dev/screens/{link,spending,confirm,confirm/manual,decisions,why,why/fallback,why-index,
+                    check-in,check-in/complete,check-in-index}  a screen on
                     the sample data, no API (development only)
 src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fake-xhr.ts,
                     fixtures/sample.ts (the Acme / J. Rivera dataset), fixtures/documents.ts (the
@@ -87,9 +88,11 @@ src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fa
                     results made by api/calc, with make-k401-results.py), fixtures/cashflow.ts (the
                     sample period's cash flow, spending summary and recurring charges), msw/db.ts
                     (in-memory API state), msw/handlers.ts (every route, stateful),
-                    msw/spending-handlers.ts (cash flow, summary, recurring; `spendingDb`)
+                    msw/spending-handlers.ts (cash flow, summary, recurring; `spendingDb`),
+                    fixtures/checkins.ts (spec 015's November user: check-ins, findings, plan
+                    lines, calendar, net worth, holdings), msw/checkin-handlers.ts (`checkinDb`)
 e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions,
-                    import, alpha), support/auth.ts, support/api.ts, fixtures/ (synthetic
+                    import, check-in, alpha), support/auth.ts, support/api.ts, fixtures/ (synthetic
                     acme-paystub.pdf and the script that makes it, bank-export.csv), baselines
 ```
 
@@ -195,6 +198,19 @@ next is a real disabled button, never a dead link).
   `useToday()` (null on the server, so nothing reads the clock while rendering).
   `useRecurring()` lists recurring charges; `useUpdateRecurring()` PATCHes `user_status` or
   `name` optimistically, with rollback.
+- **Check-ins and net worth** (`hooks/checkins.ts`, `hooks/net-worth.ts`): `useCheckIns()`,
+  `useCheckIn(id)` (a 404 is not retried), `useUpdateFinding(checkInId, { onError })`,
+  `useNetWorth(months)` and `useHoldings()`. `useUpdateFinding` takes `{ findingId, type }` with
+  `type` `done`, `dismiss` or `undo` (sent as `user_action` `done`, `dismissed`, `null`). It is
+  optimistic through the pure `findingsReducer` (`lib/findings.ts`), which mirrors the server
+  (spec 015 rules 13 and 18: the action and its time, `handled_count`, `status` and
+  `completed_at`); a refusal runs its `restore` action on that one finding only, so another
+  finding changed meanwhile keeps its change, and the hook-level `onError` fires for every refused
+  change (a `mutate` callback would miss an earlier one). The check-in and the list are read
+  again (`invalidateCheckIn`) once no other finding write is in flight. `useCalendar({ from, to })`
+  bounds `due_at`; with no bounds it is the plain read under `queryKeys.calendar()`. A finished
+  `checkin.monthly` job refreshes the list and every check-in; a sync refreshes net worth and
+  holdings.
 - **Uploads** (`lib/api/upload.ts`): `POST /docs` and `POST /accounts/import` (`importCsv`,
   wrapped by `useImportCsv`) go over XMLHttpRequest, because fetch cannot report upload progress.
   They share `sessionTokens` with the fetch middleware (one refresh and one resend on a 401), and
@@ -219,6 +235,10 @@ next is a real disabled button, never a dead link).
 - Spending routes (`GET /cashflow`, `GET /spending/summary`, `GET /recurring`,
   `PATCH /recurring/{id}`) live in `src/test/msw/spending-handlers.ts` over `spendingDb`, seeded
   from `fixtures/cashflow.ts` and reset after every test.
+- Check-in routes (`GET /check-ins`, `GET /check-ins/{id}`, `PATCH .../findings/{fid}`,
+  `GET /net-worth`, `GET /holdings`) live in `src/test/msw/checkin-handlers.ts` over `checkinDb`,
+  seeded from `fixtures/checkins.ts` (November open with nine findings, October completed) and
+  reset after every test. `GET /calendar` filters `from`/`to` over `db.calendar`.
 - `scriptJob(states, onSucceeded)` scripts what `GET /jobs/{id}` returns poll by poll;
   `syncJobStates(id)` is queued, running at 40%, succeeded. Drive polling with
   `vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) })` and
@@ -302,6 +322,40 @@ that is on but not built says "Coming in a later milestone."
 - **None yet** (404): offers "Write the explanation". A 503 `llm_unavailable` is a calm blue
   notice, with the calculator result still shown. An unknown decision is "Decision not found"
   with a link back to `/why`.
+
+## Check-in screen
+
+`/check-in/[checkInId]` (`CheckInScreen`, from `CheckIn.dc.html`); `/check-in`
+(`CheckInIndexScreen`) lists every check-in with its counts. The side nav's "Monthly check-in"
+opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` until the list loads).
+
+- **What changed** (`FindingsCard`, `FindingRow`): findings in the API's order. Each has a
+  severity tile (`severityTone`: alert `off`, warning `warning`, info `blue`; neutral once
+  handled), its kind, and its text from one small component per payload kind (`FindingText.tsx`),
+  which prints payload fields only, formatted, signs included. "Affects" links to the calculators
+  or the Spending map. Done and Dismiss become Undo; focus moves to the button that replaces the
+  one pressed (and back on a rollback), and a polite status line says what changed. The badge
+  reads `handled_count` and `finding_count`; a completed check-in shows a confirmed notice.
+- **Cash flow against the plan** (`PlanLinesCard`): `cash_flow.plan` lines as a table with each
+  planned line's `Bar` in the line's hue (`planLineTone`). The bar width is geometry
+  (`planBarValue`: actual over plan), never shown or compared; the API sends no on-plan status, so
+  none is drawn. In a card under 28rem (a container query) the difference moves under the plan.
+- **Net worth** (`NetWorthCard`) sits beside it, where the mockup puts it, and on the list of
+  check-ins, so it does not wait for the first check-in: the figure, assets and liabilities, the
+  change since the first month, `NetWorthChart`, a "Monthly figures" table, each account, and
+  `HoldingsTable` (a basis the API sends as null reads "Not reported", for totals too).
+- **The chart** is Recharts (the one chart library; pinned): three 2 px lines on one money axis
+  with an HTML legend, a crosshair tooltip that lists every series, no animation, and the width
+  from `useContainerWidth`. Marks draw in `currentColor` under `toneMark[hue]` (`lib/design/tone.ts`,
+  hues only); gridlines take `stroke-line`, dots a `stroke-surface` ring. `netWorthChartData`
+  maps the API series to rows without deriving anything. Colors (blue net worth, teal assets,
+  coral liabilities) pass the dataviz palette validator; teal is under 3:1 on white, which the
+  legend and the table cover.
+- **Coming up** (`DeadlinesCard`): `GET /calendar` from the first of the month to the end of the
+  next (`checkInWindow`).
+- The API cannot create a check-in (no `POST /check-ins`): the worker's monthly tick makes one per
+  user, so `e2e/check-in.spec.ts` reads what is there and checks the empty state when there is
+  nothing.
 
 ## Cash flow diagram
 
@@ -392,18 +446,12 @@ previews without secrets).
 (git-ignored) for the `authenticated` project, which runs `e2e/auth.spec.ts`. Set these in
 `web/.env.local` or the environment:
 
-| Variable                                                           | Needed for                                                                                                                                                                                                   |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)                                                                                                                                           |
-| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                                                                     |
-| `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                                                             |
-| `E2E_API_URL`                                                      | `link.spec.ts`, `confirm.spec.ts`, `spending.spec.ts` and `decisions.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it |
-| Variable                                                           | Needed for                                                                                                                                                                                                   |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------    |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)                                                                                                                                           |
-| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                                                                     |
-| `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                                                             |
-| `E2E_API_URL`                                                      | `link.spec.ts`, `confirm.spec.ts`, `spending.spec.ts` and `import.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it    |
+| Variable                                                           | Needed for                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)                                                                                                                                                                                 |
+| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                                                                                                           |
+| `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                                                                                                   |
+| `E2E_API_URL`                                                      | `link.spec.ts`, `confirm.spec.ts`, `spending.spec.ts`, `decisions.spec.ts`, `import.spec.ts` and `check-in.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it |
 
 Missing variables skip those tests with a message saying which to set. The e2e user must be a
 confirmed user: the hosted project requires email confirmation, so create it in the Supabase
@@ -426,7 +474,10 @@ the read, confirms every field and continues to Spending. `decisions.spec.ts` (p
 `authenticated-decisions`, after confirm) fills in the plan details if the profile has none,
 saves a 401(k) decision, changes it and saves the next version, then opens its explanation and
 accepts verified, fallback, or "not available" when the API has no model. Decisions cannot be
-deleted, so it reads the current version instead of assuming v1. Never use a real document as a
+deleted, so it reads the current version instead of assuming v1. `check-in.spec.ts` (project
+`authenticated-check-in`) lists the check-ins (or the empty state), opens the newest, marks a
+finding done and undoes it (checking both survive a reload), and opens a check-in that is not
+the user's. Never use a real document as a
 fixture.
 
 ### Local real-API stack
