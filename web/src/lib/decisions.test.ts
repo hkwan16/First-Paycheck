@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { Decision, DecisionList } from './api/types';
 import { sampleEmergencyFund, sampleHealthPlans } from '@/test/fixtures/planning';
+import { sampleW4, sampleW4Inputs } from '@/test/fixtures/w4';
 import {
   ageAtYearEnd,
   asEmergencyFundInputs,
   asHealthPlansInputs,
   asK401Inputs,
   asK401Result,
+  asW4Inputs,
   calculatorIdOf,
   CALCULATOR_KINDS,
   currentDecision,
@@ -183,6 +185,30 @@ describe('asEmergencyFundInputs and asHealthPlansInputs', () => {
     expect(asHealthPlansInputs({ ...plans, plans: [{ name: 'Gold PPO' }] } as never)).toBeNull();
     expect(asHealthPlansInputs({ ...plans, expected_usage: 'some' } as never)).toBeNull();
     expect(asHealthPlansInputs(inputs)).toBeNull();
+  });
+});
+
+describe('asW4Inputs', () => {
+  it("reads a saved W-4 decision's stored inputs, with or without the optional ones set", () => {
+    const stored = sampleW4().inputs;
+    expect(asW4Inputs({ ...stored })).toEqual(stored);
+    const set = sampleW4Inputs({
+      multiple_jobs: true,
+      deductions_cents: 1_752_200,
+      expected_deductions_cents: 0,
+      age: null,
+    });
+    expect(asW4Inputs({ ...set })).toEqual(set);
+  });
+
+  it('refuses objects that are not that shape', () => {
+    const stored = sampleW4().inputs;
+    expect(asW4Inputs({ ...stored, multiple_jobs: 'no' })).toBeNull();
+    expect(asW4Inputs({ ...stored, extra_withholding_cents: '100' })).toBeNull();
+    expect(asW4Inputs({ ...stored, k401_contribution_pct: 4 })).toBeNull();
+    expect(asW4Inputs({ ...stored, filing_status: 'married' })).toBeNull();
+    expect(asW4Inputs({ ...stored, expected_deductions_cents: undefined })).toBeNull();
+    expect(asW4Inputs(inputs)).toBeNull();
   });
 });
 

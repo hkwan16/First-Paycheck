@@ -31,6 +31,7 @@ const CALC_PATHS: Partial<Record<CalculatorKind, CalcPath>> = {
   emergency_fund: '/calc/emergency-fund',
   k401_match: '/calc/401k-match',
   health_plans: '/calc/health-plans',
+  w4: '/calc/w4',
 };
 
 interface ApiErrorBody {

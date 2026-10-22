@@ -7,6 +7,7 @@ import type {
   K401MatchInput,
   K401MatchResult,
   PayFrequency,
+  W4Input,
 } from './api/types';
 import { formatDate } from './dates';
 import { deepEqual } from './deep-equal';
@@ -186,6 +187,32 @@ export function asHealthPlansInputs(inputs: Record<string, unknown>): HealthPlan
     (inputs.selected_plan_index === null || isInt(inputs.selected_plan_index)) &&
     (inputs.enrollment_deadline === null || isText(inputs.enrollment_deadline));
   return ok ? (inputs as unknown as HealthPlansInput) : null;
+}
+
+const FILING_STATUSES = new Set(['single', 'married_filing_jointly', 'head_of_household']);
+const W4_CENTS = [
+  'salary_cents',
+  'health_premium_per_paycheck_cents',
+  'dependents_credit_cents',
+  'other_income_cents',
+  'deductions_cents',
+  'extra_withholding_cents',
+  'other_jobs_wages_cents',
+  'other_jobs_withholding_cents',
+] as const satisfies readonly (keyof W4Input)[];
+
+/** A saved `w4` decision's inputs, or null when they are not that shape. */
+export function asW4Inputs(inputs: Record<string, unknown>): W4Input | null {
+  const ok =
+    W4_CENTS.every((key) => isInt(inputs[key])) &&
+    isInt(inputs.pay_periods_per_year) &&
+    FILING_STATUSES.has(inputs.filing_status as string) &&
+    isInt(inputs.tax_year) &&
+    isText(inputs.k401_contribution_pct) &&
+    (inputs.age === null || isInt(inputs.age)) &&
+    typeof inputs.multiple_jobs === 'boolean' &&
+    (inputs.expected_deductions_cents === null || isInt(inputs.expected_deductions_cents));
+  return ok ? (inputs as unknown as W4Input) : null;
 }
 
 const RESULT_CENTS = [

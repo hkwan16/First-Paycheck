@@ -10,6 +10,7 @@ import {
 } from '@/test/fixtures/decisions';
 import { sampleEmergencyFund, sampleHealthPlans } from '@/test/fixtures/planning';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
+import { sampleW4 } from '@/test/fixtures/w4';
 import { db, savedDecision } from '@/test/msw/db';
 import { server } from '@/test/msw/server';
 import { renderHookWithClient } from '@/test/render';
@@ -204,6 +205,7 @@ describe('useSaveDecision', () => {
     it.each([
       ['emergency_fund', '/calc/emergency-fund', sampleEmergencyFund()],
       ['health_plans', '/calc/health-plans', sampleHealthPlans({ selected_plan_index: 0 })],
+      ['w4', '/calc/w4', sampleW4()],
     ] as const)('recalculates %s results from %s', async (calculator, path, known) => {
       const calcRequests = countCalcRequests(path);
       const { result } = renderHookWithClient(() => ({
@@ -212,7 +214,12 @@ describe('useSaveDecision', () => {
       }));
       await waitFor(() => expect(result.current.calc.isCurrent).toBe(true));
 
-      const stale = { ...known.result, recommended_index: 9, target_cents: 1 };
+      const stale = {
+        ...known.result,
+        recommended_index: 9,
+        target_cents: 1,
+        withholding_per_paycheck_cents: 1,
+      };
       act(() =>
         result.current.save.mutate({ inputs: known.inputs, result: stale, current: undefined }),
       );
@@ -221,6 +228,27 @@ describe('useSaveDecision', () => {
       await act(() => vi.advanceTimersByTimeAsync(CALC_DEBOUNCE_MS));
       await waitFor(() => expect(calcRequests.count).toBe(2));
     });
+  });
+
+  it('saves a W-4 decision with its reminder to hand the form to the employer', async () => {
+    const { result } = renderHookWithClient(() => ({
+      calendar: useCalendar(),
+      save: useSaveDecision('w4'),
+    }));
+    await waitFor(() => expect(result.current.calendar.isSuccess).toBe(true));
+    const { inputs, result: computed } = sampleW4();
+    act(() => result.current.save.mutate({ inputs, result: computed, current: undefined }));
+    await waitFor(() => expect(result.current.save.isSuccess).toBe(true));
+    expect(result.current.save.data).toMatchObject({ calculator: 'w4', version: 1, goal_id: null });
+    expect(result.current.calendar.data).toEqual([
+      expect.objectContaining({
+        id: result.current.save.data?.calendar_event_id,
+        kind: 'w4_submit',
+        title: 'Give your employer your updated Form W-4',
+        due_at: '2026-10-31',
+        decision_id: result.current.save.data?.decision_id,
+      }),
+    ]);
   });
 
   it('refuses a health plan decision with no plan chosen, saving nothing', async () => {
