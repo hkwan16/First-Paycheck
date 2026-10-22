@@ -39,6 +39,7 @@ from tests.support.factories import (
     make_snapshot,
     make_transaction,
 )
+from tests.support.full_user import populate_every_table, row_counts
 
 # Routes with no user data behind them, or no user at all. The calculators
 # are stateless: they read and write nothing (spec 007 rule 6).
@@ -730,7 +731,25 @@ def get_holdings(connection: Connection, client_as: Callable[[FixtureUser], Test
     return Case("GET", "/holdings", 200, body=body)
 
 
+def delete_account(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    """B deletes B's own account; A's account and rows stay (spec 017 rule 1)."""
+    populate_every_table(connection, USER_A.id)
+    before = row_counts(connection, USER_A.id)
+
+    def after(conn: Connection) -> None:
+        assert row_counts(conn, USER_A.id) == before
+        assert conn.execute(
+            text("SELECT EXISTS (SELECT 1 FROM auth.users WHERE id = :id)"), {"id": USER_A.id}
+        ).scalar_one()
+        assert not conn.execute(
+            text("SELECT EXISTS (SELECT 1 FROM auth.users WHERE id = :id)"), {"id": USER_B.id}
+        ).scalar_one()
+
+    return Case("DELETE", "/me", 204, after=after)
+
+
 ROUTE_CASES: dict[tuple[str, str], Builder] = {
+    ("DELETE", "/me"): delete_account,
     ("GET", "/check-ins"): list_check_ins,
     ("GET", "/check-ins/{check_in_id}"): get_check_in,
     ("PATCH", "/check-ins/{check_in_id}/findings/{finding_id}"): update_finding,

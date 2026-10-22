@@ -55,7 +55,7 @@ Every job handler, after the privileged dequeue, opens a user-scoped session wit
 16. `CHECK ((version = 1) = (supersedes_id IS NULL))`: the first version supersedes nothing, and every later version supersedes something.
 17. `BEFORE INSERT` trigger: when `supersedes_id` is set, the superseded row must have the same `user_id` and `calculator` and `version = NEW.version - 1`; otherwise it raises. (The composite foreign key of rule 6 already enforces the same user.)
 18. The **current** decision for a calculator is the row that no other row's `supersedes_id` points to. The view `current_decisions` (created `WITH (security_invoker = true)` so RLS applies) selects exactly those rows.
-19. `BEFORE UPDATE OR DELETE` trigger raises for every row. See Open question 1 for account deletion.
+19. `BEFORE UPDATE OR DELETE` trigger raises for every row, except a delete that is the cascade from the owner's `auth.users` row (spec 007 rule 9), which is how account deletion removes decisions (spec 017).
 20. `POST /decisions` sends `supersedes_id` equal to the current row's id, or null when there is none. A save against a stale current row violates rule 14 or 15 and returns 409.
 
 ### Sign convention
@@ -71,7 +71,7 @@ Every job handler, after the privileged dequeue, opens a user-scoped session wit
 26. **Confirmed data** (`profiles`, `pay_stubs`, `benefits_plans`, `benefits_chunks`, `decisions`, `explanations`, `goals`, `calendar_events`, `check_ins`, `check_in_findings`, `recurring_charges`) is kept while the account exists.
 27. **`llm_calls`** stores counts, cost, latency and status, never prompt or output text, and is kept for cost reporting.
 28. **`jobs`** payloads and results never contain document bytes, extracted text, access tokens or account numbers; they carry ids. `last_error` is truncated and must not echo request bodies.
-29. **Account deletion** removes every user row through `ON DELETE CASCADE` from `auth.users`, subject to Open question 1.
+29. **Account deletion** (`DELETE /me`, spec 017) removes every user row through `ON DELETE CASCADE` from `auth.users`. The API deletes that row through `public.delete_user_account(uuid)`, a `SECURITY DEFINER` function executable only by `app_api` (migration `0014_delete_account_fn`), the third cross-user place after `jobs/queue.py` and `enqueue_sync_for_plaid_item`.
 
 ## Enums
 
@@ -451,6 +451,7 @@ Reference data, no `user_id` (RLS exception).
 | `0006_webhook_fn` | `enqueue_sync_for_plaid_item(text)` |
 | `0007_lock_alembic_version` | Nothing new. Revokes Supabase's default grants to `anon` and `authenticated` from `alembic_version` and the `public` functions, which `enable_rls` never touched, then grants back only what 0001, 0002 and 0006 intended. The test auth shim copies those defaults so a future object that skips its revoke fails `test_migrations` |
 | `0012_checkin_findings` | Nothing new. `check_in_findings.key` with `UNIQUE (check_in_id, key)` and an index on `(user_id, key)`; `finding_action` rebuilt as `done`, `dismissed` (spec 015) |
+| `0014_delete_account_fn` | `delete_user_account(uuid)`: deletes one `auth.users` row so every user table cascades (spec 017) |
 
 CI runs upgrade, downgrade, upgrade and `alembic check` on every pull request.
 
@@ -487,7 +488,7 @@ The data model's examples are RLS and constraint tests rather than arithmetic. E
 
 ## Open questions
 
-1. **Account deletion and immutable decisions.** The decisions trigger rejects every `DELETE`, which also blocks the `ON DELETE CASCADE` from `auth.users`. M10 ("unlink and deletion paths") must choose between letting the trigger allow deletes inside a privileged account-deletion function and another mechanism. Until then, account deletion is not offered.
+1. **Account deletion and immutable decisions.** Settled: the trigger lets a delete through only as the cascade from the owner's `auth.users` row (spec 007 rule 9), and `DELETE /me` deletes that row (spec 017).
 2. **Abandoned uploads.** A blob whose document is never confirmed has no deletion rule in the spec. Proposal for M10: a scheduled job deletes blobs older than a fixed age and marks the document `failed`.
 3. **Recurring charges after unlink.** `recurring_charges` has no account link, so unlinking leaves charges detected from that account's transactions. Decide in M5 whether to add `account_id` or to re-run detection after unlink.
 4. **Terminal job retention.** Succeeded and dead jobs accumulate; decide a pruning age before M10.

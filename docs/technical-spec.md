@@ -137,7 +137,7 @@ Rules that keep the model honest:
 
 REST and JSON (multipart for uploads). The client logs in with Supabase Auth and sends the resulting JWT on every route. The backend runs each database query as that user by forwarding the JWT claims to Postgres, so row-level security on every table limits each user to their own data, and another user's row reads as 404, never 403. An automated test tries to read another user's rows through every route, and a meta-test fails when a route is not covered. The one route without a user JWT is the Plaid webhook, which is verified by signature instead.
 
-SQL that crosses users exists in exactly two audited places: the job dequeue in `jobs/queue.py`, which runs on the privileged connection, and the `SECURITY DEFINER` function `enqueue_sync_for_plaid_item(text)`, which the webhook calls to map a Plaid item to its owner. Every job handler then opens a user-scoped session under row-level security.
+SQL that crosses users exists in three audited places: the job queue and scheduler in `jobs/`, which run on the privileged connection, and two `SECURITY DEFINER` functions executable only by `app_api`: `enqueue_sync_for_plaid_item(text)`, which the webhook calls to map a Plaid item to its owner, and `delete_user_account(uuid)`, which `DELETE /me` calls to delete the signed-in user's `auth.users` row and, through `ON DELETE CASCADE`, every row they own (spec 017). Every job handler then opens a user-scoped session under row-level security.
 
 The API's OpenAPI document is committed as `api/openapi.json` (exported by `python -m app.openapi`) with stable `operation_id`s; `openapi-typescript` generates `web/src/lib/api/schema.d.ts` from it, and CI fails when either file drifts from the code.
 
@@ -153,6 +153,7 @@ The API's OpenAPI document is committed as `api/openapi.json` (exported by `pyth
 | `GET /pay-stubs` | → confirmed pay stubs, newest first | No |
 | `GET /benefits-plans` | → confirmed health plan options | No |
 | `GET /profile`, `PUT /profile` | Confirmed salary, filing status, expected healthcare usage, 401(k) match tiers and vesting years → saved profile | No |
+| `DELETE /me` | → 204; revokes the user's Plaid items (best effort), then deletes their account and every row they own (spec 017) | No |
 
 **Accounts and sync**
 

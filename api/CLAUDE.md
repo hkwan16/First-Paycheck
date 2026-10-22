@@ -54,7 +54,9 @@ Rules:
   (dequeue across users), `jobs/scheduler.py`, the seed loader
   (`db/seed/load.py`, which writes the ownerless seed rules) and Alembic only.
   Cross-user SQL outside those places goes through a reviewed
-  `SECURITY DEFINER` function.
+  `SECURITY DEFINER` function granted to `app_api` only:
+  `enqueue_sync_for_plaid_item(text)` (the webhook) and
+  `delete_user_account(uuid)` (`DELETE /me`).
 - A row owned by someone else is invisible under RLS, so the route returns 404.
 - `app_api` is `NOINHERIT` and owns nothing; without the role switch it cannot
   read user data. Turn off Supabase's Data API exposure of `public` (Project
@@ -451,6 +453,30 @@ table `plan_exports` (`enable_rls`, SELECT and INSERT only).
   fail in CI, which installs pango and runs `tests/*/export` in the image too.
   On macOS run them with `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib uv run
   pytest ...` (make's shell drops `DYLD_*` variables).
+
+## Account deletion and unlinking (from M10)
+
+Spec 017. Migration `0014_delete_account_fn` (revises `0013_plan_export_job`)
+adds `public.delete_user_account(uuid)`; no new table.
+
+- **`DELETE /me`** (`app/routers/account.py`, operation `delete_account`):
+  read the user's Plaid tokens in one user session, remove each item at Plaid
+  with no transaction open (`sync/revoke.py:remove_at_provider`, best effort:
+  errors are logged with the item id, never returned), then call
+  `delete_user_account(sub)` in a `ServiceSessions` session (`SET LOCAL ROLE
+  app_api`). The function is `SECURITY DEFINER`, executable only by `app_api`
+  (`db.rls.restrict_function`), and deletes the `auth.users` row; every user
+  table cascades, decisions through spec 007 rule 9, jobs with them. 204, also
+  when the account is already gone.
+- `OptionalPlaid` / `OptionalCipher` (`app/deps.py`) are None when Plaid or the
+  token key is not configured, so deletion and unlinking never 503 on Plaid.
+  The `app` fixture overrides `get_optional_plaid_client` with `fake_plaid` too.
+- A write under a deleted account's still-valid token fails on
+  `fk_<table>_user_id_users`; `app/errors.py` answers 401 `account_deleted`
+  instead of a 500 (`is_missing_owner`; a test checks every key's name).
+- `tests/support/full_user.py:populate_every_table` writes a row in every user
+  table; `test_account_deletion` lists the tables from `information_schema` and
+  fails when a table has no row there, so add one for every new user table.
 
 ## Testing
 

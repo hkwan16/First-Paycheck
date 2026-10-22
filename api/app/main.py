@@ -16,6 +16,7 @@ from app.errors import install_error_handlers
 from app.logs import ensure_logging
 from app.request_log import REQUEST_ID_HEADER, RequestLogging
 from app.routers import (
+    account,
     accounts,
     benefits,
     calc,
@@ -123,6 +124,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(checkins.router)
     app.include_router(net_worth.router)
     app.include_router(plan.router)
+    app.include_router(account.router)
     return app
 
 

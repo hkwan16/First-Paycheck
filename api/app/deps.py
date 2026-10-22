@@ -164,6 +164,18 @@ def get_service_session(bind: DbBind) -> Iterator[Session]:
 
 ServiceSession = Annotated[Session, Depends(get_service_session, scope="function")]
 
+ServiceSessionFactory = Callable[[], AbstractContextManager[Session]]
+
+
+def get_service_session_factory(bind: DbBind) -> ServiceSessionFactory:
+    """Opens a fresh, committed-on-exit ``app_api`` session on each call, for a
+    route that must call a granted function after a network call made with no
+    transaction open (``DELETE /me``, spec 017 rule 2)."""
+    return lambda: service_session(bind=bind)
+
+
+ServiceSessions = Annotated[ServiceSessionFactory, Depends(get_service_session_factory)]
+
 
 # ---------------------------------------------------------------- Plaid
 
@@ -189,6 +201,22 @@ def get_plaid_client() -> PlaidLinking:
 PlaidDep = Annotated[PlaidLinking, Depends(get_plaid_client)]
 
 
+def get_optional_plaid_client() -> PlaidLinking | None:
+    """The Plaid client, or None when Plaid is not configured.
+
+    For unlinking and account deletion, whose removal at Plaid is best effort
+    (spec 017 rule 3): deleting the user's data never waits on Plaid.
+    """
+    try:
+        return _plaid_client()
+    except PlaidNotConfigured as exc:
+        logger.warning("plaid is not configured: %s", exc)
+        return None
+
+
+OptionalPlaid = Annotated[PlaidLinking | None, Depends(get_optional_plaid_client)]
+
+
 def get_token_cipher(settings: SettingsDep) -> TokenCipher:
     try:
         return cipher_from_settings(settings)
@@ -198,6 +226,19 @@ def get_token_cipher(settings: SettingsDep) -> TokenCipher:
 
 
 CipherDep = Annotated[TokenCipher, Depends(get_token_cipher)]
+
+
+def get_optional_token_cipher(settings: SettingsDep) -> TokenCipher | None:
+    """The token cipher, or None when ``PLAID_TOKEN_KEY`` is not set (see
+    ``get_optional_plaid_client``)."""
+    try:
+        return cipher_from_settings(settings)
+    except TokenCipherNotConfigured as exc:
+        logger.warning("token encryption is not configured: %s", exc)
+        return None
+
+
+OptionalCipher = Annotated[TokenCipher | None, Depends(get_optional_token_cipher)]
 
 # One verification-key cache per Plaid client, so keys survive across requests.
 _key_caches: weakref.WeakKeyDictionary[PlaidLinking, WebhookKeyCache] = weakref.WeakKeyDictionary()
