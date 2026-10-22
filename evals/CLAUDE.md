@@ -32,6 +32,13 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   rules alone over that CSV. `rules_precision` is the share of rule-labeled
   rows labeled correctly; `rules_coverage` is the share a rule labels, so
   `1 - rules_coverage` is the share that would go to the LLM.
+- `suites/categorization.py` (`categorization`, LLM): the same 500 rows the
+  way `categorize.run` labels them (spec 003 rule 29): seed rules, then each
+  unknown merchant's newest row to Haiku, 50 per call, the label applied to
+  every row of the merchant. `accuracy` (all rows) and `llm_accuracy` (rows
+  the model labeled); baseline at the targets (0.90, 0.80) until the first
+  live run. `SuiteUnavailable` without `ANTHROPIC_API_KEY`; scoring is
+  unit-tested with a labeler that answers from the labels.
 - `fixtures/pay_stubs/`: 30 synthetic pay stubs (text PDFs, clean and noisy
   PNG/JPEG scans, scanned PDFs; three layouts, `ledger`, `summary` and
   `advice`, each in all five outputs) with `<id>.json` labels beside each.
