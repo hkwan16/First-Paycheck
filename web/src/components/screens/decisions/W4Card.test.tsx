@@ -220,8 +220,8 @@ describe('W4Card suggestion', () => {
     otherDecisionsSaved();
     const seen = requests();
     const { user } = await renderReady();
-    type("Other jobs' wages this year", '20,000');
-    type('Federal tax the other jobs withhold this year', '390');
+    type("Other jobs' wages a year", '20,000');
+    type("Other jobs' withholding a year", '390');
     await recalculated('$3,449.92 due at tax time');
     expect(result()).toHaveTextContent('Refund or balance due$3,449.92 due');
     expect(suggestion()).toHaveTextContent(

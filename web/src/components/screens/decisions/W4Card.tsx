@@ -65,9 +65,9 @@ type AmountKey =
 type TextKey = AmountKey | 'expected_deductions_cents';
 
 const FIELDS: Record<AmountKey, { label: string; example: string; hint?: string }> = {
-  other_jobs_wages_cents: { label: "Other jobs' wages this year", example: '20,000.00' },
+  other_jobs_wages_cents: { label: "Other jobs' wages a year", example: '20,000.00' },
   other_jobs_withholding_cents: {
-    label: 'Federal tax the other jobs withhold this year',
+    label: "Other jobs' withholding a year",
     example: '390.00',
   },
   dependents_credit_cents: {
