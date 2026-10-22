@@ -369,7 +369,8 @@ const line = (
   actual_cents: number,
   plan_cents: number | null,
   difference_cents: number | null,
-): PlanLine => ({ key, label, actual_cents, plan_cents, difference_cents });
+  status: PlanLine['status'] = null,
+): PlanLine => ({ key, label, actual_cents, plan_cents, difference_cents, status });
 
 /**
  * Spec 015 rule 19 for November: essentials 182,300 from the emergency fund
@@ -378,12 +379,12 @@ const line = (
  */
 export const novemberPlan = (): PlanLine[] => [
   line('take_home', 'Take-home pay', 205_892, null, null),
-  line('essentials', 'Essentials', 25_860, 182_300, -156_440),
+  line('essentials', 'Essentials', 25_860, 182_300, -156_440, 'under'),
   line('flexible', 'Flexible', 22_349, null, null),
   line('other', 'Other spending', 0, null, null),
-  line('savings', 'Savings', 30_000, 30_000, 0),
-  line('retirement', '401(k) from pay stubs', 5_417, 10_833, -5_416),
-  line('health', 'Health premiums', 3_125, 3_125, 0),
+  line('savings', 'Savings', 30_000, 30_000, 0, 'on_plan'),
+  line('retirement', '401(k) from pay stubs', 5_417, 10_833, -5_416, 'under'),
+  line('health', 'Health premiums', 3_125, 3_125, 0, 'on_plan'),
   line('left_over', 'Left over', 127_683, null, null),
 ];
 

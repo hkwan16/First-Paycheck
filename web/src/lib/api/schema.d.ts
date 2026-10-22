@@ -231,7 +231,11 @@ export interface paths {
      */
     get: operations['list_check_ins'];
     put?: never;
-    post?: never;
+    /**
+     * Check In Now
+     * @description Create or refresh this month's check-in: queue its job, or return the waiting one.
+     */
+    post: operations['check_in_now'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1246,6 +1250,16 @@ export interface components {
        * Format: date-time
        */
       updated_at: string;
+    };
+    /** CheckInQueued */
+    CheckInQueued: {
+      /** Check In Id */
+      check_in_id: string | null;
+      /**
+       * Job Id
+       * Format: uuid
+       */
+      job_id: string;
     };
     /** CheckInSummary */
     CheckInSummary: {
@@ -2650,6 +2664,8 @@ export interface components {
       label: string;
       /** Plan Cents */
       plan_cents: number | null;
+      /** Status */
+      status: ('on_plan' | 'over' | 'under') | null;
     };
     /** PlanOut */
     PlanOut: {
@@ -3908,6 +3924,44 @@ export interface operations {
       };
       /** @description Unauthorized */
       401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  check_in_now: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CheckInQueued'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Too Many Requests */
+      429: {
         headers: {
           [name: string]: unknown;
         };

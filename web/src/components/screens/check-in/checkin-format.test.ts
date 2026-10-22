@@ -104,6 +104,7 @@ describe('planBarValue', () => {
     key: 'retirement',
     label: '401(k) from pay stubs',
     actual_cents: actual,
+    status: null,
     plan_cents: plan,
     difference_cents: null,
   });
