@@ -1,7 +1,7 @@
 import type { PayFrequency } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import type { Tone } from '@/lib/design/tone';
-import { formatMoney } from '@/lib/money';
+import { formatMoney, formatRate } from '@/lib/money';
 import type { Choice, ReviewField } from './confirmReducer';
 
 /*
@@ -41,8 +41,14 @@ export function fieldDisplay(
       return value;
     }
   }
-  if (kind === 'percent') return `${value}%`;
-  return field.choices?.find((c) => c.value === value)?.label ?? String(value);
+  if (kind === 'percent') {
+    try {
+      return formatRate(value);
+    } catch {
+      return `${value}%`;
+    }
+  }
+  return field.choices?.find((c) => c.value === String(value))?.label ?? String(value);
 }
 
 /** Below this the field is marked for a check (spec amendment 12). */

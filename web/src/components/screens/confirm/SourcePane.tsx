@@ -41,6 +41,13 @@ export interface SourcePaneProps {
   selectedLabel: string | null;
   /** Manual entry: no field was read from a line, so nothing is highlighted. */
   manual?: boolean;
+  /**
+   * Whether the document's lines name the field read from them. A benefits
+   * summary's do not (spec 013), so nothing is highlighted and the pane says so.
+   */
+  linked?: boolean;
+  /** The list's accessible name. */
+  documentLabel?: string;
   className?: string;
 }
 
@@ -57,6 +64,8 @@ export function SourcePane({
   selectedKey,
   selectedLabel,
   manual = false,
+  linked = true,
+  documentLabel = 'Redacted pay stub',
   className,
 }: SourcePaneProps) {
   const titleId = useId();
@@ -79,7 +88,7 @@ export function SourcePane({
         </p>
       ) : (
         <ol
-          aria-label="Redacted pay stub"
+          aria-label={documentLabel}
           className="m-0 list-none rounded-seg border border-ink/12 bg-paper p-4 font-mono text-code text-ink"
         >
           {lines.map((line, index) => {
@@ -125,14 +134,16 @@ export function SourcePane({
       <p className="m-0 text-tiny text-ink-3" aria-live="polite">
         {manual
           ? 'Type each field from these lines. '
-          : selectedLabel !== null &&
-            (hasLine ? (
-              <>
-                Highlighted line: <strong>{selectedLabel}</strong>.{' '}
-              </>
-            ) : (
-              <>{selectedLabel} has no line of its own in the source. </>
-            ))}
+          : !linked
+            ? 'Find each value in these lines. '
+            : selectedLabel !== null &&
+              (hasLine ? (
+                <>
+                  Highlighted line: <strong>{selectedLabel}</strong>.{' '}
+                </>
+              ) : (
+                <>{selectedLabel} has no line of its own in the source. </>
+              ))}
         Redaction ran before extraction. The original file is deleted when you continue.
       </p>
     </Card>

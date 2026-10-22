@@ -364,3 +364,40 @@ describe('parseDraft for a number field', () => {
     }
   });
 });
+
+describe('fields that set whether they are required', () => {
+  const benefitsLike = (overrides: Partial<ProposedField>) =>
+    initConfirmState([{ ...sampleFields[0]!, ...overrides }], { manual: false });
+
+  it('opens the editor for a required text or percentage with nothing in it', () => {
+    const text = benefitsLike({ key: 'name', kind: 'text', value: null });
+    text.fields[0]!.required = true;
+    expect(run(text, { type: 'toggle', key: 'name' }).fields[0]).toMatchObject({
+      confirmed: false,
+      error: 'Enter a value',
+    });
+    const percent = benefitsLike({ key: 'pct', kind: 'percent', value: null });
+    percent.fields[0]!.required = true;
+    expect(run(percent, { type: 'toggle', key: 'pct' }).fields[0]).toMatchObject({
+      error: 'Enter a percentage, like 20 or 12.5',
+    });
+  });
+
+  it('confirms an optional date left empty', () => {
+    const date = benefitsLike({ key: 'deadline', kind: 'date', value: null });
+    date.fields[0]!.required = false;
+    expect(run(date, { type: 'toggle', key: 'deadline' }).fields[0]).toMatchObject({
+      confirmed: true,
+      value: null,
+    });
+  });
+
+  it('reads a number with choices only as one of them', () => {
+    const choices = [{ value: '3', label: '3 years' }];
+    expect(parseDraft({ kind: 'number', choices }, '3')).toEqual({ ok: true, value: 3 });
+    expect(parseDraft({ kind: 'number', choices }, '4')).toEqual({
+      ok: false,
+      error: 'Choose one of the options',
+    });
+  });
+});

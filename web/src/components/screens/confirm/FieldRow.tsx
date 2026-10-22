@@ -19,15 +19,26 @@ export interface FieldRowProps {
   /** The source pane, which the row's selection drives. */
   sourceId: string;
   dispatch: Dispatch<ConfirmAction>;
+  /** The empty option of an optional choice: what the document lacks ("Not on the stub"). */
+  emptyChoice?: string;
 }
 
 /**
  * One row of the mockup's `.frow` grid: the field (a button that selects its
  * source line) or its inline editor, the confidence badge, and the actions.
  * Focus follows the edit: into the input when it opens, back to Edit when it
- * closes, and onto the input when a save is refused.
+ * closes, and onto the input when a save is refused. A field in a group (a
+ * benefits plan or tier) is named with it, "Plan 2: Deductible", since every
+ * plan has one; the group's heading shows it on screen.
  */
-export function FieldRow({ field, selected, manual, sourceId, dispatch }: FieldRowProps) {
+export function FieldRow({
+  field,
+  selected,
+  manual,
+  sourceId,
+  dispatch,
+  emptyChoice = 'Not on the stub',
+}: FieldRowProps) {
   const inputId = useId();
   const errorId = useId();
   const noteId = useId();
@@ -36,7 +47,8 @@ export function FieldRow({ field, selected, manual, sourceId, dispatch }: FieldR
   const editButton = useRef<HTMLButtonElement>(null);
   const focusNext = useRef<'input' | 'edit' | null>(null);
   const badge = confidenceBadge(field.confidence, manual);
-  const { key, label } = field;
+  const { key } = field;
+  const label = field.group ? `${field.group}: ${field.label}` : field.label;
 
   useEffect(() => {
     if (editing && focusNext.current === 'input') input.current?.focus();
@@ -96,7 +108,8 @@ export function FieldRow({ field, selected, manual, sourceId, dispatch }: FieldR
       {editing ? (
         <div className="min-w-0 py-1">
           <label htmlFor={inputId} className="block text-small text-ink-3">
-            {label}
+            {field.group && <span className="sr-only">{field.group}: </span>}
+            {field.label}
           </label>
           {field.choices ? (
             <Select
@@ -107,7 +120,7 @@ export function FieldRow({ field, selected, manual, sourceId, dispatch }: FieldR
                 dispatch({ type: 'draft', key, text: event.currentTarget.value })
               }
             >
-              <option value="">Not on the stub</option>
+              <option value="">{field.required ? 'Choose one' : emptyChoice}</option>
               {field.choices.map((choice) => (
                 <option key={choice.value} value={choice.value}>
                   {choice.label}
@@ -143,7 +156,7 @@ export function FieldRow({ field, selected, manual, sourceId, dispatch }: FieldR
           onClick={() => dispatch({ type: 'select', key })}
           className="block min-h-11 w-full min-w-0 rounded-seg text-left"
         >
-          <span className="block text-small text-ink-3">{label}</span>
+          <span className="block text-small text-ink-3">{field.label}</span>
           <span
             className={cn(
               'block text-lead font-semibold tabular-nums',

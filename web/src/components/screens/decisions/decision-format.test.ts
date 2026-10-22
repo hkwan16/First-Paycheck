@@ -1,6 +1,66 @@
 import { describe, expect, it } from 'vitest';
+import { ResultMismatch } from '@/lib/api/hooks';
 import { cappedK401, sampleK401 } from '@/test/fixtures/decisions';
-import { matchHeadline, saveBadgeTone, tiersText } from './decision-format';
+import {
+  amountText,
+  matchHeadline,
+  readAmount,
+  saveBadgeTone,
+  saveErrorText,
+  tiersText,
+} from './decision-format';
+
+const apiError = (code: string, message = 'The API said no') => ({ error: { code, message } });
+
+describe('readAmount and amountText', () => {
+  const example = '300.00';
+
+  it('reads an amount as cents, the way it is typed', () => {
+    expect(readAmount('$1,823.25', { example })).toEqual({ cents: 182_325, error: null });
+    expect(readAmount(' 300 ', { example })).toEqual({ cents: 30_000, error: null });
+    expect(readAmount('0', { example })).toEqual({ cents: 0, error: null });
+  });
+
+  it('is nothing yet when empty, and says what to fix otherwise', () => {
+    expect(readAmount('  ', { example })).toEqual({ cents: null, error: null });
+    for (const text of ['lots', '-5', '1.234']) {
+      expect(readAmount(text, { example })).toEqual({
+        cents: null,
+        error: 'Enter an amount, like 300.00.',
+      });
+    }
+    expect(readAmount('0', { example: '1,823.25', positive: true })).toEqual({
+      cents: null,
+      error: 'Enter an amount above $0, like 1,823.25.',
+    });
+  });
+
+  it('writes cents back the way a person types them', () => {
+    expect(amountText(182_325)).toBe('1,823.25');
+    expect(amountText(0)).toBe('0.00');
+    expect(amountText(null)).toBe('');
+  });
+});
+
+describe('saveErrorText', () => {
+  it('asks to check the refreshed numbers after a result mismatch', () => {
+    const mismatch = new ResultMismatch({
+      error: { code: 'result_mismatch', message: 'x', details: { fields: ['missed_cents'] } },
+    });
+    expect(saveErrorText(mismatch)).toMatch(/^The calculator's numbers had changed/);
+  });
+
+  it('explains a conflict, a missing plan choice, and passes other messages on', () => {
+    expect(saveErrorText(apiError('decision_conflict'))).toMatch(/saved somewhere else/);
+    expect(saveErrorText(apiError('plan_not_selected'))).toBe(
+      'Choose the plan you will enroll in, then save.',
+    );
+    expect(saveErrorText(apiError('validation_error', 'tax_year: no constants'))).toBe(
+      'tax_year: no constants',
+    );
+    expect(saveErrorText(new Error('offline'))).toBe('Could not save this decision. Try again.');
+  });
+});
 
 describe('saveBadgeTone', () => {
   it('is neutral before a save, warning once changed, confirmed when it is the saved version', () => {

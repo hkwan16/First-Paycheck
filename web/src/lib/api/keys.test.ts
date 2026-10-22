@@ -88,6 +88,7 @@ describe('document keys', () => {
       }).queryKey,
       payStubs: $api.queryOptions('get', '/pay-stubs').queryKey,
       profile: $api.queryOptions('get', '/profile').queryKey,
+      benefitsPlans: $api.queryOptions('get', '/benefits-plans').queryKey,
       accounts: $api.queryOptions('get', '/accounts').queryKey,
     };
     for (const key of Object.values(keys)) client.setQueryData(key, {});
@@ -103,6 +104,7 @@ describe('document keys', () => {
     );
     expect(queryKeys.payStubs()).toEqual($api.queryOptions('get', '/pay-stubs').queryKey);
     expect(queryKeys.profile()).toEqual($api.queryOptions('get', '/profile').queryKey);
+    expect(queryKeys.benefitsPlans()).toEqual($api.queryOptions('get', '/benefits-plans').queryKey);
   });
 
   it('a finished extraction refreshes the list and every document read', async () => {
@@ -121,12 +123,15 @@ describe('document keys', () => {
     expect(invalidated(keys.accounts)).toBe(false);
   });
 
-  it('a confirmed document refreshes documents and pay stubs', async () => {
+  it('a confirmed document refreshes documents, pay stubs, benefits plans and the profile', async () => {
     const { client, keys, invalidated } = seededDocs();
     await invalidateAfterConfirm(client);
     expect(invalidated(keys.list)).toBe(true);
     expect(invalidated(keys.detail)).toBe(true);
     expect(invalidated(keys.payStubs)).toBe(true);
+    // A benefits summary writes plans, and its 401(k) match to the profile.
+    expect(invalidated(keys.benefitsPlans)).toBe(true);
+    expect(invalidated(keys.profile)).toBe(true);
     expect(invalidated(keys.accounts)).toBe(false);
   });
 });
@@ -168,6 +173,7 @@ describe('decision keys', () => {
       }).queryKey,
     );
     expect(queryKeys.calendar()).toEqual($api.queryOptions('get', '/calendar').queryKey);
+    expect(queryKeys.goals()).toEqual($api.queryOptions('get', '/goals').queryKey);
     expect(queryKeys.calc('/calc/401k-match', body)).toEqual(
       $api.queryOptions('post', '/calc/401k-match', { body: body as never }).queryKey,
     );

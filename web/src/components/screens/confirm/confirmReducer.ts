@@ -6,6 +6,8 @@ import { parseISODate } from '@/lib/dates';
  * The Confirm screen's state, ported from the mockup's script
  * (docs/mockup/Confirm.dc.html): select a field, confirm or un-confirm it,
  * edit it as a draft, save (validate and confirm) or cancel, confirm all.
+ * Pay stubs and benefits summaries share it; benefits-fields.ts lays a
+ * benefits proposal out as fields with keys of their own.
  *
  * Every value is a proposal until the person confirms it, and only confirmed
  * values are sent. The one piece of money arithmetic in the web app is
@@ -38,7 +40,15 @@ export interface ReviewField {
   draft: string | null;
   /** Why the last save was refused. */
   error: string | null;
+  /** Fixed options (pay frequency, plan type, vesting years); the editor is a select. */
   choices?: readonly Choice[];
+  /**
+   * Whether the field needs a value before it can be confirmed. Unset, amounts
+   * and dates do and the rest do not, as on a pay stub.
+   */
+  required?: boolean;
+  /** The plan or tier the field belongs to ("Plan 2"), which its accessible name includes. */
+  group?: string;
 }
 
 export interface ConfirmState {
@@ -86,9 +96,13 @@ export function initConfirmState(
 
 const MONEY_ERROR = 'Enter an amount, like 1,234.56';
 const DATE_ERROR = 'Enter a date';
+const PERCENT_ERROR = 'Enter a percentage, like 20 or 12.5';
+const NUMBER_ERROR = 'Enter a number, like 3';
+const CHOICE_ERROR = 'Choose one of the options';
 
-/** Amounts and dates must be there to confirm; text may be left empty. */
-const isRequired = (f: Pick<ReviewField, 'kind'>) => f.kind === 'money' || f.kind === 'date';
+/** Whether a field needs a value to be confirmed: its own say, else amounts and dates do. */
+const isRequired = (f: Pick<ReviewField, 'kind' | 'required'>) =>
+  f.required ?? (f.kind === 'money' || f.kind === 'date');
 
 const hasWhatItNeeds = (f: ReviewField) => f.value !== null || !isRequired(f);
 
@@ -127,22 +141,42 @@ export function parseDraft(f: Pick<ReviewField, 'kind' | 'choices'>, text: strin
     case 'percent':
       return /^\d{1,3}(\.\d{1,2})?$/.test(trimmed)
         ? { ok: true, value: trimmed }
-        : { ok: false, error: 'Enter a percentage, like 20 or 12.5' };
+        : { ok: false, error: PERCENT_ERROR };
     case 'number':
       // A plain count the API stores as a number (vesting years on a benefits summary).
+      if (f.choices) {
+        return f.choices.some((c) => c.value === trimmed)
+          ? { ok: true, value: Number(trimmed) }
+          : { ok: false, error: CHOICE_ERROR };
+      }
       return /^\d+(\.\d+)?$/.test(trimmed)
         ? { ok: true, value: Number(trimmed) }
-        : { ok: false, error: 'Enter a number, like 3' };
+        : { ok: false, error: NUMBER_ERROR };
     case 'text':
       if (trimmed === '') return { ok: true, value: null };
       if (f.choices && !f.choices.some((c) => c.value === trimmed)) {
-        return { ok: false, error: 'Choose one of the options' };
+        return { ok: false, error: CHOICE_ERROR };
       }
       return { ok: true, value: trimmed };
   }
 }
 
-const requiredError = (f: ReviewField) => (f.kind === 'money' ? MONEY_ERROR : DATE_ERROR);
+/** What to type into a required field that is empty. */
+function requiredError(f: ReviewField): string {
+  if (f.choices) return CHOICE_ERROR;
+  switch (f.kind) {
+    case 'money':
+      return MONEY_ERROR;
+    case 'date':
+      return DATE_ERROR;
+    case 'percent':
+      return PERCENT_ERROR;
+    case 'number':
+      return NUMBER_ERROR;
+    case 'text':
+      return 'Enter a value';
+  }
+}
 
 function patch(
   state: ConfirmState,

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Decision, DecisionList } from './api/types';
+import { sampleEmergencyFund, sampleHealthPlans } from '@/test/fixtures/planning';
 import {
+  ageAtYearEnd,
+  asEmergencyFundInputs,
+  asHealthPlansInputs,
   asK401Inputs,
   asK401Result,
   calculatorIdOf,
@@ -160,5 +164,38 @@ describe('asK401Inputs and asK401Result', () => {
     expect(asK401Inputs({ months: 3 })).toBeNull();
     expect(asK401Result({ ...result, missed_cents: undefined })).toBeNull();
     expect(asK401Result({ ...result, capped: 'no' })).toBeNull();
+  });
+});
+
+describe('asEmergencyFundInputs and asHealthPlansInputs', () => {
+  it("read a saved decision's stored inputs", () => {
+    const fund = sampleEmergencyFund().inputs;
+    const plans = sampleHealthPlans({ selected_plan_index: 1 }).inputs;
+    expect(asEmergencyFundInputs({ ...fund })).toEqual(fund);
+    expect(asHealthPlansInputs(structuredClone(plans) as never)).toEqual(plans);
+  });
+
+  it('refuse objects that are not those shapes', () => {
+    const fund = sampleEmergencyFund().inputs;
+    const plans = sampleHealthPlans().inputs;
+    expect(asEmergencyFundInputs({ ...fund, target_months: '3' })).toBeNull();
+    expect(asEmergencyFundInputs(inputs)).toBeNull();
+    expect(asHealthPlansInputs({ ...plans, plans: [{ name: 'Gold PPO' }] } as never)).toBeNull();
+    expect(asHealthPlansInputs({ ...plans, expected_usage: 'some' } as never)).toBeNull();
+    expect(asHealthPlansInputs(inputs)).toBeNull();
+  });
+});
+
+describe('ageAtYearEnd', () => {
+  // The 401(k) calculator wants the age reached by December 31 of the tax year (spec 006).
+  it('is the tax year less the birth year', () => {
+    expect(ageAtYearEnd(2026, 1996)).toBe(30);
+    expect(ageAtYearEnd(2026, 1976)).toBe(50);
+  });
+
+  it('is null without a birth year, or one after the tax year', () => {
+    expect(ageAtYearEnd(2026, null)).toBeNull();
+    expect(ageAtYearEnd(2026, undefined)).toBeNull();
+    expect(ageAtYearEnd(2026, 2027)).toBeNull();
   });
 });

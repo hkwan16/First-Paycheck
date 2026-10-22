@@ -3,6 +3,7 @@ import { $api, fetchClient } from '../client';
 import { apiErrorCode } from '../errors';
 import { invalidateAfterConfirm, invalidateDocuments } from '../keys';
 import type {
+  BenefitsValues,
   Confirmed,
   DocumentStatus,
   DocumentSummary,
@@ -17,15 +18,22 @@ import { unwrap } from './request';
 const REVIEW_STATUSES: ReadonlySet<DocumentStatus> = new Set(['proposed', 'manual_entry_required']);
 
 /**
- * A pay stub waiting on the Confirm screen: read and proposed, or needing
- * every field typed. Benefits summaries are reviewed in a later milestone.
+ * A document waiting on the Confirm screen: a pay stub read and proposed or
+ * needing every field typed, or a benefits summary read and proposed. A
+ * benefits summary nothing could be read from is not typed in here: its plans
+ * go in on the health plan card and its match in the 401(k) plan details.
  */
 export const isReviewable = (document: Pick<DocumentSummary, 'type' | 'status'>) =>
-  document.type === 'pay_stub' && REVIEW_STATUSES.has(document.status);
+  (document.type === 'pay_stub' && REVIEW_STATUSES.has(document.status)) ||
+  (document.type === 'benefits' && document.status === 'proposed');
 
-/** The newest reviewable document of a `GET /docs` list (which is newest first). */
+/**
+ * The document Confirm opens from a `GET /docs` list (which is newest first):
+ * the newest reviewable pay stub, since every calculator reads it, else the
+ * newest reviewable benefits summary.
+ */
 export const newestReviewable = (documents: readonly DocumentSummary[] | undefined) =>
-  documents?.find(isReviewable);
+  documents?.find((d) => d.type === 'pay_stub' && isReviewable(d)) ?? documents?.find(isReviewable);
 
 export interface UseDocumentsOptions {
   /**
@@ -148,10 +156,9 @@ export class PayStubUnbalanced extends Error {
 /** Codes that mean the document changed state under the screen: re-read it. */
 const STATE_CONFLICTS = new Set(['document_confirmed', 'document_deleted', 'document_not_ready']);
 
-export interface ConfirmDocumentVariables {
-  documentId: string;
-  values: PayStubValues;
-}
+/** A pay stub's values, or a benefits summary's plans and match: the document's own type. */
+export type ConfirmDocumentVariables =
+  { documentId: string; values: PayStubValues } | { documentId: string; benefits: BenefitsValues };
 
 export interface ConfirmDocumentOptions {
   /**
@@ -166,16 +173,20 @@ export interface ConfirmDocumentOptions {
 /**
  * `POST /docs/{id}/confirm` with the values the person checked. A 422
  * `pay_stub_unbalanced` is thrown as `PayStubUnbalanced`; anything else as
- * the API body. Success calls `onConfirmed`, then refreshes documents and
- * pay stubs.
+ * the API body. Success calls `onConfirmed`, then refreshes documents, pay
+ * stubs, benefits plans and the profile (a benefits summary's match and
+ * vesting are written to it).
  */
 export function useConfirmDocument({ onConfirmed }: ConfirmDocumentOptions = {}) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ documentId, values }: ConfirmDocumentVariables): Promise<Confirmed> => {
+    mutationFn: async (variables: ConfirmDocumentVariables): Promise<Confirmed> => {
       const { data, error } = await fetchClient.POST('/docs/{document_id}/confirm', {
-        params: { path: { document_id: documentId } },
-        body: { pay_stub: values },
+        params: { path: { document_id: variables.documentId } },
+        body:
+          'benefits' in variables
+            ? { benefits: variables.benefits }
+            : { pay_stub: variables.values },
       });
       if (error !== undefined) {
         const body = error as ApiErrorBody;
