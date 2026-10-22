@@ -8,6 +8,7 @@ import {
   sampleK401,
   sampleK401Inputs,
 } from '@/test/fixtures/decisions';
+import { sampleEmergencyFund, sampleHealthPlans } from '@/test/fixtures/planning';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
 import { db, savedDecision } from '@/test/msw/db';
 import { server } from '@/test/msw/server';
@@ -32,10 +33,10 @@ function saveBodies() {
   return bodies;
 }
 
-function countCalcRequests() {
+function countCalcRequests(path = '/calc/401k-match') {
   const seen = { count: 0 };
   server.events.on('request:start', ({ request }) => {
-    if (new URL(request.url).pathname === '/calc/401k-match') seen.count += 1;
+    if (new URL(request.url).pathname === path) seen.count += 1;
   });
   return seen;
 }
@@ -199,5 +200,35 @@ describe('useSaveDecision', () => {
       await waitFor(() => expect(calcRequests.count).toBe(2));
       expect(db.decisions).toEqual([]);
     });
+
+    it.each([
+      ['emergency_fund', '/calc/emergency-fund', sampleEmergencyFund()],
+      ['health_plans', '/calc/health-plans', sampleHealthPlans({ selected_plan_index: 0 })],
+    ] as const)('recalculates %s results from %s', async (calculator, path, known) => {
+      const calcRequests = countCalcRequests(path);
+      const { result } = renderHookWithClient(() => ({
+        calc: useCalc(path, known.inputs),
+        save: useSaveDecision(calculator),
+      }));
+      await waitFor(() => expect(result.current.calc.isCurrent).toBe(true));
+
+      const stale = { ...known.result, recommended_index: 9, target_cents: 1 };
+      act(() =>
+        result.current.save.mutate({ inputs: known.inputs, result: stale, current: undefined }),
+      );
+      await waitFor(() => expect(result.current.save.isError).toBe(true));
+      expect(result.current.save.error).toBeInstanceOf(ResultMismatch);
+      await act(() => vi.advanceTimersByTimeAsync(CALC_DEBOUNCE_MS));
+      await waitFor(() => expect(calcRequests.count).toBe(2));
+    });
+  });
+
+  it('refuses a health plan decision with no plan chosen, saving nothing', async () => {
+    const { inputs, result: computed } = sampleHealthPlans();
+    const { result } = renderHookWithClient(() => useSaveDecision('health_plans'));
+    act(() => result.current.mutate({ inputs, result: computed, current: undefined }));
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toMatchObject({ error: { code: 'plan_not_selected' } });
+    expect(db.decisions).toEqual([]);
   });
 });

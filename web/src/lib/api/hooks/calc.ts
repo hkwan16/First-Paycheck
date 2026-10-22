@@ -59,7 +59,7 @@ export function useCalc<P extends CalcPath>(path: P, inputs: CalcInput<P> | null
     queryKey: queryKeys.calc(path, settled),
     queryFn: ({ signal }) =>
       unwrap<CalcResult<P>>(
-        // One calculator route today; the cast spans the union when there are more.
+        // A generic `P` does not narrow openapi-fetch's body type; the cast spans the union.
         fetchClient.POST(path as CalcPath, { body: settled as CalcInput<CalcPath>, signal }),
       ),
     enabled: settled !== null,

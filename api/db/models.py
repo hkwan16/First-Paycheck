@@ -953,6 +953,10 @@ class CheckInFinding(Base):
         CheckConstraint("(user_action IS NULL) = (user_action_at IS NULL)", name="action_has_time"),
         Index("ix_check_in_findings_check_in_id", "check_in_id"),
         Index("ix_check_in_findings_decision_id", "decision_id"),
+        # One finding per key and check-in; the key lookup across check-ins (0012).
+        CheckConstraint("key <> ''", name="key_not_empty"),
+        UniqueConstraint("check_in_id", "key"),
+        Index("ix_check_in_findings_user_key", "user_id", "key"),
     )
 
     id: Mapped[uuid.UUID] = _id()
@@ -960,6 +964,8 @@ class CheckInFinding(Base):
     check_in_id: Mapped[uuid.UUID] = mapped_column(Uuid)
     kind: Mapped[FindingKind] = mapped_column(pg_enum(FindingKind, "finding_kind"))
     severity: Mapped[FindingSeverity] = mapped_column(pg_enum(FindingSeverity, "finding_severity"))
+    # What the finding reports, for example "pay_change:<stub id>" (spec 015 rule 12).
+    key: Mapped[str] = mapped_column(Text)
     decision_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
     # Null undoes the user's action (spec amendment 14).

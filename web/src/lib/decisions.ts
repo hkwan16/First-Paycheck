@@ -2,6 +2,8 @@ import type {
   CalculatorKind,
   Decision,
   DecisionList,
+  EmergencyFundInput,
+  HealthPlansInput,
   K401MatchInput,
   K401MatchResult,
   PayFrequency,
@@ -59,6 +61,17 @@ const PAY_PERIODS: Record<PayFrequency, PayPeriods> = {
 /** Paychecks a year for a pay frequency (the calculator's `pay_periods_per_year`). */
 export const payPeriodsFor = (frequency: PayFrequency | null | undefined): PayPeriods | null =>
   frequency ? PAY_PERIODS[frequency] : null;
+
+/**
+ * The age the 401(k) calculator asks for: the age reached by December 31 of
+ * the tax year (spec 006), which is the tax year less the birth year. A
+ * difference of years, not money. Null without a birth year, or with one
+ * after the tax year (the calculator accepts no negative age).
+ */
+export function ageAtYearEnd(taxYear: number, birthYear: number | null | undefined): number | null {
+  if (birthYear == null || birthYear > taxYear) return null;
+  return taxYear - birthYear;
+}
 
 /**
  * A whole-number slider value as the API writes a percentage: `4` is
@@ -129,6 +142,50 @@ export function asK401Inputs(inputs: Record<string, unknown>): K401MatchInput | 
     isText(inputs.filing_status) &&
     isInt(inputs.age);
   return ok ? (inputs as unknown as K401MatchInput) : null;
+}
+
+/** A saved `emergency_fund` decision's inputs, or null when they are not that shape. */
+export function asEmergencyFundInputs(inputs: Record<string, unknown>): EmergencyFundInput | null {
+  const ok = (
+    [
+      'monthly_essentials_cents',
+      'target_months',
+      'current_balance_cents',
+      'monthly_contribution_cents',
+      'pay_periods_per_year',
+    ] as const
+  ).every((key) => isInt(inputs[key]));
+  return ok ? (inputs as unknown as EmergencyFundInput) : null;
+}
+
+const PLAN_KINDS = new Set(['hdhp', 'ppo', 'hmo']);
+const USAGES = new Set(['low', 'medium', 'high']);
+
+const isPlanOption = (value: unknown) =>
+  isRecord(value) &&
+  isText(value.name) &&
+  PLAN_KINDS.has(value.kind as string) &&
+  isInt(value.premium_per_period_cents) &&
+  isInt(value.deductible_cents) &&
+  isText(value.coinsurance_pct) &&
+  isInt(value.oop_max_cents) &&
+  isInt(value.employer_hsa_cents);
+
+/** A saved `health_plans` decision's inputs, or null when they are not that shape. */
+export function asHealthPlansInputs(inputs: Record<string, unknown>): HealthPlansInput | null {
+  const ok =
+    Array.isArray(inputs.plans) &&
+    inputs.plans.length > 0 &&
+    inputs.plans.every(isPlanOption) &&
+    isInt(inputs.pay_periods_per_year) &&
+    isInt(inputs.salary_cents) &&
+    isText(inputs.filing_status) &&
+    isInt(inputs.tax_year) &&
+    isInt(inputs.employee_hsa_cents) &&
+    USAGES.has(inputs.expected_usage as string) &&
+    (inputs.selected_plan_index === null || isInt(inputs.selected_plan_index)) &&
+    (inputs.enrollment_deadline === null || isText(inputs.enrollment_deadline));
+  return ok ? (inputs as unknown as HealthPlansInput) : null;
 }
 
 const RESULT_CENTS = [

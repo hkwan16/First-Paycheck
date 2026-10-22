@@ -74,6 +74,8 @@ export const sampleProfile: Profile = {
   pay_frequency: 'semimonthly',
   filing_status: 'single',
   match_tiers: [{ employee_pct_upto: '4.00', employer_pct: '100.00' }],
+  // 30 by the end of 2026, the age every sample 401(k) case is calculated at.
+  birth_year: 1996,
   updated_at: '2026-10-17T15:58:30Z',
 };
 

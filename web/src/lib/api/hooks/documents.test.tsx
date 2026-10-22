@@ -10,8 +10,10 @@ import {
   sampleProposal,
   sampleValues,
 } from '@/test/fixtures/documents';
+import { sampleBenefitsValues } from '@/test/fixtures/planning';
 import { db, emptyDocuments } from '@/test/msw/db';
 import { apiUrl, createDocument } from '@/test/msw/handlers';
+import { benefitsWaiting } from '@/test/msw/planning-handlers';
 import { server } from '@/test/msw/server';
 import { renderHookWithClient } from '@/test/render';
 import { apiErrorMessage } from '../errors';
@@ -101,10 +103,21 @@ describe('newestReviewable', () => {
     expect(newestReviewable(undefined)).toBeUndefined();
   });
 
-  it('isReviewable needs a pay stub that was read or needs typing', () => {
+  it('picks a benefits summary waiting for review when no pay stub is', () => {
+    expect(
+      newestReviewable([sampleBenefitsDocument, sampleDocument({ status: 'confirmed' })])?.id,
+    ).toBe(BENEFITS_DOC_ID);
+  });
+
+  it('isReviewable needs a pay stub that was read or needs typing, or a benefits summary that was read', () => {
     expect(isReviewable(sampleDocument())).toBe(true);
     expect(isReviewable(sampleDocument({ status: 'manual_entry_required' }))).toBe(true);
-    expect(isReviewable(sampleBenefitsDocument)).toBe(false);
+    expect(isReviewable(sampleBenefitsDocument)).toBe(true);
+    // Plans that could not be read are entered on the health plan card, not typed here.
+    expect(isReviewable({ ...sampleBenefitsDocument, status: 'manual_entry_required' })).toBe(
+      false,
+    );
+    expect(isReviewable({ ...sampleBenefitsDocument, type: 'offer_letter' })).toBe(false);
     expect(isReviewable(sampleDocument({ status: 'failed' }))).toBe(false);
   });
 });
@@ -256,6 +269,26 @@ describe('useConfirmDocument', () => {
     expect(queryClient.getQueryState(queryKeys.document(PAY_STUB_DOC_ID))?.isInvalidated).toBe(
       true,
     );
+  });
+
+  it('sends a benefits summary under benefits and says when the profile changed', async () => {
+    benefitsWaiting();
+    const bodies: unknown[] = [];
+    server.events.on('request:start', async ({ request }) => {
+      if (request.method === 'POST') bodies.push(await request.clone().json());
+    });
+    const { result, queryClient } = renderHookWithClient(() => useConfirmDocument());
+    queryClient.setQueryData(queryKeys.benefitsPlans(), []);
+    queryClient.setQueryData(queryKeys.profile(), {});
+    act(() =>
+      result.current.mutate({ documentId: BENEFITS_DOC_ID, benefits: sampleBenefitsValues }),
+    );
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(bodies).toEqual([{ benefits: sampleBenefitsValues }]);
+    expect(result.current.data?.profile_updated).toBe(true);
+    expect(result.current.data?.plans).toHaveLength(2);
+    expect(queryClient.getQueryState(queryKeys.benefitsPlans())?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(queryKeys.profile())?.isInvalidated).toBe(true);
   });
 
   it('treats a 422 without a readable diff as an ordinary error', async () => {

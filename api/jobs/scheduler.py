@@ -6,15 +6,18 @@ with the transaction if the worker dies. A tick requeues running jobs whose
 heartbeat is more than 10 minutes old (as a failed attempt, so the usual
 backoff and the 5-attempt limit apply), prunes finished ticks older than an
 hour, expires uploads left unconfirmed for 7 days and deletes day-old
-rate-limit counters (spec 004 rule 21), and queues the next tick 60 seconds
-out. ``worker_status`` tells ``GET /health`` whether the worker is alive from
-the same rows (spec 002 rule 38). This module may use the privileged
+rate-limit counters (spec 004 rule 21), queues the month's
+``checkin.monthly`` job for every user still without one (spec 015 rule 14),
+and queues the next tick 60 seconds out. ``worker_status`` tells
+``GET /health`` whether the worker is alive from the same rows (spec 002
+rule 38). This module may use the privileged
 connection: it reads and changes rows across users.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import json
 from typing import Any, Literal
 
 from sqlalchemy import Connection, text
@@ -74,11 +77,51 @@ def _requeue_stale(connection: Connection) -> tuple[int, int]:
     return requeued, dead
 
 
+_QUEUE_CHECK_INS = text(
+    """
+    INSERT INTO jobs (user_id, kind, payload, idempotency_key)
+    SELECT u.id, 'checkin.monthly', CAST(:payload AS jsonb), :key
+    FROM auth.users AS u
+    WHERE NOT EXISTS (
+      SELECT 1 FROM jobs AS j WHERE j.user_id = u.id AND j.idempotency_key = :key)
+    ON CONFLICT (user_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
+    """
+)
+
+
+def checkin_key(month: dt.date) -> str:
+    """The idempotency key of a user's scheduled check-in job for ``month``."""
+    return f"checkin.monthly:{month:%Y-%m}"
+
+
+def _queue_check_ins(connection: Connection, now: dt.datetime) -> int:
+    """Spec 015 rule 14: one ``checkin.monthly`` job per user and UTC month.
+
+    The first tick of a month reaches every user; a later one only a user
+    still without the month's job (the worker was down on the 1st, or the user
+    signed up since). Users are read across accounts, so this runs here, on
+    the privileged connection.
+    """
+    month = now.astimezone(dt.UTC).date().replace(day=1)
+    payload = json.dumps({"period": month.isoformat(), "trigger": "schedule"}, sort_keys=True)
+    queued: int = connection.execute(
+        _QUEUE_CHECK_INS, {"payload": payload, "key": checkin_key(month)}
+    ).rowcount
+    return queued
+
+
 def tick(*, bind: QueueBind | None = None, now: dt.datetime | None = None) -> dict[str, Any]:
     now = now or dt.datetime.now(dt.UTC)
     with privileged_connection(bind) as connection:
         if not _locked(connection):
-            return {"requeued": 0, "dead": 0, "pruned": 0, "expired": 0, "skipped": True}
+            return {
+                "requeued": 0,
+                "dead": 0,
+                "pruned": 0,
+                "expired": 0,
+                "checkins_queued": 0,
+                "skipped": True,
+            }
         requeued, dead = _requeue_stale(connection)
         pruned = connection.execute(
             text(
@@ -92,6 +135,7 @@ def tick(*, bind: QueueBind | None = None, now: dt.datetime | None = None) -> di
         # Retention (spec 016 rule 15): plan PDFs go after 7 days.
         export_store.expire_old(connection, now=now)
         prune_counters(connection, now=now)
+        checkins_queued = _queue_check_ins(connection, now)
         connection.execute(
             text(
                 "INSERT INTO jobs (kind, run_after)"
@@ -106,6 +150,7 @@ def tick(*, bind: QueueBind | None = None, now: dt.datetime | None = None) -> di
         "dead": dead,
         "pruned": pruned,
         "expired": expired,
+        "checkins_queued": checkins_queued,
         "skipped": False,
     }
 
@@ -156,4 +201,4 @@ def worker_status(*, bind: QueueBind | None = None) -> WorkerStatus:
 
 def run_tick(ctx: JobContext) -> dict[str, Any]:
     """The ``schedule.tick`` handler."""
-    return tick(bind=ctx.queue_bind)
+    return tick(bind=ctx.queue_bind, now=ctx.services.clock())

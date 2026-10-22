@@ -73,3 +73,24 @@ export type RecurringUserStatus = Schemas['RecurringUserStatus'];
 export type RecurringCadence = Schemas['RecurringCadence'];
 export type CsvImport = Schemas['CsvImport'];
 export type AmountSign = Schemas['AmountSign'];
+
+// Emergency fund, goals, health plans and benefits summaries (M6).
+export type EmergencyFundInput = Schemas['EmergencyFundInput'];
+export type EmergencyFundResult = Schemas['EmergencyFundResult'];
+export type HealthPlansInput = Schemas['HealthPlansInput'];
+export type HealthPlansResult = Schemas['HealthPlansResult'];
+export type HealthPlanOption = Schemas['HealthPlanOption'];
+export type HealthcareUsage = Schemas['HealthcareUsage'];
+export type PlanCost = Schemas['PlanCost'];
+export type PlanPair = Schemas['PlanPair'];
+export type PlanKind = Schemas['PlanKind'];
+export type Goal = Schemas['GoalOut'];
+export type GoalPatch = Schemas['GoalPatch'];
+export type GoalStatus = Schemas['GoalStatus'];
+export type CalendarKind = Schemas['CalendarKind'];
+export type BenefitsPlan = Schemas['BenefitsPlanOut'];
+export type BenefitsValues = Schemas['BenefitsValues'];
+export type PlanValues = Schemas['PlanValues'];
+export type RetirementValues = Schemas['RetirementValues'];
+export type PlanProposal = Schemas['PlanProposal'];
+export type TierProposal = Schemas['TierProposal'];

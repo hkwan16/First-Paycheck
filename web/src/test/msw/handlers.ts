@@ -34,6 +34,12 @@ import {
 import { samplePayStub } from '../fixtures/documents';
 import { sampleJob, SAMPLE_NOW, SAMPLE_SYNCED_AT } from '../fixtures/sample';
 import { db } from './db';
+import {
+  planningCalculators,
+  planningHandlers,
+  type DecisionCalculator,
+  type DecisionEffects,
+} from './planning-handlers';
 import { spendingHandlers } from './spending-handlers';
 
 export const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
@@ -43,6 +49,9 @@ const notFound = (message: string) =>
 
 const invalid = (message: string) =>
   HttpResponse.json({ error: { code: 'validation_error', message } }, { status: 422 });
+
+/** A percentage as the API stores it (a two-place Decimal string): `4` and `"4"` are `"4.00"`. */
+const storedPercent = (value: number | string) => Number(value).toFixed(2);
 
 const appError = (status: number, code: string, message: string, details?: object) =>
   HttpResponse.json({ error: { code, message, ...(details ? { details } : {}) } }, { status });
@@ -244,21 +253,35 @@ function listDecisions(): CalculatorDecisions[] {
   });
 }
 
+/** Spec 007 rule 14: a 401(k) decision schedules a check of the next pay stub. */
+function k401Effects(decision: Decision): DecisionEffects {
+  const event = sampleCalendarEvent({ id: nextId('ca000000'), decision_id: decision.id });
+  db.calendar.push(event);
+  return { calendar_event_id: event.id, goal_id: null };
+}
+
+/** Each saveable calculator's result (from its fixture) and what a saved version creates. */
+const DECISION_CALCULATORS: Partial<Record<CalculatorKind, DecisionCalculator>> = {
+  k401_match: { result: k401Result, effects: k401Effects },
+  ...planningCalculators,
+};
+
 /**
- * `POST /decisions` (spec 007 rules 2, 4 and 5, and 14 for the calendar): the
- * result must be the calculator's own (here, k401-results.json), and the
- * version chain must not fork.
+ * `POST /decisions` (spec 007 rules 2, 4 and 5, and the side effects of rule
+ * 14 and specs 011 and 012): the result must be the calculator's own (its
+ * results fixture), and the version chain must not fork.
  */
 async function saveDecision(request: Request) {
   const body = (await request.json()) as DecisionIn;
-  if (body.calculator !== 'k401_match') {
+  const calculator = DECISION_CALCULATORS[body.calculator];
+  if (!calculator) {
     return appError(422, 'calculator_unavailable', `${body.calculator} cannot be saved yet`);
   }
-  const computed = k401Result(body.inputs);
-  if (!computed) return invalid('inputs: no k401-results.json case for these inputs');
-  const fields = Object.keys(computed).filter(
-    (key) => !deepEqual(computed[key as keyof typeof computed], body.result[key]),
-  );
+  const computed = calculator.result(body.inputs) as Record<string, unknown> | undefined;
+  if (!computed) return invalid(`inputs: no ${body.calculator} results case for these inputs`);
+  const refused = calculator.refuse?.(body.inputs);
+  if (refused) return refused;
+  const fields = Object.keys(computed).filter((key) => !deepEqual(computed[key], body.result[key]));
   if (fields.length > 0) {
     return appError(422, 'result_mismatch', "The result does not match the calculator's result", {
       fields,
@@ -300,17 +323,14 @@ async function saveDecision(request: Request) {
       event.status = 'dismissed';
     }
   }
-  const event = sampleCalendarEvent({ id: nextId('ca000000'), decision_id: decision.id });
   db.decisions.push(decision);
-  db.calendar.push(event);
   const saved: DecisionSaved = {
     decision_id: decision.id,
     calculator: decision.calculator,
     version,
     supersedes_id: decision.supersedes_id,
     created_at: decision.created_at,
-    calendar_event_id: event.id,
-    goal_id: null,
+    ...calculator.effects(decision),
   };
   return HttpResponse.json(saved, { status: 201 });
 }
@@ -345,6 +365,9 @@ async function explain(request: Request) {
 
 /** Default handlers: the happy path for every route the web app calls. */
 export const handlers = [
+  // First: its benefits confirm handler passes pay stubs on to the one below.
+  ...planningHandlers,
+
   http.get(apiUrl('/health'), () =>
     HttpResponse.json({ status: 'ok', git_sha: 'test', alembic_revision: '0001_roles' }),
   ),
@@ -529,12 +552,13 @@ export const handlers = [
   http.put<never, ProfileIn>(apiUrl('/profile'), async ({ request }) => {
     const body = await request.json();
     db.profile = {
+      birth_year: body.birth_year ?? null,
       dependents: body.dependents ?? 0,
       expected_healthcare_usage: body.expected_healthcare_usage ?? null,
       filing_status: body.filing_status ?? null,
       match_tiers: (body.match_tiers ?? []).map((tier) => ({
-        employee_pct_upto: String(tier.employee_pct_upto),
-        employer_pct: String(tier.employer_pct),
+        employee_pct_upto: storedPercent(tier.employee_pct_upto),
+        employer_pct: storedPercent(tier.employer_pct),
       })),
       other_jobs: body.other_jobs ?? [],
       pay_frequency: body.pay_frequency ?? null,

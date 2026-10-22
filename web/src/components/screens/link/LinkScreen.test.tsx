@@ -4,7 +4,12 @@ import type { PlaidScriptState } from '@/lib/plaid-script';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JOB_POLL_MS } from '@/lib/api/hooks';
 import { installFakeXhr } from '@/test/fake-xhr';
-import { PAY_STUB_DOC_ID, sampleBenefitsDocument, sampleDocument } from '@/test/fixtures/documents';
+import {
+  BENEFITS_DOC_ID,
+  PAY_STUB_DOC_ID,
+  sampleBenefitsDocument,
+  sampleDocument,
+} from '@/test/fixtures/documents';
 import { CHASE_ITEM_ID, CHECKING_ID, SAMPLE_NOW, sampleJob } from '@/test/fixtures/sample';
 import { db, emptyDb, emptyDocuments } from '@/test/msw/db';
 import { apiUrl, createDocument, scriptJob } from '@/test/msw/handlers';
@@ -530,12 +535,30 @@ describe('LinkScreen documents', () => {
 
     const benefits = within(docsCard()).getByRole('group', { name: /^Benefits summary/ });
     expect(benefits).toHaveTextContent('Review needed');
-    expect(benefits).toHaveTextContent('Benefits are reviewed with your health plan decision');
-    expect(within(benefits).queryByRole('link')).not.toBeInTheDocument();
+    expect(benefits).not.toHaveTextContent('after alpha');
+    expect(within(benefits).getByRole('link', { name: 'Review benefits summary' })).toHaveAttribute(
+      'href',
+      `/setup/confirm/${BENEFITS_DOC_ID}`,
+    );
 
     expect(screen.getByRole('link', { name: /Review extracted fields/ })).toHaveAttribute(
       'href',
       `/setup/confirm/${PAY_STUB_DOC_ID}`,
+    );
+  });
+
+  it('sends a benefits summary nothing could be read from to the decision cards', async () => {
+    db.documents = [
+      { ...sampleBenefitsDocument, status: 'manual_entry_required', status_reason: 'refused' },
+    ];
+    renderLink();
+    const benefits = await within(docsCard()).findByRole('group', { name: /^Benefits summary/ });
+    expect(benefits).toHaveTextContent(
+      'Enter its plans on the health plan card and its match in your 401(k) plan details.',
+    );
+    expect(within(benefits).getByRole('link', { name: 'Go to decisions' })).toHaveAttribute(
+      'href',
+      '/setup/decisions',
     );
   });
 

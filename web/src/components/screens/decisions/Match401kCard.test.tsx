@@ -50,10 +50,6 @@ async function renderReady() {
   return rendered;
 }
 
-/** The whole age at once, as a paste would, so no half-typed age is ever sent. */
-const enterAge = (input: HTMLElement, age: string) =>
-  fireEvent.change(input, { target: { value: age } });
-
 const drag = (percent: number) =>
   fireEvent.change(slider(), { target: { value: String(percent) } });
 
@@ -73,7 +69,8 @@ describe('Match401kCard with a saved decision', () => {
     expect(card()).toHaveTextContent('Your Oct 15 pay stub shows $0.00 a paycheck');
     expect(slider()).toHaveValue('4');
     expect(slider()).toHaveAttribute('aria-valuetext', '4% of salary');
-    expect(within(card()).getByLabelText('Your age at the end of 2026')).toHaveValue(30);
+    // The age comes from the profile's birth year; the card no longer asks for it.
+    expect(within(card()).queryByLabelText(/age/i)).not.toBeInTheDocument();
 
     expect(result()).toHaveTextContent('You capture the full $2,600 match');
     const rows = within(result())
@@ -122,22 +119,18 @@ describe('Match401kCard with a saved decision', () => {
 });
 
 describe('Match401kCard calculating', () => {
-  it('asks for the age the calculator needs, then calculates from 0%', async () => {
+  it('calculates from 0% with the age the birth year gives for the tax year', async () => {
     decisionsReady();
     const seen = requests();
     renderCard();
-    const age = await within(
-      await screen.findByRole('region', { name: '401(k) match' }),
-    ).findByLabelText('Your age at the end of 2026');
-    expect(result()).toHaveTextContent('Enter your age to see your numbers.');
-    expect(saveButton()).toBeDisabled();
+    await within(await screen.findByRole('region', { name: '401(k) match' })).findByRole('slider');
     expect(within(card()).getByText('Not saved')).toBeInTheDocument();
 
-    enterAge(age, '30');
     await settle();
     await waitFor(() =>
       expect(result()).toHaveTextContent('You leave the whole $2,600 match behind'),
     );
+    // Born in 1996, so 30 by the end of 2026.
     expect(seen.calc.map((body) => body.contribution_pct)).toEqual(['0.00']);
     expect(seen.calc[0]).toEqual(sampleK401(0).inputs);
     expect(saveButton()).toHaveTextContent('Save this decision');
@@ -178,12 +171,7 @@ describe('Match401kCard saving', () => {
     decisionsReady();
     const seen = requests();
     const { user } = renderCard();
-    enterAge(
-      await within(await screen.findByRole('region', { name: '401(k) match' })).findByLabelText(
-        'Your age at the end of 2026',
-      ),
-      '30',
-    );
+    await within(await screen.findByRole('region', { name: '401(k) match' })).findByRole('slider');
     drag(4);
     await settle();
     await waitFor(() => expect(saveButton()).toBeEnabled());
@@ -296,11 +284,13 @@ describe('Match401kCard plan details', () => {
     await user.click(within(form).getByRole('button', { name: 'Single' }));
     await user.type(within(form).getByLabelText('Employer adds, % of what you put in'), '100');
     await user.type(within(form).getByLabelText('Up to, % of your pay'), '4');
+    await user.type(within(form).getByLabelText('Year you were born'), '1996');
     await user.click(within(form).getByRole('button', { name: 'Save plan details' }));
 
     await within(card()).findByRole('slider');
     expect(puts).toEqual([
       {
+        birth_year: 1996,
         dependents: 0,
         expected_healthcare_usage: null,
         filing_status: 'single',
@@ -315,6 +305,23 @@ describe('Match401kCard plan details', () => {
     expect(card()).toHaveTextContent(
       'Acme Corp matches 100% of the first 4% of your $65,000 salary.',
     );
+  });
+
+  it('asks once for the birth year a profile saved before it existed, keeping the rest', async () => {
+    decisionsReady();
+    db.profile = { ...db.profile, birth_year: null };
+    const { user } = renderCard();
+    const form = await within(
+      await screen.findByRole('region', { name: '401(k) match' }),
+    ).findByRole('form', { name: 'Your plan details' });
+    expect(within(form).getByLabelText('Yearly salary')).toHaveValue('65,000.00');
+    await user.type(within(form).getByLabelText('Year you were born'), '1996');
+    await user.click(within(form).getByRole('button', { name: 'Save plan details' }));
+
+    await within(card()).findByRole('slider');
+    expect(db.profile).toMatchObject({ birth_year: 1996, salary_cents: 6_500_000 });
+    await settle();
+    await waitFor(() => expect(result()).toHaveTextContent('You leave the whole $2,600 match'));
   });
 
   it('says what to fix before sending anything', async () => {

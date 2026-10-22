@@ -45,9 +45,9 @@ export interface PlanDetailsFormProps {
 
 /**
  * What the 401(k) calculator needs that the pay stub does not say: salary,
- * filing status and the employer's match formula (and the pay schedule if
- * the stub left it out). Saved to the profile with PUT /profile, which the
- * API validates again.
+ * filing status, the employer's match formula and the birth year (and the
+ * pay schedule if the stub left it out). Saved to the profile with PUT
+ * /profile, which the API validates again, so each is asked for once.
  */
 export function PlanDetailsForm({ profile, payStub, onSaved, onCancel }: PlanDetailsFormProps) {
   const id = useId();
@@ -62,7 +62,7 @@ export function PlanDetailsForm({ profile, payStub, onSaved, onCancel }: PlanDet
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const read = readPlanDetails(draft);
+    const read = readPlanDetails(draft, payStub?.tax_year);
     if (!read.ok) {
       setErrors(read.errors);
       return;
@@ -84,8 +84,8 @@ export function PlanDetailsForm({ profile, payStub, onSaved, onCancel }: PlanDet
       className="flex flex-col gap-4"
     >
       <p className="m-0 text-small text-ink-3">
-        The calculator needs your salary, filing status and how your employer matches. Your offer
-        letter or benefits summary says how the match works.
+        The calculator needs your salary, filing status, how your employer matches and the year you
+        were born. Your offer letter or benefits summary says how the match works.
       </p>
 
       <div>
@@ -199,6 +199,26 @@ export function PlanDetailsForm({ profile, payStub, onSaved, onCancel }: PlanDet
           </div>
         )}
       </fieldset>
+
+      <div>
+        <Label htmlFor={fieldId('birth-year')}>Year you were born</Label>
+        <Input
+          id={fieldId('birth-year')}
+          inputMode="numeric"
+          autoComplete="bday-year"
+          placeholder="1996"
+          maxLength={4}
+          value={draft.birthYear}
+          invalid={Boolean(errors.birthYear)}
+          aria-describedby={fieldId(errors.birthYear ? 'birth-year-error' : 'birth-year-hint')}
+          onChange={(event) => change({ birthYear: event.currentTarget.value })}
+          className="w-28 tabular-nums"
+        />
+        <p id={fieldId('birth-year-hint')} className="mt-1.5 mb-0 text-tiny text-ink-3">
+          Only used for the extra amount the IRS allows at 50 and over.
+        </p>
+        <FieldError id={fieldId('birth-year-error')}>{errors.birthYear}</FieldError>
+      </div>
 
       {update.isError && (
         <Notice tone="warning" compact role="alert">

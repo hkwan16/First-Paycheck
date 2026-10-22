@@ -199,6 +199,7 @@ export function samplePayStub(overrides: Partial<PayStub> = {}): PayStub {
 
 /** `GET /profile` for a user who has saved nothing. */
 export const emptyProfile: Profile = {
+  birth_year: null,
   dependents: 0,
   expected_healthcare_usage: null,
   filing_status: null,

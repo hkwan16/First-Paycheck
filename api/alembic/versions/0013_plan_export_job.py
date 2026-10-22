@@ -13,7 +13,7 @@ drops the table, deletes ``plan.export`` jobs and rebuilds ``job_kind`` with
 its earlier labels, as 0009_w4_calendar_kind does for ``calendar_kind``.
 
 Revision ID: 0013_plan_export_job
-Revises: 0009_w4_calendar_kind
+Revises: 0012_checkin_findings
 Create Date: 2026-10-21
 """
 
@@ -26,7 +26,7 @@ from sqlalchemy.dialects import postgresql
 from db.rls import enable_rls
 
 revision: str = "0013_plan_export_job"
-down_revision: str | None = "0009_w4_calendar_kind"
+down_revision: str | None = "0012_checkin_findings"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

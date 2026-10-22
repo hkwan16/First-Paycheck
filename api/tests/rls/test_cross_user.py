@@ -22,17 +22,21 @@ from sqlalchemy import Connection, select, text
 from sqlalchemy.sql import column, func, table
 
 from app.db import user_session_for
-from db.enums import AccountRole, JobKind
+from db.enums import AccountKind, AccountRole, FindingKind, JobKind
 from export import store as export_store
 from tests.conftest import USER_A, USER_B, FixtureUser
 from tests.support.factories import (
     MOCKUP_STUB,
     make_account,
+    make_check_in,
     make_document,
+    make_finding,
+    make_holding,
     make_item,
     make_job,
     make_pay_stub,
     make_recurring_charge,
+    make_snapshot,
     make_transaction,
 )
 
@@ -638,7 +642,100 @@ def update_recurring(
     )
 
 
+def a_check_in(connection: Connection) -> tuple[uuid.UUID, uuid.UUID]:
+    """A's check-in with one unhandled finding."""
+    check_in = make_check_in(connection, USER_A.id)
+    finding = make_finding(
+        connection,
+        USER_A.id,
+        check_in,
+        kind=FindingKind.RECURRING_STOPPED,
+        payload={
+            "kind": "recurring_stopped",
+            "affects": "spending",
+            "recurring_charge_id": str(uuid.uuid4()),
+            "merchant": "Hulu",
+            "cadence": "monthly",
+            "typical_amount_cents": 1_799,
+            "first_seen": "2026-06-03",
+            "last_seen": "2026-09-03",
+            "user_status": None,
+        },
+    )
+    return check_in, finding
+
+
+def list_check_ins(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    a_check_in(connection)
+
+    def body(data: Any) -> None:
+        assert data == []
+
+    return Case("GET", "/check-ins", 200, body=body)
+
+
+def get_check_in(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    check_in, _ = a_check_in(connection)
+    return Case("GET", f"/check-ins/{check_in}", 404)
+
+
+def update_finding(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    check_in, finding = a_check_in(connection)
+
+    def after(conn: Connection) -> None:
+        action = conn.execute(
+            text("SELECT user_action FROM check_in_findings WHERE id = :id"), {"id": finding}
+        ).scalar_one()
+        assert action is None
+
+    return Case(
+        "PATCH",
+        f"/check-ins/{check_in}/findings/{finding}",
+        404,
+        json={"user_action": "done"},
+        after=after,
+    )
+
+
+def update_finding_through_own_check_in(
+    connection: Connection, client_as: Callable[[FixtureUser], TestClient]
+) -> Case:
+    """B's own check-in id with A's finding id: still 404, A's finding unchanged."""
+    _, finding = a_check_in(connection)
+    mine = make_check_in(connection, USER_B.id)
+    return Case(
+        "PATCH", f"/check-ins/{mine}/findings/{finding}", 404, json={"user_action": "dismissed"}
+    )
+
+
+def get_net_worth(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    account = a_account(connection)
+    make_snapshot(connection, USER_A.id, account, balance_cents=500_000)
+
+    def body(data: Any) -> None:
+        assert (data["accounts"], data["series"], data["net_worth_cents"]) == ([], [], 0)
+
+    return Case("GET", "/net-worth", 200, body=body)
+
+
+def get_holdings(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    account = make_account(
+        connection, USER_A.id, a_item(connection), kind=AccountKind.INVESTMENT, name="Brokerage"
+    )
+    make_holding(connection, USER_A.id, account)
+
+    def body(data: Any) -> None:
+        assert (data["accounts"], data["value_cents"]) == ([], 0)
+
+    return Case("GET", "/holdings", 200, body=body)
+
+
 ROUTE_CASES: dict[tuple[str, str], Builder] = {
+    ("GET", "/check-ins"): list_check_ins,
+    ("GET", "/check-ins/{check_in_id}"): get_check_in,
+    ("PATCH", "/check-ins/{check_in_id}/findings/{finding_id}"): update_finding,
+    ("GET", "/net-worth"): get_net_worth,
+    ("GET", "/holdings"): get_holdings,
     ("GET", "/cashflow"): get_cashflow,
     ("GET", "/recurring"): list_recurring,
     ("PATCH", "/recurring/{charge_id}"): update_recurring,
@@ -689,6 +786,22 @@ def test_user_b_cannot_link_user_a_account_to_a_goal(
     assert response.json()["error"]["code"] == "not_found"
     assert case.after is not None
     case.after(db_connection)
+
+
+def test_user_b_cannot_reach_user_a_finding_through_own_check_in(
+    db_connection: Connection,
+    client_as: Callable[[FixtureUser], TestClient],
+    user_a: FixtureUser,
+    user_b: FixtureUser,
+) -> None:
+    case = update_finding_through_own_check_in(db_connection, client_as)
+    response = client_as(user_b).request(case.method, case.path, json=case.json)
+    assert response.status_code == 404, response.text
+    assert response.json()["error"]["code"] == "not_found"
+    actions = db_connection.execute(
+        text("SELECT count(*) FROM check_in_findings WHERE user_action IS NOT NULL")
+    ).scalar_one()
+    assert actions == 0
 
 
 def app_routes(app: FastAPI) -> set[tuple[str, str]]:

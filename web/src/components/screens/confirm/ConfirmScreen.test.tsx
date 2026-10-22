@@ -10,8 +10,10 @@ import {
   sampleValues,
 } from '@/test/fixtures/documents';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
+import { sampleBenefitsProposal, sampleBenefitsValues } from '@/test/fixtures/planning';
 import { db } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
+import { benefitsWaiting, planningDb } from '@/test/msw/planning-handlers';
 import { server } from '@/test/msw/server';
 import { act, renderWithProviders, screen, waitFor, within } from '@/test/render';
 import { ConfirmScreen } from './ConfirmScreen';
@@ -428,12 +430,10 @@ describe('ConfirmScreen document states', () => {
     );
   });
 
-  it('says benefits summaries are reviewed later', async () => {
-    db.documents = [sampleBenefitsDocument];
+  it('says offer letters are kept but not read', async () => {
+    db.documents = [{ ...sampleBenefitsDocument, type: 'offer_letter' }];
     renderConfirm(BENEFITS_DOC_ID);
-    expect(
-      await screen.findByText(/Benefits summaries are reviewed with your health plan decision/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Offer letters are kept but not read yet/)).toBeInTheDocument();
   });
 
   it('says so when the document does not exist', async () => {
@@ -442,5 +442,197 @@ describe('ConfirmScreen document states', () => {
       'Could not load this document. Document not found',
     );
     expect(screen.getByRole('link', { name: 'Back to documents' })).toBeInTheDocument();
+  });
+});
+
+describe('ConfirmScreen benefits summary', () => {
+  const BENEFITS_FIELDS = 'Plans and 401(k) match';
+  const benefitsCard = () => screen.getByRole('region', { name: BENEFITS_FIELDS });
+  const benefitsRow = (name: string) => within(benefitsCard()).getByRole('group', { name });
+
+  async function renderBenefits() {
+    const rendered = renderConfirm(BENEFITS_DOC_ID);
+    await screen.findByRole('region', { name: BENEFITS_FIELDS });
+    return rendered;
+  }
+
+  beforeEach(() => {
+    db.documents = [];
+    benefitsWaiting();
+  });
+
+  it('lists each plan, the match tiers and vesting with their confidence', async () => {
+    await renderBenefits();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Check what we read from your benefits summary',
+    );
+    expect(benefitsCard()).toHaveTextContent('0 of 21 confirmed');
+    for (const heading of ['Plan 1: Bronze HSA', 'Plan 2: Gold PPO', '401(k) match']) {
+      expect(
+        within(benefitsCard()).getByRole('heading', { level: 3, name: heading }),
+      ).toBeInTheDocument();
+    }
+    expect(benefitsRow('Plan 1: Plan type')).toHaveTextContent('High deductible (HDHP)');
+    expect(benefitsRow('Plan 1: Deductible')).toHaveTextContent('$1,800.00');
+    expect(benefitsRow('Plan 2: Coinsurance')).toHaveTextContent('10%');
+    expect(within(benefitsRow('Plan 2: Coinsurance')).getByText('Check · 82%')).toBeInTheDocument();
+    expect(benefitsRow('Plan 2: Enrollment deadline')).toHaveTextContent('Nov 14, 2026');
+    expect(benefitsRow('Tier 1: Employer match')).toHaveTextContent('100%');
+    expect(benefitsRow('Tier 2: Matched up to (% of pay)')).toHaveTextContent(
+      'Cumulative: 2.00% added to the tiers before it',
+    );
+    expect(benefitsRow('Years to full vesting')).toHaveTextContent('3 years');
+
+    const pane = sourcePane();
+    expect(
+      within(pane).getByRole('list', { name: 'Redacted benefits summary' }),
+    ).toBeInTheDocument();
+    expect(within(pane).getByText('0 items redacted')).toBeInTheDocument();
+    expect(within(pane).getByText('ACME CORP 2027 BENEFITS SUMMARY')).toBeInTheDocument();
+    expect(pane).toHaveTextContent('Find each value in these lines');
+    expect(highlighted()).toHaveLength(0);
+  });
+
+  it('edits a field, confirms the rest and sends the plans and the match', async () => {
+    const bodies = confirmBodies();
+    const { user } = await renderBenefits();
+    await user.click(
+      within(benefitsRow('Plan 1: Deductible')).getByRole('button', {
+        name: 'Edit Plan 1: Deductible',
+      }),
+    );
+    const input = within(benefitsRow('Plan 1: Deductible')).getByLabelText('Plan 1: Deductible');
+    await user.clear(input);
+    await user.type(input, '2,000{Enter}');
+    expect(benefitsRow('Plan 1: Deductible')).toHaveTextContent('$2,000.00');
+
+    await user.click(
+      within(benefitsRow('Years to full vesting')).getByRole('button', {
+        name: 'Edit Years to full vesting',
+      }),
+    );
+    expect(
+      within(benefitsRow('Years to full vesting')).getByRole('combobox', {
+        name: 'Years to full vesting',
+      }),
+    ).toHaveDisplayValue('3 years');
+    await user.click(
+      within(benefitsRow('Years to full vesting')).getByRole('button', {
+        name: 'Save and confirm Years to full vesting',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Confirm all remaining' }));
+    expect(benefitsCard()).toHaveTextContent('21 of 21 confirmed');
+    await user.click(continueButton());
+
+    expect(await screen.findByText('Your benefits summary is confirmed.')).toBeInTheDocument();
+    expect(
+      screen.getByText(/401\(k\) match and vesting now come from this summary/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Continue to decisions/ })).toHaveAttribute(
+      'href',
+      '/setup/decisions',
+    );
+    const [bronze, gold] = sampleBenefitsValues.plans;
+    expect(bodies).toEqual([
+      {
+        benefits: {
+          ...sampleBenefitsValues,
+          plans: [{ ...bronze, deductible_cents: 200_000 }, gold],
+        },
+      },
+    ]);
+    expect(planningDb.benefitsPlans).toHaveLength(2);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('needs every required value before continuing', async () => {
+    const proposal = structuredClone(sampleBenefitsProposal);
+    proposal.plans![1]!.fields[0]!.value = null;
+    db.proposals.set(BENEFITS_DOC_ID, proposal);
+    const { user } = await renderBenefits();
+    await user.click(screen.getByRole('button', { name: 'Confirm all remaining' }));
+    expect(benefitsCard()).toHaveTextContent('20 of 21 confirmed');
+    expect(continueButton()).toBeDisabled();
+    expect(screen.getByText('1 left to confirm')).toBeInTheDocument();
+
+    await user.click(
+      within(benefitsRow('Plan 2: Plan name')).getByRole('button', {
+        name: 'Confirm Plan 2: Plan name',
+      }),
+    );
+    expect(within(benefitsRow('Plan 2: Plan name')).getByText('Enter a value')).toBeInTheDocument();
+    await user.type(
+      within(benefitsRow('Plan 2: Plan name')).getByLabelText('Plan 2: Plan name'),
+      'Gold PPO{Enter}',
+    );
+    expect(continueButton()).toBeEnabled();
+  });
+
+  it("shows the server's refusal and keeps what the person checked", async () => {
+    const { user } = await renderBenefits();
+    await user.click(
+      within(benefitsRow('Plan 1: Deductible')).getByRole('button', {
+        name: 'Edit Plan 1: Deductible',
+      }),
+    );
+    const input = within(benefitsRow('Plan 1: Deductible')).getByLabelText('Plan 1: Deductible');
+    await user.clear(input);
+    await user.type(input, '4,000{Enter}');
+    await user.click(screen.getByRole('button', { name: 'Confirm all remaining' }));
+    await user.click(continueButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not save these fields. deductible_cents must not exceed oop_max_cents',
+    );
+    expect(benefitsCard()).toHaveTextContent('21 of 21 confirmed');
+    expect(planningDb.benefitsPlans).toHaveLength(0);
+  });
+
+  it('sends no match when the summary describes none, and says the profile keeps its own', async () => {
+    const proposal = structuredClone(sampleBenefitsProposal);
+    proposal.match_tiers = [];
+    proposal.vesting_years = null;
+    db.proposals.set(BENEFITS_DOC_ID, proposal);
+    const bodies = confirmBodies();
+    const { user } = await renderBenefits();
+    expect(benefitsCard()).toHaveTextContent('0 of 16 confirmed');
+    expect(benefitsCard()).toHaveTextContent(
+      'No 401(k) match was found in this summary, so your plan details keep the match you entered.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Confirm all remaining' }));
+    await user.click(continueButton());
+    expect(await screen.findByText('Your benefits summary is confirmed.')).toBeInTheDocument();
+    expect(screen.queryByText(/401\(k\) match and vesting now come/)).toBeNull();
+    expect(bodies).toEqual([{ benefits: { plans: sampleBenefitsValues.plans, retirement: null } }]);
+  });
+
+  it('points a summary nothing could be read from to the decision cards', async () => {
+    db.documents = [{ ...sampleBenefitsDocument, status: 'manual_entry_required' }];
+    renderConfirm(BENEFITS_DOC_ID);
+    expect(
+      await screen.findByText(/Enter your health plans on the health plan card/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Go to decisions/ })).toHaveAttribute(
+      'href',
+      '/setup/decisions',
+    );
+  });
+
+  it('says a confirmed summary is done and points on to Decisions', async () => {
+    db.documents = [{ ...sampleBenefitsDocument, status: 'confirmed' }];
+    renderConfirm(BENEFITS_DOC_ID);
+    expect(await screen.findByText('This benefits summary is confirmed.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Continue to decisions/ })).toHaveAttribute(
+      'href',
+      '/setup/decisions',
+    );
+  });
+
+  it('follows a benefits summary still being read', async () => {
+    db.documents = [{ ...sampleBenefitsDocument, status: 'extracting' }];
+    renderConfirm(BENEFITS_DOC_ID);
+    expect(
+      await screen.findByRole('progressbar', { name: 'Reading benefits summary' }),
+    ).toBeInTheDocument();
   });
 });

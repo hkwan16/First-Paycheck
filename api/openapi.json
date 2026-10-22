@@ -1,6 +1,162 @@
 {
   "components": {
     "schemas": {
+      "AccountBalanceOut": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "balance_as_of": {
+            "format": "date",
+            "title": "Balance As Of",
+            "type": "string"
+          },
+          "balance_cents": {
+            "title": "Balance Cents",
+            "type": "integer"
+          },
+          "institution_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institution Name"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AccountKind"
+          },
+          "mask": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mask"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "side": {
+            "enum": [
+              "asset",
+              "liability"
+            ],
+            "title": "Side",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "name",
+          "mask",
+          "kind",
+          "role",
+          "institution_name",
+          "side",
+          "balance_cents",
+          "balance_as_of"
+        ],
+        "title": "AccountBalanceOut",
+        "type": "object"
+      },
+      "AccountHoldingsOut": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "cost_basis_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis Cents"
+          },
+          "gain_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gain Cents"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/PositionValue"
+            },
+            "title": "Holdings",
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AccountKind"
+          },
+          "mask": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mask"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "value_cents": {
+            "title": "Value Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "account_id",
+          "as_of",
+          "value_cents",
+          "cost_basis_cents",
+          "gain_cents",
+          "holdings",
+          "name",
+          "mask",
+          "kind"
+        ],
+        "title": "AccountHoldingsOut",
+        "type": "object"
+      },
       "AccountKind": {
         "enum": [
           "checking",
@@ -594,6 +750,181 @@
         "title": "CategoryTotal",
         "type": "object"
       },
+      "CheckInCashFlow": {
+        "properties": {
+          "cash_flow": {
+            "$ref": "#/components/schemas/CashFlow"
+          },
+          "plan": {
+            "items": {
+              "$ref": "#/components/schemas/PlanLine"
+            },
+            "title": "Plan",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cash_flow",
+          "plan"
+        ],
+        "title": "CheckInCashFlow",
+        "type": "object"
+      },
+      "CheckInDetail": {
+        "properties": {
+          "cash_flow": {
+            "$ref": "#/components/schemas/CheckInCashFlow"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "finding_count": {
+            "title": "Finding Count",
+            "type": "integer"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/FindingOut"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "handled_count": {
+            "title": "Handled Count",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "period": {
+            "format": "date",
+            "title": "Period",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CheckinStatus"
+          },
+          "triggered_by": {
+            "$ref": "#/components/schemas/CheckinTrigger"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "period",
+          "triggered_by",
+          "status",
+          "completed_at",
+          "finding_count",
+          "handled_count",
+          "created_at",
+          "updated_at",
+          "findings",
+          "cash_flow"
+        ],
+        "title": "CheckInDetail",
+        "type": "object"
+      },
+      "CheckInSummary": {
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "finding_count": {
+            "title": "Finding Count",
+            "type": "integer"
+          },
+          "handled_count": {
+            "title": "Handled Count",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "period": {
+            "format": "date",
+            "title": "Period",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CheckinStatus"
+          },
+          "triggered_by": {
+            "$ref": "#/components/schemas/CheckinTrigger"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "period",
+          "triggered_by",
+          "status",
+          "completed_at",
+          "finding_count",
+          "handled_count",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CheckInSummary",
+        "type": "object"
+      },
+      "CheckinStatus": {
+        "enum": [
+          "open",
+          "completed"
+        ],
+        "title": "CheckinStatus",
+        "type": "string"
+      },
+      "CheckinTrigger": {
+        "enum": [
+          "schedule",
+          "sync",
+          "manual"
+        ],
+        "title": "CheckinTrigger",
+        "type": "string"
+      },
       "CitationOut": {
         "properties": {
           "key": {
@@ -951,6 +1282,98 @@
         "title": "DecisionVersion",
         "type": "object"
       },
+      "DeductionChangePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "affects": {
+            "anyOf": [
+              {
+                "enum": [
+                  "k401_match",
+                  "health_plans",
+                  "emergency_fund",
+                  "w4",
+                  "spending"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affects"
+          },
+          "amount_cents": {
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "change_cents": {
+            "title": "Change Cents",
+            "type": "integer"
+          },
+          "kind": {
+            "const": "deduction_change",
+            "default": "deduction_change",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "line": {
+            "enum": [
+              "federal_withholding",
+              "social_security",
+              "medicare",
+              "state_tax",
+              "retirement_contribution",
+              "medical_premium",
+              "other_deductions"
+            ],
+            "title": "Line",
+            "type": "string"
+          },
+          "pay_date": {
+            "format": "date",
+            "title": "Pay Date",
+            "type": "string"
+          },
+          "pay_stub_id": {
+            "format": "uuid",
+            "title": "Pay Stub Id",
+            "type": "string"
+          },
+          "previous_cents": {
+            "title": "Previous Cents",
+            "type": "integer"
+          },
+          "previous_pay_date": {
+            "format": "date",
+            "title": "Previous Pay Date",
+            "type": "string"
+          },
+          "previous_pay_stub_id": {
+            "format": "uuid",
+            "title": "Previous Pay Stub Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "affects",
+          "pay_stub_id",
+          "pay_date",
+          "previous_pay_stub_id",
+          "previous_pay_date",
+          "line",
+          "label",
+          "amount_cents",
+          "previous_cents",
+          "change_cents"
+        ],
+        "title": "DeductionChangePayload",
+        "type": "object"
+      },
       "DocumentCreated": {
         "properties": {
           "document_id": {
@@ -1174,6 +1597,109 @@
         ],
         "title": "DocumentType",
         "type": "string"
+      },
+      "ElectionMismatchPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "actual_cents": {
+            "title": "Actual Cents",
+            "type": "integer"
+          },
+          "actual_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Pct"
+          },
+          "affects": {
+            "anyOf": [
+              {
+                "enum": [
+                  "k401_match",
+                  "health_plans",
+                  "emergency_fund",
+                  "w4",
+                  "spending"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affects"
+          },
+          "calculator": {
+            "enum": [
+              "k401_match",
+              "health_plans"
+            ],
+            "title": "Calculator",
+            "type": "string"
+          },
+          "difference_cents": {
+            "title": "Difference Cents",
+            "type": "integer"
+          },
+          "elected_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elected Pct"
+          },
+          "expected_cents": {
+            "title": "Expected Cents",
+            "type": "integer"
+          },
+          "kind": {
+            "const": "election_mismatch",
+            "default": "election_mismatch",
+            "title": "Kind",
+            "type": "string"
+          },
+          "pay_date": {
+            "format": "date",
+            "title": "Pay Date",
+            "type": "string"
+          },
+          "pay_stub_id": {
+            "format": "uuid",
+            "title": "Pay Stub Id",
+            "type": "string"
+          },
+          "plan_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Name"
+          }
+        },
+        "required": [
+          "affects",
+          "calculator",
+          "pay_stub_id",
+          "pay_date",
+          "expected_cents",
+          "actual_cents",
+          "difference_cents"
+        ],
+        "title": "ElectionMismatchPayload",
+        "type": "object"
       },
       "EmergencyFundInput": {
         "additionalProperties": false,
@@ -1479,6 +2005,179 @@
         "title": "FilingStatus",
         "type": "string"
       },
+      "FindingAction": {
+        "description": "What the user did with a finding; null undoes it (0012_checkin_findings, spec 015).",
+        "enum": [
+          "done",
+          "dismissed"
+        ],
+        "title": "FindingAction",
+        "type": "string"
+      },
+      "FindingKind": {
+        "enum": [
+          "election_mismatch",
+          "goal_off_pace",
+          "recurring_new",
+          "recurring_changed",
+          "recurring_stopped",
+          "pay_change",
+          "deduction_change",
+          "upcoming_deadline"
+        ],
+        "title": "FindingKind",
+        "type": "string"
+      },
+      "FindingOut": {
+        "properties": {
+          "check_in_id": {
+            "format": "uuid",
+            "title": "Check In Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FindingKind"
+          },
+          "payload": {
+            "discriminator": {
+              "mapping": {
+                "deduction_change": "#/components/schemas/DeductionChangePayload",
+                "election_mismatch": "#/components/schemas/ElectionMismatchPayload",
+                "goal_off_pace": "#/components/schemas/GoalOffPacePayload",
+                "pay_change": "#/components/schemas/PayChangePayload",
+                "recurring_changed": "#/components/schemas/RecurringPayload",
+                "recurring_new": "#/components/schemas/RecurringPayload",
+                "recurring_stopped": "#/components/schemas/RecurringPayload",
+                "upcoming_deadline": "#/components/schemas/UpcomingDeadlinePayload"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ElectionMismatchPayload"
+              },
+              {
+                "$ref": "#/components/schemas/GoalOffPacePayload"
+              },
+              {
+                "$ref": "#/components/schemas/RecurringPayload"
+              },
+              {
+                "$ref": "#/components/schemas/PayChangePayload"
+              },
+              {
+                "$ref": "#/components/schemas/DeductionChangePayload"
+              },
+              {
+                "$ref": "#/components/schemas/UpcomingDeadlinePayload"
+              }
+            ],
+            "title": "Payload"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/FindingSeverity"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "user_action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FindingAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user_action_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Action At"
+          }
+        },
+        "required": [
+          "id",
+          "check_in_id",
+          "kind",
+          "severity",
+          "key",
+          "decision_id",
+          "payload",
+          "user_action",
+          "user_action_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "FindingOut",
+        "type": "object"
+      },
+      "FindingPatch": {
+        "additionalProperties": false,
+        "description": "``done`` or ``dismissed``, or null to undo.",
+        "properties": {
+          "user_action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FindingAction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null undoes the action"
+          }
+        },
+        "required": [
+          "user_action"
+        ],
+        "title": "FindingPatch",
+        "type": "object"
+      },
+      "FindingSeverity": {
+        "enum": [
+          "info",
+          "warning",
+          "alert"
+        ],
+        "title": "FindingSeverity",
+        "type": "string"
+      },
       "GoalKind": {
         "enum": [
           "emergency_fund",
@@ -1486,6 +2185,93 @@
         ],
         "title": "GoalKind",
         "type": "string"
+      },
+      "GoalOffPacePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "affects": {
+            "anyOf": [
+              {
+                "enum": [
+                  "k401_match",
+                  "health_plans",
+                  "emergency_fund",
+                  "w4",
+                  "spending"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affects"
+          },
+          "balance_as_of": {
+            "format": "date",
+            "title": "Balance As Of",
+            "type": "string"
+          },
+          "balance_cents": {
+            "title": "Balance Cents",
+            "type": "integer"
+          },
+          "expected_cents": {
+            "title": "Expected Cents",
+            "type": "integer"
+          },
+          "goal_id": {
+            "format": "uuid",
+            "title": "Goal Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "goal_off_pace",
+            "default": "goal_off_pace",
+            "title": "Kind",
+            "type": "string"
+          },
+          "monthly_contribution_cents": {
+            "title": "Monthly Contribution Cents",
+            "type": "integer"
+          },
+          "months_elapsed": {
+            "title": "Months Elapsed",
+            "type": "integer"
+          },
+          "shortfall_cents": {
+            "title": "Shortfall Cents",
+            "type": "integer"
+          },
+          "start_balance_cents": {
+            "title": "Start Balance Cents",
+            "type": "integer"
+          },
+          "started_on": {
+            "format": "date",
+            "title": "Started On",
+            "type": "string"
+          },
+          "target_amount_cents": {
+            "title": "Target Amount Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "affects",
+          "goal_id",
+          "started_on",
+          "start_balance_cents",
+          "monthly_contribution_cents",
+          "months_elapsed",
+          "expected_cents",
+          "balance_cents",
+          "balance_as_of",
+          "shortfall_cents",
+          "target_amount_cents"
+        ],
+        "title": "GoalOffPacePayload",
+        "type": "object"
       },
       "GoalOut": {
         "properties": {
@@ -2007,6 +2793,51 @@
         "title": "HealthcareUsage",
         "type": "string"
       },
+      "HoldingsOut": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/AccountHoldingsOut"
+            },
+            "title": "Accounts",
+            "type": "array"
+          },
+          "cost_basis_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis Cents"
+          },
+          "gain_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gain Cents"
+          },
+          "value_cents": {
+            "title": "Value Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accounts",
+          "value_cents",
+          "cost_basis_cents",
+          "gain_cents"
+        ],
+        "title": "HoldingsOut",
+        "type": "object"
+      },
       "JobKind": {
         "enum": [
           "sync.initial",
@@ -2274,6 +3105,40 @@
         "title": "K401MatchResult",
         "type": "object"
       },
+      "KindTotal": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "checking",
+              "savings",
+              "credit",
+              "investment",
+              "retirement"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "asset",
+              "liability"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "total_cents": {
+            "title": "Total Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "side",
+          "total_cents"
+        ],
+        "title": "KindTotal",
+        "type": "object"
+      },
       "LineItem": {
         "additionalProperties": false,
         "description": "One printed line of the stub's current-period column (spec 005 rule 3).",
@@ -2477,6 +3342,113 @@
         "title": "MatchTier",
         "type": "object"
       },
+      "NetWorthOut": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/AccountBalanceOut"
+            },
+            "title": "Accounts",
+            "type": "array"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "assets_cents": {
+            "title": "Assets Cents",
+            "type": "integer"
+          },
+          "by_kind": {
+            "items": {
+              "$ref": "#/components/schemas/KindTotal"
+            },
+            "title": "By Kind",
+            "type": "array"
+          },
+          "change_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Cents"
+          },
+          "liabilities_cents": {
+            "title": "Liabilities Cents",
+            "type": "integer"
+          },
+          "net_worth_cents": {
+            "title": "Net Worth Cents",
+            "type": "integer"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/NetWorthPoint"
+            },
+            "title": "Series",
+            "type": "array"
+          }
+        },
+        "required": [
+          "as_of",
+          "assets_cents",
+          "liabilities_cents",
+          "net_worth_cents",
+          "change_cents",
+          "accounts",
+          "by_kind",
+          "series"
+        ],
+        "title": "NetWorthOut",
+        "type": "object"
+      },
+      "NetWorthPoint": {
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "assets_cents": {
+            "title": "Assets Cents",
+            "type": "integer"
+          },
+          "liabilities_cents": {
+            "title": "Liabilities Cents",
+            "type": "integer"
+          },
+          "month": {
+            "format": "date",
+            "title": "Month",
+            "type": "string"
+          },
+          "net_worth_cents": {
+            "title": "Net Worth Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "as_of",
+          "assets_cents",
+          "liabilities_cents",
+          "net_worth_cents"
+        ],
+        "title": "NetWorthPoint",
+        "type": "object"
+      },
       "NumberClaim": {
         "additionalProperties": false,
         "description": "A figure the explanation states, for the UI to show beside the text.",
@@ -2514,6 +3486,94 @@
           "annual_wages_cents"
         ],
         "title": "OtherJob",
+        "type": "object"
+      },
+      "PayChangePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "affects": {
+            "anyOf": [
+              {
+                "enum": [
+                  "k401_match",
+                  "health_plans",
+                  "emergency_fund",
+                  "w4",
+                  "spending"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affects"
+          },
+          "gross_cents": {
+            "title": "Gross Cents",
+            "type": "integer"
+          },
+          "gross_change_cents": {
+            "title": "Gross Change Cents",
+            "type": "integer"
+          },
+          "kind": {
+            "const": "pay_change",
+            "default": "pay_change",
+            "title": "Kind",
+            "type": "string"
+          },
+          "net_cents": {
+            "title": "Net Cents",
+            "type": "integer"
+          },
+          "net_change_cents": {
+            "title": "Net Change Cents",
+            "type": "integer"
+          },
+          "pay_date": {
+            "format": "date",
+            "title": "Pay Date",
+            "type": "string"
+          },
+          "pay_stub_id": {
+            "format": "uuid",
+            "title": "Pay Stub Id",
+            "type": "string"
+          },
+          "previous_gross_cents": {
+            "title": "Previous Gross Cents",
+            "type": "integer"
+          },
+          "previous_net_cents": {
+            "title": "Previous Net Cents",
+            "type": "integer"
+          },
+          "previous_pay_date": {
+            "format": "date",
+            "title": "Previous Pay Date",
+            "type": "string"
+          },
+          "previous_pay_stub_id": {
+            "format": "uuid",
+            "title": "Previous Pay Stub Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "affects",
+          "pay_stub_id",
+          "pay_date",
+          "previous_pay_stub_id",
+          "previous_pay_date",
+          "gross_cents",
+          "previous_gross_cents",
+          "gross_change_cents",
+          "net_cents",
+          "previous_net_cents",
+          "net_change_cents"
+        ],
+        "title": "PayChangePayload",
         "type": "object"
       },
       "PayFrequency": {
@@ -3122,6 +4182,63 @@
         "title": "PlanKind",
         "type": "string"
       },
+      "PlanLine": {
+        "properties": {
+          "actual_cents": {
+            "title": "Actual Cents",
+            "type": "integer"
+          },
+          "difference_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference Cents"
+          },
+          "key": {
+            "enum": [
+              "take_home",
+              "essentials",
+              "flexible",
+              "other",
+              "savings",
+              "retirement",
+              "health",
+              "left_over"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "plan_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Cents"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "actual_cents",
+          "plan_cents",
+          "difference_cents"
+        ],
+        "title": "PlanLine",
+        "type": "object"
+      },
       "PlanOut": {
         "properties": {
           "as_of": {
@@ -3419,6 +4536,70 @@
           "enrollment_deadline"
         ],
         "title": "PlanValues",
+        "type": "object"
+      },
+      "PositionValue": {
+        "properties": {
+          "cost_basis_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis Cents"
+          },
+          "gain_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gain Cents"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "security_id": {
+            "title": "Security Id",
+            "type": "string"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "value_cents": {
+            "title": "Value Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "security_id",
+          "name",
+          "ticker",
+          "quantity",
+          "value_cents",
+          "cost_basis_cents",
+          "gain_cents"
+        ],
+        "title": "PositionValue",
         "type": "object"
       },
       "ProfileIn": {
@@ -3939,6 +5120,109 @@
           }
         },
         "title": "RecurringPatch",
+        "type": "object"
+      },
+      "RecurringPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "affects": {
+            "anyOf": [
+              {
+                "enum": [
+                  "k401_match",
+                  "health_plans",
+                  "emergency_fund",
+                  "w4",
+                  "spending"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affects"
+          },
+          "cadence": {
+            "$ref": "#/components/schemas/RecurringCadence"
+          },
+          "change_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Cents"
+          },
+          "first_seen": {
+            "format": "date",
+            "title": "First Seen",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "recurring_new",
+              "recurring_changed",
+              "recurring_stopped"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_seen": {
+            "format": "date",
+            "title": "Last Seen",
+            "type": "string"
+          },
+          "merchant": {
+            "title": "Merchant",
+            "type": "string"
+          },
+          "previous_amount_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Amount Cents"
+          },
+          "recurring_charge_id": {
+            "format": "uuid",
+            "title": "Recurring Charge Id",
+            "type": "string"
+          },
+          "typical_amount_cents": {
+            "title": "Typical Amount Cents",
+            "type": "integer"
+          },
+          "user_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecurringUserStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "affects",
+          "kind",
+          "recurring_charge_id",
+          "merchant",
+          "cadence",
+          "typical_amount_cents",
+          "first_seen",
+          "last_seen",
+          "user_status"
+        ],
+        "title": "RecurringPayload",
         "type": "object"
       },
       "RecurringStatus": {
@@ -4466,6 +5750,66 @@
           "next_cursor"
         ],
         "title": "TransactionPage",
+        "type": "object"
+      },
+      "UpcomingDeadlinePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "affects": {
+            "anyOf": [
+              {
+                "enum": [
+                  "k401_match",
+                  "health_plans",
+                  "emergency_fund",
+                  "w4",
+                  "spending"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affects"
+          },
+          "calendar_event_id": {
+            "format": "uuid",
+            "title": "Calendar Event Id",
+            "type": "string"
+          },
+          "calendar_kind": {
+            "$ref": "#/components/schemas/CalendarKind"
+          },
+          "days_until": {
+            "title": "Days Until",
+            "type": "integer"
+          },
+          "due_at": {
+            "format": "date",
+            "title": "Due At",
+            "type": "string"
+          },
+          "kind": {
+            "const": "upcoming_deadline",
+            "default": "upcoming_deadline",
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "affects",
+          "calendar_event_id",
+          "calendar_kind",
+          "title",
+          "due_at",
+          "days_until"
+        ],
+        "title": "UpcomingDeadlinePayload",
         "type": "object"
       },
       "ValidationError": {
@@ -5420,6 +6764,46 @@
       "get": {
         "description": "Upcoming events, soonest first; done and dismissed ones stay for the plan export.",
         "operationId": "list_calendar",
+        "parameters": [
+          {
+            "description": "Earliest due date, inclusive",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Earliest due date, inclusive",
+              "title": "From"
+            }
+          },
+          {
+            "description": "Latest due date, inclusive",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Latest due date, inclusive",
+              "title": "To"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -5444,6 +6828,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
           }
         },
         "security": [
@@ -5541,6 +6935,205 @@
         "summary": "Get Cashflow",
         "tags": [
           "spending"
+        ]
+      }
+    },
+    "/check-ins": {
+      "get": {
+        "description": "The user's check-ins, newest month first, with finding counts.",
+        "operationId": "list_check_ins",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CheckInSummary"
+                  },
+                  "title": "Response List Check Ins",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Check Ins",
+        "tags": [
+          "check-ins"
+        ]
+      }
+    },
+    "/check-ins/{check_in_id}": {
+      "get": {
+        "description": "One check-in: its findings and the month's cash flow against the plan.",
+        "operationId": "get_check_in",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "check_in_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Check In Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckInDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Check In",
+        "tags": [
+          "check-ins"
+        ]
+      }
+    },
+    "/check-ins/{check_in_id}/findings/{finding_id}": {
+      "patch": {
+        "description": "Mark a finding done or dismissed, or undo that with null.",
+        "operationId": "update_finding",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "check_in_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Check In Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "finding_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Finding Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FindingPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Finding",
+        "tags": [
+          "check-ins"
         ]
       }
     },
@@ -6396,6 +7989,43 @@
         ]
       }
     },
+    "/holdings": {
+      "get": {
+        "description": "The newest holdings of each investment and retirement account, with gains.",
+        "operationId": "get_holdings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Holdings",
+        "tags": [
+          "net worth"
+        ]
+      }
+    },
     "/jobs/{job_id}": {
       "get": {
         "description": "One of the user's jobs.",
@@ -6462,6 +8092,69 @@
         "summary": "Get Job",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/net-worth": {
+      "get": {
+        "description": "Assets minus liabilities now and at the end of each month, from balance snapshots.",
+        "operationId": "get_net_worth",
+        "parameters": [
+          {
+            "description": "Months in the series, ending this month",
+            "in": "query",
+            "name": "months",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "description": "Months in the series, ending this month",
+              "maximum": 60,
+              "minimum": 1,
+              "title": "Months",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetWorthOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Net Worth",
+        "tags": [
+          "net worth"
         ]
       }
     },

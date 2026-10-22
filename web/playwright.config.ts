@@ -76,7 +76,8 @@ export default defineConfig({
       dependencies: ['setup'],
       use: { ...desktop, storageState: STORAGE_STATE },
     },
-    // Saves 401(k) decisions over the pay stub Confirm confirmed.
+    // Saves the 401(k), emergency fund and health plan decisions over the pay
+    // stub Confirm confirmed.
     {
       name: 'authenticated-decisions',
       testMatch: 'decisions.spec.ts',

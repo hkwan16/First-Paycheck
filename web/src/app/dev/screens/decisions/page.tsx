@@ -5,7 +5,7 @@ import { HydrationMarker } from '@/app/hydration-marker';
 
 export const metadata: Metadata = { title: 'Sample: Decisions', robots: { index: false } };
 
-/** The Decisions screen on the sample 401(k) decision, for visual baselines. Development only. */
+/** The Decisions screen on the sample saved decisions, for visual baselines. Development only. */
 export default function SampleDecisionsPage() {
   if (process.env.NODE_ENV === 'production') notFound();
   return (
