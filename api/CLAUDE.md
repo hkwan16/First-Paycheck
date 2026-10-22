@@ -127,6 +127,18 @@ Rules:
   stubs; the exemption is scoped to that file). It parses money as `Decimal`
   and raises `PlaidError` without request bodies. Access tokens are `SecretStr`
   everywhere and encrypted with `sync/crypto.py` before they touch the database.
+- `POST /sync/items` (`link_item`) takes a Link `public_token`, or, while
+  `PLAID_ENV=sandbox` (`SandboxAllowed`), a `sandbox_institution_id` for which
+  it makes the public token itself through `sandbox_public_token_create`
+  (spec 002 rule 27). With the latter, `sandbox_username` (1-64 characters)
+  and `sandbox_password` (a `SecretStr` of up to 65,536 characters, only with
+  the username) pick Plaid's sandbox user, sent as `override_username` and
+  `override_password`: `user_good` when absent, `user_transactions_dynamic`
+  (checking, a credit card and five loans with a history dated relative to
+  today), `user_custom` with a JSON configuration as its password, or a
+  Sandbox Studio user. The password is a Plaid test configuration, still never
+  logged, stored or echoed. Plaid refuses a request body over 100,000 bytes, so
+  a configuration much over 64 KB cannot go this way.
 - The webhook route verifies the signature in a dependency declared before
   its database session, then calls `enqueue_sync_for_plaid_item` through
   `ServiceSession` (`SET LOCAL ROLE app_api`), the one granted function.
