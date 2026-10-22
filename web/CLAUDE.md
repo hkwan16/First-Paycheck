@@ -72,16 +72,17 @@ src/components/sankey/  the cash-flow diagram: layout.ts, popover.ts, keyboard.t
                     useContainerWidth, CashFlowSankey, FlowStack (see "Cash flow diagram")
 src/components/icons.tsx  the mockup's SVG glyphs, decorative, drawn in currentColor
 src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts, client.ts,
-                    upload.ts, keys.ts, errors.ts, hooks/), auth/ (next-path, protected,
+                    upload.ts, download.ts, keys.ts, errors.ts, hooks/), auth/ (next-path, protected,
                     validation, errors, account), supabase/ (env, client, server, proxy),
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
                     documents.ts, decisions.ts, deep-equal.ts, features.ts, findings.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts,
                     page-hydration.ts
 src/app/dev/screens/{link,spending,confirm,confirm/manual,confirm/benefits,decisions,why,why/fallback,
-                    why-index,check-in,check-in/complete,check-in-index}  a screen on the sample
-                    data, no API (development only)
+                    why-index,check-in,check-in/complete,check-in-index,plan,plan/empty}  a screen on
+                    the sample data, no API (development only)
 src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fake-xhr.ts,
+                    fake-download.ts (object URLs and anchor clicks recorded, no navigation),
                     fixtures/sample.ts (the Acme / J. Rivera dataset), fixtures/documents.ts (the
                     Acme pay stub as the API proposes it), fixtures/decisions.ts (profile, 401(k)
                     decision, explanations, calendar event), fixtures/k401-results.json (calculator
@@ -97,9 +98,11 @@ src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fa
                     `spendingDb`), msw/planning-handlers.ts (M6 and M7 calculators, goals,
                     benefits plans, benefits confirm; `planningDb`),
                     fixtures/checkins.ts (spec 015's November user: check-ins, findings, plan
-                    lines, calendar, net worth, holdings), msw/checkin-handlers.ts (`checkinDb`)
+                    lines, calendar, net worth, holdings), msw/checkin-handlers.ts (`checkinDb`),
+                    fixtures/plan.ts (`GET /plan` built from the decision, goal, calendar and pay
+                    stub fixtures; export jobs), msw/plan-handlers.ts (`planDb`)
 e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions,
-                    import, check-in, alpha), support/auth.ts, support/api.ts, fixtures/ (synthetic
+                    plan, import, check-in, alpha), support/auth.ts, support/api.ts, fixtures/ (synthetic
                     acme-paystub.pdf and the script that makes it, bank-export.csv), baselines
 ```
 
@@ -154,8 +157,11 @@ next is a real disabled button, never a dead link).
   `queryKeys.transactionPages(filters)`; the trailing `'pages'` keeps its `InfiniteData` apart
   from plain reads under the same prefix.
   Documents: `invalidateDocuments` after an upload or extraction, `invalidateAfterConfirm`
-  (documents, pay stubs, benefits plans and the profile) after a confirm. Decisions: `invalidateDecisions` (the list and every
+  (documents, pay stubs, benefits plans, the profile and the plan) after a confirm. Decisions: `invalidateDecisions` (the list and every
   `GET /decisions/{id}`) and `invalidateAfterDecision` (also calendar, plan and goals) after a save.
+  `GET /plan` repeats decisions, goals, the calendar, explanation statuses and the newest pay stub,
+  so whatever changes one of those invalidates `queryKeys.plan()` too (a goal change, a new
+  explanation, a confirm, a sync's balances).
 - **Calculators**: `useCalc(path, inputs)` (`hooks/calc.ts`) runs a `POST /calc/*` route as a
   query keyed by its body (`queryKeys.calc(path, body)`), so the same inputs never ask twice. It
   waits `CALC_DEBOUNCE_MS` (150 ms) after the inputs stop changing, keeps the previous result on
@@ -177,7 +183,7 @@ next is a real disabled button, never a dead link).
 - **Goals and plans**: `useGoals()` reads `GET /goals` (a saved emergency fund decision makes or
   updates one); `useUpdateGoal()` PATCHes `{ goalId, patch }` (status `active`, `paused`,
   `reached`, or a new `monthly_contribution_cents`), writes the returned goal into the cache, then
-  reads the list again. `useBenefitsPlans()` reads the confirmed plans (`GET /benefits-plans`,
+  reads the list and the plan again. `useBenefitsPlans()` reads the confirmed plans (`GET /benefits-plans`,
   newest summary first) that the health plan card compares.
 - **Explanations**: `useExplanation(decisionId)` reads `GET /decisions/{id}/explanation` (a 404
   means none yet); `useExplain()` posts `{ decisionId, force }` to `POST /explain` and writes the
@@ -223,6 +229,20 @@ next is a real disabled button, never a dead link).
   bounds `due_at`; with no bounds it is the plain read under `queryKeys.calendar()`. A finished
   `checkin.monthly` job refreshes the list and every check-in; a sync refreshes net worth and
   holdings.
+- **The plan** (`hooks/plan.ts`, spec 016): `usePlan()` is `GET /plan`. `useExportPlan()` posts
+  `POST /plan/export` (`start()`; the API returns the queued job again while one waits), follows
+  the `plan.export` job with `useJob`, and gives `pdfUrl` once it succeeded; a dead job is
+  `job.isFailed` and `start()` queues a new one. `useDownloadPlanPdf()` (by job id) and
+  `useDownloadCalendar()` wrap the downloads below and resolve with the saved file's name.
+- **Downloads** (`lib/api/download.ts`): a link cannot carry the bearer token, so
+  `downloadPlanPdf(jobId)` and `downloadCalendar()` fetch through `fetchClient` with
+  `parseAs: 'blob'` (the token, one refresh and one resend on a 401, like every request), name
+  the file from Content-Disposition (`filenameFrom`, `filename*=` first, no directory part) and
+  hand it over with `saveFile` (an object URL on a hidden anchor in the document, clicked, revoked
+  after `REVOKE_AFTER_MS`). The API does not list Content-Disposition in CORS `expose_headers`,
+  so a cross-origin browser falls back to `first-paycheck-calendar.ics` and
+  `first-paycheck-plan.pdf`. Failures are `DownloadError` (`status`, 0 for no answer; `code`;
+  `error` for `apiErrorMessage`). `isApiErrorBody` (`errors.ts`) is shared with the uploads.
 - **Uploads** (`lib/api/upload.ts`): `POST /docs` and `POST /accounts/import` (`importCsv`,
   wrapped by `useImportCsv`) go over XMLHttpRequest, because fetch cannot report upload progress.
   They share `sessionTokens` with the fetch middleware (one refresh and one resend on a 401), and
@@ -251,6 +271,16 @@ next is a real disabled button, never a dead link).
   `GET /net-worth`, `GET /holdings`) live in `src/test/msw/checkin-handlers.ts` over `checkinDb`,
   seeded from `fixtures/checkins.ts` (November open with nine findings, October completed) and
   reset after every test. `GET /calendar` filters `from`/`to` over `db.calendar`.
+- Plan routes (`GET /plan`, `GET /plan/calendar.ics`, `POST /plan/export`,
+  `GET /plan/export/{job_id}`) live in `src/test/msw/plan-handlers.ts` over `planDb` (`plan`,
+  the export job ids handed out), reset after every test. `samplePlan()` (every decision saved;
+  the 401(k) explanation verified, the health plan's a fallback, the W-4's not written),
+  `partialPlan()` (the 401(k) only) and `emptyPlan()`; each figure is copied from its decision
+  by the key the API names, never written by hand. The n-th export is `exportJobId(n)`; one
+  nothing scripted has already succeeded, so `scriptJob(exportJobStates(exportJobId(1)))` before
+  the click shows queued, running and succeeded. The PDF streams only for a succeeded export.
+  Downloads in jsdom: `watchDownloads()` (`src/test/fake-download.ts`) records each saved file;
+  call `restore()` and `vi.restoreAllMocks()` in `afterEach`.
 - `scriptJob(states, onSucceeded)` scripts what `GET /jobs/{id}` returns poll by poll;
   `syncJobStates(id)` is queued, running at 40%, succeeded. Drive polling with
   `vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) })` and
@@ -418,6 +448,33 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
   user, so `e2e/check-in.spec.ts` reads what is there and checks the empty state when there is
   nothing.
 
+## Plan screen
+
+`/plan` (`PlanScreen`, from `Plan.dc.html`) is one read of `GET /plan` (spec 016). The side
+nav's "Plan and calendar" gets its done mark when the plan's `completeness.missing` is empty
+(`setupProgress`, `planMissingCount`).
+
+- **Completeness**: an "n of 4 decisions saved" badge (`completenessText`, counting the API's
+  two lists; `confirmed` when nothing is missing) and "Still to decide" linking each missing
+  calculator to its card on Decisions (`DECISION_ANCHORS`, the card headings' ids).
+- **Decisions** (`DecisionSummary`): one `DecisionCard` per saved decision in the API's order,
+  with "v{n} · Saved {date}", the API's `figures` by their labels (`figureText` formats by
+  `kind`: money, a percentage as stored, a count, text; a null `months_to_target` reads "Not
+  within 10 years"; a value of the wrong type throws rather than guessing), and the explanation:
+  a `confirmed` "Verified explanation" badge linking to Why, a warning notice for a fallback, or
+  "Explanation not written yet. Write it". An emergency fund is never explained (spec 011), so
+  it shows none (`explanationView`).
+- **Your paycheck** (`PaycheckCard`): the newest confirmed stub's gross and take-home tiles and
+  its deductions, or a link to Confirm. **Goals** (`GoalsCard`): status badge, contribution,
+  target and date, progress bar. **Next 90 days** (`PlanCalendarCard`): `calendar` through
+  `calendar_through`, each event in its decision's hue (`eventHue`) with a badge to its card.
+- **Export** (`ExportCard`): Download PDF starts `useExportPlan`, shows `JobProgress` while the
+  job runs, downloads once it succeeds (once per job), then says "Downloaded {name}." with
+  Download again. A dead job offers Try again (a new export); a failed download offers Try
+  again (a 404, an export past 7 days, makes a new export). Add to calendar (.ics) downloads at
+  once. One polite status line, always rendered, says what was saved.
+- Nothing saved yet: a card linking to Decisions, and no export.
+
 ## Cash flow diagram
 
 `components/sankey` draws `GET /cashflow` as the mockup does: absolutely positioned HTML buttons
@@ -507,12 +564,12 @@ previews without secrets).
 (git-ignored) for the `authenticated` project, which runs `e2e/auth.spec.ts`. Set these in
 `web/.env.local` or the environment:
 
-| Variable                                                           | Needed for                                                                                                                                                                                                                                         |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)                                                                                                                                                                                 |
-| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                                                                                                           |
-| `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                                                                                                   |
-| `E2E_API_URL`                                                      | `link.spec.ts`, `confirm.spec.ts`, `spending.spec.ts`, `decisions.spec.ts`, `import.spec.ts` and `check-in.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it |
+| Variable                                                           | Needed for                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the signed-out tests (redirect with `next`, wrong-password notice)                                                                                                                                                                                                 |
+| `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`                              | the signed-in tests (sign in, return to `next`, sign out, saved session)                                                                                                                                                                                           |
+| `NEXT_PUBLIC_E2E_USER_EMAIL`                                       | optional; defaults to `E2E_USER_EMAIL` in e2e runs; shows the "Sample data" chip                                                                                                                                                                                   |
+| `E2E_API_URL`                                                      | `link.spec.ts`, `confirm.spec.ts`, `spending.spec.ts`, `decisions.spec.ts`, `plan.spec.ts`, `import.spec.ts` and `check-in.spec.ts`: a running non-production API with Plaid sandbox credentials and a worker; the web server's `NEXT_PUBLIC_API_URL` points at it |
 
 Missing variables skip those tests with a message saying which to set. The e2e user must be a
 confirmed user: the hosted project requires email confirmation, so create it in the Supabase
@@ -538,7 +595,11 @@ accepts verified, fallback, or "not available" when the API has no model; it the
 emergency fund version and pauses and resumes its goal, and saves a health plan choice (typing two
 synthetic plans when no benefits summary is confirmed) with an enrollment deadline, and saves a W-4
 version that reads those two decisions, with its reminder. Decisions cannot be
-deleted, so it reads the current version instead of assuming v1. `check-in.spec.ts` (project
+deleted, so it reads the current version instead of assuming v1. `plan.spec.ts` (project
+`authenticated-plan`, after decisions) reads the four decisions back on `/plan` (and the nav's
+done mark), downloads the `.ics` and checks its first line is `BEGIN:VCALENDAR`, and exports the
+PDF through the worker, checking the `GET /plan/export/{id}` response is `application/pdf` and
+the saved file starts with `%PDF-`. `check-in.spec.ts` (project
 `authenticated-check-in`) lists the check-ins (or the empty state), opens the newest, marks a
 finding done and undoes it (checking both survive a reload), and opens a check-in that is not
 the user's. Never use a real document as a
