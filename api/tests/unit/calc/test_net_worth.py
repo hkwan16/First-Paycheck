@@ -10,6 +10,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from calc.net_worth import (
+    KINDS,
     HoldingsAccount,
     NetWorthAccount,
     Position,
@@ -17,9 +18,11 @@ from calc.net_worth import (
     holdings,
     months_ending,
     net_worth,
+    side_of,
 )
+from db.enums import AccountKind
 
-CHECKING, SAVINGS, CREDIT, RETIREMENT, BROKERAGE = (uuid.UUID(int=n) for n in range(1, 6))
+CHECKING, SAVINGS, CREDIT, RETIREMENT, BROKERAGE, LOAN = (uuid.UUID(int=n) for n in range(1, 7))
 TODAY = dt.date(2026, 11, 16)
 
 ACCOUNTS = [
@@ -85,6 +88,55 @@ def test_net_worth_by_month() -> None:
         ("retirement", "asset", 21_710),
     ]
     assert {a.account_id: a.balance_cents for a in result.accounts}[CREDIT] == 60_000
+
+
+def test_net_worth_counts_a_loan_as_owed() -> None:
+    # Spec 015 route row 12: row 5 plus a student loan.
+    accounts = [*ACCOUNTS, NetWorthAccount(account_id=LOAN, kind="loan")]
+    snapshots = [
+        *SNAPSHOTS,
+        snap(LOAN, "2026-10-20", 1_210_000),
+        snap(LOAN, "2026-11-15", 1_200_000),
+    ]
+
+    result = net_worth(accounts, snapshots, today=TODAY, months=3)
+
+    assert [(p.month.isoformat(), p.net_worth_cents) for p in result.series] == [
+        ("2026-09-01", 450_000),
+        ("2026-10-01", -745_000),
+        ("2026-11-01", -652_246),
+    ]
+    assert result.change_cents == -1_102_246
+    assert (result.assets_cents, result.liabilities_cents, result.net_worth_cents) == (
+        607_754,
+        1_260_000,
+        -652_246,
+    )
+    loan = next(a for a in result.accounts if a.account_id == LOAN)
+    assert (loan.kind, loan.side, loan.balance_cents) == ("loan", "liability", 1_200_000)
+    assert [(k.kind, k.side, k.total_cents) for k in result.by_kind] == [
+        ("checking", "asset", 312_044),
+        ("savings", "asset", 274_000),
+        ("credit", "liability", 60_000),
+        ("loan", "liability", 1_200_000),
+        ("retirement", "asset", 21_710),
+    ]
+
+
+def test_every_kind_has_a_side() -> None:
+    assert {kind: side_of(kind) for kind in KINDS} == {
+        "checking": "asset",
+        "savings": "asset",
+        "credit": "liability",
+        "loan": "liability",
+        "investment": "asset",
+        "retirement": "asset",
+    }
+
+
+def test_kinds_follow_the_account_kind_enum() -> None:
+    # by_kind is in account_kind order (spec 015), and every stored kind needs a side.
+    assert list(KINDS) == [kind.value for kind in AccountKind]
 
 
 def test_months_before_any_snapshot_are_left_out() -> None:

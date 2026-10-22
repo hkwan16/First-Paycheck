@@ -52,6 +52,16 @@ describe('CsvImport', () => {
     expect(within(region()).getByRole('button', { name: 'Import CSV' })).toBeDisabled();
   });
 
+  it('offers every account type for a new account, a loan among them', () => {
+    setup();
+    const kinds = within(region()).getByLabelText('Account type');
+    expect(
+      within(kinds)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['Checking', 'Savings', 'Credit card', 'Loan', 'Investment', 'Retirement']);
+  });
+
   it('imports into a new account with the chosen sign, then follows both jobs', async () => {
     scriptJob(jobStates(IMPORTED.categorize_job_id, 'categorize.run'));
     scriptJob(jobStates(IMPORTED.recurring_job_id, 'recurring.detect'));

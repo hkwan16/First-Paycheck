@@ -6,10 +6,10 @@ import { Card } from '@/components/ui/Card';
 import { Money } from '@/components/ui/Money';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { maskLabel } from '@/lib/accounts';
+import { ACCOUNT_KIND_LABELS, maskLabel } from '@/lib/accounts';
 import { apiErrorMessage } from '@/lib/api/errors';
 import { useHoldings, useNetWorth } from '@/lib/api/hooks';
-import type { AccountBalance, AccountKind, AccountRole, NetWorth } from '@/lib/api/types';
+import type { AccountBalance, AccountRole, NetWorth } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import { HoldingsTable } from './HoldingsTable';
@@ -25,16 +25,8 @@ const ROLE_LABELS: Record<AccountRole, string> = {
   retirement: 'Retirement',
 };
 
-const KIND_LABELS: Record<AccountKind, string> = {
-  checking: 'Checking',
-  savings: 'Savings',
-  credit: 'Credit card',
-  investment: 'Investment',
-  retirement: 'Retirement',
-};
-
 function accountNote(account: AccountBalance): string {
-  const what = account.role ? ROLE_LABELS[account.role] : KIND_LABELS[account.kind];
+  const what = account.role ? ROLE_LABELS[account.role] : ACCOUNT_KIND_LABELS[account.kind];
   return account.side === 'liability' ? `${what} · owed` : what;
 }
 

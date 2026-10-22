@@ -107,7 +107,7 @@ PostgreSQL with row-level security on every table; every user row carries `user_
 | `benefits_plans` | Confirmed plan options from the benefits summary | name, kind (hdhp, ppo, hmo), premium_per_period_cents, deductible_cents, oop_max_cents, coinsurance, employer_hsa_cents, enrollment_deadline |
 | `benefits_chunks` | Chunked benefits text with a `tsvector` for retrieval | document_id, chunk_index, text, search |
 | `sync_items` | One per linked institution | provider (plaid, csv), provider_item_id, access_token (encrypted), cursor, status, last_synced_at |
-| `accounts` | Every bank, card, investment or retirement account | sync_item_id, provider_account_id, kind (checking, savings, credit, investment, retirement), name, mask, role (spending, emergency_fund, retirement), is_active |
+| `accounts` | Every bank, card, loan, investment or retirement account | sync_item_id, provider_account_id, kind (checking, savings, credit, loan, investment, retirement), name, mask, role (spending, emergency_fund, retirement), is_active |
 | `transactions` | Every transaction, from any provider; `amount_cents > 0` is money out | account_id, provider_txn_id, posted_at, amount_cents, merchant_raw, merchant_clean, merchant_norm, category, category_source (rule, user, llm), confidence, pending |
 | `category_rules` | Merchant to category mappings, seeded and learned from user fixes | user_id (NULL for seed rows), merchant_norm, match (exact, prefix), category, source (seed, user) |
 | `balance_snapshots` | Balance per account per sync | account_id, as_of, balance_cents |

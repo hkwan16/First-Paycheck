@@ -29,6 +29,12 @@ pytestmark = pytest.mark.plaid_sandbox
 
 READY_ATTEMPTS = 12
 READY_WAIT_SECONDS = 5.0
+SANDBOX_LOANS = (
+    "Plaid Student Loan",
+    "Plaid Mortgage",
+    "Plaid Auto Loan",
+    "Plaid Home Equity Line of Credit",
+)
 
 
 @pytest.fixture
@@ -97,5 +103,15 @@ def test_first_platypus_bank_syncs_end_to_end(
         assert counts[1] >= 1
         assert counts[2] >= 1
         assert counts[3]
+        kinds: dict[str, str] = dict(
+            db_connection.execute(
+                text("SELECT name, kind::text FROM accounts WHERE user_id = :u"),
+                {"u": user_a.id},
+            ).all()
+        )
+        # The sandbox's loans are loans, never credit cards (spec 002 rule 4).
+        assert {name: kinds.get(name) for name in SANDBOX_LOANS} == dict.fromkeys(
+            SANDBOX_LOANS, "loan"
+        )
     finally:
         plaid.item_remove(token)

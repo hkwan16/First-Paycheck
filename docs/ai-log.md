@@ -367,3 +367,21 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above. Production walkthrough issue closed on the board; the alpha document's screenshot table now says what each shot shows without a model key.
 
 **Time saved or lost:** Not measured. Six capture runs before all 18 passed; each failure was a real difference between a deployed product and the local stack.
+
+## 2026-10-22: loans were listed as credit cards on the net worth card
+
+**Task:** The backlog bug "Net worth lists loans under the right kind, not Credit card", found on the production walkthrough: the check-in's net worth card read "Plaid Auto Loan ··9003, Credit card · owed", and the same for the mortgage, the student loan and the home equity line.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree.
+
+**Prompt or skill:** Specs first, failing tests first, then the enum, migration, mapping, contract and web label.
+
+**What it produced:** A `loan` account kind. Specs 001, 002, 010 and 015 (and the technical spec's table) say Plaid's `loan` type maps to it and that `credit` and `loan` are both liabilities, with spec 015 route row 12 worked by hand for a student loan. Migration `0015_loan_account_kind` adds the label after `credit`, and its downgrade maps loans back to `credit` and rebuilds the type. The web's kind labels moved to `lib/accounts.ts`, so the net worth card and the CSV import's account types read the same exhaustive map.
+
+**What was wrong:** `sync/plaid/provider.py:account_kind` had `case "credit" | "loan": return AccountKind.CREDIT`, as spec 002 rule 4 said at the time. The totals were already right, because a loan was a liability either way. Only the kind, and so the label, was wrong. The recorded sandbox test even asserted `kinds["Plaid Mortgage"] is AccountKind.CREDIT`, so the tests had locked the label bug in.
+
+**How it was caught:** On the production walkthrough's check-in screenshot. A scratch script linked the live sandbox bank and printed each account's Plaid type and mapped kind: all four loans came out as `credit`. After the fix, the same bank linked on the local e2e stack (real API, worker and Plaid sandbox) gives `GET /net-worth` with four `loan` rows on the liability side and the same totals production showed (assets 8,654,174, liabilities 16,370,589).
+
+**Fix:** As above. Existing loan accounts stored as `credit` change on their item's next sync, because the upsert rewrites `kind`. The migration cannot tell a loan from a card, so it changes no rows. The live `plaid_sandbox` test now asserts the four sandbox loans arrive as `loan`.
+
+**Time saved or lost:** Not measured.

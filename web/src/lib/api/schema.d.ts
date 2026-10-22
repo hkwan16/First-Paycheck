@@ -965,7 +965,7 @@ export interface components {
      * AccountKind
      * @enum {string}
      */
-    AccountKind: 'checking' | 'savings' | 'credit' | 'investment' | 'retirement';
+    AccountKind: 'checking' | 'savings' | 'credit' | 'loan' | 'investment' | 'retirement';
     /** AccountOut */
     AccountOut: {
       /** Balance As Of */
@@ -2206,7 +2206,7 @@ export interface components {
        * Kind
        * @enum {string}
        */
-      kind: 'checking' | 'savings' | 'credit' | 'investment' | 'retirement';
+      kind: 'checking' | 'savings' | 'credit' | 'loan' | 'investment' | 'retirement';
       /**
        * Side
        * @enum {string}

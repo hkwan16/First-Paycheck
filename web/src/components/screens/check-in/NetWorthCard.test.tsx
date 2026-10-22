@@ -45,6 +45,24 @@ describe('NetWorthCard', () => {
     ]);
   });
 
+  it('calls a loan a loan, owed, not a credit card', async () => {
+    const sample = checkinDb.netWorth;
+    const card = sample.accounts.find((a) => a.kind === 'credit')!;
+    checkinDb.netWorth = {
+      ...sample,
+      accounts: [
+        ...sample.accounts,
+        { ...card, account_id: 'loan-9003', name: 'Plaid Auto Loan', mask: '9003', kind: 'loan' },
+      ],
+    };
+    const { card: region } = await open();
+    const accounts = within(region).getByRole('list', { name: 'Accounts' });
+    const items = within(accounts).getAllByRole('listitem');
+    expect(items.map((item) => item.textContent)).toContain(
+      'Plaid Auto Loan··9003Loan · owed$600.00',
+    );
+  });
+
   it('draws the monthly series with a legend, and lists every month in a table', async () => {
     const { card, user } = await open();
     const chart = within(card).getByRole('figure', { name: 'Net worth by month' });

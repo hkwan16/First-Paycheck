@@ -541,7 +541,9 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
   difference moves under the plan and the badge wraps under the actual.
 - **Net worth** (`NetWorthCard`) sits beside it, where the mockup puts it, and on the list of
   check-ins, so it does not wait for the first check-in: the figure, assets and liabilities, the
-  change since the first month, `NetWorthChart`, a "Monthly figures" table, each account, and
+  change since the first month, `NetWorthChart`, a "Monthly figures" table, each account (its
+  role, else its kind from `ACCOUNT_KIND_LABELS` in `lib/accounts.ts`, which the CSV import's
+  account types share; a liability, `side` from the API, adds "owed"), and
   `HoldingsTable` (a basis the API sends as null reads "Not reported", for totals too).
 - **The chart** is Recharts (the one chart library; pinned): three 2 px lines on one money axis
   with an HTML legend, a crosshair tooltip that lists every series, no animation, and the width

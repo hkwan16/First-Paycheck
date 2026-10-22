@@ -162,6 +162,7 @@
           "checking",
           "savings",
           "credit",
+          "loan",
           "investment",
           "retirement"
         ],
@@ -3147,6 +3148,7 @@
               "checking",
               "savings",
               "credit",
+              "loan",
               "investment",
               "retirement"
             ],

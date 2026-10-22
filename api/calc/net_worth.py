@@ -3,7 +3,7 @@
 Pure: the routes read accounts, balance snapshots and holdings under RLS and
 hand them in; every sum is made here so the client never adds money.
 Balances follow spec 001 rule 22: depository and investment balances are money
-held, a credit balance is the amount owed.
+held, a credit or loan balance is the amount owed.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict
 
 __all__ = [
     "KINDS",
+    "LIABILITY_KINDS",
     "AccountBalance",
     "AccountHoldings",
     "Holdings",
@@ -37,14 +38,16 @@ __all__ = [
     "side_of",
 ]
 
-Kind = Literal["checking", "savings", "credit", "investment", "retirement"]
+Kind = Literal["checking", "savings", "credit", "loan", "investment", "retirement"]
 Side = Literal["asset", "liability"]
 # account_kind in its enum order: the order of ``by_kind``.
-KINDS: tuple[Kind, ...] = ("checking", "savings", "credit", "investment", "retirement")
+KINDS: tuple[Kind, ...] = ("checking", "savings", "credit", "loan", "investment", "retirement")
+# Kinds whose balance is the amount owed (spec 001 rule 22).
+LIABILITY_KINDS: frozenset[Kind] = frozenset({"credit", "loan"})
 
 
 def side_of(kind: Kind) -> Side:
-    return "liability" if kind == "credit" else "asset"
+    return "liability" if kind in LIABILITY_KINDS else "asset"
 
 
 class NetWorthAccount(BaseModel):

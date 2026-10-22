@@ -48,7 +48,7 @@ class AccountBalanceOut(BaseModel):
     role: AccountRole | None
     institution_name: str | None
     side: Side
-    # Money held, or for a credit account the amount owed.
+    # Money held, or for a credit or loan account the amount owed.
     balance_cents: int
     balance_as_of: dt.date
 

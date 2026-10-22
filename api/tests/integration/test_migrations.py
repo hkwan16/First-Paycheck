@@ -217,6 +217,62 @@ def test_0012_keys_old_findings_and_maps_their_actions(
         assert list(actions) == ["acted", "acted", "dismissed", None]
 
 
+def account_kinds(engine: Engine) -> list[str]:
+    """The labels of account_kind, in their sort order."""
+    with engine.connect() as connection:
+        return list(
+            connection.execute(
+                text("SELECT unnest(enum_range(NULL::public.account_kind))::text")
+            ).scalars()
+        )
+
+
+def test_0015_adds_loan_after_credit_and_its_downgrade_maps_loans_to_credit(
+    scratch_database: tuple[str, Engine],
+) -> None:
+    url, engine = scratch_database
+    upgrade(url, "0014_delete_account_fn")
+    assert account_kinds(engine) == ["checking", "savings", "credit", "investment", "retirement"]
+
+    upgrade(url, "0015_loan_account_kind")
+    assert account_kinds(engine) == [
+        "checking",
+        "savings",
+        "credit",
+        "loan",
+        "investment",
+        "retirement",
+    ]
+    user = "00000000-0000-4000-8000-0000000000c3"
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO auth.users (id) VALUES (:u)"), {"u": user})
+        item = connection.execute(
+            text("INSERT INTO sync_items (user_id, provider) VALUES (:u, 'csv') RETURNING id"),
+            {"u": user},
+        ).scalar_one()
+        for name, kind in [("Card", "credit"), ("Mortgage", "loan"), ("Checking", "checking")]:
+            connection.execute(
+                text(
+                    "INSERT INTO accounts (user_id, sync_item_id, provider_account_id, kind, name)"
+                    " VALUES (:u, :i, :name, CAST(:kind AS account_kind), :name)"
+                ),
+                {"u": user, "i": item, "name": name, "kind": kind},
+            )
+
+    downgrade(url, "0014_delete_account_fn")
+    assert account_kinds(engine) == ["checking", "savings", "credit", "investment", "retirement"]
+    with engine.connect() as connection:
+        rows = connection.execute(text("SELECT name, kind::text FROM accounts ORDER BY name"))
+        assert [tuple(row) for row in rows] == [
+            ("Card", "credit"),
+            ("Checking", "checking"),
+            ("Mortgage", "credit"),
+        ]
+
+    upgrade(url, "head")
+    assert "loan" in account_kinds(engine)
+
+
 def role_rows(engine: Engine) -> tuple[str, str | None]:
     """The catalog row versions behind app_api and its membership of authenticated."""
     with engine.connect() as connection:

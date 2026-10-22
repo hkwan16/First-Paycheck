@@ -141,7 +141,15 @@ Rules:
   the next revision (`0003_documents`) revises `0006_webhook_fn`;
   `0007_lock_alembic_version` revises `0003_documents`, `0004_decisions`
   revises `0007_lock_alembic_version`, and `0005_checkins` revises
-  `0004_decisions`.
+  `0004_decisions`. After that the chain runs `0008_goals_and_birth_year`,
+  `0011_no_model_reason`, `0009_w4_calendar_kind`, `0012_checkin_findings`,
+  `0013_plan_export_job`, `0014_delete_account_fn`, `0015_loan_account_kind`
+  (each revises the one before it); the head is `0015_loan_account_kind`.
+- Adding an enum label is `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with
+  `AFTER` when the order means something, as `by_kind` does for
+  `account_kind`); the downgrade maps the rows that use it and rebuilds the
+  type from its old labels (`0011_no_model_reason`, `0015_loan_account_kind`).
+  Keep the `StrEnum` in `db/enums.py` in the database's order.
 - Supabase grants every new table and function in `public` to `anon` and
   `authenticated` by default. `enable_rls` revokes that per table; a function
   needs its own `REVOKE ALL ... FROM PUBLIC, anon, authenticated` plus the
@@ -418,7 +426,9 @@ function.
   requests; `checkin/engine.py:queue_check_in_now`; the scheduler and the
   route share `checkin_key` and `monthly_payload`), `PATCH /check-ins/{id}/findings/{fid}` (`done | dismissed | null`;
   `settle_status` completes or reopens the check-in), `GET /net-worth?months=`
-  and `GET /holdings` (`routers/net_worth.py`, sums in `calc/net_worth.py`),
+  and `GET /holdings` (`routers/net_worth.py`, sums in `calc/net_worth.py`;
+  `credit` and `loan` are the liability kinds, `LIABILITY_KINDS`, and `KINDS`
+  follows `AccountKind`'s order, which a unit test checks),
   `GET /calendar?from=&to=`.
 - Tests: `tests/unit/checkin/` (finders from the spec table, reconcile),
   `tests/integration/checkin/` (job, tick, refresh, routes, check in now) on
