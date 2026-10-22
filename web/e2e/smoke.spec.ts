@@ -14,6 +14,11 @@ interface Screen {
 
 const SCREENS: readonly Screen[] = [
   { path: '/sign-in', name: 'sign-in', heading: /Your first month's money decisions/ },
+  {
+    path: '/sign-in?deleted=1',
+    name: 'sign-in-deleted',
+    heading: /Your first month's money decisions/,
+  },
   { path: '/dev/kit', name: 'kit', heading: 'Component kit' },
   {
     path: '/dev/screens/link',
@@ -37,6 +42,30 @@ const SCREENS: readonly Screen[] = [
     path: '/dev/screens/confirm/benefits',
     name: 'confirm-benefits',
     heading: 'Check what we read from your benefits summary',
+    sample: true,
+  },
+  {
+    path: '/dev/screens/confirm/extracting',
+    name: 'confirm-extracting',
+    heading: 'Check what we read from your pay stub',
+    sample: true,
+  },
+  {
+    path: '/dev/screens/confirm/failed',
+    name: 'confirm-failed',
+    heading: 'Check what we read from your pay stub',
+    sample: true,
+  },
+  {
+    path: '/dev/screens/confirm/confirmed',
+    name: 'confirm-confirmed',
+    heading: 'Check what we read from your pay stub',
+    sample: true,
+  },
+  {
+    path: '/dev/screens/account',
+    name: 'account',
+    heading: 'Link your accounts and add your documents',
     sample: true,
   },
   {
@@ -126,14 +155,18 @@ test('the root sends visitors to sign in', async ({ page }) => {
   await expect(page).toHaveURL(/\/sign-in$/);
 });
 
-/** Serious and critical axe violations on the page as it is now. */
+/**
+ * Axe violations on the page as it is now, at every impact. The plan's gate
+ * is serious and critical; the M10 audit left none of any impact, so minor
+ * and moderate ones fail too and stay fixed.
+ */
 async function blockingViolations(page: Page) {
   const { violations } = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
     .analyze();
-  return violations
-    .filter((v) => v.impact === 'serious' || v.impact === 'critical')
-    .map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
+  return violations.map(
+    (v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`,
+  );
 }
 
 const screenAt = (path: string) => SCREENS.find((s) => s.path === path)!;
@@ -157,7 +190,7 @@ async function settled(locator: Locator) {
 
 for (const screen of SCREENS) {
   test.describe(screen.path, () => {
-    test('renders cleanly with no serious or critical axe violations', async ({ page }) => {
+    test('renders cleanly with no axe violations', async ({ page }) => {
       const errors = watchErrors(page);
       await open(page, screen);
       expect(await blockingViolations(page)).toEqual([]);
@@ -168,7 +201,114 @@ for (const screen of SCREENS) {
       await open(page, screen);
       await expect(page).toHaveScreenshot(`${screen.name}.png`, { fullPage: true });
     });
+
+    test('reaches every control by Tab with its focus visible, and lets Tab leave', async ({
+      page,
+    }) => {
+      await open(page, screen);
+      const walk = await tabWalk(page);
+      expect(walk.trapped, `Tab never left the page: ${walk.trail.join(' > ')}`).toBe(false);
+      expect(walk.unreached, 'controls Tab never reached').toEqual([]);
+      expect(walk.unseen, 'controls focused without a visible focus ring').toEqual([]);
+      expect(walk.obscured, 'controls focused under the sticky header').toEqual([]);
+    });
   });
+}
+
+interface TabWalk {
+  trapped: boolean;
+  /** The last controls focused, for a trap's message. */
+  trail: string[];
+  unreached: string[];
+  unseen: string[];
+  obscured: string[];
+}
+
+/**
+ * The keyboard audit: tag every control a person can Tab to (in a roving
+ * group only the one with tabindex 0), press Tab until focus leaves the page,
+ * and report the controls never reached, those focused with no visible ring
+ * (an outline on the control, or on the nearest ancestor that draws one for a
+ * visually hidden input, as the drop zone does), and those the sticky header
+ * covers. Focus that never leaves is a trap.
+ */
+async function tabWalk(page: Page): Promise<TabWalk> {
+  const stops = await page.evaluate(() => {
+    const selector = 'a[href], button, input, select, textarea, summary, [tabindex]';
+    const names: string[] = [];
+    for (const element of document.querySelectorAll<HTMLElement>(selector)) {
+      if (element.tabIndex < 0 || element.matches(':disabled')) continue;
+      if (element instanceof HTMLInputElement && element.type === 'hidden') continue;
+      if (element.closest('[inert], [hidden]')) continue;
+      if (!element.checkVisibility({ visibilityProperty: true })) continue;
+      element.dataset.tabStop = String(names.length);
+      const label =
+        element.getAttribute('aria-label') ??
+        element.textContent?.trim().replace(/\s+/g, ' ').slice(0, 40) ??
+        '';
+      names.push(`${element.tagName.toLowerCase()} "${label}"`);
+    }
+    return names;
+  });
+
+  const reached = new Set<number>();
+  const unseen = new Set<string>();
+  const obscured = new Set<string>();
+  let trapped = true;
+  let previous: number | null = null;
+  const trail: string[] = [];
+  // Controls that appear on focus (a row's Save and Cancel) are extra stops, so allow for them.
+  for (let press = 0; press < 2 * stops.length + 20; press += 1) {
+    await page.keyboard.press('Tab');
+    const focus = await page.evaluate(() => {
+      const element = document.activeElement as HTMLElement | null;
+      if (!element || element === document.body) return null;
+      const drawsRing = (node: Element) => {
+        const style = getComputedStyle(node);
+        return style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0;
+      };
+      let ringed = false;
+      let node: Element | null = element;
+      for (let depth = 0; node && depth < 4 && !ringed; depth += 1) {
+        ringed = drawsRing(node);
+        node = node.parentElement;
+      }
+      // Covered: the point at the middle of the control is the sticky header.
+      const box = element.getBoundingClientRect();
+      const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      const header = document.querySelector('header');
+      const covered =
+        box.width > 1 &&
+        Boolean(header && top && header.contains(top) && !header.contains(element));
+      const name = `${element.tagName.toLowerCase()}#${element.id} "${(element.getAttribute('aria-label') ?? element.textContent ?? '').trim().slice(0, 30)}"`;
+      return { stop: element.dataset.tabStop ?? null, ringed, covered, name };
+    });
+    if (focus === null) {
+      trapped = false;
+      break;
+    }
+    trail.push(focus.name);
+    if (trail.length > 12) trail.shift();
+    if (focus.stop === null) continue;
+    const index = Number(focus.stop);
+    // A date field takes one Tab per part (month, day, year) and stays focused.
+    if (index === previous) continue;
+    previous = index;
+    if (reached.has(index)) {
+      // Back at a control already reached: focus wrapped without leaving.
+      break;
+    }
+    reached.add(index);
+    if (!focus.ringed) unseen.add(stops[index]!);
+    if (focus.covered) obscured.add(stops[index]!);
+  }
+  return {
+    trapped,
+    trail,
+    unreached: stops.filter((_, index) => !reached.has(index)),
+    unseen: [...unseen],
+    obscured: [...obscured],
+  };
 }
 
 test.describe('the cash-flow Sankey', () => {
@@ -230,6 +370,112 @@ test('the CSV import panel opens next to the bank link and stays accessible', as
   expect(await blockingViolations(page)).toEqual([]);
   await expect(panel).toHaveScreenshot('link-csv-import.png');
   expect(errors).toEqual([]);
+});
+
+test('unlinking asks in the page, keeps focus on the safe choice, and stays accessible', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  await open(page, screenAt('/dev/screens/link'));
+  await page.getByRole('button', { name: 'Unlink Chase' }).click();
+  const confirm = page.getByRole('group', { name: 'Unlink Chase?' });
+  await expect(confirm.getByRole('button', { name: 'Keep Chase' })).toBeFocused();
+  expect(await blockingViolations(page)).toEqual([]);
+  await page.keyboard.press('Enter');
+  await expect(confirm).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Unlink Chase' })).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
+test('deleting the account asks for the word in the page and stays accessible', async ({
+  page,
+}) => {
+  const errors = watchErrors(page);
+  await tallWindow(page);
+  await open(page, screenAt('/dev/screens/account'));
+  const chip = page.getByRole('button', { name: 'J. Rivera' });
+  await chip.focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  const remove = page.getByRole('button', { name: 'Delete account' });
+  await expect(remove).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  const confirm = page.getByRole('group', { name: 'Delete your account?' });
+  const field = confirm.getByRole('textbox', { name: 'Type delete to confirm' });
+  await expect(field).toBeFocused();
+  const button = confirm.getByRole('button', { name: 'Delete my account' });
+  await expect(button).toBeDisabled();
+  await field.fill('delete');
+  await expect(button).toBeEnabled();
+  expect(await blockingViolations(page)).toEqual([]);
+  await expect(confirm).toHaveScreenshot('account-delete-confirm.png');
+
+  await confirm.getByRole('button', { name: 'Keep my account' }).click();
+  await expect(remove).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(chip).toBeFocused();
+  await expect(chip).toHaveAttribute('aria-expanded', 'false');
+  expect(errors).toEqual([]);
+});
+
+/**
+ * What moves on the page now: the CSS animations running, by keyframes name,
+ * and the elements that transition a movement (scale, rotate, translate,
+ * transform) over a non-zero duration.
+ */
+async function motion(page: Page) {
+  return page.evaluate(() => {
+    const animations = document
+      .getAnimations()
+      .filter((animation): animation is CSSAnimation => animation instanceof CSSAnimation)
+      .map((animation) => animation.animationName);
+    const moving: string[] = [];
+    for (const element of document.querySelectorAll('*')) {
+      const style = getComputedStyle(element);
+      const properties = style.transitionProperty.split(',').map((p) => p.trim());
+      const durations = style.transitionDuration.split(',').map((d) => parseFloat(d));
+      properties.forEach((property, index) => {
+        const duration = durations[index % durations.length] ?? 0;
+        if (/^(all|scale|rotate|translate|transform)$/.test(property) && duration > 0) {
+          moving.push(`${element.tagName.toLowerCase()}.${property}`);
+        }
+      });
+    }
+    return { animations: [...new Set(animations)], moving: [...new Set(moving)] };
+  });
+}
+
+test('reduced motion keeps feedback but drops every movement', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+
+  // The indeterminate bar pulses in place instead of sliding.
+  await open(page, screenAt('/dev/screens/confirm/extracting'));
+  let now = await motion(page);
+  expect(now.animations).toEqual(['pulse']);
+  expect(now.moving).toEqual([]);
+
+  // Buttons, the segmented control and the account menu's arrow do not move.
+  await open(page, screenAt('/dev/screens/account'));
+  await page.getByRole('button', { name: 'J. Rivera' }).click();
+  now = await motion(page);
+  expect(now.animations).toEqual([]);
+  expect(now.moving).toEqual([]);
+
+  await open(page, screenAt('/dev/screens/decisions'));
+  expect((await motion(page)).moving).toEqual([]);
+
+  // The Sankey's popover fades instead of growing (desktop only).
+  if ((page.viewportSize()?.width ?? 0) >= 640) {
+    await open(page, screenAt('/dev/screens/spending'));
+    const card = page.getByRole('region', { name: 'Where each dollar of October pay went' });
+    await card.getByRole('button', { name: 'Gross pay, 2 stubs $5,416.66' }).focus();
+    await expect(card.getByRole('group', { name: 'Gross pay, 2 stubs' })).toBeVisible();
+    now = await motion(page);
+    expect(now.animations).not.toContain('pop-in');
+    expect(now.moving).toEqual([]);
+  }
 });
 
 test.describe('the net-worth card', () => {
