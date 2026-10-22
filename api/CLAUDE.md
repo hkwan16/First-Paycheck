@@ -399,13 +399,19 @@ function.
 - **Routes.** `GET /check-ins`, `GET /check-ins/{id}` (findings by severity,
   `cash_flow`: `GET /cashflow`'s body for the month to date via
   `routers/cashflow.py:cash_flow_for`, plus `calc/cashflow.py:against_plan`
-  lines), `PATCH /check-ins/{id}/findings/{fid}` (`done | dismissed | null`;
+  lines, each with a `status` `on_plan | over | under` within
+  `max(5% of plan, $25)` from `plan_status`, null without a plan), `POST
+  /check-ins` (`check_in_now`, 202 `{job_id, check_in_id}`: queues the
+  month's keyed job, or once it has started a refresh shared by repeated
+  requests; `checkin/engine.py:queue_check_in_now`; the scheduler and the
+  route share `checkin_key` and `monthly_payload`), `PATCH /check-ins/{id}/findings/{fid}` (`done | dismissed | null`;
   `settle_status` completes or reopens the check-in), `GET /net-worth?months=`
   and `GET /holdings` (`routers/net_worth.py`, sums in `calc/net_worth.py`),
   `GET /calendar?from=&to=`.
 - Tests: `tests/unit/checkin/` (finders from the spec table, reconcile),
-  `tests/integration/checkin/` (job, tick, refresh, routes) on the November
-  user in `tests/support/november.py`; factories `make_decision` (with a
+  `tests/integration/checkin/` (job, tick, refresh, routes, check in now) on
+  the November user in `tests/support/november.py`, with the worker and job
+  readers in `tests/support/checkin_jobs.py`; factories `make_decision` (with a
   chosen `created_at`), `make_goal`, `make_check_in`, `make_finding`,
   `make_calendar_event`.
 
@@ -506,6 +512,7 @@ that returns an already-queued job.
 | `POST /explain` (`explain`) | 30 runs that reach the model | spec 008; stored answers are free |
 | `POST /decisions` (`save_decision`) | 60 | each writes an immutable version |
 | `POST /plan/export` (`export_plan`) | 10 | each queues a WeasyPrint render and stores a PDF |
+| `POST /check-ins` (`check_in_now`) | 10 | each queues a check-in run (finders, reconcile, writes) |
 | `POST /sync/link-token` (`create_link_token`) | 30 | a Plaid call |
 | `POST /sync/items` (`link_item`) | 10 | Plaid exchange plus an initial sync |
 | `POST /sync/items/{id}/sync` (`sync_item`) | 30 | a Plaid `/transactions/sync` per job |

@@ -15,6 +15,7 @@ from calc.cashflow import (
     RoleTotals,
     SpendingActuals,
     against_plan,
+    plan_status,
     withholding,
 )
 from calc.pay_stub import PayStubAmounts
@@ -194,3 +195,70 @@ def test_without_decisions_every_plan_is_null() -> None:
         "health",
         "left_over",
     ]
+
+
+def test_plan_line_status_in_route_row_2() -> None:
+    # Spec 015 rule 19a: the route row 2 lines with their statuses.
+    september = withholding(
+        [PayStubAmounts.model_validate(MOCKUP), PayStubAmounts.model_validate(MOCKUP)]
+    )
+    lines = against_plan(
+        september.total,
+        september.paycheck_count,
+        SEPTEMBER_SPENDING,
+        PlanTargets(
+            contribution_pct=Decimal("4"),
+            premium_per_period_cents=6_250,
+            monthly_essentials_cents=250_000,
+            monthly_savings_cents=50_000,
+        ),
+    )
+    assert {line.key: line.status for line in lines} == {
+        "take_home": None,
+        "essentials": "under",
+        "flexible": None,
+        "other": None,
+        "savings": "under",
+        "retirement": "under",
+        "health": "on_plan",
+        "left_over": None,
+    }
+
+
+@pytest.mark.parametrize(
+    ("plan", "actual", "expected"),
+    [
+        (250_000, 180_000, "under"),
+        (50_000, 40_000, "under"),
+        (21_667, 0, "under"),
+        (12_500, 12_500, "on_plan"),
+        (250_000, 262_500, "on_plan"),
+        (250_000, 262_501, "over"),
+        (250_000, 237_500, "on_plan"),
+        (250_000, 237_499, "under"),
+        (10_000, 12_500, "on_plan"),
+        (10_000, 7_499, "under"),
+        (0, 2_501, "over"),
+        (250_010, 262_511, "on_plan"),
+        (250_010, 262_512, "over"),
+        (None, 999_999, None),
+    ],
+    ids=[f"row-{n}" for n in range(1, 15)],
+)
+def test_plan_status_examples(plan: int | None, actual: int, expected: str | None) -> None:
+    # Spec 015 plan line status table: 5% of the plan or $25, whichever is larger.
+    assert plan_status(actual, plan) == expected
+
+
+@given(
+    plan=st.integers(min_value=0, max_value=10**9),
+    actual=st.integers(min_value=0, max_value=10**9),
+)
+def test_plan_status_is_symmetric_around_the_plan(plan: int, actual: int) -> None:
+    status = plan_status(actual, plan)
+    mirrored = plan_status(2 * plan - actual, plan)
+    flip = {"over": "under", "under": "over", "on_plan": "on_plan"}
+    assert status is not None
+    assert mirrored == flip[status]
+    if actual == plan:
+        assert status == "on_plan"

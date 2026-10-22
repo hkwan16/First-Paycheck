@@ -6,7 +6,8 @@ Each confirmed pay stub becomes seven lines in a fixed order, grouped by role
 the client never adds money. Amounts are the stubs' non-negative magnitudes.
 
 ``against_plan`` sets a month's actuals beside the saved decisions' targets
-for the check-in screen (spec 015 rule 19).
+for the check-in screen (spec 015 rule 19), and ``plan_status`` says which
+side of its plan each line is on (rule 19a).
 """
 
 from __future__ import annotations
@@ -22,17 +23,22 @@ from calc.pay_stub import PayStubAmounts, balance, total_cents
 
 __all__ = [
     "LINES",
+    "PLAN_TOLERANCE_FLOOR_CENTS",
+    "PLAN_TOLERANCE_PCT",
     "CashFlowWithholding",
     "DeductionRole",
     "LineSpec",
     "PlanLine",
     "PlanLineKey",
+    "PlanLineStatus",
     "PlanTargets",
     "RoleTotals",
     "SpendingActuals",
     "StubFlow",
     "WithholdingLine",
     "against_plan",
+    "plan_status",
+    "plan_tolerance",
     "withholding",
 ]
 
@@ -189,6 +195,13 @@ class PlanTargets(BaseModel):
     monthly_savings_cents: Cents | None = None
 
 
+PlanLineStatus = Literal["on_plan", "over", "under"]
+
+# Rule 19a: a line is on plan within 5% of the plan or $25, whichever is larger.
+PLAN_TOLERANCE_PCT = Decimal("5")
+PLAN_TOLERANCE_FLOOR_CENTS = 2_500
+
+
 class PlanLine(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -198,6 +211,27 @@ class PlanLine(BaseModel):
     plan_cents: Cents | None
     # Actual minus plan: positive when the month ran over the plan.
     difference_cents: Cents | None
+    # Which side of the plan the line is on, beyond the tolerance; null without
+    # a plan. Whether over is good depends on the line (spending vs saving).
+    status: PlanLineStatus | None
+
+
+def plan_tolerance(plan_cents: int) -> int:
+    """Rule 19a: ``max(round_half_up(plan * 5 / 100), 2,500)``."""
+    return max(round_half_up(pct_of(plan_cents, PLAN_TOLERANCE_PCT)), PLAN_TOLERANCE_FLOOR_CENTS)
+
+
+def plan_status(actual_cents: int, plan_cents: int | None) -> PlanLineStatus | None:
+    """Rule 19a: ``on_plan`` within the tolerance, else ``over`` or ``under``."""
+    if plan_cents is None:
+        return None
+    difference = actual_cents - plan_cents
+    tolerance = plan_tolerance(plan_cents)
+    if difference > tolerance:
+        return "over"
+    if -difference > tolerance:
+        return "under"
+    return "on_plan"
 
 
 def _line(key: PlanLineKey, label: str, actual: int, plan: int | None) -> PlanLine:
@@ -207,6 +241,7 @@ def _line(key: PlanLineKey, label: str, actual: int, plan: int | None) -> PlanLi
         actual_cents=actual,
         plan_cents=plan,
         difference_cents=None if plan is None else actual - plan,
+        status=plan_status(actual, plan),
     )
 
 

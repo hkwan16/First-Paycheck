@@ -197,6 +197,17 @@ def test_cash_flow_against_the_plan(
         "health": (12_500, 12_500, 0),
         "left_over": (166_808, None, None),
     }
+    # Rule 19a: which side of the plan each line is on, null without a plan.
+    assert {line["key"]: line["status"] for line in flow["plan"]} == {
+        "take_home": None,
+        "essentials": "under",
+        "flexible": None,
+        "other": None,
+        "savings": "under",
+        "retirement": "under",
+        "health": "on_plan",
+        "left_over": None,
+    }
 
 
 def test_unknown_check_in_is_404(frozen: FastAPI, client_as: Client, user_a: FixtureUser) -> None:
