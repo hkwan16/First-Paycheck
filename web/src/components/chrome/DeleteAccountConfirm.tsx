@@ -40,48 +40,46 @@ export function DeleteAccountConfirm({ onCancel }: DeleteAccountConfirmProps) {
   };
 
   return (
-    <form
-      role="group"
-      aria-labelledby={titleId}
-      onSubmit={submit}
-      className="flex flex-col gap-3 p-1"
-    >
-      <p id={titleId} className="m-0 font-semibold">
-        Delete your account?
-      </p>
-      <p className="m-0 text-small text-ink-2">
-        This deletes your account and everything in it: linked banks, transactions, documents,
-        decisions, goals and check-ins. It cannot be undone.
-      </p>
-      <div>
-        <Label htmlFor={fieldId}>
-          Type <strong className="font-bold text-ink">{CONFIRM_WORD}</strong> to confirm
-        </Label>
-        <Input
-          ref={fieldRef}
-          id={fieldId}
-          value={typed}
-          autoComplete="off"
-          autoCapitalize="none"
-          spellCheck={false}
-          readOnly={busy}
-          onChange={(event) => setTyped(event.currentTarget.value)}
-        />
-      </div>
-      {remove.isError && (
-        <p role="alert" className="m-0 text-small text-ink-2">
-          Your account was not deleted.{' '}
-          {apiErrorMessage(remove.error, 'Check your connection and try again.')}
+    // A group around the form: `role="group"` is not allowed on a <form> itself.
+    <div role="group" aria-labelledby={titleId} className="p-1">
+      <form onSubmit={submit} className="flex flex-col gap-3">
+        <p id={titleId} className="m-0 font-semibold">
+          Delete your account?
         </p>
-      )}
-      <div className="flex flex-col gap-2">
-        <Button type="submit" variant="primary" block disabled={!ready} loading={busy}>
-          Delete my account
-        </Button>
-        <Button type="button" block onClick={onCancel} disabled={busy}>
-          Keep my account
-        </Button>
-      </div>
-    </form>
+        <p className="m-0 text-small text-ink-2">
+          This deletes your account and everything in it: linked banks, transactions, documents,
+          decisions, goals and check-ins. It cannot be undone.
+        </p>
+        <div>
+          <Label htmlFor={fieldId}>
+            Type <strong className="font-bold text-ink">{CONFIRM_WORD}</strong> to confirm
+          </Label>
+          <Input
+            ref={fieldRef}
+            id={fieldId}
+            value={typed}
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            readOnly={busy}
+            onChange={(event) => setTyped(event.currentTarget.value)}
+          />
+        </div>
+        {remove.isError && (
+          <p role="alert" className="m-0 text-small text-ink-2">
+            Your account was not deleted.{' '}
+            {apiErrorMessage(remove.error, 'Check your connection and try again.')}
+          </p>
+        )}
+        <div className="flex flex-col gap-2">
+          <Button type="submit" variant="primary" block disabled={!ready} loading={busy}>
+            Delete my account
+          </Button>
+          <Button type="button" block onClick={onCancel} disabled={busy}>
+            Keep my account
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 }
