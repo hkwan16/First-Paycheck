@@ -26,6 +26,8 @@ def test_allowed_origin_can_read_retry_after() -> None:
     assert response.headers["access-control-allow-origin"] == ORIGIN
     exposed = {h.strip() for h in response.headers["access-control-expose-headers"].split(",")}
     assert "Retry-After" in exposed
+    # The plan downloads name their file (and the PDF's date) in this header.
+    assert "Content-Disposition" in exposed
 
 
 def test_other_origins_get_no_cors_headers() -> None:

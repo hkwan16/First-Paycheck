@@ -97,7 +97,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["Authorization", "Content-Type"],
         # The upload UI tells the user how long to wait after a 429; the
         # request id lets a bug report point at the server's log line.
-        expose_headers=["Retry-After", REQUEST_ID_HEADER],
+        expose_headers=["Retry-After", "Content-Disposition", REQUEST_ID_HEADER],
         max_age=600,
     )
     # Outermost, so its line and X-Request-Id cover CORS and the size limit too.
