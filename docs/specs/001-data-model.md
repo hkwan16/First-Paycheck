@@ -102,7 +102,7 @@ Every job handler, after the privileged dequeue, opens a user-scoped session wit
 | `finding_action` | `done`, `dismissed` (`0012_checkin_findings` replaced the original `acknowledged`, `acted`, `dismissed`, spec 015) |
 | `calendar_kind` | `enrollment_deadline`, `tax_season`, `open_enrollment`, `goal_target` |
 | `calendar_status` | `upcoming`, `done`, `dismissed` |
-| `job_kind` | `sync.initial`, `sync.incremental`, `categorize.run`, `ingest.extract`, `recurring.detect`, `checkin.monthly`, `schedule.tick` |
+| `job_kind` | `sync.initial`, `sync.incremental`, `categorize.run`, `ingest.extract`, `recurring.detect`, `checkin.monthly`, `schedule.tick`, `plan.export` (spec 016) |
 | `job_status` | `queued`, `running`, `succeeded`, `dead` |
 | `llm_purpose` | `extract`, `categorize`, `explain` |
 | `llm_status` | `ok`, `refusal`, `schema_error`, `api_error`, `budget_blocked` |
@@ -411,6 +411,18 @@ Append-only cost ledger (spec amendment 4). Written by `llm/gateway.py` in the c
 | `job_id` | `uuid` | Nullable; references `jobs(id) ON DELETE SET NULL` |
 
 Indexes: `(user_id, created_at)` for the daily budget sum over the current UTC day.
+
+### `plan_exports`
+
+A rendered plan PDF, kept 7 days (spec 016 rules 14-15). Only `export/store.py` touches it.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `job_id` | `uuid` | Primary key; FK `(job_id, user_id) -> jobs(id, user_id) ON DELETE CASCADE` (`jobs` has `UNIQUE (id, user_id)` for it) |
+| `bytes` | `bytea` | `NOT NULL`, `CHECK (octet_length(bytes) > 0)` |
+| `content_type` | `text` | `NOT NULL`, `CHECK (content_type = 'application/pdf')` |
+
+Indexes: `(created_at)` for retention. Owner policy with `SELECT` and `INSERT`; the scheduler deletes old rows on the privileged connection.
 
 ### `irs_citations`
 

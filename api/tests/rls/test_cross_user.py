@@ -21,7 +21,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Connection, select, text
 from sqlalchemy.sql import column, func, table
 
+from app.db import user_session_for
 from db.enums import AccountKind, AccountRole, FindingKind, JobKind
+from export import store as export_store
 from tests.conftest import USER_A, USER_B, FixtureUser
 from tests.support.factories import (
     MOCKUP_STUB,
@@ -61,7 +63,7 @@ class Case:
     # A multipart body: form fields and files.
     form: dict[str, str] | None = None
     files: dict[str, tuple[str, bytes, str]] | None = None
-    # Extra checks on B's response body.
+    # Extra checks on B's response body (parsed JSON, else the text).
     body: Callable[[Any], None] | None = None
     # Checks that A's data is untouched, run against the test connection.
     after: Callable[[Connection], None] | None = None
@@ -502,6 +504,78 @@ def list_calendar(connection: Connection, client_as: Callable[[FixtureUser], Tes
     return Case("GET", "/calendar", 200, body=body)
 
 
+def get_plan(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    a_decision(client_as, explained=True)
+    a_goal(client_as)
+    make_pay_stub(connection, USER_A.id, a_document(connection, with_blob=False))
+
+    def body(data: Any) -> None:
+        assert (data["decisions"], data["goals"], data["calendar"], data["pay_stub"]) == (
+            [],
+            [],
+            [],
+            None,
+        )
+        assert data["completeness"]["saved"] == []
+
+    return Case("GET", "/plan", 200, body=body)
+
+
+def plan_calendar(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    a_decision(client_as)
+
+    def body(data: Any) -> None:
+        assert "BEGIN:VCALENDAR" in data
+        assert "BEGIN:VEVENT" not in data
+
+    return Case("GET", "/plan/calendar.ics", 200, body=body)
+
+
+def a_plan_export(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> str:
+    """A's export job, succeeded with its PDF stored (no rendering needed here)."""
+    response = client_as(USER_A).post("/plan/export")
+    assert response.status_code == 202, response.text
+    job_id: str = response.json()["job_id"]
+    with user_session_for(USER_A.id, bind=connection) as session:
+        export_store.put(
+            session,
+            job_id=uuid.UUID(job_id),
+            user_id=USER_A.id,
+            data=b"%PDF-1.7 A's plan",
+            created_at=dt.datetime(2026, 10, 21, tzinfo=dt.UTC),
+        )
+    connection.execute(text("UPDATE jobs SET status = 'succeeded' WHERE id = :id"), {"id": job_id})
+    assert client_as(USER_A).get(f"/plan/export/{job_id}").status_code == 200
+    return job_id
+
+
+def export_plan(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    job_id = a_plan_export(connection, client_as)
+    created: list[str] = []
+
+    def body(data: Any) -> None:
+        created.append(data["job_id"])
+        assert data["job_id"] != job_id
+
+    def after(conn: Connection) -> None:
+        owner = conn.execute(
+            text("SELECT user_id FROM jobs WHERE id = :id"), {"id": created[0]}
+        ).scalar_one()
+        assert owner == USER_B.id
+        status = conn.execute(
+            text("SELECT status::text FROM jobs WHERE id = :id"), {"id": job_id}
+        ).scalar_one()
+        assert status == "succeeded"
+
+    return Case("POST", "/plan/export", 202, body=body, after=after)
+
+
+def download_plan_export(
+    connection: Connection, client_as: Callable[[FixtureUser], TestClient]
+) -> Case:
+    return Case("GET", f"/plan/export/{a_plan_export(connection, client_as)}", 404)
+
+
 def spending_summary(
     connection: Connection, client_as: Callable[[FixtureUser], TestClient]
 ) -> Case:
@@ -671,6 +745,10 @@ ROUTE_CASES: dict[tuple[str, str], Builder] = {
     ("GET", "/decisions/{decision_id}/explanation"): get_explanation,
     ("POST", "/explain"): explain,
     ("GET", "/calendar"): list_calendar,
+    ("GET", "/plan"): get_plan,
+    ("GET", "/plan/calendar.ics"): plan_calendar,
+    ("POST", "/plan/export"): export_plan,
+    ("GET", "/plan/export/{job_id}"): download_plan_export,
     ("GET", "/goals"): list_goals,
     ("PATCH", "/goals/{goal_id}"): update_goal,
     ("GET", "/spending/summary"): spending_summary,
@@ -768,6 +846,7 @@ def test_user_b_cannot_reach_user_a_data(
     if case.status == 404:
         assert response.json()["error"]["code"] == "not_found"
     if case.body is not None:
-        case.body(response.json())
+        json_body = response.headers["content-type"].startswith("application/json")
+        case.body(response.json() if json_body else response.text)
     if case.after is not None:
         case.after(db_connection)

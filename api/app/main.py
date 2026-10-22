@@ -30,6 +30,7 @@ from app.routers import (
     jobs,
     net_worth,
     pay_stubs,
+    plan,
     profile,
     recurring,
     spending,
@@ -121,6 +122,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(cashflow.router)
     app.include_router(checkins.router)
     app.include_router(net_worth.router)
+    app.include_router(plan.router)
     return app
 
 

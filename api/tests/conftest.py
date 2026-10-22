@@ -17,6 +17,7 @@ from tests.support.env import pin_test_environment
 pin_test_environment()
 
 # The imports below read settings, so they come after the environment is pinned.
+import importlib
 import os
 import uuid
 from collections.abc import Callable, Iterator
@@ -70,6 +71,24 @@ def tesseract() -> None:
     if os.environ.get("CI"):
         pytest.fail("tesseract must be installed in CI")
     pytest.skip("tesseract is not installed; OCR tests run in the ingest-in-docker job")
+
+
+@pytest.fixture
+def weasyprint() -> None:
+    """For tests that render a PDF: WeasyPrint loads pango when imported, so
+    they skip on a laptop where it cannot be found and fail in CI, which
+    installs it (and runs them again inside the Docker image).
+
+    On macOS with Homebrew's pango, run pytest directly (not through make,
+    whose protected shell drops DYLD variables) with
+    ``DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib``.
+    """
+    try:
+        importlib.import_module("weasyprint")
+    except OSError as exc:
+        if os.environ.get("CI"):
+            pytest.fail(f"WeasyPrint must load in CI: {exc}")
+        pytest.skip("WeasyPrint cannot load pango here; PDF tests run in CI")
 
 
 @pytest.fixture(scope="session", autouse=True)

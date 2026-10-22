@@ -8,6 +8,7 @@ dependencies = [
   "anthropic>=1.14.0",
   "cryptography>=50.0.2",
   "fastapi>=0.125",
+  "jinja2>=3.1",
   "pdfplumber>=0.11",
   "pillow>=11",
   "plaid-python>=45.0.0",
@@ -22,6 +23,7 @@ dependencies = [
   "sentry-sdk[fastapi]>=2",
   "sqlalchemy>=2.0.36",
   "uvicorn[standard]>=0.32",
+  "weasyprint>=66",
 ]
 
 [dependency-groups]
@@ -42,4 +44,6 @@ build-backend = "hatchling.build"
 # top-level packages, matching `python -m app.openapi`, `python -m jobs.worker`
 # and `python -m db.seed.load`. Add each new top-level package here.
 [tool.hatch.build.targets.wheel]
-packages = ["app", "calc", "checkin", "db", "ingest", "jobs", "llm", "retrieval", "sync", "verify"]
+packages = [
+  "app", "calc", "checkin", "db", "export", "ingest", "jobs", "llm", "retrieval", "sync", "verify",
+]

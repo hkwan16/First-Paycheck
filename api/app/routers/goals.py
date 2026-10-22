@@ -79,7 +79,8 @@ def _latest_balance(session: Session, account_id: uuid.UUID | None) -> int | Non
     )
 
 
-def _out(session: Session, goal: Goal) -> GoalOut:
+def goal_out(session: Session, goal: Goal) -> GoalOut:
+    """A goal as `GET /goals` and `GET /plan` show it."""
     balance = _latest_balance(session, goal.account_id)
     return GoalOut(
         id=goal.id,
@@ -102,7 +103,7 @@ def _out(session: Session, goal: Goal) -> GoalOut:
 def list_goals(session: UserSession) -> list[GoalOut]:
     """The user's goals, oldest first, with progress from the linked account."""
     goals = session.scalars(select(Goal).order_by(Goal.created_at, Goal.id))
-    return [_out(session, goal) for goal in goals]
+    return [goal_out(session, goal) for goal in goals]
 
 
 @router.patch("/{goal_id}", responses=error_responses(401, 404, 422))
@@ -126,4 +127,4 @@ def update_goal(goal_id: uuid.UUID, body: GoalPatch, session: UserSession, now: 
         goal.reached_at = now if body.status is GoalStatus.REACHED else None
     session.flush()
     session.refresh(goal)  # updated_at comes from the trigger
-    return _out(session, goal)
+    return goal_out(session, goal)

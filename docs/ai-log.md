@@ -166,3 +166,26 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above, in the subagent's branch.
 
 **Time saved or lost:** Not measured.
+
+## 2026-10-21: M9 plan, calendar file and PDF export
+
+**Task:** The backend of M9: spec 016, `GET /plan`, `GET /plan/calendar.ics`, `POST /plan/export` with the `plan.export` job rendering a PDF with WeasyPrint, `GET /plan/export/{job_id}`, migration `0013_plan_export_job` and 7-day retention.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, in parallel with another subagent building check-ins.
+
+**Prompt or skill:** Spec first, then failing tests, then code; every number in the plan is a field a calculator produced; WeasyPrint only in the worker.
+
+**What it produced:** `app/plan.py` (one read shared by the route and the job, figures copied by path), `export/calendar.py` (RFC 5545 with the standard library, checked against a hand-written `.ics` fixture), the Jinja template and its byte-for-byte HTML fixture, the job, the table under RLS and its retention, and CI and Docker changes so the PDF tests run against real pango.
+
+**What was wrong:**
+- The first downgrade of `0013` failed: rebuilding `job_kind` cannot carry the `jobs` CHECK that compares `kind` with a literal, so the migration now drops and recreates that constraint around the type change.
+- The spec's first draft listed the 2026-10-31 events in the wrong order; the rule says `kind` order, which puts the election check first.
+- The test seed wrote a fallback explanation with `retries = 2`, which the table's check refuses.
+- In the Docker image, fontconfig printed "No writable cache directories" on every WeasyPrint import, because the `app` user's home is read-only; `XDG_CACHE_HOME=/tmp/app-cache`, set after the build steps (an earlier attempt in the base stage let uv create the directory as root during the build, so the error stayed), fixes it.
+- On macOS, Homebrew's pango is not on the loader's path; the PDF tests skip there unless pytest runs with `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib`, which `make` drops.
+
+**How it was caught:** `test_migrations` (upgrade, downgrade, upgrade), writing the calendar test from the rule, the seed's own insert, running the image, and rendering the PDF to PNG to look at it.
+
+**Fix:** As above, in the subagent's branch.
+
+**Time saved or lost:** Not measured.

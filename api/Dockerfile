@@ -52,8 +52,8 @@ RUN uv sync --frozen --no-dev --package first-paycheck-api --no-install-workspac
 
 
 # ---------------------------------------------------------------- test
-# Adds the api dev group and runs the ingest tests (unit and integration)
-# against the image's own tesseract build. The integration tests need a
+# Adds the api dev group and runs the ingest and plan export tests (unit and
+# integration) against the image's own tesseract and pango builds. The integration tests need a
 # Postgres: pass TEST_DATABASE_URL, for example
 #
 #   docker run --rm --network host \
@@ -66,9 +66,13 @@ RUN uv sync --frozen --package first-paycheck-api --no-install-workspace
 COPY api/ api/
 RUN uv sync --frozen --package first-paycheck-api
 WORKDIR /app/api
+# The app user's home (/app) is read-only to it; without a writable cache
+# directory fontconfig prints an error on every WeasyPrint import. Set here,
+# after the build steps, so uv's build-time cache never lands in it as root.
+ENV XDG_CACHE_HOME=/tmp/app-cache
 USER app
 ENV CI=true
-CMD ["pytest", "-p", "no:cacheprovider", "tests/unit/ingest", "tests/integration/ingest"]
+CMD ["pytest", "-p", "no:cacheprovider", "tests/unit/ingest", "tests/integration/ingest", "tests/unit/export", "tests/integration/export"]
 
 
 # ---------------------------------------------------------------- runtime
@@ -77,6 +81,8 @@ COPY api/ api/
 RUN uv sync --frozen --no-dev --package first-paycheck-api \
  && rm -rf /app/api/tests
 WORKDIR /app/api
+# As in the test stage: a writable fontconfig cache for the app user.
+ENV XDG_CACHE_HOME=/tmp/app-cache
 USER app
 EXPOSE 8000
 # What Render runs (render.yaml): the API on $PORT and the job worker, supervised

@@ -1,0 +1,2 @@
+# iCalendar lines end in CRLF (RFC 5545); never convert them.
+*.ics -text

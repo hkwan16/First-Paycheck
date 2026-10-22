@@ -80,6 +80,8 @@ class JobKind(StrEnum):
     RECURRING_DETECT = "recurring.detect"
     CHECKIN_MONTHLY = "checkin.monthly"
     SCHEDULE_TICK = "schedule.tick"
+    # Render the plan PDF (spec 016); added by 0013_plan_export_job.
+    PLAN_EXPORT = "plan.export"
 
 
 class JobStatus(StrEnum):

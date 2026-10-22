@@ -24,9 +24,9 @@ llm/        gateway.py (the only anthropic import), schemas.py, cost.py, prompts
 retrieval/  IRS citations, benefits full-text search, context.py (what explain sends)
 verify/     numbers, allowed, verify (checks), flow (draft-verify-retry-fallback), fallback
 jobs/       queue.py, worker.py, scheduler.py, registry.py, services.py, context.py,
-            handlers/ (sync, categorize, recurring, ingest_extract, checkin)
+            handlers/ (sync, categorize, recurring, ingest_extract, checkin, plan_export)
 checkin/    findings (one pure function per finding kind), facts (RLS reads), engine
-export/     plan PDF (WeasyPrint, worker only), calendar
+export/     calendar (.ics), store (plan_exports) (API-safe); html, pdf, templates/ (worker only)
 tests/      unit/ (no DB, no network), integration/ (real Postgres), rls/ (cross-user
             route cases), support/ (fakes, factories), fixtures/ (plaid, llm)
 ```
@@ -405,6 +405,52 @@ function.
   user in `tests/support/november.py`; factories `make_decision` (with a
   chosen `created_at`), `make_goal`, `make_check_in`, `make_finding`,
   `make_calendar_event`.
+
+## The plan and its export (from M9)
+
+Spec 016. Migration `0013_plan_export_job` (revises `0012_checkin_findings`)
+adds the `job_kind` label `plan.export`, `jobs UNIQUE (id, user_id)` and the
+table `plan_exports` (`enable_rls`, SELECT and INSERT only).
+
+- **`GET /plan`** (`app/plan.py:build_plan`, shared with the worker): the
+  current decisions in `calculator_kind` order with `figures` (fields copied by
+  their path, `inputs.x` or `result.plans[i].y`; no arithmetic, a test follows
+  every key), the explanation status from the latest row (`verified`,
+  `fallback`, `none`) with its citations, `GET /goals`'s goals (`goal_out`),
+  upcoming events from today to today + 90 days ordered by `due_at`, `kind`,
+  `id`, the newest pay stub and `completeness`. A total the plan needs belongs
+  in `calc/`, not here.
+- **`GET /plan/calendar.ics`** (`export/calendar.py`, standard library):
+  every event in any status, `UID` = event id, all-day `DTSTART;VALUE=DATE`,
+  `STATUS:CANCELLED` for dismissed, TEXT escaping, CRLF, folding at 75 octets
+  without splitting a UTF-8 character. Each `calendar_kind` needs a sentence in
+  `DESCRIPTIONS` (a test fails otherwise). `.gitattributes` keeps `*.ics`
+  fixtures byte for byte.
+- **PDF.** `POST /plan/export` queues `plan.export` (`enqueue_unless_queued`,
+  payload `{}`); `jobs/handlers/plan_export.py` builds the plan in one user
+  session as of `Services.clock`, renders `export/templates/plan.html.j2`
+  (`export/html.py`, Jinja2, autoescaped, numbers via `verify.format`) with
+  `export/pdf.py` (WeasyPrint imported inside the function, URL fetcher refuses
+  everything) with no session open, and stores it in a second session; a rerun
+  keeps the first PDF. `GET /plan/export/{job_id}` streams it only when the job
+  is a succeeded `plan.export` of the user and the row exists, else 404.
+- **Worker only.** `app/` never imports `export.html`, `export.pdf`, `jinja2`
+  or `weasyprint`, and `import app.main` loads none of them
+  (`tests/unit/test_boundaries.py`). `export/store.py` is the only module that
+  touches `plan_exports`; `expire_old` runs in the scheduler tick (7 days).
+- **Look.** Page 1 is the plan, page 2 starts with the calendar and "Why, with
+  sources" (citation URLs printed in full). Ledger ink on white, hairlines, no
+  fills or images, US Letter, `DejaVu Sans` first (the image installs
+  `fonts-dejavu-core`; `XDG_CACHE_HOME=/tmp/app-cache` gives fontconfig a writable
+  cache as the `app` user).
+- **Tests.** The plan user (`tests/support/plan_user.py`) saves all four
+  decisions through the API at 2026-10-21 15:00 UTC and writes fixed
+  explanations. `tests/fixtures/export/plan.html` is the expected page byte for
+  byte; review a template change by rendering it and replacing the fixture.
+  PDF tests take the `weasyprint` fixture: they skip when pango cannot load and
+  fail in CI, which installs pango and runs `tests/*/export` in the image too.
+  On macOS run them with `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib uv run
+  pytest ...` (make's shell drops `DYLD_*` variables).
 
 ## Testing
 

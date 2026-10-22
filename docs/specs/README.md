@@ -48,3 +48,4 @@ Specs may add an **Open questions** section for decisions not yet made. A spec w
 | [013 Benefits extraction: health plans, the 401(k) match and vesting](013-benefits-extraction.md) | Implemented, M6 |
 | [014 W-4 withholding calculator](014-w4.md) | Implemented, M7 |
 | [015 Monthly check-ins, net worth and holdings](015-check-ins.md) | Implemented, M8 |
+| [016 The plan, its calendar file and the PDF export](016-plan-and-export.md) | Implemented, M9 (backend) |

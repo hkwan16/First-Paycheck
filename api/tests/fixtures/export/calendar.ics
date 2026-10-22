@@ -1,0 +1,42 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//First Paycheck//Plan calendar//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:First Paycheck
+BEGIN:VEVENT
+UID:00000000-0000-4000-8000-000000000e03@first-paycheck
+DTSTAMP:20261021T150000Z
+DTSTART;VALUE=DATE:20261015
+SUMMARY:Give your employer your updated Form W-4
+DESCRIPTION:Give your employer the Form W-4 entries from your plan.
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:00000000-0000-4000-8000-000000000e01@first-paycheck
+DTSTAMP:20261021T150000Z
+DTSTART;VALUE=DATE:20261031
+SUMMARY:Check that your next pay stub shows your new 401(k) contribution
+DESCRIPTION:Check that your pay stub shows the 401(k) contribution you chos
+ e.
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:00000000-0000-4000-8000-000000000e02@first-paycheck
+DTSTAMP:20261021T150000Z
+DTSTART;VALUE=DATE:20261031
+SUMMARY:Check that your next pay stub shows your new 401(k) contribution
+DESCRIPTION:Check that your pay stub shows the 401(k) contribution you chos
+ e.
+STATUS:CANCELLED
+END:VEVENT
+BEGIN:VEVENT
+UID:00000000-0000-4000-8000-000000000e04@first-paycheck
+DTSTAMP:20261021T150000Z
+DTSTART;VALUE=DATE:20261114
+SUMMARY:Health plan enrollment deadline\; Acme\, 2027 plans
+DESCRIPTION:Last day to enroll in the health plan you chose in First Payche
+ ck.
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR

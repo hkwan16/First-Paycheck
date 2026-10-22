@@ -1,5 +1,6 @@
 """The scheduler tick deletes unconfirmed uploads after 7 days and old
-rate-limit counters (spec 004 rule 21), at a frozen time."""
+rate-limit counters (spec 004 rule 21), and plan PDFs after 7 days (spec 016
+rule 15), at a frozen time."""
 
 from __future__ import annotations
 
@@ -9,9 +10,12 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from app.db import user_session_for
+from db.enums import JobKind
+from export import store as export_store
 from jobs import scheduler
 from tests.conftest import FixtureUser
-from tests.support.factories import make_document
+from tests.support.factories import make_document, make_job
 
 NOW = dt.datetime(2026, 11, 20, 12, 0, tzinfo=dt.UTC)
 DAY = dt.timedelta(days=1)
@@ -86,3 +90,27 @@ def test_tick_prunes_day_old_rate_limit_counters(
         .all()
     )
     assert kept == [NOW - DAY + dt.timedelta(minutes=1), NOW]
+
+
+def test_tick_deletes_week_old_exports(
+    db_connection: Connection, user_a: FixtureUser, user_b: FixtureUser
+) -> None:
+    """Spec 016 rule 15, example 22: plan PDFs are kept for 7 days."""
+    ages = {
+        "eight_days": (user_a, 8 * DAY),
+        "just_over_a_week": (user_b, 7 * DAY + dt.timedelta(seconds=1)),
+        "six_days": (user_a, 6 * DAY),
+    }
+    jobs: dict[str, uuid.UUID] = {}
+    for name, (user, age) in ages.items():
+        job = make_job(db_connection, user.id, kind=JobKind.PLAN_EXPORT)
+        with user_session_for(user.id, bind=db_connection) as session:
+            export_store.put(
+                session, job_id=job, user_id=user.id, data=b"%PDF-1.7", created_at=NOW - age
+            )
+        jobs[name] = job
+
+    scheduler.tick(bind=db_connection, now=NOW)
+
+    kept = db_connection.execute(text("SELECT job_id FROM plan_exports")).scalars().all()
+    assert kept == [jobs["six_days"]]
