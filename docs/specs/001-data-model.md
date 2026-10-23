@@ -258,7 +258,7 @@ Indexes: `(user_id, posted_at DESC, id DESC)` for cursor pagination; `(user_id, 
 | `category` | `text` | `NOT NULL` |
 | `source` | `rule_source` | `NOT NULL` |
 
-`UNIQUE NULLS NOT DISTINCT (user_id, merchant_norm, match)`. Precedence when categorizing: user exact, user prefix, seed exact, seed prefix, seed contains, then the LLM, counting only the rules that apply to the transaction's direction (a spending rule applies to money out only, a `contains` rule to money in only; spec 003 rules 3a-4); among prefix rules of one source, the longest `merchant_norm` wins. The categorizer loads the user's rules and the seed rules once per run and matches in memory, so prefix lookups need no special index.
+`UNIQUE NULLS NOT DISTINCT (user_id, merchant_norm, match)`. Precedence when categorizing depends on the direction (spec 003 rule 4): money out goes user exact, user prefix, seed exact, seed prefix, then the LLM; money in goes user exact, user prefix, seed contains, seed exact, seed prefix, then the LLM; among prefix rules of one source, the longest `merchant_norm` wins. The categorizer loads the user's rules and the seed rules once per run and matches in memory, so prefix lookups need no special index.
 
 ### `balance_snapshots`
 
@@ -453,7 +453,7 @@ Reference data, no `user_id` (RLS exception).
 | `0012_checkin_findings` | Nothing new. `check_in_findings.key` with `UNIQUE (check_in_id, key)` and an index on `(user_id, key)`; `finding_action` rebuilt as `done`, `dismissed` (spec 015) |
 | `0014_delete_account_fn` | `delete_user_account(uuid)`: deletes one `auth.users` row so every user table cascades (spec 017) |
 | `0015_loan_account_kind` | Nothing new. `account_kind` gains `loan` after `credit` (spec 002 rule 4). The downgrade maps `loan` accounts back to `credit` and rebuilds the type with its five 0002 labels |
-| `0016_rule_match_contains` | Nothing new. `rule_match` gains `contains` after `prefix`, and `category_rules` the check `ck_category_rules_contains_is_seed_money_in` (spec 003 rule 3c). It clears the `rule` and `llm` labels spec 003 rules 3b and 10 no longer allow (money in with a spending category) so the next categorize run labels them again. The downgrade deletes the `contains` rows, drops the check and rebuilds the type with its two 0002 labels; the cleared labels stay cleared |
+| `0016_rule_match_contains` | Nothing new. `rule_match` gains `contains` after `prefix`, and `category_rules` the check `ck_category_rules_contains_is_seed_money_in` (spec 003 rule 3c). It clears the `rule` and `llm` labels of money-in rows with a spending category (the old precedence's paycheck-as-dining) so the next categorize run's rules pass labels them again under spec 003 rule 4. The downgrade deletes the `contains` rows, drops the check and rebuilds the type with its two 0002 labels; the cleared labels stay cleared |
 
 CI runs upgrade, downgrade, upgrade and `alembic check` on every pull request.
 
