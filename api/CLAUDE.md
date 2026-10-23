@@ -149,18 +149,31 @@ Rules:
 - `sync/categorize.py`: normalization, the `RuleBook`, the `categorize.run`
   job (rules, reuse of earlier LLM labels, then 50 merchants per gateway call)
   and `record_user_label` for `PATCH /transactions/{id}` (spec 003).
+  Matching takes the amount and the precedence depends on the direction
+  (rule 4): money out goes user exact, user prefix, seed exact, seed prefix;
+  money in goes user exact, user prefix, seed `contains` (income and transfer
+  only, seed only), seed exact, seed prefix. So a paycheck named like a
+  restaurant is income and a refund keeps its merchant's category. The model
+  labels each merchant and direction separately (`CategorizeItem.direction`,
+  `categorize/v2`) and may call money in a refund. `tests/support/
+  sandbox_history.py:DYNAMIC` replays Plaid's `user_transactions_dynamic`
+  user (a paycheck named like a restaurant, five loan ledgers).
 - Migration names follow spec 001: `0006_webhook_fn` revises `0002_core`, and
   the next revision (`0003_documents`) revises `0006_webhook_fn`;
   `0007_lock_alembic_version` revises `0003_documents`, `0004_decisions`
   revises `0007_lock_alembic_version`, and `0005_checkins` revises
   `0004_decisions`. After that the chain runs `0008_goals_and_birth_year`,
   `0011_no_model_reason`, `0009_w4_calendar_kind`, `0012_checkin_findings`,
-  `0013_plan_export_job`, `0014_delete_account_fn`, `0015_loan_account_kind`
-  (each revises the one before it); the head is `0015_loan_account_kind`.
+  `0013_plan_export_job`, `0014_delete_account_fn`, `0015_loan_account_kind`,
+  `0016_rule_match_contains` (each revises the one before it); the head is
+  `0016_rule_match_contains`.
 - Adding an enum label is `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with
   `AFTER` when the order means something, as `by_kind` does for
   `account_kind`); the downgrade maps the rows that use it and rebuilds the
-  type from its old labels (`0011_no_model_reason`, `0015_loan_account_kind`).
+  type from its old labels (`0011_no_model_reason`, `0015_loan_account_kind`,
+  `0016_rule_match_contains`). A check that names the new label in the same
+  migration compares `column::text`, since Postgres refuses a new enum value
+  inside the transaction that added it.
   Keep the `StrEnum` in `db/enums.py` in the database's order.
 - Supabase grants every new table and function in `public` to `anon` and
   `authenticated` by default. `enable_rls` revokes that per table; a function
@@ -281,7 +294,7 @@ explanation, `GET /calendar` shows the check it implies.
   `tests/support/sandbox_history.py:link_sandbox` runs a recorded sandbox
   item through `run_sync` and the seed rules for tests that need that shape:
   `RECORDED` (`user_good`) or `DYNAMIC` (`user_transactions_dynamic`, five
-  loans; `tests/fixtures/plaid/recorded_dynamic`).
+  loans; `tests/fixtures/plaid/recorded/dynamic`).
 
 ## Logging and operations (from M4)
 

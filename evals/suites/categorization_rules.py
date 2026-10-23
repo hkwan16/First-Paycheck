@@ -29,7 +29,7 @@ def score(rows: Sequence[Row], rules: RuleBook | None = None) -> SuiteResult:
     failures: list[str] = []
     for row in rows:
         merchant_norm = normalize_merchant(row.merchant_raw)
-        rule = rules.match(merchant_norm)
+        rule = rules.match(merchant_norm, amount_cents=row.amount_cents)
         if rule is None:
             continue
         covered += 1

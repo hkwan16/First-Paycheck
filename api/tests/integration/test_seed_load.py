@@ -9,6 +9,7 @@ import sys
 
 import pytest
 from sqlalchemy import Connection, Engine, text
+from sqlalchemy.exc import IntegrityError
 
 from app.config import REPO_ROOT
 from db.enums import RuleMatch, RuleSource
@@ -82,6 +83,45 @@ def test_load_never_touches_user_rules(db_connection: Connection, user_a: object
         text("SELECT count(*) FROM category_rules WHERE user_id IS NOT NULL")
     ).scalar_one()
     assert users == 1
+
+
+@pytest.mark.usefixtures("no_seed_rules")
+def test_load_writes_contains_rows(db_connection: Connection) -> None:
+    """Spec 003 rule 3c: the seed's contains rows load beside its prefix rows."""
+    load_category_rules(
+        db_connection,
+        [
+            seed_rule("payroll", RuleMatch.PREFIX, "income"),
+            seed_rule("payroll", RuleMatch.CONTAINS, "income"),
+        ],
+    )
+    assert seed_rows(db_connection) == {
+        ("payroll", "prefix"): "income",
+        ("payroll", "contains"): "income",
+    }
+
+
+@pytest.mark.parametrize(
+    ("user_id", "category", "source"),
+    [
+        (None, "dining", "seed"),
+        ("00000000-0000-4000-8000-00000000000a", "income", "user"),
+    ],
+)
+def test_the_database_refuses_contains_outside_seed_income_and_transfer(
+    db_connection: Connection, user_a: object, user_id: str | None, category: str, source: str
+) -> None:
+    with (
+        pytest.raises(IntegrityError, match="ck_category_rules_contains_is_seed_money_in"),
+        db_connection.begin_nested(),
+    ):
+        db_connection.execute(
+            text(
+                "INSERT INTO category_rules (user_id, merchant_norm, match, category, source)"
+                " VALUES (CAST(:u AS uuid), 'payroll', 'contains', :c, CAST(:s AS rule_source))"
+            ),
+            {"u": user_id, "c": category, "s": source},
+        )
 
 
 def seed_count(engine: Engine) -> int:

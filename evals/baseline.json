@@ -12,8 +12,8 @@
     "llm_accuracy": 0.8
   },
   "categorization-rules": {
-    "rules_coverage": 0.808,
-    "rules_precision": 0.9702970297029703
+    "rules_coverage": 0.8155339805825242,
+    "rules_precision": 0.9714285714285714
   },
   "checkin": {
     "fields_exact": 1.0,

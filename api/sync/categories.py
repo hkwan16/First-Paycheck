@@ -63,3 +63,14 @@ CATEGORY_BUCKETS: Mapping[str, Bucket] = MappingProxyType(
         "other": "other",
     }
 )
+
+# The categories in the income and transfer buckets: the only ones a seed
+# ``contains`` rule may carry (spec 003 rule 3c).
+INCOME_TRANSFER_CATEGORIES: frozenset[str] = frozenset(
+    category for category, bucket in CATEGORY_BUCKETS.items() if bucket in {"income", "transfer"}
+)
+
+
+def is_money_in(amount_cents: int) -> bool:
+    """Spec 001 rule 21: positive is money out; zero counts as money out."""
+    return amount_cents < 0

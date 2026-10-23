@@ -10,6 +10,17 @@ direct deposit,prefix,income
 rippling,prefix,income
 intrst pymnt,exact,income
 interest payment,prefix,income
+payroll,contains,income
+ppd id,contains,income
+direct dep,contains,income
+direct deposit,contains,income
+salary,contains,income
+interest,contains,income
+interest,exact,fees
+interest charged,exact,fees
+monthly payment,exact,transfer
+payment,exact,transfer
+cash deposit,exact,transfer
 zelle,prefix,transfer
 venmo,prefix,transfer
 cash app,prefix,transfer

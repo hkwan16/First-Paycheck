@@ -66,6 +66,8 @@ class CategorySource(StrEnum):
 class RuleMatch(StrEnum):
     EXACT = "exact"
     PREFIX = "prefix"
+    # Seed income and transfer rules only, money in only (spec 003 rule 3c).
+    CONTAINS = "contains"
 
 
 class RuleSource(StrEnum):

@@ -208,8 +208,9 @@ def test_the_dynamic_sandbox_october_skips_the_loans(
     # Spec 007 rules 21a and 25 on Plaid's user_transactions_dynamic user,
     # recorded 2026-10-22 and labeled by the seed rules alone. Before them the
     # five loans' 165 posted rows made uncategorized_cents -5,498,010, and 12
-    # cents of income made essentials_pct "304000.0".
-    link_sandbox(seeded_rules, user_a, DYNAMIC)
+    # cents of income (the paychecks were dining until spec 003 rule 4) made
+    # essentials_pct "304000.0".
+    link_sandbox(seeded_rules, user_a, history=DYNAMIC)
     client = client_as(user_a)
     body = client.get("/spending/summary", params=OCTOBER).json()
     assert {
@@ -231,19 +232,19 @@ def test_the_dynamic_sandbox_october_skips_the_loans(
             "savings_rate_pct",
         )
     } == {
-        "income_cents": 12,
+        "income_cents": 243_012,
         "essentials_cents": 36_480,
-        "flexible_cents": -101_979,
+        "flexible_cents": 141_021,
         "savings_cents": 0,
         "other_cents": 0,
-        "transfers_ignored_cents": 301_989,
-        "uncategorized_cents": 121_602,
-        "uncategorized_count": 35,
+        "transfers_ignored_cents": 351_589,
+        "uncategorized_cents": 171_202,
+        "uncategorized_count": 34,
         "left_over_cents": 65_511,
         "transaction_count": 80,
         "ledger_rows_skipped": {"count": 165, "net_cents": -5_619_612},
-        "essentials_pct": None,
-        "flexible_pct": None,
+        "essentials_pct": "15.0",
+        "flexible_pct": "58.0",
         "savings_rate_pct": "0.0",
     }
     # GET /transactions is unchanged: the loans' rows are still listed.

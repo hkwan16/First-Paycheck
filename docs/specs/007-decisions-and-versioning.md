@@ -168,16 +168,16 @@ September 2026. Checking: a paycheck -250,000 (income), rent 120,000 (housing), 
 | # | Month | Shares |
 |---|---|---|
 | 1 | No income: essentials 50,000, flexible 1,000 | all null (`income_cents = 0`) |
-| 2 | Tiny income, the `user_transactions_dynamic` October below: income 12, essentials 36,480, flexible -101,979 (three payroll deposits filed under dining), savings 0 | `essentials_pct` null (36,480 > 120; 304,000.0 before rule 25); `flexible_pct` null (101,979 > 120; -849,825.0); `savings_rate_pct` "0.0" |
+| 2 | Tiny income (the `user_transactions_dynamic` October as it read before spec 003 rule 4 let the payroll's pay words win): income 12, essentials 36,480, flexible -101,979 (three payroll deposits filed under dining), savings 0 | `essentials_pct` null (36,480 > 120; 304,000.0 before rule 25); `flexible_pct` null (101,979 > 120; -849,825.0); `savings_rate_pct` "0.0" |
 | 3 | At the limit: income 1,000, essentials 10,000, flexible 10,001, savings -10,000 | `essentials_pct` "1000.0" (10,000 = 10 * 1,000); `flexible_pct` null (10,001 > 10,000); `savings_rate_pct` "-1000.0" |
 | 4 | A normal month: the spec month above, plus a refund-heavy case: income 200,000, essentials -30,000 (refunds beat spending), flexible 2,500 | spec month "45.1", "2.1", "10.0"; refund case `essentials_pct` "-15.0" (shown: a negative share within the limit), `flexible_pct` "1.3" |
 
 ### Plaid's `user_transactions_dynamic` October (rules 21a and 25; `api/tests/integration/test_spending_summary.py`)
 
-The recorded sandbox user (`api/tests/fixtures/plaid/recorded_dynamic`, recorded 2026-10-22, so October runs to the 22nd) synced through `run_sync` and labeled by the seed rules alone: a checking account (weekly "Sweetgreen inc payroll" deposits of -81,000, which the seed rules file under dining, and "Interest payment" -12, the only `income` row), a credit card, and five loans (mortgage, student, auto, consumer, line of credit) whose ledgers book "Monthly payment" as money in and "Interest charged" as money out.
+The recorded sandbox user (`api/tests/fixtures/plaid/recorded/dynamic`, recorded 2026-10-22, so October runs to the 22nd) synced through `run_sync` and labeled by the seed rules alone: a checking account (weekly "Sweetgreen inc payroll ppd id" deposits of -81,000, `income` by spec 003's `contains` rule for money in, and "Interest payment" -12), a credit card, and five loans (mortgage, student, auto, consumer, line of credit) whose ledgers book "Monthly payment" as money in and "Interest charged" as money out.
 
-- Before rule 21a: `uncategorized_cents = -5,498,010` and `uncategorized_count = 200`, of which the loans' 165 posted rows were -5,619,612; `transaction_count = 245`; `essentials_pct` "304000.0", `flexible_pct` "-849825.0".
-- After: `income_cents = 12`; `essentials_cents = 36,480`; `flexible_cents = -101,979`; `savings_cents = 0`; `other_cents = 0`; `transfers_ignored_cents = 301,989`; `uncategorized_cents = 121,602`, `uncategorized_count = 35`; `left_over_cents = 12 - 36,480 + 101,979 = 65,511`; `transaction_count = 80`; `ledger_rows_skipped`: `count = 165`, `net_cents = -5,619,612`; `essentials_pct` and `flexible_pct` null, `savings_rate_pct` "0.0" (shares example 2).
+- Before rule 21a: `uncategorized_cents = -5,498,010` and `uncategorized_count = 200`, of which the loans' 165 posted rows were -5,619,612; `transaction_count = 245`. With the paychecks still filed under dining, `essentials_pct` read "304000.0" and `flexible_pct` "-849825.0" (shares example 2).
+- After: `income_cents = 243,012` (three paychecks and the interest); `essentials_cents = 36,480`; `flexible_cents = 141,021`; `savings_cents = 0`; `other_cents = 0`; `transfers_ignored_cents = 351,589` (the card payments and a cash deposit); `uncategorized_cents = 171,202`, `uncategorized_count = 34`; `left_over_cents = 243,012 - 36,480 - 141,021 = 65,511`; `transaction_count = 80`; `ledger_rows_skipped`: `count = 165`, `net_cents = -5,619,612`; `essentials_pct` "15.0", `flexible_pct` "58.0", `savings_rate_pct` "0.0".
 
 ## Edge cases
 

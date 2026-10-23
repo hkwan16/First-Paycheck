@@ -30,9 +30,9 @@ def test_generation_is_deterministic_and_seed_dependent() -> None:
 def test_rows_are_well_formed() -> None:
     with gen.DEFAULT_CSV.open(newline="") as handle:
         rows = list(csv.DictReader(handle))
-    assert len(rows) == 500
+    assert len(rows) == 515
     assert list(rows[0]) == ["id", "merchant_raw", "amount_cents", "posted_at", "category"]
-    assert len({row["id"] for row in rows}) == 500
+    assert len({row["id"] for row in rows}) == 515
     assert {row["category"] for row in rows} <= set(CATEGORIES)
     income = [int(row["amount_cents"]) for row in rows if row["category"] == "income"]
     assert income
@@ -41,7 +41,7 @@ def test_rows_are_well_formed() -> None:
 
 def test_suite_scores_rules_only() -> None:
     result = categorization_rules.run(Budget(0))
-    assert result.cases == 500
+    assert result.cases == 515
     assert set(result.metrics) == {"rules_precision", "rules_coverage"}
     assert 0.9 <= result.metrics["rules_precision"] < 1.0
     # Some merchants no rule knows: they are the LLM's share.
@@ -62,6 +62,22 @@ def test_scoring_on_hand_made_rows() -> None:
     result = categorization_rules.score(rows)
     assert result.metrics == {"rules_precision": 0.5, "rules_coverage": 0.5}
     assert result.failures == ["2: rent the runway expected shopping, rules said housing"]
+
+
+def test_the_hand_written_rows_follow_the_seeded_ones() -> None:
+    rows = gen.generate()
+    assert [row.id for row in rows] == list(range(1, 516))
+    assert [row.merchant_raw for row in rows[500:]] == [case[0] for case in gen.SIGN_CASES]
+
+
+def test_rules_follow_the_direction_on_the_hand_written_rows() -> None:
+    """Spec 003 rules 3b and 5a: paychecks named like merchants are income, the
+    bank descriptors are labeled, and refunds keep their merchant's category."""
+    rows = gen.generate()[500:]
+    result = categorization_rules.score(rows)
+    assert result.failures == []
+    assert result.metrics["rules_precision"] == 1.0
+    assert result.metrics["rules_coverage"] == 1.0
 
 
 def test_registered_with_a_baseline() -> None:

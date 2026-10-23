@@ -1,14 +1,13 @@
 {
   "accounts": [
     {
-      "account_id": "wWLLbLXvPKtwjN9595VzCoxpNwQwJjcq66Lrd",
+      "account_id": "y4bkBEkB1ETGRe5JVrZ4ujn6l9xD8oC4KbzqJ",
       "apy": null,
       "balances": {
         "available": 393.74580000000003,
         "current": 500,
         "iso_currency_code": "USD",
         "limit": null,
-        "margin_loan_amount": null,
         "unofficial_currency_code": null
       },
       "holder_category": "personal",
@@ -19,14 +18,13 @@
       "type": "depository"
     },
     {
-      "account_id": "5vDD4DMkloC5NxzPzPEyFreAw3E3DRf3DDgZe",
+      "account_id": "9PwRBmRBXmTk5bDX6ZE4uX19l3mEQqC4qwpWX",
       "apy": null,
       "balances": {
-        "available": 5283.01,
+        "available": 12683.01,
         "current": 500,
         "iso_currency_code": "USD",
-        "limit": 5800,
-        "margin_loan_amount": null,
+        "limit": 13200,
         "unofficial_currency_code": null
       },
       "holder_category": "personal",
@@ -37,14 +35,13 @@
       "type": "credit"
     },
     {
-      "account_id": "JMZZ4ZNJpEiEkXL9L95wCRr5yvevJdfoLLZdl",
+      "account_id": "vxRgKogKQosmJMq6a3DxF8AKapNZJdtqvBM3y",
       "apy": null,
       "balances": {
         "available": null,
         "current": 500,
         "iso_currency_code": "USD",
         "limit": null,
-        "margin_loan_amount": null,
         "unofficial_currency_code": null
       },
       "holder_category": "personal",
@@ -55,14 +52,13 @@
       "type": "loan"
     },
     {
-      "account_id": "k7ddxdQvlyCw3zBqBq14Ckq9ZnpnaBuzbbwWy",
+      "account_id": "Rz1wbpwbnpIB4jDyWZG9tGa6JBqoMbTaPWgvd",
       "apy": null,
       "balances": {
         "available": 25000,
         "current": 25000,
         "iso_currency_code": "USD",
         "limit": null,
-        "margin_loan_amount": null,
         "unofficial_currency_code": null
       },
       "holder_category": "personal",
@@ -73,14 +69,13 @@
       "type": "loan"
     },
     {
-      "account_id": "leaa9aQ6kZUQ3o6K6KlnFJA4oQLQdXCEvvJZP",
+      "account_id": "6aBnKGnKDGIe9E47V1yWFQMB8NRd3ku81pBWd",
       "apy": null,
       "balances": {
         "available": null,
         "current": 500,
         "iso_currency_code": "USD",
         "limit": null,
-        "margin_loan_amount": null,
         "unofficial_currency_code": null
       },
       "holder_category": "personal",
@@ -91,14 +86,13 @@
       "type": "loan"
     },
     {
-      "account_id": "qL77b71v3RC8MkBxBxnGI7oEk838M4iNqqodb",
+      "account_id": "X4wbkAbkJATjJDw5e3K9tKjxBaXE5LCb1Nm4V",
       "apy": null,
       "balances": {
         "available": null,
         "current": 500,
         "iso_currency_code": "USD",
         "limit": null,
-        "margin_loan_amount": null,
         "unofficial_currency_code": null
       },
       "holder_category": "personal",
@@ -109,14 +103,13 @@
       "type": "loan"
     },
     {
-      "account_id": "K1MM4MNJonUeRJXyXy5dCn769RqRzKfGvvnRz",
+      "account_id": "DgwnQknQXkSDvz1gkAaqcdxZNrPR8Xu34B5gb",
       "apy": null,
       "balances": {
         "available": null,
         "current": 500,
         "iso_currency_code": "USD",
         "limit": null,
-        "margin_loan_amount": null,
         "unofficial_currency_code": null
       },
       "holder_category": "personal",
@@ -127,7 +120,6 @@
       "type": "loan"
     }
   ],
-  "holdings": [],
   "item": {
     "available_products": [
       "assets",
@@ -160,6 +152,5 @@
     "update_type": "background",
     "webhook": ""
   },
-  "request_id": "request-redacted",
-  "securities": []
+  "request_id": "request-redacted"
 }

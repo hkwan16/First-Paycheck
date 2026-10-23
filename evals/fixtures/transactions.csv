@@ -499,3 +499,18 @@ id,merchant_raw,amount_cents,posted_at,category
 498,CREDIT CARD PAYMENT RG9169,41065,2026-07-06,transfer
 499,TST* JOE'S DINER,1741,2026-08-18,dining
 500,TST* JOE'S DINER,1666,2026-09-15,dining
+501,Sweetgreen inc payroll ppd id,-81000,2026-09-23,income
+502,Sweetgreen inc payroll ppd id,-81000,2026-09-30,income
+503,SWEETGREEN #0412 SEATTLE WA,1450,2026-09-24,dining
+504,STARBUCKS CORP DIRECT DEP,-254300,2026-10-01,income
+505,PLANET FITNESS PAYROLL,-198000,2026-10-02,income
+506,Monthly payment,-31195,2026-09-29,transfer
+507,Monthly payment,-12500,2026-10-13,transfer
+508,Interest charged,10788,2026-09-22,fees
+509,Interest charged,4520,2026-10-06,fees
+510,Payment,-283580,2026-10-14,transfer
+511,Interest,11147,2026-09-22,fees
+512,Interest,-12,2026-10-15,income
+513,CASH DEPOSIT,-49600,2026-10-15,transfer
+514,UNITED AIRLINES REFUND,-45000,2026-08-19,travel
+515,AMZN MKTP US*RF2291 REFUND,-2599,2026-09-03,shopping

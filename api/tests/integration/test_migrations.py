@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import uuid
+
 from sqlalchemy import Engine, text
 
-from app.db import current_alembic_revision
+from app.db import current_alembic_revision, user_session_for
+from db.seed.load import load_category_rules, read_seed_rules
+from sync.categorize import categorize_user
 from tests.support.database import check, downgrade, head_revision, upgrade
 
 
@@ -271,6 +275,114 @@ def test_0015_adds_loan_after_credit_and_its_downgrade_maps_loans_to_credit(
 
     upgrade(url, "head")
     assert "loan" in account_kinds(engine)
+
+
+def rule_matches(engine: Engine) -> list[str]:
+    with engine.connect() as connection:
+        return list(
+            connection.execute(
+                text("SELECT unnest(enum_range(NULL::public.rule_match))::text")
+            ).scalars()
+        )
+
+
+def test_0016_adds_contains_and_clears_spending_labels_on_money_in(
+    scratch_database: tuple[str, Engine],
+) -> None:
+    """Spec 003 rules 3c-4: ``contains`` after ``prefix``. The rule and LLM
+    labels the old precedence gave money in with a spending category are
+    cleared, and the next categorize run's rules pass labels them under the new
+    precedence: the paychecks become income, the refund comes back as travel.
+    User labels and every other label are kept."""
+    url, engine = scratch_database
+    upgrade(url, "0015_loan_account_kind")
+    assert rule_matches(engine) == ["exact", "prefix"]
+    user = uuid.UUID("00000000-0000-4000-8000-0000000000c4")
+    paycheck = "sweetgreen inc payroll ppd id"
+    rows = [
+        # (id, merchant_norm, amount, category, source, after 0016, after the rules pass)
+        ("paycheck by rule", paycheck, -81_000, "dining", "rule", None, "income"),
+        ("paycheck by llm", paycheck, -81_000, "dining", "llm", None, "income"),
+        ("paycheck by user", paycheck, -81_000, "dining", "user", "dining", "dining"),
+        ("refund by rule", "united airlines", -50_000, "travel", "rule", None, "travel"),
+        ("income by rule", "acme payroll", -81_000, "income", "rule", "income", "income"),
+        ("transfer by llm", "zz own account", -5_000, "transfer", "llm", "transfer", "transfer"),
+        ("lunch by rule", "sweetgreen", 1_450, "dining", "rule", "dining", "dining"),
+        ("uncategorized", "zz unknown", -100, None, None, None, None),
+    ]
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO auth.users (id) VALUES (:u)"), {"u": user})
+        item = connection.execute(
+            text("INSERT INTO sync_items (user_id, provider) VALUES (:u, 'csv') RETURNING id"),
+            {"u": user},
+        ).scalar_one()
+        account = connection.execute(
+            text(
+                "INSERT INTO accounts (user_id, sync_item_id, provider_account_id, kind, name)"
+                " VALUES (:u, :i, 'chk', 'checking', 'Checking') RETURNING id"
+            ),
+            {"u": user, "i": item},
+        ).scalar_one()
+        for name, merchant, amount, category, source, _, _ in rows:
+            connection.execute(
+                text(
+                    "INSERT INTO transactions (user_id, account_id, provider_txn_id, posted_at,"
+                    " amount_cents, merchant_raw, merchant_norm, category, category_source,"
+                    " confidence) VALUES (:u, :a, :name, '2026-10-01', :amount, :merchant,"
+                    " :merchant, :category, CAST(:source AS category_source),"
+                    " CASE WHEN CAST(:source AS text) = 'llm' THEN 0.9 END)"
+                ),
+                {
+                    "u": user,
+                    "a": account,
+                    "name": name,
+                    "merchant": merchant,
+                    "amount": amount,
+                    "category": category,
+                    "source": source,
+                },
+            )
+
+    def categories() -> dict[str, str | None]:
+        with engine.connect() as connection:
+            return {
+                row.provider_txn_id: row.category
+                for row in connection.execute(
+                    text("SELECT provider_txn_id, category FROM transactions")
+                )
+            }
+
+    upgrade(url, "0016_rule_match_contains")
+    assert rule_matches(engine) == ["exact", "prefix", "contains"]
+    assert categories() == {row[0]: row[5] for row in rows}
+    with engine.connect() as connection:
+        cleared = connection.execute(
+            text(
+                "SELECT category_source, confidence FROM transactions"
+                " WHERE provider_txn_id = 'paycheck by llm'"
+            )
+        ).one()
+    assert tuple(cleared) == (None, None)
+
+    # The next categorize run, as the user with the seed rules and no model.
+    with engine.begin() as connection:
+        load_category_rules(connection, read_seed_rules())
+    result = categorize_user(
+        user_id=user, sessions=lambda: user_session_for(user, bind=engine), labeler=None
+    )
+    assert result.rule_labeled == 3
+    assert categories() == {row[0]: row[6] for row in rows}
+
+    downgrade(url, "0015_loan_account_kind")
+    assert rule_matches(engine) == ["exact", "prefix"]
+    with engine.connect() as connection:
+        payroll_rules = connection.execute(
+            text("SELECT match::text FROM category_rules WHERE merchant_norm = 'payroll'")
+        ).scalars()
+        assert list(payroll_rules) == ["prefix"]
+
+    upgrade(url, "head")
+    assert "contains" in rule_matches(engine)
 
 
 def role_rows(engine: Engine) -> tuple[str, str | None]:

@@ -1,10 +1,11 @@
 """The categorization suite (LLM, spec 003 rule 29): the seed rules, then Haiku
-for every merchant no rule knows, over the 500 labeled rows of
+for every merchant no rule knows, over the labeled rows of
 ``evals/fixtures/transactions.csv``, with no database.
 
 It mirrors ``categorize.run`` (spec 003 rules 8-10): each unknown non-empty
-``merchant_norm`` goes to the model once, as its newest row, in merchant order,
-50 per call, and its label applies to every row of that merchant. The real
+``merchant_norm`` and direction (money out, money in) goes to the model once,
+as its newest row, in merchant order with money out first, 50 per call, and
+its label applies to every row of that merchant and direction. The real
 ``LLMGateway`` records to an in-memory ledger that charges the run's
 ``Budget`` before the answer is read, so ``--max-cost-cents`` is a hard cap.
 
@@ -37,7 +38,8 @@ from llm.gateway import (
     MemoryLedger,
 )
 from llm.schemas import CategoryBatch
-from sync.categorize import BATCH_SIZE, RuleBook, normalize_merchant
+from sync.categories import is_money_in
+from sync.categorize import BATCH_SIZE, RuleBook, Unit, normalize_merchant
 
 EVAL_USER = uuid.UUID("00000000-0000-4000-8000-0000000ca7e9")
 # The gateway's per-user daily cap is not the eval's limit: --max-cost-cents is.
@@ -59,31 +61,37 @@ class Plan:
     """What the rules label (row id to category) and what goes to the model."""
 
     rule_labels: dict[int, str]
-    # One item per unknown merchant, newest row first chosen, in merchant order.
+    # One item per unknown merchant and direction, its newest row, in merchant
+    # order with money out first.
     samples: list[Row]
+
+
+def unit_of(row: Row) -> Unit:
+    """The merchant and direction the job labels ``row`` by (spec 003 rule 8)."""
+    return normalize_merchant(row.merchant_raw), is_money_in(row.amount_cents)
 
 
 def plan(rows: Sequence[Row], rules: RuleBook | None = None) -> Plan:
     rules = rules or RuleBook(read_seed_rules(SEED_CSV))
     rule_labels: dict[int, str] = {}
-    newest: dict[str, Row] = {}
+    newest: dict[Unit, Row] = {}
     for row in rows:
-        merchant = normalize_merchant(row.merchant_raw)
-        rule = rules.match(merchant)
+        unit = unit_of(row)
+        rule = rules.match(unit[0], amount_cents=row.amount_cents)
         if rule is not None:
             rule_labels[row.id] = rule.category
-        elif merchant:
-            seen = newest.get(merchant)
+        elif unit[0]:
+            seen = newest.get(unit)
             if seen is None or (row.posted_at, row.id) > (seen.posted_at, seen.id):
-                newest[merchant] = row
-    return Plan(rule_labels=rule_labels, samples=[newest[m] for m in sorted(newest)])
+                newest[unit] = row
+    return Plan(rule_labels=rule_labels, samples=[newest[unit] for unit in sorted(newest)])
 
 
 def score(
     rows: Sequence[Row], labeler: CategoryLabeler, rules: RuleBook | None = None
 ) -> SuiteResult:
     planned = plan(rows, rules)
-    by_merchant: dict[str, str] = {}
+    by_unit: dict[Unit, str] = {}
     failures: list[str] = []
     samples = planned.samples
     for start in range(0, len(samples), BATCH_SIZE):
@@ -104,25 +112,25 @@ def score(
         except LLMError as exc:
             failures.append(f"batch {start // BATCH_SIZE + 1}: {type(exc).__name__}: {exc}")
             continue
-        merchants = {item.id: item.merchant for item in items}
+        by_id = {item.id: item for item in items}
         for assignment in answer.items:
-            merchant = merchants.get(assignment.id)
-            if merchant is not None:
-                by_merchant[merchant] = assignment.category
+            item = by_id.get(assignment.id)
+            if item is not None:
+                by_unit[(item.merchant, is_money_in(item.amount_cents))] = assignment.category
 
     right = llm_rows = llm_right = 0
     for row in rows:
         if row.id in planned.rule_labels:
             right += planned.rule_labels[row.id] == row.category
             continue
-        merchant = normalize_merchant(row.merchant_raw)
-        label = by_merchant.get(merchant)
+        unit = unit_of(row)
+        label = by_unit.get(unit)
         llm_rows += 1
         if label == row.category:
             right += 1
             llm_right += 1
-        elif merchant in by_merchant:
-            failures.append(f"{row.id}: {merchant} expected {row.category}, model said {label}")
+        elif unit in by_unit:
+            failures.append(f"{row.id}: {unit[0]} expected {row.category}, model said {label}")
     count = len(rows)
     return SuiteResult(
         metrics={

@@ -8,5 +8,6 @@
   "acme corp payroll": {"category": "income", "confidence": 0.95},
   "city of springfield utilities": {"category": "utilities", "confidence": 0.89},
   "corner bodega": {"category": "groceries", "confidence": 0.62},
-  "venmo payment": {"category": "transfer", "confidence": 0.58}
+  "venmo payment": {"category": "transfer", "confidence": 0.58},
+  "united airlines refund": {"category": "travel", "confidence": 0.86}
 }
