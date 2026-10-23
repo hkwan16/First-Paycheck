@@ -462,3 +462,5 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above, in the subagent's branch.
 
 **Time saved or lost:** Not measured.
+
+**Revised before merge:** Making spending rules money-out only also stopped refunds from netting (the `user_good` October's United Airlines refund, -50,000, became uncategorized and changed spec 007's figures). The coordinator replaced it with direction-aware precedence: money out goes user exact, user prefix, seed exact, seed prefix; money in goes user exact, user prefix, seed contains, seed exact, seed prefix. The paycheck is still `income` (`payroll` beats the prefix `sweetgreen` for money in), the refund is `travel` again, the model may call money in a refund, and a user rule applies both ways. A failing precedence row (`united airlines`, -50,000 -> `travel`) reproduced it first; the migration test now runs the categorize rules pass after 0016 to show the cleared rows come back right.
