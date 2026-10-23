@@ -1,7 +1,7 @@
 import { delay, http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { emptyCashflow, sandboxCashflow } from '@/test/fixtures/cashflow';
-import { SAMPLE_NOW, sampleTransactions } from '@/test/fixtures/sample';
+import { dynamicCashflow, emptyCashflow, sandboxCashflow } from '@/test/fixtures/cashflow';
+import { SAMPLE_NOW, sampleCsvAccount, sampleTransactions } from '@/test/fixtures/sample';
 import { db, emptyDb } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
@@ -26,6 +26,7 @@ afterEach(() => server.events.removeAllListeners());
 
 const summaryRegion = () => screen.getByRole('region', { name: /paychecks?$|Your month so far/ });
 const tile = (label: string) => within(summaryRegion()).getByText(label).parentElement!;
+const LOAN_ID = '1a2b3c4d-0000-4000-8000-00000000a070';
 
 /** Query strings of every `GET /cashflow`. */
 function cashflowReads() {
@@ -88,12 +89,42 @@ describe('SpendingScreen summary', () => {
     );
   });
 
-  it('leaves the percentages out when there was no income', async () => {
+  it('says n/a for the shares when there was no income', async () => {
     spendingDb.cashflow = emptyCashflow('2026-10-01', '2026-10-17');
     await renderSpending();
     await waitFor(() => expect(tile('Essentials')).toHaveTextContent('$0.00'));
-    expect(tile('Essentials')).toHaveTextContent('No income to compare yet');
-    expect(tile('Savings')).toHaveTextContent('No income to compare yet');
+    expect(tile('Essentials')).toHaveTextContent('n/a, income too small to compare');
+    expect(tile('Savings')).toHaveTextContent('n/a, income too small to compare');
+  });
+
+  it('says n/a for a share the API holds back as too large, and shows the rest', async () => {
+    // Plaid's user_transactions_dynamic October (spec 007 rules 21a and 25):
+    // 12 cents of income against $364.80 of essentials.
+    spendingDb.cashflow = dynamicCashflow();
+    await renderSpending();
+    await waitFor(() => expect(tile('Income')).toHaveTextContent('$0.12'));
+    expect(tile('Essentials')).toHaveTextContent('$364.80');
+    expect(tile('Essentials')).toHaveTextContent('n/a, income too small to compare');
+    expect(tile('Essentials')).not.toHaveTextContent('%');
+    expect(tile('Flexible')).toHaveTextContent('-$1,019.79');
+    expect(tile('Flexible')).toHaveTextContent('n/a, income too small to compare');
+    expect(tile('Savings')).toHaveTextContent('Savings rate 0%');
+  });
+
+  it('says how many ledger rows the totals left out', async () => {
+    spendingDb.cashflow = dynamicCashflow();
+    await renderSpending();
+    expect(
+      await within(summaryRegion()).findByText(
+        "165 rows on loan, investment and retirement accounts are left out: they are those accounts' own ledgers, not money you spent or received.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing about ledgers when none were left out', async () => {
+    await renderSpending();
+    await waitFor(() => expect(tile('Income')).toHaveTextContent('$3,992.08'));
+    expect(summaryRegion()).not.toHaveTextContent(/left out/);
   });
 
   it('offers a retry when the totals cannot be read', async () => {
@@ -190,6 +221,44 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
       'Costco WholesaleAI · 62%-$142.60Oct 13 · ··4821',
       'AmazonAI · 78%-$62.30Oct 9 · ··4821',
     ]);
+  });
+
+  it("leaves a loan ledger's rows out of a category's popover, as the API leaves them out of its total", async () => {
+    db.accounts = [
+      ...db.accounts,
+      {
+        ...sampleCsvAccount,
+        id: LOAN_ID,
+        provider: 'plaid',
+        name: 'Auto loan',
+        kind: 'loan',
+      },
+    ];
+    db.transactions = [
+      {
+        ...sampleTransactions.find((t) => t.category === 'shopping')!,
+        id: '7a000000-0000-4000-8000-00000000a001',
+        account_id: LOAN_ID,
+        merchant_raw: 'Loan ledger row',
+        merchant_clean: 'Loan ledger row',
+        posted_at: '2026-10-16',
+      },
+      ...db.transactions,
+    ];
+    const { user } = await renderSpending({ showSankey: true });
+    await user.hover(await within(card()).findByRole('button', { name: 'Shopping $204.90' }));
+    const popover = within(card()).getByRole('group', { name: 'Shopping' });
+    expect(within(popover).getAllByRole('listitem')).toHaveLength(2);
+    expect(popover).not.toHaveTextContent('Loan ledger row');
+  });
+
+  it('says n/a for a bucket whose share the API held back', async () => {
+    spendingDb.cashflow = dynamicCashflow();
+    const { user } = await renderSpending({ showSankey: true });
+    await user.hover(await within(card()).findByRole('button', { name: 'Essentials $364.80' }));
+    const popover = within(card()).getByRole('group', { name: 'Essentials' });
+    expect(popover).toHaveTextContent('n/a, income too small to compare');
+    expect(popover).not.toHaveTextContent('Debt payments');
   });
 
   it('explains take-home from both sides: the pay stubs and the deposits', async () => {

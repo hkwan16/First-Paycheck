@@ -6,7 +6,13 @@ is reported positive (rule 22a): an income-labeled row that is money out, such
 as the Plaid sandbox's GUSTO PAY payroll, is not income and is left out of every
 total like a transfer, so income is never negative. The spending buckets are
 net outflows, so refunds reduce them. Transfers between the user's own
-accounts are left out of every total.
+accounts are left out of every total. The sums cover checking, savings and
+credit accounts only (rule 21a); the route leaves loan, investment and
+retirement ledgers out before they get here.
+
+A share of income is null when there is no income, or when its size would
+exceed ``MAX_SHARE_PCT`` (rule 25): a few cents deposited against a month of
+spending gives a percentage that says nothing.
 """
 
 from __future__ import annotations
@@ -19,10 +25,19 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from calc.money import CONTEXT
 
-__all__ = ["Bucket", "CategorySum", "CategoryTotal", "SpendingTotals", "summarize"]
+__all__ = [
+    "MAX_SHARE_PCT",
+    "Bucket",
+    "CategorySum",
+    "CategoryTotal",
+    "SpendingTotals",
+    "summarize",
+]
 
 Bucket = Literal["income", "essentials", "flexible", "savings", "other", "transfer"]
 _TENTH = Decimal("0.1")
+# Rule 25: the largest share of income shown, in percent, either sign.
+MAX_SHARE_PCT = 1_000
 
 # A sum of amounts in one direction: never negative, and never bounded the way
 # a typed amount is (a year of transactions can add up past any one of them).
@@ -85,6 +100,7 @@ class SpendingTotals(BaseModel):
     uncategorized_cents: int
     uncategorized_count: int
     left_over_cents: int
+    # One decimal place; null with no income or too little to compare (rule 25).
     essentials_pct: Decimal | None
     flexible_pct: Decimal | None
     savings_rate_pct: Decimal | None
@@ -93,7 +109,10 @@ class SpendingTotals(BaseModel):
 
 
 def _share(part: int, income: int) -> Decimal | None:
-    if income <= 0:
+    """``part`` as a percentage of ``income``, or None when there is no income
+    or the share's size would exceed ``MAX_SHARE_PCT`` (compared exactly, in
+    cents, before rounding)."""
+    if income <= 0 or abs(part) * 100 > MAX_SHARE_PCT * income:
         return None
     with localcontext(CONTEXT):
         return (Decimal(part) * 100 / income).quantize(_TENTH, rounding=ROUND_HALF_UP)

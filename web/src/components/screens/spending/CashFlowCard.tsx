@@ -59,6 +59,10 @@ export function CashFlowCard({ flow, updating }: CashFlowCardProps) {
     () => new Map((accounts ?? []).map((a) => [a.id, a.mask] as const)),
     [accounts],
   );
+  const kinds = useMemo(
+    () => new Map((accounts ?? []).map((a) => [a.id, a.kind] as const)),
+    [accounts],
+  );
 
   const month = flow ? monthName(flow.start) : null;
   const stacked = width < STACK_BELOW;
@@ -98,7 +102,13 @@ export function CashFlowCard({ flow, updating }: CashFlowCardProps) {
         width={width}
         headings={headings}
         renderDetails={(node: FlowNode) => (
-          <FlowDetails node={node} flow={flow} transactions={transactions} masks={masks} />
+          <FlowDetails
+            node={node}
+            flow={flow}
+            transactions={transactions}
+            masks={masks}
+            kinds={kinds}
+          />
         )}
       />
     );

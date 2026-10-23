@@ -9,7 +9,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pydantic import ValidationError
 
-from calc.spending import Bucket, CategorySum, summarize
+from calc.spending import Bucket, CategorySum, SpendingTotals, summarize
 
 BUCKETS: dict[str, Bucket] = {
     "income": "income",
@@ -150,6 +150,56 @@ def test_percent_rounds_half_up_to_one_place() -> None:
     assert totals.essentials_pct == Decimal("-0.1")
 
 
+# Spec 007 rule 25, "Shares of income": a share is null with no income, or when
+# its size would exceed 1,000.0 (|bucket| > 10 * income).
+
+
+def shares(totals: SpendingTotals) -> tuple[Decimal | None, Decimal | None, Decimal | None]:
+    return (totals.essentials_pct, totals.flexible_pct, totals.savings_rate_pct)
+
+
+def test_shares_example_1_no_income() -> None:
+    totals = summarize([out("housing", 50_000), out("dining", 1_000)], BUCKETS)
+    assert totals.income_cents == 0
+    assert shares(totals) == (None, None, None)
+
+
+def test_shares_example_2_tiny_income() -> None:
+    # The user_transactions_dynamic October: 12 cents of interest is the only
+    # income; three payroll deposits of 81,000 were filed under dining.
+    sums = [
+        into("income", 12),
+        out("housing", 36_480),
+        CategorySum(category="dining", out_cents=141_021, in_cents=243_000, count=6, out_count=3),
+    ]
+    totals = summarize(sums, BUCKETS)
+    assert (totals.income_cents, totals.essentials_cents) == (12, 36_480)
+    assert (totals.flexible_cents, totals.savings_cents) == (-101_979, 0)
+    # 304,000.0 and -849,825.0 before rule 25; savings 0 is within the limit.
+    assert shares(totals) == (None, None, Decimal("0.0"))
+
+
+def test_shares_example_3_at_the_limit() -> None:
+    sums = [
+        into("income", 1_000),
+        out("housing", 10_000),
+        out("dining", 10_001),
+        into("savings_investment", 10_000),
+    ]
+    totals = summarize(sums, BUCKETS)
+    assert totals.savings_cents == -10_000
+    assert shares(totals) == (Decimal("1000.0"), None, Decimal("-1000.0"))
+
+
+def test_shares_example_4_a_normal_month_and_a_refund_heavy_one() -> None:
+    # The spec month's shares are in test_the_spec_month; here refunds beat
+    # spending on essentials, a negative share well within the limit.
+    sums = [into("income", 200_000), into("housing", 30_000), out("dining", 2_500)]
+    totals = summarize(sums, BUCKETS)
+    assert totals.essentials_cents == -30_000
+    assert shares(totals) == (Decimal("-15.0"), Decimal("1.3"), Decimal("0.0"))
+
+
 @pytest.mark.parametrize(
     "fields",
     [
@@ -197,3 +247,18 @@ def test_income_is_money_in_and_never_negative(sums: list[CategorySum]) -> None:
     assert totals.transaction_count == sum(item.count for item in sums)
     if totals.income_cents == 0:
         assert totals.essentials_pct is totals.flexible_pct is totals.savings_rate_pct is None
+
+
+@given(category_sums())
+def test_a_share_is_shown_only_within_ten_times_income(sums: list[CategorySum]) -> None:
+    totals = summarize(sums, BUCKETS)
+    income = totals.income_cents
+    for bucket, share in (
+        (totals.essentials_cents, totals.essentials_pct),
+        (totals.flexible_cents, totals.flexible_pct),
+        (totals.savings_cents, totals.savings_rate_pct),
+    ):
+        shown = income > 0 and abs(bucket) <= 10 * income
+        assert (share is not None) == shown
+        if share is not None:
+            assert abs(share) <= 1000

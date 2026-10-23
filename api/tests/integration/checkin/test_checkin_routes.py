@@ -33,7 +33,7 @@ from tests.support.factories import (
 )
 from tests.support.november import EMERGENCY_FUND_INPUTS, HEALTH_INPUTS, K401_INPUTS
 from tests.support.sandbox_history import link_sandbox
-from tests.support.spending_month import september
+from tests.support.spending_month import loan_ledger_month, september
 
 Client = Callable[[FixtureUser], TestClient]
 NOW = dt.datetime(2026, 10, 21, 15, 0, tzinfo=dt.UTC)
@@ -208,6 +208,26 @@ def test_cash_flow_against_the_plan(
         "retirement": "under",
         "health": "on_plan",
         "left_over": None,
+    }
+
+
+def test_cash_flow_skips_loan_ledgers(
+    frozen: FastAPI, db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    # Spec 015 route row 2a: the loan's "Monthly payment" is money in on its own
+    # ledger, labeled income; counting it made take-home 291,500.
+    loan_ledger_month(db_connection, user_a)
+    check_in = make_check_in(db_connection, user_a.id, period=dt.date(2026, 9, 1))
+
+    response = client_as(user_a).get(f"/check-ins/{check_in}")
+
+    assert response.status_code == 200, response.text
+    flow = response.json()["cash_flow"]
+    lines = {line["key"]: line["actual_cents"] for line in flow["plan"]}
+    assert (lines["take_home"], lines["other"], lines["left_over"]) == (250_000, 40_000, 70_000)
+    assert flow["cash_flow"]["spending"]["ledger_rows_skipped"] == {
+        "count": 3,
+        "net_cents": -38_000,
     }
 
 

@@ -1,7 +1,38 @@
-import type { CategorySource, Transaction } from '@/lib/api/types';
+import type { CategorySource, SpendingSummary, Transaction } from '@/lib/api/types';
 import { parseISODate } from '@/lib/dates';
 import type { Tone } from '@/lib/design/tone';
-import { formatPct } from '@/lib/money';
+import { formatNumber, formatPct } from '@/lib/money';
+
+/**
+ * What a share of income says when the API sent none: no income, or too
+ * little to compare a bucket with (spec 007 rule 25).
+ */
+export const NO_SHARE = 'n/a, income too small to compare';
+
+/**
+ * A bucket's share of income as the API rounded it, worded by `words`, or
+ * `NO_SHARE` when the API held it back. `decimals` is display precision only.
+ */
+export function shareText(
+  pct: string | null,
+  words: (pct: string) => string,
+  decimals = 0,
+): string {
+  return pct === null ? NO_SHARE : words(formatPct(pct, { decimals }));
+}
+
+/**
+ * Why rows on loan, investment and retirement accounts are not in the totals
+ * (spec 007 rule 21a), or null when the API left none out. A count of rows,
+ * never their amount.
+ */
+export function ledgerNote(skipped: SpendingSummary['ledger_rows_skipped']): string | null {
+  if (skipped.count === 0) return null;
+  if (skipped.count === 1) {
+    return "1 row on a loan, investment or retirement account is left out: it is that account's own ledger, not money you spent or received.";
+  }
+  return `${formatNumber(skipped.count)} rows on loan, investment and retirement accounts are left out: they are those accounts' own ledgers, not money you spent or received.`;
+}
 
 /** Below this confidence an AI label is shown as a warning: worth a look. */
 export const LOW_CONFIDENCE = 0.7;

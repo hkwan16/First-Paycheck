@@ -79,6 +79,13 @@ const category = (
   count: number,
 ): CategoryTotal => ({ category: name, bucket, total_cents, count });
 
+/** `SPENDING_ACCOUNT_KINDS` in api/app/routers/spending.py (spec 007 rule 21a). */
+export const ACCOUNT_KINDS_COUNTED: SpendingSummary['account_kinds_counted'] = [
+  'checking',
+  'savings',
+  'credit',
+];
+
 /** `CATEGORY_BUCKETS` in api/sync/categories.py. */
 export const CATEGORY_BUCKETS: SpendingSummary['category_buckets'] = {
   income: 'income',
@@ -123,6 +130,8 @@ export const sampleSpendingSummary: SpendingSummary = {
   transaction_count: 16,
   uncategorized_count: 0,
   paycheck_count: 2,
+  ledger_rows_skipped: { count: 0, net_cents: 0 },
+  account_kinds_counted: ACCOUNT_KINDS_COUNTED,
   categories: [
     category('income', 'income', 399_208, 2),
     category('housing', 'essentials', 145_000, 1),
@@ -196,6 +205,8 @@ export function emptyCashflow(start: string, end: string): CashFlow {
       transaction_count: 0,
       uncategorized_count: 0,
       paycheck_count: 0,
+      ledger_rows_skipped: { count: 0, net_cents: 0 },
+      account_kinds_counted: ACCOUNT_KINDS_COUNTED,
       categories: [],
       category_buckets: CATEGORY_BUCKETS,
     },
@@ -209,7 +220,8 @@ export const SANDBOX_PERIOD = { start: '2026-10-01', end: '2026-10-31' } as cons
  * stub, as the API returns it (api/tests/integration/test_spending_summary.py,
  * spec 007 rule 22a). The sandbox books its GUSTO PAY payroll as money out,
  * so only 4.22 of interest came in: income 422, the payroll in
- * `income_outflows_ignored_cents`, and spending far beyond the income.
+ * `income_outflows_ignored_cents`, and spending far beyond the income. Rule 25
+ * drops the flexible and savings shares, over ten times that income.
  */
 export function sandboxCashflow(): CashFlow {
   const empty = emptyCashflow(SANDBOX_PERIOD.start, SANDBOX_PERIOD.end);
@@ -227,8 +239,8 @@ export function sandboxCashflow(): CashFlow {
       uncategorized_cents: 50_000,
       left_over_cents: -168_541,
       essentials_pct: '128.0',
-      flexible_pct: '16214.0',
-      savings_rate_pct: '23696.7',
+      flexible_pct: null,
+      savings_rate_pct: null,
       transaction_count: 14,
       uncategorized_count: 1,
       paycheck_count: 0,
@@ -241,6 +253,51 @@ export function sandboxCashflow(): CashFlow {
         category('entertainment', 'flexible', 7_850, 1),
         category('travel', 'flexible', -50_000, 1),
         category('savings_investment', 'savings', 100_000, 1),
+      ],
+    },
+  };
+}
+
+/**
+ * `GET /cashflow` for October 1 to 22 on Plaid's `user_transactions_dynamic`
+ * sandbox user with no confirmed stub, as the API returns it
+ * (api/tests/integration/test_spending_summary.py, spec 007 rules 21a and 25).
+ * The five loans' 165 posted ledger rows are left out; 12 cents of interest is
+ * the only income (the seed rules file the weekly payroll under dining), so
+ * the essentials and flexible shares are null.
+ */
+export function dynamicCashflow(): CashFlow {
+  const empty = emptyCashflow(SANDBOX_PERIOD.start, SANDBOX_PERIOD.end);
+  return {
+    ...empty,
+    spending: {
+      ...empty.spending,
+      income_cents: 12,
+      essentials_cents: 36_480,
+      flexible_cents: -101_979,
+      savings_cents: 0,
+      other_cents: 0,
+      transfers_ignored_cents: 301_989,
+      income_outflows_ignored_cents: 0,
+      uncategorized_cents: 121_602,
+      left_over_cents: 65_511,
+      essentials_pct: null,
+      flexible_pct: null,
+      savings_rate_pct: '0.0',
+      transaction_count: 80,
+      uncategorized_count: 35,
+      paycheck_count: 0,
+      ledger_rows_skipped: { count: 165, net_cents: -5_619_612 },
+      categories: [
+        category('income', 'income', 12, 1),
+        category('transfer', 'transfer', 301_989, 4),
+        category('groceries', 'essentials', 34_267, 5),
+        category('dining', 'flexible', -173_353, 15),
+        category('transport', 'essentials', 2_213, 2),
+        category('subscriptions', 'flexible', 3_521, 3),
+        category('shopping', 'flexible', 46_655, 13),
+        category('travel', 'flexible', 18_600, 1),
+        category('personal_care', 'flexible', 2_598, 1),
       ],
     },
   };

@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JOB_POLL_MS } from '@/lib/api/hooks';
+import { dynamicCashflow } from '@/test/fixtures/cashflow';
 import {
   checkInJobId,
   checkInJobStates,
@@ -187,6 +188,36 @@ describe('CheckInScreen', () => {
       'href',
       '/setup/spending',
     );
+  });
+
+  it('says which ledger rows the cash flow left out, and shows no share it was not sent', async () => {
+    // The user_transactions_dynamic shape (spec 007 rules 21a and 25): loan
+    // ledgers left out, 12 cents of income, no essentials or flexible share.
+    const checkIn = novemberCheckIn();
+    const spending = checkIn.cash_flow.cash_flow.spending;
+    checkIn.cash_flow.cash_flow.spending = {
+      ...spending,
+      ...dynamicCashflow().spending,
+      start: spending.start,
+      end: spending.end,
+    };
+    checkinDb.checkIns[0] = checkIn;
+    await open();
+    const card = await screen.findByRole('region', {
+      name: 'November cash flow against the plan',
+    });
+    expect(card).toHaveTextContent(
+      "165 rows on loan, investment and retirement accounts are left out: they are those accounts' own ledgers, not money you spent or received.",
+    );
+    expect(card).not.toHaveTextContent('%');
+  });
+
+  it('says nothing about ledgers when none were left out', async () => {
+    await open();
+    const card = await screen.findByRole('region', {
+      name: 'November cash flow against the plan',
+    });
+    expect(card).not.toHaveTextContent(/left out/);
   });
 
   it('shows net worth and holdings beside the cash flow, as the mockup places them', async () => {

@@ -1,6 +1,6 @@
 # 007: Decisions, versioning, the calendar and the spending summary
 
-Status: Implemented, M3. Part B (`GET /spending/summary`) is pulled forward from M5 because the Spending tiles need it. Rule 22a (income counts money in only) added in M10 after the October 22 production walkthrough showed negative income on a Plaid sandbox history.
+Status: Implemented, M3. Part B (`GET /spending/summary`) is pulled forward from M5 because the Spending tiles need it. Rule 22a (income counts money in only) added in M10 after the October 22 production walkthrough showed negative income on a Plaid sandbox history. Rule 21a (cash accounts only) and the share limit of rule 25 added after the same walkthrough with Plaid's `user_transactions_dynamic` sandbox user, whose loan ledgers drove the summary (`uncategorized_cents` -5,498,010) and whose 12 cents of income gave an `essentials_pct` of 304000.0.
 
 ## Goal
 
@@ -75,18 +75,19 @@ Save the calculator result a user picks as an immutable, versioned `decisions` r
 
 ### Outputs (`SpendingSummary`)
 
-`start`, `end`, `income_cents`, `essentials_cents`, `flexible_cents`, `savings_cents`, `other_cents`, `transfers_ignored_cents`, `income_outflows_ignored_cents`, `uncategorized_cents`, `left_over_cents`, `essentials_pct`, `flexible_pct`, `savings_rate_pct` (Decimal strings with one decimal place, or null when income is not positive), `transaction_count`, `uncategorized_count`, `paycheck_count`, `categories` (one `CategoryTotal` per category with transactions counted in its bucket: `category`, `bucket`, `total_cents`, `count`, in category list order) and `category_buckets` (every category to its bucket).
+`start`, `end`, `income_cents`, `essentials_cents`, `flexible_cents`, `savings_cents`, `other_cents`, `transfers_ignored_cents`, `income_outflows_ignored_cents`, `uncategorized_cents`, `left_over_cents`, `essentials_pct`, `flexible_pct`, `savings_rate_pct` (Decimal strings with one decimal place, or null when there is no income or too little to compare with, rule 25), `transaction_count`, `uncategorized_count`, `paycheck_count`, `ledger_rows_skipped` (`count` and `net_cents` of the rows on loan, investment and retirement accounts, rule 21a), `categories` (one `CategoryTotal` per category with transactions counted in its bucket: `category`, `bucket`, `total_cents`, `count`, in category list order), `category_buckets` (every category to its bucket) and `account_kinds_counted` (the account kinds whose rows the totals read, in `account_kind` order: `checking`, `savings`, `credit`).
 
 ### Rules
 
 20. **Buckets** live in `sync/categories.py` (`CATEGORY_BUCKETS`), next to the category list, and cover every category: `income` (income); `essentials` (housing, utilities, phone_internet, groceries, transport, insurance, healthcare); `flexible` (dining, subscriptions, shopping, entertainment, travel, personal_care, education, gifts_donations); `savings` (savings_investment); `other` (debt_payment, fees, taxes, other); `transfer` (transfer).
-21. **Which transactions.** Posted (`pending = false`) transactions of active accounts with `posted_at` in the period, read under RLS. The per-category sums and counts are one SQL `GROUP BY category`; the bucket roll-up and percentages are `calc/spending.py:summarize`, a pure function.
+21. **Which transactions.** Posted (`pending = false`) transactions of active `checking`, `savings` and `credit` accounts (rule 21a) with `posted_at` in the period, read under RLS. The per-category sums and counts are one SQL `GROUP BY category`; the bucket roll-up and percentages are `calc/spending.py:summarize`, a pure function.
+21a. **Cash accounts only.** The summary reads rows on the accounts money is spent from and saved in: `checking`, `savings` and `credit` (`SPENDING_ACCOUNT_KINDS` in `app/routers/spending.py`, returned as `account_kinds_counted`). Rows on `loan`, `investment` and `retirement` accounts (`LEDGER_ACCOUNT_KINDS`) are that account's own bookkeeping, not cash the user spent or received: a loan books the payment it received as money in, though that payment is the transfer that already left checking, and books accrued interest as money out, though no cash left an account; an investment or retirement account books contributions, dividends and trades inside the account. Counting them would add every loan payment twice (once as the checking outflow, once as the loan's inflow) and could make it income. They are left out of every bucket, of `uncategorized_*` and of `transaction_count`, whatever their category, and reported as `ledger_rows_skipped`: `count`, the number of such posted rows in the period on active accounts, and `net_cents`, their sum (net, positive is money out, like `uncategorized_cents`). Every `account_kind` belongs to exactly one of the two sets; a new kind must be placed in one (a unit test checks it). `GET /transactions` still lists every account's rows (spec 003); only the money math skips them.
 22. **Signs** follow spec 001 rule 21 (positive is money out). `income_cents` is the money that came in under `income`: the sum of the magnitudes of the negative amounts of `income` transactions (rule 22a), so it is never negative. `essentials_cents`, `flexible_cents`, `savings_cents` and `other_cents` are the net amounts of their buckets, so refunds reduce spending. A category's `total_cents` is reported in the same direction as its bucket (income positive when money came in), and its `count` is the number of transactions behind that total.
 22a. **Income counts money in only.** An `income` transaction that is money out (amount above 0) is not income. Banks usually book payroll as money in, but the Plaid sandbox books its GUSTO PAY payroll as money out (585,000) while the seed rules label it `income`, and a mislabel or a payroll reversal can do the same; netting such a row would make income negative and every figure derived from it wrong. The row is left out of every total, like a transfer, and reported as `income_outflows_ignored_cents`, the sum of those amounts. `left_over_cents` (rule 24) and the percentages (rule 25) follow from the money-in `income_cents`. An `income` row of exactly 0 is counted as income (it adds nothing). The `income` category's `total_cents` equals `income_cents`, its `count` leaves the money-out rows out, and it is listed in `categories` only when that count is above 0. The other buckets keep netting (refunds reduce spending, a withdrawal reduces savings).
 23. **Ignored and uncategorized.** `transfer` transactions are left out of every total; `transfers_ignored_cents` is the sum of their absolute amounts. Money-out `income` transactions are left out too (rule 22a) and reported apart from transfers in `income_outflows_ignored_cents`, so `transfers_ignored_cents` stays the money moved between the user's own accounts. Uncategorized transactions (category null) are left out of the buckets and reported as `uncategorized_count` and `uncategorized_cents` (net, positive out).
 24. `left_over_cents = income - essentials - flexible - savings - other`; it can be negative.
-25. Percentages are `bucket / income * 100` rounded half up to one decimal place: `essentials_pct`, `flexible_pct`, and `savings_rate_pct` (savings over income). Null when `income_cents <= 0`.
-26. `transaction_count` counts every transaction in the period (all buckets, transfers, ignored income outflows and uncategorized included). `paycheck_count` counts the user's confirmed pay stubs with `pay_date` in the period.
+25. **Shares of income.** Percentages are `bucket / income * 100` rounded half up to one decimal place: `essentials_pct`, `flexible_pct`, and `savings_rate_pct` (savings over income). A share is null when `income_cents` is 0, or when its size would exceed 1,000.0 (`|bucket| > 10 * income`, compared exactly in cents before rounding: income under a tenth of the bucket's size), because a share of a few cents of income says nothing about the month. A share of exactly 1,000.0 is shown. The limit is on the size, so a negative bucket (a refund-heavy month, or a payroll the categorizer filed under a spending category) gives a negative share that is shown within the limit and null beyond it. Each share is judged on its own: one can be null while another is shown. The client prints a null share as "n/a" with the reason "income too small to compare"; it never works one out. Every share the cash-flow and check-in routes return is this summary's.
+26. `transaction_count` counts every transaction the summary reads in the period (all buckets, transfers, ignored income outflows and uncategorized included; rows on ledger accounts are counted in `ledger_rows_skipped` instead, rule 21a). `paycheck_count` counts the user's confirmed pay stubs with `pay_date` in the period.
 
 ## Hand-worked examples
 
@@ -127,7 +128,7 @@ September 2026, one checking account: paycheck -199,604 and -199,604 (income); r
 - `income_cents = 399,208`; `essentials_cents = 150,000 + 30,000 = 180,000`; `flexible_cents = 8,500`; `savings_cents = 40,000`; `other_cents = 3,900`; `transfers_ignored_cents = 25,000`; `income_outflows_ignored_cents = 0`; `uncategorized_cents = 1,200`.
 - `left_over_cents = 399,208 - 180,000 - 8,500 - 40,000 - 3,900 = 166,808`.
 - `essentials_pct = 180,000 / 399,208 * 100 = 45.089...`, "45.1"; `flexible_pct = 2.129...`, "2.1"; `savings_rate_pct = 10.019...`, "10.0".
-- `transaction_count = 10` (the pending and August rows excluded); `uncategorized_count = 1`; `paycheck_count = 2`.
+- `transaction_count = 10` (the pending and August rows excluded); `uncategorized_count = 1`; `paycheck_count = 2`; `ledger_rows_skipped` is `count = 0`, `net_cents = 0`.
 
 ### Income-labeled money out (rule 22a; `api/tests/unit/calc/test_spending.py`)
 
@@ -147,8 +148,36 @@ The recorded sandbox item (`api/tests/fixtures/plaid/recorded`) synced through `
 - `income_cents = 422` (was -584,578); `income_outflows_ignored_cents = 585,000`; `transfers_ignored_cents = 2,500 + 207,850 = 210,350`.
 - `essentials_cents = 540`; `flexible_cents = 433 + 1,200 + 50,000 + 8,940 + 50,000 + 7,850 - 50,000 = 68,423`; `savings_cents = 100,000`; `other_cents = 0`; `uncategorized_cents = 50,000`.
 - `left_over_cents = 422 - 540 - 68,423 - 100,000 = -168,541` (was -753,541): this month really did spend beyond the 4.22 that came in.
-- `essentials_pct = 540 / 422 * 100 = 127.96...`, "128.0"; `flexible_pct = 68,423 / 422 * 100 = 16,213.98...`, "16214.0"; `savings_rate_pct = 100,000 / 422 * 100 = 23,696.68...`, "23696.7". Shares this far over 100% are what a month with almost nothing deposited looks like; they are not clamped.
+- `essentials_pct = 540 / 422 * 100 = 127.96...`, "128.0" (540 is within 10 * 422 = 4,220); `flexible_pct` null (68,423 > 4,220: 16,213.98... would exceed 1,000.0); `savings_rate_pct` null (100,000 > 4,220: 23,696.68...). Rule 25 drops the two shares that compare spending with almost nothing deposited.
 - `transaction_count = 14`; `uncategorized_count = 1`; `paycheck_count = 0`; the `income` category is `total_cents = 422`, `count = 1`.
+- Every row is on a checking, savings or credit account (the CD and money market accounts are `savings`), so `ledger_rows_skipped` is `count = 0`, `net_cents = 0`.
+
+### A loan ledger (rule 21a; `api/tests/integration/test_spending_summary.py`, `tests/support/spending_month.py:loan_ledger_month`)
+
+September 2026. Checking: a paycheck -250,000 (income), rent 120,000 (housing), the auto loan payment 40,000 (debt_payment), the credit card payment 20,000 (transfer). Credit card: groceries 20,000 (groceries), the payment received -20,000 (transfer). Auto loan (`loan`): "Monthly payment" -40,000, the same payment as the loan books it, labeled `income` (money in, as a model might read it), and "Interest charged" 3,500 (fees). Brokerage (`investment`): a dividend -1,500 (income).
+
+- Rows read: the six on checking and the credit card. `income_cents = 250,000`; `essentials_cents = 120,000 + 20,000 = 140,000`; `flexible_cents = 0`; `savings_cents = 0`; `other_cents = 40,000`; `transfers_ignored_cents = 20,000 + 20,000 = 40,000`; `uncategorized_cents = 0`.
+- `left_over_cents = 250,000 - 140,000 - 40,000 = 70,000`.
+- `essentials_pct = 140,000 / 250,000 * 100 = 56.0`, "56.0"; `flexible_pct` "0.0"; `savings_rate_pct` "0.0".
+- `transaction_count = 6`; `ledger_rows_skipped`: `count = 3`, `net_cents = -40,000 + 3,500 - 1,500 = -38,000`.
+- Counting the ledgers, as before rule 21a, gave `income_cents = 250,000 + 40,000 + 1,500 = 291,500` (the loan payment counted once as money out of checking and again as income), `other_cents = 43,500` and `left_over_cents = 108,000`.
+- `GET /transactions` for the month still lists all nine rows.
+
+### Shares of income (rule 25; `api/tests/unit/calc/test_spending.py`)
+
+| # | Month | Shares |
+|---|---|---|
+| 1 | No income: essentials 50,000, flexible 1,000 | all null (`income_cents = 0`) |
+| 2 | Tiny income, the `user_transactions_dynamic` October below: income 12, essentials 36,480, flexible -101,979 (three payroll deposits filed under dining), savings 0 | `essentials_pct` null (36,480 > 120; 304,000.0 before rule 25); `flexible_pct` null (101,979 > 120; -849,825.0); `savings_rate_pct` "0.0" |
+| 3 | At the limit: income 1,000, essentials 10,000, flexible 10,001, savings -10,000 | `essentials_pct` "1000.0" (10,000 = 10 * 1,000); `flexible_pct` null (10,001 > 10,000); `savings_rate_pct` "-1000.0" |
+| 4 | A normal month: the spec month above, plus a refund-heavy case: income 200,000, essentials -30,000 (refunds beat spending), flexible 2,500 | spec month "45.1", "2.1", "10.0"; refund case `essentials_pct` "-15.0" (shown: a negative share within the limit), `flexible_pct` "1.3" |
+
+### Plaid's `user_transactions_dynamic` October (rules 21a and 25; `api/tests/integration/test_spending_summary.py`)
+
+The recorded sandbox user (`api/tests/fixtures/plaid/recorded_dynamic`, recorded 2026-10-22, so October runs to the 22nd) synced through `run_sync` and labeled by the seed rules alone: a checking account (weekly "Sweetgreen inc payroll" deposits of -81,000, which the seed rules file under dining, and "Interest payment" -12, the only `income` row), a credit card, and five loans (mortgage, student, auto, consumer, line of credit) whose ledgers book "Monthly payment" as money in and "Interest charged" as money out.
+
+- Before rule 21a: `uncategorized_cents = -5,498,010` and `uncategorized_count = 200`, of which the loans' 165 posted rows were -5,619,612; `transaction_count = 245`; `essentials_pct` "304000.0", `flexible_pct` "-849825.0".
+- After: `income_cents = 12`; `essentials_cents = 36,480`; `flexible_cents = -101,979`; `savings_cents = 0`; `other_cents = 0`; `transfers_ignored_cents = 301,989`; `uncategorized_cents = 121,602`, `uncategorized_count = 35`; `left_over_cents = 12 - 36,480 + 101,979 = 65,511`; `transaction_count = 80`; `ledger_rows_skipped`: `count = 165`, `net_cents = -5,619,612`; `essentials_pct` and `flexible_pct` null, `savings_rate_pct` "0.0" (shares example 2).
 
 ## Edge cases
 
@@ -157,6 +186,9 @@ The recorded sandbox item (`api/tests/fixtures/plaid/recorded`) synced through `
 - A user with no profile and no pay stub still gets an event, dated from `pay_periods_per_year` with no anchor.
 - A month with no income gives null percentages and a negative or zero `left_over_cents`.
 - A month whose only `income` rows are money out has `income_cents = 0` (never negative), the rows in `income_outflows_ignored_cents`, and null percentages.
+- A month whose rows are all on loan, investment or retirement accounts reads as an empty period (zeros, `transaction_count = 0`) with those rows in `ledger_rows_skipped`.
+- A month with a few cents of income shows the shares within the limit and nulls the rest (rule 25); the amounts themselves are always shown.
+- An inactive ledger account's rows are in neither the totals nor `ledger_rows_skipped`, like an inactive cash account's.
 - A summary period with no transactions returns zeros, empty `categories`, and the full `category_buckets`.
 
 ## Out of scope
