@@ -100,7 +100,7 @@ def test_sandbox_income_is_never_negative(
         spending["income_cents"],
         spending["income_outflows_ignored_cents"],
         spending["left_over_cents"],
-    ) == (422, 585_000, -168_541)
+    ) == (422, 585_000, -218_541)
 
 
 def test_stub_ids_are_the_users_pay_stubs(

@@ -73,15 +73,18 @@ def test_batches_are_what_categorize_run_sends() -> None:
     assert all(len(batch) <= 50 for batch in labeler.batches)
     for batch in labeler.batches:
         assert [item.id for item in batch] == list(range(1, len(batch) + 1))
-    merchants = [item.merchant for item in sent]
-    assert merchants == sorted(set(merchants))
-    # Exactly the merchants no seed rule knows, each with its newest row.
-    unknown = {
-        normalize_merchant(row.merchant_raw) for row in ROWS if row.id not in plan.rule_labels
-    }
-    assert set(merchants) == unknown - {""}
+    # One item per merchant and direction, by merchant, money out first.
+    units = [(item.merchant, item.direction == "in") for item in sent]
+    assert units == sorted(set(units))
+    # Exactly the merchants and directions no seed rule knows, each with its newest row.
+    unknown = {categorization.unit_of(row) for row in ROWS if row.id not in plan.rule_labels}
+    assert set(units) == {unit for unit in unknown if unit[0]}
     for item in sent:
-        mine = [row for row in ROWS if normalize_merchant(row.merchant_raw) == item.merchant]
+        mine = [
+            row
+            for row in ROWS
+            if categorization.unit_of(row) == (item.merchant, item.direction == "in")
+        ]
         newest = max(mine, key=lambda row: (row.posted_at, row.id))
         assert (item.amount_cents, item.date) == (newest.amount_cents, newest.posted_at)
 

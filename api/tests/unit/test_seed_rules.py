@@ -41,32 +41,71 @@ def test_seed_covers_the_core_categories(category: str) -> None:
     assert sum(rule.category == category for rule in read_seed_rules()) >= 5
 
 
+# Amounts in cents, positive is money out (spec 001 rule 21).
 @pytest.mark.parametrize(
-    ("raw", "category"),
+    ("raw", "amount_cents", "category"),
     [
-        ("NETFLIX.COM #1234", "subscriptions"),
-        ("WHOLEFDS MKT 10234", "groceries"),
-        ("Uber 063015 SF**POOL**", "transport"),
-        ("UBER EATS 8005928996", "dining"),
-        ("ADP PAYROLL 102326", "income"),
-        ("ACH Electronic CreditGUSTO PAY 123456", "income"),
-        ("COMCAST CABLE 800-266-2278", "phone_internet"),
-        ("PG&E WEB ONLINE", "utilities"),
-        ("GEICO *AUTO", "insurance"),
-        ("ZELLE TO JOHN", "transfer"),
-        ("CREDIT CARD 3333 PAYMENT *//", "transfer"),
-        ("BILT RENT 12/01", "housing"),
-        ("CLIPPER SERVICE", "transport"),
-        ("COSTCO GAS #0123", "transport"),
-        ("COSTCO WHSE #0123", "shopping"),
-        ("United Airlines", "travel"),
-        ("McDonald's", "dining"),
+        ("NETFLIX.COM #1234", 1_549, "subscriptions"),
+        ("WHOLEFDS MKT 10234", 4_500, "groceries"),
+        ("Uber 063015 SF**POOL**", 540, "transport"),
+        ("UBER EATS 8005928996", 2_300, "dining"),
+        ("ADP PAYROLL 102326", -250_000, "income"),
+        ("ACH Electronic CreditGUSTO PAY 123456", -585_000, "income"),
+        # The Plaid sandbox books GUSTO PAY as money out: an income rule applies both ways.
+        ("ACH Electronic CreditGUSTO PAY 123456", 585_000, "income"),
+        ("COMCAST CABLE 800-266-2278", 7_000, "phone_internet"),
+        ("PG&E WEB ONLINE", 9_000, "utilities"),
+        ("GEICO *AUTO", 12_000, "insurance"),
+        ("ZELLE TO JOHN", 2_000, "transfer"),
+        ("CREDIT CARD 3333 PAYMENT *//", 2_500, "transfer"),
+        ("BILT RENT 12/01", 200_000, "housing"),
+        ("CLIPPER SERVICE", 2_000, "transport"),
+        ("COSTCO GAS #0123", 4_000, "transport"),
+        ("COSTCO WHSE #0123", 12_000, "shopping"),
+        ("United Airlines", 50_000, "travel"),
+        ("McDonald's", 1_200, "dining"),
+        # Spec 003 rule 3b: a paycheck from an employer named like a merchant.
+        ("Sweetgreen inc payroll ppd id", -81_000, "income"),
+        ("SWEETGREEN #0412", 1_450, "dining"),
+        ("STARBUCKS CORP DIRECT DEP", -254_300, "income"),
+        ("ACME CORP SALARY", -300_000, "income"),
     ],
 )
-def test_seed_rules_label_common_descriptors(raw: str, category: str) -> None:
-    found = apply_rules(normalize_merchant(raw), RuleBook(read_seed_rules()))
+def test_seed_rules_label_common_descriptors(raw: str, amount_cents: int, category: str) -> None:
+    found = apply_rules(
+        normalize_merchant(raw), RuleBook(read_seed_rules()), amount_cents=amount_cents
+    )
     assert found is not None, raw
     assert found.category == category
+
+
+@pytest.mark.parametrize(
+    ("raw", "amount_cents"),
+    [
+        # Refunds: only spending rules match, so they wait for the model or the user.
+        ("United Airlines", -50_000),
+        ("AMZN Mktp US*2K39H1", -2_599),
+        ("Sweetgreen", -1_450),
+    ],
+)
+def test_seed_rules_leave_money_in_at_a_merchant_unlabeled(raw: str, amount_cents: int) -> None:
+    rules = RuleBook(read_seed_rules())
+    assert apply_rules(normalize_merchant(raw), rules, amount_cents=amount_cents) is None
+
+
+def test_seed_contains_rows_are_the_income_markers() -> None:
+    contains = {
+        rule.merchant_norm: rule.category
+        for rule in read_seed_rules()
+        if rule.match is RuleMatch.CONTAINS
+    }
+    assert contains == {
+        "payroll": "income",
+        "ppd id": "income",
+        "direct dep": "income",
+        "direct deposit": "income",
+        "salary": "income",
+    }
 
 
 def write(tmp_path: Path, body: str) -> Path:
@@ -83,11 +122,29 @@ def write(tmp_path: Path, body: str) -> Path:
         ("netflix,prefix,streaming\n", "category"),
         ("netflix,prefix,subscriptions\nnetflix,prefix,entertainment\n", "duplicate"),
         (",exact,other\n", "empty"),
+        # Spec 003 rule 3c: contains is for income and transfer only.
+        ("payroll,contains,dining\n", "contains"),
+        ("payroll,contains,savings_investment\n", "contains"),
     ],
 )
 def test_invalid_seed_rows_are_rejected(tmp_path: Path, body: str, message: str) -> None:
     with pytest.raises(SeedError, match=message):
         read_seed_rules(write(tmp_path, body))
+
+
+@pytest.mark.parametrize("category", ["income", "transfer"])
+def test_contains_rows_for_income_and_transfer_are_read(tmp_path: Path, category: str) -> None:
+    [rule] = read_seed_rules(write(tmp_path, f"ppd id,contains,{category}\n"))
+    assert (rule.merchant_norm, rule.match, rule.category) == (
+        "ppd id",
+        RuleMatch.CONTAINS,
+        category,
+    )
+
+
+def test_a_contains_and_a_prefix_rule_may_share_a_merchant(tmp_path: Path) -> None:
+    rules = read_seed_rules(write(tmp_path, "payroll,prefix,income\npayroll,contains,income\n"))
+    assert [rule.match for rule in rules] == [RuleMatch.PREFIX, RuleMatch.CONTAINS]
 
 
 def test_header_is_required(tmp_path: Path) -> None:

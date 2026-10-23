@@ -1,11 +1,11 @@
-"""Merchant normalization and rule precedence (spec 003, rules 1-6)."""
+"""Merchant normalization, rule precedence and direction (spec 003, rules 1-6)."""
 
 from __future__ import annotations
 
 import pytest
 
 from db.enums import RuleMatch, RuleSource
-from sync.categories import CATEGORIES
+from sync.categories import CATEGORIES, MONEY_IN_CATEGORIES, allowed_for
 from sync.categorize import CategoryRule, RuleBook, apply_rules, normalize_merchant, token_prefixes
 
 
@@ -58,6 +58,11 @@ SEED = [
     rule("uber", RuleMatch.PREFIX, "transport", RuleSource.SEED),
     rule("uber eats", RuleMatch.PREFIX, "dining", RuleSource.SEED),
     rule("netflix", RuleMatch.PREFIX, "subscriptions", RuleSource.SEED),
+    rule("sweetgreen", RuleMatch.PREFIX, "dining", RuleSource.SEED),
+    rule("zelle", RuleMatch.PREFIX, "transfer", RuleSource.SEED),
+    rule("interest", RuleMatch.EXACT, "fees", RuleSource.SEED),
+    rule("payroll", RuleMatch.CONTAINS, "income", RuleSource.SEED),
+    rule("interest", RuleMatch.CONTAINS, "income", RuleSource.SEED),
 ]
 USER = [
     rule("uber eats order", RuleMatch.EXACT, "groceries", RuleSource.USER),
@@ -65,21 +70,133 @@ USER = [
 ]
 
 
+# Spec 003, "Precedence": amounts in cents, positive is money out.
 @pytest.mark.parametrize(
-    ("merchant_norm", "expected"),
+    ("merchant_norm", "amount_cents", "expected"),
     [
-        ("uber eats order", "groceries"),
-        ("uber trip", "travel"),
-        ("netflix", "subscriptions"),
-        ("netflix.com", None),
-        ("ubereats", None),
-        ("", None),
+        ("uber eats order", 2_000, "groceries"),
+        ("uber trip", 1_500, "travel"),
+        ("netflix", 1_549, "subscriptions"),
+        ("netflix.com", 1_549, None),
+        ("ubereats", 1_800, None),
+        ("", 100, None),
+        ("uber eats order", -2_000, None),
+        ("netflix", -1_549, None),
+        ("sweetgreen inc payroll ppd id", -81_000, "income"),
+        ("sweetgreen inc payroll ppd id", 81_000, "dining"),
+        ("sweetgreen", -1_450, None),
+        ("acme corp payroll", 5_000, None),
+        ("interest", 10_788, "fees"),
+        ("interest", -12, "income"),
+        ("zelle to alex", 2_000, "transfer"),
+        ("zelle to alex", -2_000, "transfer"),
+        ("uber trip", 0, "travel"),
     ],
 )
-def test_precedence(merchant_norm: str, expected: str | None) -> None:
+def test_precedence(merchant_norm: str, amount_cents: int, expected: str | None) -> None:
     book = RuleBook([*SEED, *USER])
-    found = apply_rules(merchant_norm, book)
+    found = apply_rules(merchant_norm, book, amount_cents=amount_cents)
     assert (found.category if found else None) == expected
+
+
+def test_a_money_in_paycheck_is_decided_by_the_seed_contains_rule() -> None:
+    found = apply_rules(
+        "sweetgreen inc payroll ppd id", RuleBook([*SEED, *USER]), amount_cents=-81_000
+    )
+    assert found == rule("payroll", RuleMatch.CONTAINS, "income", RuleSource.SEED)
+
+
+@pytest.mark.parametrize(
+    ("contains", "merchant_norm", "expected"),
+    [
+        # Two tokens beat one.
+        (
+            [("payroll", "income"), ("online transfer", "transfer")],
+            "payroll online transfer",
+            "transfer",
+        ),
+        # One token each: the one further left wins.
+        ([("payroll", "income"), ("transfer", "transfer")], "payroll transfer", "income"),
+        ([("payroll", "income"), ("transfer", "transfer")], "transfer payroll", "transfer"),
+    ],
+)
+def test_contains_precedence(
+    contains: list[tuple[str, str]], merchant_norm: str, expected: str
+) -> None:
+    book = RuleBook(rule(norm, RuleMatch.CONTAINS, cat, RuleSource.SEED) for norm, cat in contains)
+    found = apply_rules(merchant_norm, book, amount_cents=-100)
+    assert found is not None
+    assert found.category == expected
+
+
+@pytest.mark.parametrize(
+    ("merchant_norm", "matches"),
+    [
+        ("payroll", True),
+        ("payroll acme", True),
+        ("acme payroll", True),
+        ("acme payroll inc", True),
+        ("payrolls inc", False),
+        ("acme prepayroll", False),
+        ("pay roll", False),
+    ],
+)
+def test_contains_matches_whole_tokens_only(merchant_norm: str, matches: bool) -> None:
+    book = RuleBook([rule("payroll", RuleMatch.CONTAINS, "income", RuleSource.SEED)])
+    assert (apply_rules(merchant_norm, book, amount_cents=-100) is not None) is matches
+
+
+def test_a_multi_token_contains_rule_matches_a_run_of_tokens() -> None:
+    book = RuleBook([rule("ppd id", RuleMatch.CONTAINS, "income", RuleSource.SEED)])
+    assert apply_rules("acme ppd id", book, amount_cents=-100) is not None
+    assert apply_rules("acme ppd x id", book, amount_cents=-100) is None
+
+
+def test_a_user_spending_rule_never_labels_money_in() -> None:
+    book = RuleBook(
+        [
+            rule("sweetgreen inc payroll ppd id", RuleMatch.EXACT, "dining", RuleSource.USER),
+            rule("payroll", RuleMatch.CONTAINS, "income", RuleSource.SEED),
+        ]
+    )
+    money_in = apply_rules("sweetgreen inc payroll ppd id", book, amount_cents=-81_000)
+    money_out = apply_rules("sweetgreen inc payroll ppd id", book, amount_cents=1_200)
+    assert money_in is not None
+    assert (money_in.category, money_in.source) == ("income", RuleSource.SEED)
+    assert money_out is not None
+    assert (money_out.category, money_out.source) == ("dining", RuleSource.USER)
+
+
+def test_a_user_income_rule_applies_both_ways() -> None:
+    book = RuleBook([rule("acme corp", RuleMatch.EXACT, "income", RuleSource.USER)])
+    for amount_cents in (-300_000, 300_000):
+        found = apply_rules("acme corp", book, amount_cents=amount_cents)
+        assert found is not None
+        assert found.category == "income"
+
+
+@pytest.mark.parametrize(
+    ("contains", "message"),
+    [
+        (rule("payroll", RuleMatch.CONTAINS, "dining", RuleSource.SEED), "contains"),
+        (rule("payroll", RuleMatch.CONTAINS, "income", RuleSource.USER), "contains"),
+    ],
+)
+def test_rulebook_refuses_contains_outside_seed_income_and_transfer(
+    contains: CategoryRule, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        RuleBook([contains])
+
+
+def test_money_in_categories_are_the_income_and_transfer_buckets() -> None:
+    assert frozenset({"income", "transfer"}) == MONEY_IN_CATEGORIES
+    assert allowed_for("income", -1)
+    assert allowed_for("transfer", -1)
+    assert not allowed_for("dining", -1)
+    assert not allowed_for("savings_investment", -1)
+    assert all(allowed_for(category, 1) for category in CATEGORIES)
+    assert all(allowed_for(category, 0) for category in CATEGORIES)
 
 
 @pytest.mark.parametrize(
@@ -91,7 +208,7 @@ def test_precedence(merchant_norm: str, expected: str | None) -> None:
     ],
 )
 def test_precedence_without_user_rules(merchant_norm: str, expected: str, match: RuleMatch) -> None:
-    found = apply_rules(merchant_norm, RuleBook(SEED))
+    found = apply_rules(merchant_norm, RuleBook(SEED), amount_cents=1_000)
     assert found is not None
     assert (found.category, found.match, found.source) == (expected, match, RuleSource.SEED)
 
@@ -103,15 +220,15 @@ def test_user_exact_rule_beats_a_longer_seed_prefix() -> None:
             rule("corner", RuleMatch.PREFIX, "dining", RuleSource.SEED),
         ]
     )
-    found = apply_rules("corner deli", book)
+    found = apply_rules("corner deli", book, amount_cents=1_000)
     assert found is not None
     assert found.category == "groceries"
 
 
 def test_exact_rule_does_not_match_longer_merchants() -> None:
     book = RuleBook([rule("shell", RuleMatch.EXACT, "transport", RuleSource.SEED)])
-    assert apply_rules("shell oil", book) is None
-    assert apply_rules("shell", book) is not None
+    assert apply_rules("shell oil", book, amount_cents=1_000) is None
+    assert apply_rules("shell", book, amount_cents=1_000) is not None
 
 
 def test_rulebook_rejects_categories_outside_the_list() -> None:

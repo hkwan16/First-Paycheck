@@ -319,6 +319,12 @@ class CategoryRule(Base):
         UniqueConstraint("user_id", "merchant_norm", "match", postgresql_nulls_not_distinct=True),
         CheckConstraint("merchant_norm <> ''", name="merchant_norm_not_empty"),
         CheckConstraint("(user_id IS NULL) = (source = 'seed')", name="seed_rows_have_no_owner"),
+        # Spec 003 rule 3c. ``match::text`` so the check never casts the label
+        # 0016 adds inside the transaction that adds it.
+        CheckConstraint(
+            "match::text <> 'contains' OR (user_id IS NULL AND category IN ('income', 'transfer'))",
+            name="contains_is_seed_money_in",
+        ),
     )
 
     id: Mapped[uuid.UUID] = _id()

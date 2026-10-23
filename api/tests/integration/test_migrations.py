@@ -273,6 +273,102 @@ def test_0015_adds_loan_after_credit_and_its_downgrade_maps_loans_to_credit(
     assert "loan" in account_kinds(engine)
 
 
+def rule_matches(engine: Engine) -> list[str]:
+    with engine.connect() as connection:
+        return list(
+            connection.execute(
+                text("SELECT unnest(enum_range(NULL::public.rule_match))::text")
+            ).scalars()
+        )
+
+
+def test_0016_adds_contains_and_clears_spending_labels_on_money_in(
+    scratch_database: tuple[str, Engine],
+) -> None:
+    """Spec 003 rules 3b-3c: ``contains`` after ``prefix``; the rule and LLM
+    labels the new rules forbid (money in with a spending category) are cleared
+    for the next categorize run, user labels and allowed labels are kept."""
+    url, engine = scratch_database
+    upgrade(url, "0015_loan_account_kind")
+    assert rule_matches(engine) == ["exact", "prefix"]
+    user = "00000000-0000-4000-8000-0000000000c4"
+    rows = [
+        # (name, amount_cents, category, category_source, expected after 0016)
+        ("paycheck by rule", -81_000, "dining", "rule", None),
+        ("paycheck by llm", -81_000, "dining", "llm", None),
+        ("paycheck by user", -81_000, "dining", "user", "dining"),
+        ("income by rule", -81_000, "income", "rule", "income"),
+        ("transfer by llm", -5_000, "transfer", "llm", "transfer"),
+        ("lunch by rule", 1_450, "dining", "rule", "dining"),
+        ("uncategorized", -100, None, None, None),
+    ]
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO auth.users (id) VALUES (:u)"), {"u": user})
+        item = connection.execute(
+            text("INSERT INTO sync_items (user_id, provider) VALUES (:u, 'csv') RETURNING id"),
+            {"u": user},
+        ).scalar_one()
+        account = connection.execute(
+            text(
+                "INSERT INTO accounts (user_id, sync_item_id, provider_account_id, kind, name)"
+                " VALUES (:u, :i, 'chk', 'checking', 'Checking') RETURNING id"
+            ),
+            {"u": user, "i": item},
+        ).scalar_one()
+        for name, amount, category, source, _ in rows:
+            connection.execute(
+                text(
+                    "INSERT INTO transactions (user_id, account_id, provider_txn_id, posted_at,"
+                    " amount_cents, merchant_raw, merchant_norm, category, category_source,"
+                    " confidence) VALUES (:u, :a, :name, '2026-10-01', :amount, :name, :name,"
+                    " :category, CAST(:source AS category_source),"
+                    " CASE WHEN CAST(:source AS text) = 'llm' THEN 0.9 END)"
+                ),
+                {
+                    "u": user,
+                    "a": account,
+                    "name": name,
+                    "amount": amount,
+                    "category": category,
+                    "source": source,
+                },
+            )
+
+    upgrade(url, "0016_rule_match_contains")
+    assert rule_matches(engine) == ["exact", "prefix", "contains"]
+    with engine.connect() as connection:
+        after: dict[str, str | None] = dict(
+            connection.execute(text("SELECT merchant_norm, category FROM transactions")).tuples()
+        )
+        cleared = connection.execute(
+            text(
+                "SELECT category_source, confidence FROM transactions"
+                " WHERE merchant_norm = 'paycheck by llm'"
+            )
+        ).one()
+    assert after == {name: expected for name, _, _, _, expected in rows}
+    assert tuple(cleared) == (None, None)
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO category_rules (user_id, merchant_norm, match, category, source)"
+                " VALUES (NULL, 'payroll', 'contains', 'income', 'seed')"
+            )
+        )
+
+    downgrade(url, "0015_loan_account_kind")
+    assert rule_matches(engine) == ["exact", "prefix"]
+    with engine.connect() as connection:
+        contains_rows = connection.execute(
+            text("SELECT count(*) FROM category_rules WHERE merchant_norm = 'payroll'")
+        ).scalar_one()
+    assert contains_rows == 0
+
+    upgrade(url, "head")
+    assert "contains" in rule_matches(engine)
+
+
 def role_rows(engine: Engine) -> tuple[str, str | None]:
     """The catalog row versions behind app_api and its membership of authenticated."""
     with engine.connect() as connection:

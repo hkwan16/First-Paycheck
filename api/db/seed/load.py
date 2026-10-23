@@ -26,7 +26,7 @@ from app.db import get_privileged_engine
 from app.logs import configure_logging
 from db.enums import CalculatorKind, RuleMatch, RuleSource
 from sync.categories import CATEGORIES
-from sync.categorize import CategoryRule, normalize_merchant
+from sync.categorize import CategoryRule, check_contains, normalize_merchant
 
 logger = logging.getLogger("db.seed")
 
@@ -80,15 +80,20 @@ def _parse_row(
     try:
         match = RuleMatch(match_value)
     except ValueError as exc:
-        raise SeedError(f"{where}: match must be exact or prefix") from exc
+        choices = ", ".join(kind.value for kind in RuleMatch)
+        raise SeedError(f"{where}: match must be one of {choices}") from exc
     if category not in CATEGORIES:
         raise SeedError(f"{where}: unknown category {category!r}")
     if (merchant_norm, match) in seen:
         raise SeedError(f"{where}: duplicate rule {merchant_norm!r} ({match})")
     seen.add((merchant_norm, match))
-    return CategoryRule(
+    rule = CategoryRule(
         merchant_norm=merchant_norm, match=match, category=category, source=RuleSource.SEED
     )
+    problem = check_contains(rule)
+    if problem is not None:
+        raise SeedError(f"{where}: {problem}, not {category!r} (spec 003 rule 3c)")
+    return rule
 
 
 _UPSERT = text(

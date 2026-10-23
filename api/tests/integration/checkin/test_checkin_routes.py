@@ -215,7 +215,9 @@ def test_take_home_counts_money_in_only(
     app: FastAPI, seeded_rules: Connection, client_as: Client, user_a: FixtureUser
 ) -> None:
     # Spec 015 route row 13: the Plaid sandbox's October, where GUSTO PAY is an
-    # income-labeled outflow (spec 007 rule 22a). It used to read -584,578.
+    # income-labeled outflow (spec 007 rule 22a). It used to read -584,578. The
+    # United Airlines refund is uncategorized (spec 003 rule 3b), so it no longer
+    # offsets spending.
     app.dependency_overrides[get_now] = lambda: dt.datetime(2026, 10, 22, 15, 0, tzinfo=dt.UTC)
     link_sandbox(seeded_rules, user_a)
     check_in = make_check_in(seeded_rules, user_a.id, period=dt.date(2026, 10, 1))
@@ -227,7 +229,7 @@ def test_take_home_counts_money_in_only(
     assert lines["take_home"]["label"] == "Take-home pay"
     assert (lines["take_home"]["actual_cents"], lines["left_over"]["actual_cents"]) == (
         422,
-        -168_541,
+        -218_541,
     )
 
 

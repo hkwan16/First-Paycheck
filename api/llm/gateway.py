@@ -34,7 +34,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Protocol, TypeVar
+from typing import Any, Literal, Protocol, TypeVar
 
 import anthropic
 import httpx2
@@ -57,10 +57,11 @@ from llm.schemas import (
     NumberClaim,
     PayStubExtraction,
 )
+from sync.categories import MONEY_IN_CATEGORIES, is_money_in
 
 log = logging.getLogger(__name__)
 
-CATEGORIZE_PROMPT = ("categorize", "v1")
+CATEGORIZE_PROMPT = ("categorize", "v2")
 EXTRACT_PAY_STUB_PROMPT = ("extract_pay_stub", "v1")
 EXTRACT_BENEFITS_PROMPT = ("extract_benefits", "v2")
 EXPLAIN_PROMPT = ("explain", "v1")
@@ -143,17 +144,23 @@ class LLMMisconfigured(LLMError):
 
 @dataclass(frozen=True)
 class CategorizeItem:
-    """One distinct merchant to label: the only data the model sees (rule 9)."""
+    """One distinct merchant and direction to label: the only data the model
+    sees (spec 003 rules 8-9). ``amount_cents`` is the sample, positive out."""
 
     id: int
     merchant: str
     amount_cents: int
     date: dt.date
 
+    @property
+    def direction(self) -> Literal["in", "out"]:
+        return "in" if is_money_in(self.amount_cents) else "out"
+
     def as_request(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "merchant": self.merchant,
+            "direction": self.direction,
             "amount": _dollars(self.amount_cents),
             "date": self.date.isoformat(),
         }
@@ -634,13 +641,14 @@ class FakeGateway(Gateway):
         return Reply(stop_reason="end_turn", text=text, usage=Usage())
 
     def _categorize(self, content: str) -> str:
-        items = json.loads(content)["items"]
-        answers = [
-            CategoryAssignment.model_validate(
-                {"id": item["id"], **self._categories.get(item["merchant"], _fake_default())}
-            )
-            for item in items
-        ]
+        """Fixture answers; a money-in item gets one only when it is income or
+        a transfer and is otherwise left out, as ``categorize/v2`` asks."""
+        answers = []
+        for item in json.loads(content)["items"]:
+            answer = self._categories.get(item["merchant"], _fake_default())
+            if item["direction"] == "in" and answer["category"] not in MONEY_IN_CATEGORIES:
+                continue
+            answers.append(CategoryAssignment.model_validate({"id": item["id"], **answer}))
         return CategoryBatch(items=answers).model_dump_json()
 
     @staticmethod

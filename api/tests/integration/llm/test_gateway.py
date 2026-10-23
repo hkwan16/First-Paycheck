@@ -172,8 +172,20 @@ def test_categorize_sends_minimal_data_and_records_the_call(
     payload = json.loads(sent["messages"][0]["content"])
     assert payload == {
         "items": [
-            {"id": 1, "merchant": "blue bottle coffee", "amount": "6.50", "date": "2026-10-03"},
-            {"id": 2, "merchant": "netflix.com", "amount": "15.99", "date": "2026-10-05"},
+            {
+                "id": 1,
+                "merchant": "blue bottle coffee",
+                "direction": "out",
+                "amount": "6.50",
+                "date": "2026-10-03",
+            },
+            {
+                "id": 2,
+                "merchant": "netflix.com",
+                "direction": "out",
+                "amount": "15.99",
+                "date": "2026-10-05",
+            },
         ]
     }
     assert api.headers[0]["x-api-key"] == "sk-ant-test"
@@ -184,7 +196,7 @@ def test_categorize_sends_minimal_data_and_records_the_call(
     assert row == {
         "purpose": "categorize",
         "model": "claude-haiku-5-5",
-        "prompt_version": "categorize/v1",
+        "prompt_version": "categorize/v2",
         "input_tokens": 300,
         "output_tokens": 120,
         "cache_read_tokens": 2_000,
@@ -202,6 +214,8 @@ def test_negative_amounts_keep_their_sign(db_connection: Connection, user_a: Fix
     gateway(db_connection, api).categorize(user_a.id, [refund])
     payload = json.loads(api.requests[0]["messages"][0]["content"])
     assert payload["items"][0]["amount"] == "-2500.05"
+    # Spec 003 rule 9: the direction is spelled out, not left to the sign alone.
+    assert payload["items"][0]["direction"] == "in"
 
 
 def test_refusal_raises_before_output_is_read(
@@ -373,6 +387,22 @@ def test_fake_labels_unknown_merchants_other(
     unknown = CategorizeItem(id=1, merchant="zz unheard of", amount_cents=100, date=NOW.date())
     [item] = fake(db_connection).categorize(user_a.id, [unknown]).items
     assert (item.category, item.confidence) == ("other", 0.5)
+
+
+def test_fake_answers_money_in_only_with_income_or_transfer(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    """Spec 003 rule 27: the fake follows categorize/v2 for money-in items."""
+    items = [
+        # A fixture merchant whose category is income.
+        CategorizeItem(id=1, merchant="acme corp payroll", amount_cents=-300_000, date=NOW.date()),
+        # A fixture merchant whose category is a spending one: a refund.
+        CategorizeItem(id=2, merchant="netflix.com", amount_cents=-1599, date=NOW.date()),
+        # A merchant the fixtures do not know.
+        CategorizeItem(id=3, merchant="zz unheard of", amount_cents=-100, date=NOW.date()),
+    ]
+    batch = fake(db_connection).categorize(user_a.id, items)
+    assert [(item.id, item.category) for item in batch.items] == [(1, "income")]
 
 
 def test_fake_shares_the_budget_check(db_connection: Connection, user_a: FixtureUser) -> None:

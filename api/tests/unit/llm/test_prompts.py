@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from db.enums import LlmPurpose
 from llm import schemas
+from llm.gateway import CATEGORIZE_PROMPT
 from llm.prompts import PROMPTS_DIR, Prompt, PromptError, all_prompts, load_prompt, parse_prompt
 
 VALID = """---
@@ -39,15 +40,30 @@ def test_version_matches_the_file_path() -> None:
         assert prompt.version == f"{path.parent.name}/{path.stem}"
 
 
-def test_categorize_v1() -> None:
-    prompt = load_prompt("categorize", "v1")
-    assert prompt.version == "categorize/v1"
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_categorize_prompts(version: str) -> None:
+    prompt = load_prompt("categorize", version)
+    assert prompt.version == f"categorize/{version}"
     assert prompt.purpose is LlmPurpose.CATEGORIZE
     assert prompt.effort == "low"
     assert prompt.schema is schemas.CategoryBatch
     # The prompt names every category the schema accepts.
     for category in schemas.CATEGORIES:
         assert f"`{category}`" in prompt.system
+
+
+def test_categorize_v2_explains_the_direction() -> None:
+    """Spec 003 rules 9-10: the model is told what the direction means and that
+    a money-in item is income or transfer, or left out."""
+    system = load_prompt("categorize", "v2").system
+    assert "`direction`" in system
+    assert '`"in"`' in system
+    assert '`"out"`' in system
+    assert "leave it out" in system
+
+
+def test_the_gateway_uses_categorize_v2() -> None:
+    assert CATEGORIZE_PROMPT == ("categorize", "v2")
 
 
 @pytest.mark.parametrize(
