@@ -69,6 +69,14 @@ def test_seed_covers_the_core_categories(category: str) -> None:
         ("SWEETGREEN #0412", 1_450, "dining"),
         ("STARBUCKS CORP DIRECT DEP", -254_300, "income"),
         ("ACME CORP SALARY", -300_000, "income"),
+        # Spec 003 rule 5a: generic bank descriptors.
+        ("Monthly payment", -31_195, "transfer"),
+        ("Payment", -31_195, "transfer"),
+        ("Interest charged", 10_788, "fees"),
+        ("Interest", 11_147, "fees"),
+        ("Interest", -12, "income"),
+        ("Interest payment", -12, "income"),
+        ("CASH DEPOSIT", -49_600, "transfer"),
     ],
 )
 def test_seed_rules_label_common_descriptors(raw: str, amount_cents: int, category: str) -> None:
@@ -105,6 +113,7 @@ def test_seed_contains_rows_are_the_income_markers() -> None:
         "direct dep": "income",
         "direct deposit": "income",
         "salary": "income",
+        "interest": "income",
     }
 
 
