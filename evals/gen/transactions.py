@@ -1,11 +1,19 @@
 """Seeded generator for ``evals/fixtures/transactions.csv``: 500 synthetic,
-labeled bank transactions for the categorization suites.
+labeled bank transactions for the categorization suites, then 15 written by
+hand for direction (spec 003 rules 3a-3b and 5a).
 
 Merchant descriptions mimic what banks send (store numbers, processor
 prefixes, cities, reference codes). Most merchants are ones the seed rules
 know; about a fifth are local businesses no rule covers (the LLM's share), and
 a few are traps where a whole-token prefix rule picks the wrong category.
 The labels are the true categories, never what the rules say.
+
+The hand-written rows (``SIGN_CASES``, ids 501-515) come after the seeded
+ones, so adding them left rows 1-500 unchanged: paychecks from employers named
+like merchants, the bank language of loan and card ledgers (the shape of
+Plaid's ``user_transactions_dynamic`` sandbox user), ``Interest`` in both
+directions, and two refunds, whose true label is their spending category and
+which neither rules nor the model may give a money-in row.
 
     uv run python -m evals.gen.transactions      # rewrite the committed CSV
 
@@ -146,6 +154,29 @@ TRAPS = [
 
 POOL = [*KNOWN, *UNKNOWN, *TRAPS]
 
+# Written by hand, appended after the seeded rows: (merchant_raw, amount_cents
+# with positive out, posted_at, true category). Spec 003 rules 3a-3b and 5a.
+SIGN_CASES: list[tuple[str, int, dt.date, str]] = [
+    # Paychecks from employers whose names start like a merchant's.
+    ("Sweetgreen inc payroll ppd id", -81_000, dt.date(2026, 9, 23), "income"),
+    ("Sweetgreen inc payroll ppd id", -81_000, dt.date(2026, 9, 30), "income"),
+    ("SWEETGREEN #0412 SEATTLE WA", 1_450, dt.date(2026, 9, 24), "dining"),
+    ("STARBUCKS CORP DIRECT DEP", -254_300, dt.date(2026, 10, 1), "income"),
+    ("PLANET FITNESS PAYROLL", -198_000, dt.date(2026, 10, 2), "income"),
+    # The bank language of loan and card ledgers.
+    ("Monthly payment", -31_195, dt.date(2026, 9, 29), "transfer"),
+    ("Monthly payment", -12_500, dt.date(2026, 10, 13), "transfer"),
+    ("Interest charged", 10_788, dt.date(2026, 9, 22), "fees"),
+    ("Interest charged", 4_520, dt.date(2026, 10, 6), "fees"),
+    ("Payment", -283_580, dt.date(2026, 10, 14), "transfer"),
+    ("Interest", 11_147, dt.date(2026, 9, 22), "fees"),
+    ("Interest", -12, dt.date(2026, 10, 15), "income"),
+    ("CASH DEPOSIT", -49_600, dt.date(2026, 10, 15), "transfer"),
+    # Refunds: money in at a merchant, labeled with its spending category.
+    ("UNITED AIRLINES REFUND", -45_000, dt.date(2026, 8, 19), "travel"),
+    ("AMZN MKTP US*RF2291 REFUND", -2_599, dt.date(2026, 9, 3), "shopping"),
+]
+
 
 def _fill(template: str, rng: random.Random) -> str:
     ref = "".join(rng.choices(string.ascii_uppercase, k=2)) + str(rng.randint(10, 9999))
@@ -167,6 +198,10 @@ def generate(seed: int = SEED, rows: int = ROWS) -> list[Row]:
                 category=merchant.category,
             )
         )
+    for index, (merchant_raw, amount_cents, posted_at, category) in enumerate(
+        SIGN_CASES, start=rows + 1
+    ):
+        generated.append(Row(index, merchant_raw, amount_cents, posted_at, category))
     return generated
 
 
@@ -203,4 +238,4 @@ def read_csv(path: Path = DEFAULT_CSV) -> list[Row]:
 
 if __name__ == "__main__":
     write_csv()
-    sys.stdout.write(f"wrote {ROWS} rows to {DEFAULT_CSV}\n")
+    sys.stdout.write(f"wrote {ROWS + len(SIGN_CASES)} rows to {DEFAULT_CSV}\n")

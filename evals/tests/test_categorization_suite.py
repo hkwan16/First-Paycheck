@@ -59,9 +59,19 @@ def test_a_perfect_labeler_scores_every_llm_row() -> None:
     result = categorization.score(ROWS, LabelLabeler())
     plan = categorization.plan(ROWS)
     llm_rows = len(ROWS) - len(plan.rule_labels)
-    assert result.cases == 500
-    assert result.metrics["llm_accuracy"] == 1.0
-    assert result.metrics["accuracy"] == pytest.approx(rules_correct_share() + llm_rows / 500)
+    # The two refunds (money in, true label a spending category) cannot be
+    # labeled: a spending answer for a money-in item is dropped (spec 003 rule 10).
+    refunds = sum(
+        1
+        for row in ROWS
+        if row.id not in plan.rule_labels and row.amount_cents < 0 and row.category != "income"
+    )
+    assert refunds == 2
+    assert result.cases == 515
+    assert result.metrics["llm_accuracy"] == pytest.approx((llm_rows - refunds) / llm_rows)
+    assert result.metrics["accuracy"] == pytest.approx(
+        rules_correct_share() + (llm_rows - refunds) / 515
+    )
 
 
 def test_batches_are_what_categorize_run_sends() -> None:
@@ -105,7 +115,8 @@ def test_a_gateway_error_is_a_failure_line() -> None:
 def test_a_wrong_label_is_reported() -> None:
     recorder = LabelLabeler()
     categorization.score(ROWS, recorder)
-    merchant = recorder.batches[0][0].merchant
+    # A money-out item: a spending answer for money in is dropped, not scored.
+    merchant = next(item.merchant for item in recorder.batches[0] if item.direction == "out")
     labeler = LabelLabeler()
     labeler.truth[merchant] = "taxes" if labeler.truth[merchant] != "taxes" else "fees"
     result = categorization.score(ROWS, labeler)
