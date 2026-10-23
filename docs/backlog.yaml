@@ -1427,7 +1427,15 @@ issues:
     labels: ["area:api", "area:data", "type:bug"]
     milestone: M10
     priority: High
-    status: todo
+    status: done
+    # Fixed October 22 with failing tests first, as direction-aware precedence
+    # rather than a ban (spec 003 rules 3a-3c, 4, 5a): for money in, a seed
+    # contains rule for income or transfer (payroll, ppd id, direct dep,
+    # salary, interest) ranks above every seed exact or prefix rule, so the
+    # Sweetgreen payroll is income while a United Airlines refund stays travel.
+    # Migration 0016 adds the contains kind and clears rule and model labels on
+    # money-in rows in a spending category so the next categorize run relabels
+    # them. The model prompt (categorize/v2) carries the direction.
   - title: "Seed rules for generic bank descriptors (monthly payment, interest charged, payment, cash deposit)"
     body: >-
       Found on October 22 with user_transactions_dynamic: 260 of 331 rows are
@@ -1441,7 +1449,11 @@ issues:
     labels: ["area:api", "area:data", "type:bug"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Fixed October 22: exact rules monthly payment and payment and cash
+    # deposit as transfer, interest charged as fees; contains rules for the pay
+    # words. The dynamic user's uncategorized rows fell from 256 to 52 of 316
+    # with rules alone; what remains are merchant names for the model.
   - title: "The spending summary skips loan, investment and retirement ledgers"
     body: >-
       Found on October 22 with user_transactions_dynamic: five loan accounts
@@ -1458,7 +1470,11 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: High
-    status: todo
+    status: done
+    # Fixed October 22 with failing tests first: spec 007 rule 21a, the summary
+    # reads checking, savings and credit accounts only and reports
+    # ledger_rows_skipped; Spending and the check-in say which rows were left
+    # out. GET /transactions still lists every account.
   - title: "No share of income when income is too small to divide by"
     body: >-
       Found on October 22 with user_transactions_dynamic: with 12 cents of
@@ -1471,4 +1487,7 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Fixed October 22 with failing tests first: spec 007 rule 25, a share is
+    # null when income is 0 or the share would pass 1,000.0 in either direction;
+    # the tiles and the diagram show "n/a, income too small to compare".
