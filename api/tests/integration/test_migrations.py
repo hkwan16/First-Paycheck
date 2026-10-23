@@ -337,9 +337,10 @@ def test_0016_adds_contains_and_clears_spending_labels_on_money_in(
     upgrade(url, "0016_rule_match_contains")
     assert rule_matches(engine) == ["exact", "prefix", "contains"]
     with engine.connect() as connection:
-        after: dict[str, str | None] = dict(
-            connection.execute(text("SELECT merchant_norm, category FROM transactions")).tuples()
-        )
+        after: dict[str, str | None] = {
+            row.merchant_norm: row.category
+            for row in connection.execute(text("SELECT merchant_norm, category FROM transactions"))
+        }
         cleared = connection.execute(
             text(
                 "SELECT category_source, confidence FROM transactions"
