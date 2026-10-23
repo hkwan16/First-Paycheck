@@ -442,3 +442,23 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above, in the subagent's branch.
 
 **Time saved or lost:** Not measured.
+## 2026-10-22: spending rules apply to money out only; seed rules for bank descriptors
+
+**Task:** Two bugs from production with Plaid's `user_transactions_dynamic` sandbox user. The weekly paycheck `Sweetgreen inc payroll ppd id` (money in) was labeled `dining` by the seed prefix rule `sweetgreen`, because the categorizer never looked at the sign; and 256 of 316 rows were uncategorized with rules only, most of them the loans' own ledgers (`Monthly payment`, `Interest charged`).
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Spec 003 first (direction, a seed-only `contains` match for income and transfer, the descriptors), a reproduction over the recorded dynamic user, failing precedence, seed loader, job, gateway and migration tests, then the code; eval fixtures and baseline in their own commits.
+
+**What it produced:** `RuleBook.match(merchant_norm, *, amount_cents)` that skips a spending rule for money in; `contains` rules below `prefix` (whole-token runs, money in only); the job labels each merchant and direction apart, sends the direction to the model (`categorize/v2`) and drops a spending answer for money in; a user's spending fix keeps its own row and relabels only money-out siblings; migration `0016_rule_match_contains` (enum label, a check that keeps `contains` to seed income and transfer rows, and clearing the rule and model labels the new rules forbid so the next sync relabels them); seed rows for the descriptors, with `interest` exact `fees` plus `contains` `income` so the word resolves by its sign. The dynamic user goes from 256 to 52 uncategorized rows, with the paychecks as income.
+
+**What was wrong:**
+- The first recording of the dynamic user had zero transactions: Plaid answered `HISTORICAL_UPDATE_COMPLETE` with an empty page once, and the recorder takes the first page that is not `NOT_READY`. A second run recorded 316 rows. The recorder does not yet retry an empty complete page.
+- The brief called `Interest` money in; in the recording it is money out on the student loan (Plaid files it under bank fees), so an exact `interest -> income` rule would have made accrued interest income. The spec resolves it by sign instead.
+- Making spending rules money-out only also stops rules from netting refunds: the recorded `user_good` October's United Airlines refund (-50,000) is now uncategorized, which changes spec 007's sandbox example (flexible 118,423, left over -218,541).
+
+**How it was caught:** The reproduction test over the recorded rows; the full test run (three sandbox spending tests); reading the recorded rows by account and sign.
+
+**Fix:** As above, in the subagent's branch.
+
+**Time saved or lost:** Not measured.
