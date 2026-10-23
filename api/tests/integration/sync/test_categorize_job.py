@@ -175,47 +175,47 @@ def test_the_request_carries_only_merchant_amount_and_date(
         ]
     ]
     assert [item.direction for item in labeler.batches[0]] == ["out", "in"]
-    # The model's dining is applied to money out only; the money-in row waits.
-    assert [row[0] for row in labels(seeded_rules, user_a)["zz bakery"]] == [
-        "dining",
-        "dining",
-        None,
-    ]
+    # Each answer labels its own direction's rows.
+    assert [row[0] for row in labels(seeded_rules, user_a)["zz bakery"]] == ["dining"] * 3
 
 
-def test_a_money_in_item_takes_income_or_transfer_from_the_model(
+def test_each_direction_takes_its_own_answer(
     seeded_rules: Connection, user_a: FixtureUser, account: uuid.UUID
 ) -> None:
     make_transaction(seeded_rules, user_a.id, account, merchant_raw="ZZ BAKERY", amount_cents=450)
     make_transaction(
-        seeded_rules, user_a.id, account, merchant_raw="ZZ BAKERY INC", amount_cents=-81_000
+        seeded_rules, user_a.id, account, merchant_raw="ZZ BAKERY", amount_cents=-81_000
     )
     labeler = SpyLabeler(
-        {("zz bakery", "out"): ("dining", 0.9), ("zz bakery inc", "in"): ("income", 0.8)}
+        {("zz bakery", "out"): ("dining", 0.9), ("zz bakery", "in"): ("income", 0.8)}
     )
 
     result = run(seeded_rules, user_a, labeler)
 
-    found = labels(seeded_rules, user_a)
-    assert found["zz bakery"] == [("dining", "llm", Decimal("0.900"))]
-    assert found["zz bakery inc"] == [("income", "llm", Decimal("0.800"))]
+    rows = {
+        row.amount_cents: row.category
+        for row in seeded_rules.execute(
+            text("SELECT amount_cents, category FROM transactions WHERE user_id = :u"),
+            {"u": user_a.id},
+        )
+    }
+    assert rows == {450: "dining", -81_000: "income"}
     assert (result["llm_labeled"], result["unresolved"]) == (2, 0)
 
 
-def test_a_spending_answer_for_money_in_is_dropped(
+def test_the_model_may_call_money_in_a_refund(
     seeded_rules: Connection, user_a: FixtureUser, account: uuid.UUID
 ) -> None:
-    """Spec 003 rule 10: the schema cannot tie a category to a direction, so the
-    code drops a spending category the model gives a money-in item."""
+    """Spec 003 rule 10: a money-in item in a spending category is a refund."""
     make_transaction(
-        seeded_rules, user_a.id, account, merchant_raw="ZZ BISTRO PAYOUT", amount_cents=-81_000
+        seeded_rules, user_a.id, account, merchant_raw="ZZ BISTRO REFUND", amount_cents=-2_400
     )
-    labeler = SpyLabeler({"zz bistro payout": ("dining", 0.9)})
+    labeler = SpyLabeler({"zz bistro refund": ("dining", 0.9)})
 
     result = run(seeded_rules, user_a, labeler)
 
-    assert labels(seeded_rules, user_a)["zz bistro payout"] == [(None, None, None)]
-    assert (result["llm_labeled"], result["unresolved"]) == (0, 1)
+    assert labels(seeded_rules, user_a)["zz bistro refund"] == [("dining", "llm", Decimal("0.900"))]
+    assert (result["llm_labeled"], result["unresolved"]) == (1, 0)
 
 
 def test_a_previous_llm_label_is_reused_only_in_its_direction(
@@ -243,15 +243,14 @@ def test_a_previous_llm_label_is_reused_only_in_its_direction(
 
     result = run(seeded_rules, user_a, labeler)
 
-    # The money-in row is not given the money-out row's dining: it goes to the model.
+    # The money-in row is not given the money-out row's label: it goes to the model.
     assert [(item.merchant, item.direction) for item in labeler.batches[0]] == [("zz bakery", "in")]
     assert (result["reused"], result["batches"]) == (0, 1)
 
 
-def test_an_old_spending_llm_label_on_money_in_is_not_reused(
+def test_a_previous_money_in_label_is_reused_for_money_in(
     seeded_rules: Connection, user_a: FixtureUser, account: uuid.UUID
 ) -> None:
-    """A money-in row labeled dining by the model before rule 10 is not copied."""
     make_transaction(
         seeded_rules,
         user_a.id,
@@ -275,14 +274,15 @@ def test_an_old_spending_llm_label_on_money_in_is_not_reused(
 
     result = run(seeded_rules, user_a, labeler)
 
-    assert result["reused"] == 0
-    assert [(item.merchant, item.direction) for item in labeler.batches[0]] == [("zz bakery", "in")]
+    assert (result["reused"], result["batches"]) == (1, 0)
+    assert [row[0] for row in labels(seeded_rules, user_a)["zz bakery"]] == ["dining"] * 2
 
 
-def test_rules_label_a_paycheck_from_a_restaurant_as_income(
+def test_rules_label_a_restaurant_paycheck_income_and_a_refund_its_category(
     seeded_rules: Connection, user_a: FixtureUser, account: uuid.UUID
 ) -> None:
-    """Spec 003 rule 3b: the seed's sweetgreen (dining) applies to money out only."""
+    """Spec 003 rule 4: for money in, the seed contains rule payroll ranks above
+    the seed prefix rule sweetgreen; a refund still meets its merchant's rule."""
     make_transaction(
         seeded_rules,
         user_a.id,
@@ -296,20 +296,19 @@ def test_rules_label_a_paycheck_from_a_restaurant_as_income(
     make_transaction(
         seeded_rules, user_a.id, account, merchant_raw="SWEETGREEN #12", amount_cents=-1_450
     )
+    make_transaction(
+        seeded_rules, user_a.id, account, merchant_raw="United Airlines", amount_cents=-50_000
+    )
     labeler = SpyLabeler()
 
     result = run(seeded_rules, user_a, labeler)
 
     found = labels(seeded_rules, user_a)
     assert found["sweetgreen inc payroll ppd id"] == [("income", "rule", None)]
-    assert sorted(found["sweetgreen"], key=str) == sorted(
-        [("dining", "rule", None), (None, None, None)], key=str
-    )
-    # The refund goes to the model as a money-in item.
-    assert [(item.merchant, item.direction) for item in labeler.batches[0]] == [
-        ("sweetgreen", "in")
-    ]
-    assert result["rule_labeled"] == 2
+    assert found["sweetgreen"] == [("dining", "rule", None)] * 2
+    assert found["united airlines"] == [("travel", "rule", None)]
+    assert labeler.batches == []
+    assert result["rule_labeled"] == 4
 
 
 def test_batches_of_fifty_in_alphabetical_order(
@@ -519,12 +518,12 @@ def test_fix_relabels_siblings(
     assert ("subscriptions", "rule", None) in newest
 
 
-def test_a_spending_fix_on_money_in_keeps_the_row_and_relabels_money_out_only(
+def test_a_fix_relabels_both_directions(
     seeded_rules: Connection, user_a: FixtureUser, account: uuid.UUID
 ) -> None:
-    """Spec 003 rules 13-15: the user labels one paycheck dining. The row keeps
-    the user's label and the rule is written, but a spending rule labels money
-    out only, so the other paychecks stay income."""
+    """Spec 003 rules 13-15: a user rule ranks above every seed rule in both
+    directions, so labeling one paycheck dining relabels the merchant's other
+    rows, money in and out, and labels later paychecks dining too."""
 
     def sweetgreen(amount_cents: int, **fields: Any) -> uuid.UUID:
         return make_transaction(
@@ -545,55 +544,29 @@ def test_a_spending_fix_on_money_in_keeps_the_row_and_relabels_money_out_only(
             session, user_id=user_a.id, transaction_id=paycheck, category="dining"
         )
     assert fix is not None
-    assert (fix.rule_merchant_norm, fix.relabeled) == ("sweetgreen inc payroll ppd id", 1)
+    assert (fix.rule_merchant_norm, fix.relabeled) == ("sweetgreen inc payroll ppd id", 2)
 
-    rows: dict[uuid.UUID, str] = dict(
-        seeded_rules.execute(
+    rows = {
+        row.id: (row.category, row.source)
+        for row in seeded_rules.execute(
             text(
-                "SELECT id, (category, category_source::text)::text FROM transactions"
+                "SELECT id, category, category_source::text AS source FROM transactions"
                 " WHERE user_id = :u"
             ),
             {"u": user_a.id},
-        ).all()
-    )
-    assert rows[paycheck] == "(dining,user)"
-    assert rows[other_paycheck] == "(income,rule)"
-    assert rows[money_out] == "(dining,rule)"
-    rule = seeded_rules.execute(
-        text(
-            "SELECT match::text, category FROM category_rules"
-            " WHERE user_id = :u AND merchant_norm = 'sweetgreen inc payroll ppd id'"
-        ),
-        {"u": user_a.id},
-    ).one()
-    assert tuple(rule) == ("exact", "dining")
+        )
+    }
+    assert rows[paycheck] == ("dining", "user")
+    assert rows[other_paycheck] == ("dining", "rule")
+    assert rows[money_out] == ("dining", "rule")
 
-    # A later paycheck skips the user's dining rule and is income by the seed rules.
+    # A later paycheck meets the user's rule before the seed contains rule.
     later = sweetgreen(-81_000)
     run(seeded_rules, user_a, SpyLabeler())
-    assert (
-        seeded_rules.execute(
-            text("SELECT category FROM transactions WHERE id = :id"), {"id": later}
-        ).scalar_one()
-        == "income"
-    )
-
-
-def test_an_income_fix_relabels_both_directions(
-    seeded_rules: Connection, user_a: FixtureUser, account: uuid.UUID
-) -> None:
-    first = make_transaction(
-        seeded_rules, user_a.id, account, merchant_raw="ZZ ACME", amount_cents=-300_000
-    )
-    make_transaction(
-        seeded_rules, user_a.id, account, merchant_raw="ZZ ACME", amount_cents=-300_000
-    )
-    make_transaction(seeded_rules, user_a.id, account, merchant_raw="ZZ ACME", amount_cents=300_000)
-    with user_session_for(user_a.id, bind=seeded_rules) as session:
-        fix = record_user_label(session, user_id=user_a.id, transaction_id=first, category="income")
-    assert fix is not None
-    assert fix.relabeled == 2
-    assert [row[0] for row in labels(seeded_rules, user_a)["zz acme"]] == ["income"] * 3
+    category = seeded_rules.execute(
+        text("SELECT category FROM transactions WHERE id = :id"), {"id": later}
+    ).scalar_one()
+    assert category == "dining"
 
 
 def test_fixing_again_replaces_the_rule(

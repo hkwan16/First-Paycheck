@@ -12,8 +12,7 @@ The hand-written rows (``SIGN_CASES``, ids 501-515) come after the seeded
 ones, so adding them left rows 1-500 unchanged: paychecks from employers named
 like merchants, the bank language of loan and card ledgers (the shape of
 Plaid's ``user_transactions_dynamic`` sandbox user), ``Interest`` in both
-directions, and two refunds, whose true label is their spending category and
-which neither rules nor the model may give a money-in row.
+directions, and two refunds, whose true label is their spending category.
 
     uv run python -m evals.gen.transactions      # rewrite the committed CSV
 

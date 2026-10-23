@@ -38,8 +38,7 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
 - `suites/categorization.py` (`categorization`, LLM): the same rows the
   way `categorize.run` labels them (spec 003 rule 29): seed rules, then each
   unknown merchant and direction's newest row to Haiku, 50 per call, the label
-  applied to every row of that merchant and direction (a spending label for
-  money in is dropped, so the two refunds stay unlabeled). `accuracy` (all rows) and `llm_accuracy` (rows
+  applied to every row of that merchant and direction. `accuracy` (all rows) and `llm_accuracy` (rows
   the model labeled); baseline at the targets (0.90, 0.80) until the first
   live run. `SuiteUnavailable` without `ANTHROPIC_API_KEY`; scoring is
   unit-tested with a labeler that answers from the labels.

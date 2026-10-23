@@ -88,17 +88,22 @@ def test_seed_rules_label_common_descriptors(raw: str, amount_cents: int, catego
 
 
 @pytest.mark.parametrize(
-    ("raw", "amount_cents"),
+    ("raw", "amount_cents", "category"),
     [
-        # Refunds: only spending rules match, so they wait for the model or the user.
-        ("United Airlines", -50_000),
-        ("AMZN Mktp US*2K39H1", -2_599),
-        ("Sweetgreen", -1_450),
+        # Refunds keep their merchant's category: no contains word matches (spec 003 rule 4).
+        ("United Airlines", -50_000, "travel"),
+        ("AMZN Mktp US*2K39H1", -2_599, "shopping"),
+        ("Sweetgreen", -1_450, "dining"),
     ],
 )
-def test_seed_rules_leave_money_in_at_a_merchant_unlabeled(raw: str, amount_cents: int) -> None:
-    rules = RuleBook(read_seed_rules())
-    assert apply_rules(normalize_merchant(raw), rules, amount_cents=amount_cents) is None
+def test_seed_rules_label_a_refund_with_its_merchants_category(
+    raw: str, amount_cents: int, category: str
+) -> None:
+    found = apply_rules(
+        normalize_merchant(raw), RuleBook(read_seed_rules()), amount_cents=amount_cents
+    )
+    assert found is not None, raw
+    assert found.category == category
 
 
 def test_seed_contains_rows_are_the_income_markers() -> None:

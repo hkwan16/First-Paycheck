@@ -57,7 +57,7 @@ from llm.schemas import (
     NumberClaim,
     PayStubExtraction,
 )
-from sync.categories import MONEY_IN_CATEGORIES, is_money_in
+from sync.categories import is_money_in
 
 log = logging.getLogger(__name__)
 
@@ -641,14 +641,15 @@ class FakeGateway(Gateway):
         return Reply(stop_reason="end_turn", text=text, usage=Usage())
 
     def _categorize(self, content: str) -> str:
-        """Fixture answers; a money-in item gets one only when it is income or
-        a transfer and is otherwise left out, as ``categorize/v2`` asks."""
-        answers = []
-        for item in json.loads(content)["items"]:
-            answer = self._categories.get(item["merchant"], _fake_default())
-            if item["direction"] == "in" and answer["category"] not in MONEY_IN_CATEGORIES:
-                continue
-            answers.append(CategoryAssignment.model_validate({"id": item["id"], **answer}))
+        """Fixture answers by merchant, in either direction: a money-in item at
+        a spending merchant is a refund in its category (spec 003 rule 27)."""
+        items = json.loads(content)["items"]
+        answers = [
+            CategoryAssignment.model_validate(
+                {"id": item["id"], **self._categories.get(item["merchant"], _fake_default())}
+            )
+            for item in items
+        ]
         return CategoryBatch(items=answers).model_dump_json()
 
     @staticmethod

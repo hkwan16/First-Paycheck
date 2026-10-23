@@ -53,13 +53,14 @@ def test_categorize_prompts(version: str) -> None:
 
 
 def test_categorize_v2_explains_the_direction() -> None:
-    """Spec 003 rules 9-10: the model is told what the direction means and that
-    a money-in item is income or transfer, or left out."""
+    """Spec 003 rule 9: the model is told what the direction means and that
+    money in at a merchant is usually a refund unless it reads as pay."""
     system = load_prompt("categorize", "v2").system
     assert "`direction`" in system
     assert '`"in"`' in system
     assert '`"out"`' in system
-    assert "leave it out" in system
+    assert "usually a refund" in system
+    assert "pay, payroll, deposit or transfer" in system
 
 
 def test_the_gateway_uses_categorize_v2() -> None:

@@ -1,18 +1,20 @@
-"""rule_match gains ``contains``, after ``prefix`` (spec 003 rules 3-3c).
+"""rule_match gains ``contains``, after ``prefix`` (spec 003 rules 3-4).
 
 A seed rule for ``income`` or ``transfer`` may match a run of whole tokens
 anywhere in ``merchant_norm`` (``payroll`` in "sweetgreen inc payroll ppd id"),
-for money-in transactions only. The check
+for money-in transactions only, where it ranks above the other seed rules. The check
 ``ck_category_rules_contains_is_seed_money_in`` keeps the kind to seed rows
 for those two categories, so no user row (or direct write under RLS) can hold
 one. It compares ``match::text``: a label added by ``ALTER TYPE ... ADD VALUE``
 cannot be used as an enum value in the transaction that adds it.
 
-Spec 003 rules 3b and 10 also stop rules and the model from giving money in a
-spending category. Labels written before that (the dynamic sandbox user's
-paycheck labeled ``dining`` by the seed rule ``sweetgreen``) are cleared here,
-``rule`` and ``llm`` sources only, so the categorize run every sync queues
-labels them again under the new rules. A user's own labels are kept. The
+Money-in rows that the old precedence (or the model) put in a spending
+category are cleared here, ``rule`` and ``llm`` sources only: the dynamic
+sandbox user's paycheck labeled ``dining`` by the seed rule ``sweetgreen`` is
+one. The rules pass of the categorize run every sync queues reads every
+uncategorized row, so it labels them again under the new precedence: the
+paycheck becomes ``income`` and a refund such as United Airlines comes back
+as ``travel``. A user's own labels are kept. The
 category list is spelled out (spec 007 rule 20's income and transfer buckets)
 so this revision never changes when ``sync/categories.py`` does.
 

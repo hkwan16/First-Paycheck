@@ -72,13 +72,12 @@ def test_the_hand_written_rows_follow_the_seeded_ones() -> None:
 
 def test_rules_follow_the_direction_on_the_hand_written_rows() -> None:
     """Spec 003 rules 3b and 5a: paychecks named like merchants are income, the
-    bank descriptors are labeled, and refunds are left to the model."""
+    bank descriptors are labeled, and refunds keep their merchant's category."""
     rows = gen.generate()[500:]
     result = categorization_rules.score(rows)
     assert result.failures == []
     assert result.metrics["rules_precision"] == 1.0
-    # The two refunds are the only rows no rule labels.
-    assert result.metrics["rules_coverage"] == 13 / 15
+    assert result.metrics["rules_coverage"] == 1.0
 
 
 def test_registered_with_a_baseline() -> None:

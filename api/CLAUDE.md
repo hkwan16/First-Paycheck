@@ -149,12 +149,13 @@ Rules:
 - `sync/categorize.py`: normalization, the `RuleBook`, the `categorize.run`
   job (rules, reuse of earlier LLM labels, then 50 merchants per gateway call)
   and `record_user_label` for `PATCH /transactions/{id}` (spec 003).
-  Matching takes the amount: a rule for a spending category labels money out
-  only, an `income` or `transfer` rule both ways, and a seed-only `contains`
-  rule (income and transfer) money in only, below `prefix` (rules 3a-4;
-  `sync/categories.py:allowed_for`). The model labels each merchant and
-  direction separately (`CategorizeItem.direction`, `categorize/v2`), and a
-  spending answer for a money-in item is dropped. `tests/support/
+  Matching takes the amount and the precedence depends on the direction
+  (rule 4): money out goes user exact, user prefix, seed exact, seed prefix;
+  money in goes user exact, user prefix, seed `contains` (income and transfer
+  only, seed only), seed exact, seed prefix. So a paycheck named like a
+  restaurant is income and a refund keeps its merchant's category. The model
+  labels each merchant and direction separately (`CategorizeItem.direction`,
+  `categorize/v2`) and may call money in a refund. `tests/support/
   sandbox_history.py:DYNAMIC` replays Plaid's `user_transactions_dynamic`
   user (a paycheck named like a restaurant, five loan ledgers).
 - Migration names follow spec 001: `0006_webhook_fn` revises `0002_core`, and

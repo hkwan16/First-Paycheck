@@ -389,20 +389,18 @@ def test_fake_labels_unknown_merchants_other(
     assert (item.category, item.confidence) == ("other", 0.5)
 
 
-def test_fake_answers_money_in_only_with_income_or_transfer(
+def test_fake_answers_money_in_by_merchant_a_refund_included(
     db_connection: Connection, user_a: FixtureUser
 ) -> None:
-    """Spec 003 rule 27: the fake follows categorize/v2 for money-in items."""
+    """Spec 003 rule 27: a money-in item at a spending merchant is a refund."""
     items = [
-        # A fixture merchant whose category is income.
         CategorizeItem(id=1, merchant="acme corp payroll", amount_cents=-300_000, date=NOW.date()),
-        # A fixture merchant whose category is a spending one: a refund.
-        CategorizeItem(id=2, merchant="netflix.com", amount_cents=-1599, date=NOW.date()),
-        # A merchant the fixtures do not know.
-        CategorizeItem(id=3, merchant="zz unheard of", amount_cents=-100, date=NOW.date()),
+        CategorizeItem(
+            id=2, merchant="united airlines refund", amount_cents=-45_000, date=NOW.date()
+        ),
     ]
     batch = fake(db_connection).categorize(user_a.id, items)
-    assert [(item.id, item.category) for item in batch.items] == [(1, "income")]
+    assert [(item.id, item.category) for item in batch.items] == [(1, "income"), (2, "travel")]
 
 
 def test_fake_shares_the_budget_check(db_connection: Connection, user_a: FixtureUser) -> None:

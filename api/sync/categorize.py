@@ -1,18 +1,18 @@
 """Transaction categorization (spec 003).
 
-Plain-string rules first, in a fixed precedence (user exact, user prefix,
-seed exact, seed prefix, seed contains); only merchants no rule knows go to the
-LLM gateway, 50 per call. A rule for a spending category labels money out only
-(rule 3b), so a paycheck from an employer named like a restaurant is never
-dining; the model labels a merchant's money out and money in separately. A
-user's correction becomes a user exact rule and relabels the same merchant's
-other transactions that the rule applies to.
+Plain-string rules first, in a precedence that depends on the direction (rule
+4): money out goes user exact, user prefix, seed exact, seed prefix; money in
+goes user exact, user prefix, seed contains, seed exact, seed prefix, so a
+paycheck named like a restaurant is income while a refund at a merchant keeps
+its spending category. Only merchants no rule knows go to the LLM gateway, 50
+per call, each merchant's money out and money in as separate items. A user's
+correction becomes a user exact rule and relabels the same merchant's other
+transactions.
 """
 
 from __future__ import annotations
 
 import datetime as dt
-import logging
 import re
 import unicodedata
 import uuid
@@ -32,9 +32,7 @@ from db.models import CategoryRule as CategoryRuleRow
 from db.models import Transaction
 from llm.gateway import CategorizeItem, LLMBudgetExceeded, LLMMisconfigured, LLMRefused
 from llm.schemas import CategoryBatch
-from sync.categories import CATEGORIES, MONEY_IN_CATEGORIES, allowed_for, is_money_in
-
-logger = logging.getLogger(__name__)
+from sync.categories import CATEGORIES, INCOME_TRANSFER_CATEGORIES, is_money_in
 
 MAX_MERCHANT_NORM = 128
 BATCH_SIZE = 50
@@ -84,15 +82,15 @@ def check_contains(rule: CategoryRule) -> str | None:
     """Why ``rule`` may not be a ``contains`` rule, or None (spec 003 rule 3c)."""
     if rule.match is not RuleMatch.CONTAINS:
         return None
-    if rule.source is not RuleSource.SEED or rule.category not in MONEY_IN_CATEGORIES:
+    if rule.source is not RuleSource.SEED or rule.category not in INCOME_TRANSFER_CATEGORIES:
         return "contains is only for seed income and transfer rules"
     return None
 
 
 class RuleBook:
     """The rules one user sees (their own plus the seed rows), indexed for
-    hash lookups: one exact lookup, one per whole-token prefix and, for money
-    in, one per run of whole tokens."""
+    hash lookups: one exact lookup, one per whole-token prefix and one per run
+    of whole tokens."""
 
     def __init__(self, rules: Iterable[CategoryRule]) -> None:
         self._index: dict[tuple[RuleSource, RuleMatch], dict[str, CategoryRule]] = {
@@ -109,29 +107,48 @@ class RuleBook:
             self._index[(rule.source, rule.match)][rule.merchant_norm] = rule
 
     def match(self, merchant_norm: str, *, amount_cents: int) -> CategoryRule | None:
-        """The rule that decides a transaction's category (spec 003 rules 3-5).
-
-        A rule that does not apply to the transaction's direction (a spending
-        rule for money in) is skipped as if it did not exist.
-        """
+        """The rule that decides a transaction's category (spec 003 rules 3-5):
+        the first level of the direction's precedence that matches."""
         if not merchant_norm:
             return None
-        for source in (RuleSource.USER, RuleSource.SEED):
-            exact = self._index[(source, RuleMatch.EXACT)].get(merchant_norm)
-            if exact is not None and allowed_for(exact.category, amount_cents):
-                return exact
-            prefixes = self._index[(source, RuleMatch.PREFIX)]
-            for prefix in token_prefixes(merchant_norm):
-                found = prefixes.get(prefix)
-                if found is not None and allowed_for(found.category, amount_cents):
-                    return found
-        if is_money_in(amount_cents):
-            contains = self._index[(RuleSource.SEED, RuleMatch.CONTAINS)]
-            for run in token_runs(merchant_norm):
-                found = contains.get(run)
-                if found is not None:
-                    return found
+        levels = _MONEY_IN_LEVELS if is_money_in(amount_cents) else _MONEY_OUT_LEVELS
+        for source, kind in levels:
+            found = self._lookup(source, kind, merchant_norm)
+            if found is not None:
+                return found
         return None
+
+    def _lookup(
+        self, source: RuleSource, kind: RuleMatch, merchant_norm: str
+    ) -> CategoryRule | None:
+        rules = self._index[(source, kind)]
+        if kind is RuleMatch.EXACT:
+            return rules.get(merchant_norm)
+        keys = (
+            token_prefixes(merchant_norm) if kind is RuleMatch.PREFIX else token_runs(merchant_norm)
+        )
+        for key in keys:
+            found = rules.get(key)
+            if found is not None:
+                return found
+        return None
+
+
+# Spec 003 rule 4. A contains rule never applies to money out; for money in it
+# ranks above the other seed rules, so pay words beat a merchant-like name.
+_MONEY_OUT_LEVELS = (
+    (RuleSource.USER, RuleMatch.EXACT),
+    (RuleSource.USER, RuleMatch.PREFIX),
+    (RuleSource.SEED, RuleMatch.EXACT),
+    (RuleSource.SEED, RuleMatch.PREFIX),
+)
+_MONEY_IN_LEVELS = (
+    (RuleSource.USER, RuleMatch.EXACT),
+    (RuleSource.USER, RuleMatch.PREFIX),
+    (RuleSource.SEED, RuleMatch.CONTAINS),
+    (RuleSource.SEED, RuleMatch.EXACT),
+    (RuleSource.SEED, RuleMatch.PREFIX),
+)
 
 
 def apply_rules(merchant_norm: str, rules: RuleBook, *, amount_cents: int) -> CategoryRule | None:
@@ -300,7 +317,7 @@ def _reuse_llm_labels(
     session: Session, user_id: uuid.UUID, units: set[Unit]
 ) -> tuple[int, set[Unit]]:
     """Copy each merchant and direction's newest LLM label to its uncategorized
-    transactions, when the label is allowed for the direction (rule 8)."""
+    transactions of that direction (rule 8)."""
     if not units:
         return 0, set()
     previous = session.execute(
@@ -314,9 +331,6 @@ def _reuse_llm_labels(
             Transaction.user_id == user_id,
             Transaction.category_source == CategorySource.LLM,
             Transaction.merchant_norm.in_({merchant for merchant, _ in units}),
-            # A money-in row the model labeled with a spending category before
-            # rule 10 is not a label to copy.
-            or_(~_MONEY_IN, Transaction.category.in_(MONEY_IN_CATEGORIES)),
         )
         .order_by(
             Transaction.merchant_norm,
@@ -373,14 +387,10 @@ def _write_llm_labels(
     answer: CategoryBatch,
 ) -> int:
     by_id = {item.id: item for item in items}
-    labeled = dropped = 0
+    labeled = 0
     for assignment in answer.items:
         item = by_id.get(assignment.id)
         if item is None:
-            continue
-        if not allowed_for(assignment.category, item.amount_cents):
-            # Rule 10: a money-in item never gets a spending category.
-            dropped += 1
             continue
         confidence = Decimal(str(assignment.confidence)).quantize(
             CONFIDENCE_STEP, rounding=ROUND_HALF_UP
@@ -392,10 +402,6 @@ def _write_llm_labels(
             assignment.category,
             CategorySource.LLM,
             confidence,
-        )
-    if dropped:
-        logger.info(
-            "dropped spending labels the model gave money-in items", extra={"dropped": dropped}
         )
     return labeled
 
@@ -437,11 +443,8 @@ class UserLabel:
 def record_user_label(
     session: Session, *, user_id: uuid.UUID, transaction_id: uuid.UUID, category: str
 ) -> UserLabel | None:
-    """Apply a user's category to one transaction, its rule and its siblings.
-
-    The transaction keeps the user's category whatever its direction (rule 13);
-    the siblings relabeled are the ones the new rule applies to (rule 15), so a
-    spending category never relabels the merchant's money in.
+    """Apply a user's category to one transaction, its rule and its siblings
+    in both directions (spec 003 rules 13-15).
 
     Returns None when the transaction does not exist for this user (RLS hides
     other users' rows), so the route answers 404.
@@ -473,7 +476,7 @@ def record_user_label(
             set_={"category": rule.excluded.category},
         )
     )
-    siblings = (
+    siblings = session.execute(
         update(Transaction)
         .where(
             Transaction.user_id == user_id,
@@ -488,8 +491,6 @@ def record_user_label(
         .returning(Transaction.id)
         .execution_options(synchronize_session=False)
     )
-    if category not in MONEY_IN_CATEGORIES:
-        siblings = siblings.where(_direction(money_in=False))
-    relabeled = len(session.execute(siblings).all())
+    relabeled = len(siblings.all())
     session.flush()
     return UserLabel(transaction=txn, rule_merchant_norm=txn.merchant_norm, relabeled=relabeled)

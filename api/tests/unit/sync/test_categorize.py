@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from db.enums import RuleMatch, RuleSource
-from sync.categories import CATEGORIES, MONEY_IN_CATEGORIES, allowed_for
+from sync.categories import CATEGORIES, INCOME_TRANSFER_CATEGORIES, is_money_in
 from sync.categorize import CategoryRule, RuleBook, apply_rules, normalize_merchant, token_prefixes
 
 
@@ -59,6 +59,7 @@ SEED = [
     rule("uber eats", RuleMatch.PREFIX, "dining", RuleSource.SEED),
     rule("netflix", RuleMatch.PREFIX, "subscriptions", RuleSource.SEED),
     rule("sweetgreen", RuleMatch.PREFIX, "dining", RuleSource.SEED),
+    rule("united airlines", RuleMatch.PREFIX, "travel", RuleSource.SEED),
     rule("zelle", RuleMatch.PREFIX, "transfer", RuleSource.SEED),
     rule("interest", RuleMatch.EXACT, "fees", RuleSource.SEED),
     rule("payroll", RuleMatch.CONTAINS, "income", RuleSource.SEED),
@@ -80,11 +81,14 @@ USER = [
         ("netflix.com", 1_549, None),
         ("ubereats", 1_800, None),
         ("", 100, None),
-        ("uber eats order", -2_000, None),
-        ("netflix", -1_549, None),
+        ("uber eats order", -2_000, "groceries"),
+        ("netflix", -1_549, "subscriptions"),
+        # A refund keeps its spending category: no contains rule matches.
+        ("united airlines", -50_000, "travel"),
+        # A paycheck is income: seed contains ranks above seed prefix for money in.
         ("sweetgreen inc payroll ppd id", -81_000, "income"),
         ("sweetgreen inc payroll ppd id", 81_000, "dining"),
-        ("sweetgreen", -1_450, None),
+        ("sweetgreen", -1_450, "dining"),
         ("acme corp payroll", 5_000, None),
         ("interest", 10_788, "fees"),
         ("interest", -12, "income"),
@@ -152,19 +156,17 @@ def test_a_multi_token_contains_rule_matches_a_run_of_tokens() -> None:
     assert apply_rules("acme ppd x id", book, amount_cents=-100) is None
 
 
-def test_a_user_spending_rule_never_labels_money_in() -> None:
+def test_a_user_rule_beats_a_seed_contains_rule_for_money_in() -> None:
     book = RuleBook(
         [
             rule("sweetgreen inc payroll ppd id", RuleMatch.EXACT, "dining", RuleSource.USER),
             rule("payroll", RuleMatch.CONTAINS, "income", RuleSource.SEED),
         ]
     )
-    money_in = apply_rules("sweetgreen inc payroll ppd id", book, amount_cents=-81_000)
-    money_out = apply_rules("sweetgreen inc payroll ppd id", book, amount_cents=1_200)
-    assert money_in is not None
-    assert (money_in.category, money_in.source) == ("income", RuleSource.SEED)
-    assert money_out is not None
-    assert (money_out.category, money_out.source) == ("dining", RuleSource.USER)
+    for amount_cents in (-81_000, 1_200):
+        found = apply_rules("sweetgreen inc payroll ppd id", book, amount_cents=amount_cents)
+        assert found is not None
+        assert (found.category, found.source) == ("dining", RuleSource.USER)
 
 
 def test_a_user_income_rule_applies_both_ways() -> None:
@@ -189,14 +191,11 @@ def test_rulebook_refuses_contains_outside_seed_income_and_transfer(
         RuleBook([contains])
 
 
-def test_money_in_categories_are_the_income_and_transfer_buckets() -> None:
-    assert frozenset({"income", "transfer"}) == MONEY_IN_CATEGORIES
-    assert allowed_for("income", -1)
-    assert allowed_for("transfer", -1)
-    assert not allowed_for("dining", -1)
-    assert not allowed_for("savings_investment", -1)
-    assert all(allowed_for(category, 1) for category in CATEGORIES)
-    assert all(allowed_for(category, 0) for category in CATEGORIES)
+def test_contains_categories_are_the_income_and_transfer_buckets() -> None:
+    assert frozenset({"income", "transfer"}) == INCOME_TRANSFER_CATEGORIES
+    assert is_money_in(-1)
+    assert not is_money_in(0)
+    assert not is_money_in(1)
 
 
 @pytest.mark.parametrize(

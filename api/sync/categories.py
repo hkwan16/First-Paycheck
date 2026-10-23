@@ -64,10 +64,9 @@ CATEGORY_BUCKETS: Mapping[str, Bucket] = MappingProxyType(
     }
 )
 
-# The categories a money-in transaction can get from a rule or the model (spec
-# 003 rule 3a): those in the income and transfer buckets. Every other category
-# is a spending category and labels money out only (rule 3b).
-MONEY_IN_CATEGORIES: frozenset[str] = frozenset(
+# The categories in the income and transfer buckets: the only ones a seed
+# ``contains`` rule may carry (spec 003 rule 3c).
+INCOME_TRANSFER_CATEGORIES: frozenset[str] = frozenset(
     category for category, bucket in CATEGORY_BUCKETS.items() if bucket in {"income", "transfer"}
 )
 
@@ -75,9 +74,3 @@ MONEY_IN_CATEGORIES: frozenset[str] = frozenset(
 def is_money_in(amount_cents: int) -> bool:
     """Spec 001 rule 21: positive is money out; zero counts as money out."""
     return amount_cents < 0
-
-
-def allowed_for(category: str, amount_cents: int) -> bool:
-    """Whether a rule or the model may give ``category`` to a transaction of
-    ``amount_cents`` (spec 003 rule 3b). A user's own label is not limited."""
-    return not is_money_in(amount_cents) or category in MONEY_IN_CATEGORIES

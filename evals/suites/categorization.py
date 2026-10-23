@@ -5,8 +5,7 @@ for every merchant no rule knows, over the labeled rows of
 It mirrors ``categorize.run`` (spec 003 rules 8-10): each unknown non-empty
 ``merchant_norm`` and direction (money out, money in) goes to the model once,
 as its newest row, in merchant order with money out first, 50 per call, and
-its label applies to every row of that merchant and direction; a spending
-label for a money-in item is dropped, as the job drops it. The real
+its label applies to every row of that merchant and direction. The real
 ``LLMGateway`` records to an in-memory ledger that charges the run's
 ``Budget`` before the answer is read, so ``--max-cost-cents`` is a hard cap.
 
@@ -39,7 +38,7 @@ from llm.gateway import (
     MemoryLedger,
 )
 from llm.schemas import CategoryBatch
-from sync.categories import allowed_for, is_money_in
+from sync.categories import is_money_in
 from sync.categorize import BATCH_SIZE, RuleBook, Unit, normalize_merchant
 
 EVAL_USER = uuid.UUID("00000000-0000-4000-8000-0000000ca7e9")
@@ -116,8 +115,7 @@ def score(
         by_id = {item.id: item for item in items}
         for assignment in answer.items:
             item = by_id.get(assignment.id)
-            # A spending label for a money-in item is dropped (spec 003 rule 10).
-            if item is not None and allowed_for(assignment.category, item.amount_cents):
+            if item is not None:
                 by_unit[(item.merchant, is_money_in(item.amount_cents))] = assignment.category
 
     right = llm_rows = llm_right = 0

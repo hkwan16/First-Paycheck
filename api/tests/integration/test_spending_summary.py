@@ -93,10 +93,7 @@ def test_the_sandbox_october_counts_income_in_only(
 ) -> None:
     # Spec 007 rule 22a on the recorded Plaid sandbox item, synced and labeled
     # by the seed rules: GUSTO PAY is booked as money out (585,000) and labeled
-    # income. Netting it gave the walkthrough's income of -584,578. The United
-    # Airlines refund (-50,000, money in) is uncategorized: the seed rule
-    # `united airlines` is a spending rule and labels money out only (spec 003
-    # rule 3b), so it no longer nets travel.
+    # income. Netting it gave the walkthrough's income of -584,578.
     link_sandbox(seeded_rules, user_a)
     body = client_as(user_a).get("/spending/summary", params=OCTOBER).json()
     assert {key: value for key, value in body.items() if key != "category_buckets"} == {
@@ -104,18 +101,18 @@ def test_the_sandbox_october_counts_income_in_only(
         "end": "2026-10-31",
         "income_cents": 422,
         "essentials_cents": 540,
-        "flexible_cents": 118_423,
+        "flexible_cents": 68_423,
         "savings_cents": 100_000,
         "other_cents": 0,
         "transfers_ignored_cents": 210_350,
         "income_outflows_ignored_cents": 585_000,
-        "uncategorized_cents": 0,
-        "left_over_cents": -218_541,
+        "uncategorized_cents": 50_000,
+        "left_over_cents": -168_541,
         "essentials_pct": "128.0",
-        "flexible_pct": "28062.3",
+        "flexible_pct": "16214.0",
         "savings_rate_pct": "23696.7",
         "transaction_count": 14,
-        "uncategorized_count": 2,
+        "uncategorized_count": 1,
         "paycheck_count": 0,
         "categories": [
             {"category": "income", "bucket": "income", "total_cents": 422, "count": 1},
@@ -124,6 +121,7 @@ def test_the_sandbox_october_counts_income_in_only(
             {"category": "transport", "bucket": "essentials", "total_cents": 540, "count": 1},
             {"category": "shopping", "bucket": "flexible", "total_cents": 58_940, "count": 2},
             {"category": "entertainment", "bucket": "flexible", "total_cents": 7_850, "count": 1},
+            {"category": "travel", "bucket": "flexible", "total_cents": -50_000, "count": 1},
             {
                 "category": "savings_investment",
                 "bucket": "savings",
