@@ -3,8 +3,9 @@ rules 10-15). Worker only.
 
 The blob is read in one short user session; OCR, redaction and the model call
 run with no transaction open; the outcome is written in a second session, and
-only while the document is still ``extracting`` under this job, so a newer
-request or a confirm in the meantime wins.
+only while the document is still ``extracting`` under this job and has not
+been replaced, so a newer request, a confirm or a replacement in the meantime
+wins.
 """
 
 from __future__ import annotations
@@ -95,8 +96,10 @@ def run(ctx: JobContext) -> dict[str, Any]:
 
 
 def _is_current(document: Document | None, job_id: uuid.UUID) -> TypeGuard[Document]:
+    # A replaced document is final (spec 004 rule 28), whatever its status.
     return (
         document is not None
+        and document.replaced_by_id is None
         and document.status is DocumentStatus.EXTRACTING
         and document.extract_job_id == job_id
     )

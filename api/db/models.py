@@ -465,6 +465,14 @@ class Document(Base):
             name="status_reason_when_stuck",
         ),
         CheckConstraint("jsonb_typeof(proposal) = 'object'", name="proposal_object"),
+        # A replacement is the same user's upload, and replaces at most one
+        # document; a replaced document no longer has its file (spec 004 rules 24-25).
+        ForeignKeyConstraint(["replaced_by_id", "user_id"], ["documents.id", "documents.user_id"]),
+        UniqueConstraint("replaced_by_id"),
+        CheckConstraint("replaced_by_id <> id", name="replaced_by_other"),
+        CheckConstraint(
+            "replaced_by_id IS NULL OR deleted_at IS NOT NULL", name="replaced_means_deleted"
+        ),
         # GET /docs reads (user_id, created_at DESC) by scanning this index backwards.
         Index("ix_documents_user_created", "user_id", "created_at"),
     )
@@ -481,15 +489,18 @@ class Document(Base):
     content_type: Mapped[str] = mapped_column(Text)
     size_bytes: Mapped[int] = mapped_column(Integer)
     page_count: Mapped[int | None] = mapped_column(Integer)
-    # The reviewable proposal (ingest/proposal.py); redacted text only.
-    proposal: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    # The reviewable proposal (ingest/proposal.py); redacted text only. None is
+    # SQL NULL (cleared on replace), never JSON null, which the check refuses.
+    proposal: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
     extract_job_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("jobs.id", ondelete="SET NULL")
     )
     redaction_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     confirmed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
-    # Set when the blob is deleted (on confirm or by retention).
+    # Set when the blob is deleted (on confirm, on replace or by retention).
     deleted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    # The upload that replaced this one; GET /docs lists only documents without one.
+    replaced_by_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     created_at: Mapped[dt.datetime] = _created_at()
     updated_at: Mapped[dt.datetime] = _updated_at()
 

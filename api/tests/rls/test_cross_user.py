@@ -852,6 +852,34 @@ def test_user_b_cannot_reach_user_a_finding_through_own_check_in(
     assert actions == 0
 
 
+def test_user_b_cannot_replace_user_a_document(
+    db_connection: Connection,
+    client_as: Callable[[FixtureUser], TestClient],
+    user_a: FixtureUser,
+    user_b: FixtureUser,
+) -> None:
+    """``POST /docs`` with ``replaces`` naming A's document (spec 004 rule 29):
+    404, B stores nothing, and A's document keeps its file and its place."""
+    document = a_document(db_connection)
+    response = client_as(user_b).post(
+        "/docs",
+        data={"type": "pay_stub", "replaces": str(document)},
+        files={"file": ("b.pdf", b"%PDF-1.4 b", "application/pdf")},
+    )
+    assert response.status_code == 404, response.text
+    assert response.json()["error"]["code"] == "not_found"
+    assert count(db_connection, "documents", USER_B) == 0
+    replaced_by, deleted_at, blobs = db_connection.execute(
+        text(
+            "SELECT replaced_by_id, deleted_at,"
+            " (SELECT count(*) FROM document_blobs WHERE document_id = d.id)"
+            " FROM documents d WHERE id = :id"
+        ),
+        {"id": document},
+    ).one()
+    assert (replaced_by, deleted_at, blobs) == (None, None, 1)
+
+
 def app_routes(app: FastAPI) -> set[tuple[str, str]]:
     """Every (method, path) the app serves, including routes hidden from OpenAPI.
 

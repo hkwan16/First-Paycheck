@@ -7,6 +7,7 @@ confirms is validated here and is the only thing stored.
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from typing import Annotated, Self
 
@@ -77,8 +78,11 @@ class DocumentOut(BaseModel):
     page_count: int | None
     uploaded_at: UtcDateTime
     confirmed_at: UtcDateTime | None
-    # When the stored file was deleted (on confirm, or after 7 days unconfirmed).
+    # When the stored file was deleted (on confirm, on replace, or after 7 days unconfirmed).
     deleted_at: UtcDateTime | None
+    # The upload that replaced this document (spec 004 rule 24). GET /docs lists
+    # only documents without one, so it is set only on GET /docs/{id}.
+    replaced_by_id: uuid.UUID | None
 
 
 class DocumentDetail(DocumentOut):
@@ -124,6 +128,7 @@ def _out(document: Document) -> DocumentOut:
         uploaded_at=document.created_at,
         confirmed_at=document.confirmed_at,
         deleted_at=document.deleted_at,
+        replaced_by_id=document.replaced_by_id,
     )
 
 
@@ -134,12 +139,24 @@ def _sniff(data: bytes) -> str:
     raise AppError("Upload a PDF, PNG or JPEG", code="unsupported_media_type", status_code=415)
 
 
-def _locked(session: UserSession, document_id: uuid.UUID) -> Document:
+def _for_update(session: UserSession, document_id: uuid.UUID) -> Document:
+    """The user's document, locked; 404 when RLS hides it or it does not exist."""
     document = session.scalars(
         select(Document).where(Document.id == document_id).with_for_update()
     ).one_or_none()
     if document is None:
         raise NotFound("Document not found")
+    if document.replaced_by_id is not None:
+        raise AppError(
+            "This document was replaced by a newer upload",
+            code="document_replaced",
+            status_code=409,
+        )
+    return document
+
+
+def _locked(session: UserSession, document_id: uuid.UUID) -> Document:
+    document = _for_update(session, document_id)
     if document.status is DocumentStatus.CONFIRMED:
         raise AppError(
             "This document is already confirmed", code="document_confirmed", status_code=409
@@ -156,7 +173,7 @@ def _locked(session: UserSession, document_id: uuid.UUID) -> Document:
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
-    responses=error_responses(401, 413, 415, 422, 429),
+    responses=error_responses(401, 404, 409, 413, 415, 422, 429),
 )
 def upload_document(
     file: Annotated[UploadFile, File(description="A PDF, PNG or JPEG of at most 10 MB")],
@@ -164,9 +181,14 @@ def upload_document(
     session: UserSession,
     user: CurrentUser,
     now: Now,
+    replaces: Annotated[
+        uuid.UUID | None,
+        Form(description="A document of the same type that this upload replaces"),
+    ] = None,
 ) -> DocumentCreated:
-    """Store an uploaded document for extraction."""
+    """Store an uploaded document for extraction, retiring the one it replaces."""
     ratelimit.consume(session, user.id, ratelimit.UPLOADS, now=now)
+    replaced = _replaceable(session, replaces, document_type) if replaces is not None else None
     data = file.file.read(MAX_UPLOAD_BYTES + 1)
     if not data:
         raise AppError("The file is empty", code="empty_file", status_code=422)
@@ -181,14 +203,46 @@ def upload_document(
     store.put(
         session, document_id=document.id, user_id=user.id, data=data, content_type=content_type
     )
+    if replaced is not None:
+        _retire(session, replaced, replaced_by=document, now=now)
     return DocumentCreated(document_id=document.id)
+
+
+def _replaceable(
+    session: UserSession, document_id: uuid.UUID, document_type: DocumentType
+) -> Document:
+    """The document an upload names in ``replaces``, locked so a concurrent
+    replacement waits and then sees it replaced (spec 004 rules 24 and 29)."""
+    document = _for_update(session, document_id)
+    if document.type is not document_type:
+        raise AppError(
+            f"A {document_type.value} upload cannot replace a {document.type.value} document",
+            code="replace_type_mismatch",
+            status_code=422,
+        )
+    return document
+
+
+def _retire(
+    session: UserSession, document: Document, *, replaced_by: Document, now: dt.datetime
+) -> None:
+    """Spec 004 rules 25-26: the file and the proposal go, the row and whatever
+    was confirmed from it stay."""
+    store.delete(session, document.id)
+    if document.deleted_at is None:
+        document.deleted_at = now
+    document.proposal = None
+    document.replaced_by_id = replaced_by.id
 
 
 @router.get("", responses=error_responses(401))
 def list_documents(session: UserSession) -> list[DocumentOut]:
-    """The user's documents, newest first."""
+    """The user's documents that have not been replaced, newest first."""
     documents = session.scalars(
-        select(Document).order_by(Document.created_at.desc(), Document.id.desc()).limit(LIST_LIMIT)
+        select(Document)
+        .where(Document.replaced_by_id.is_(None))
+        .order_by(Document.created_at.desc(), Document.id.desc())
+        .limit(LIST_LIMIT)
     )
     return [_out(document) for document in documents]
 

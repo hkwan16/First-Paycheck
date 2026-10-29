@@ -494,6 +494,19 @@
             "title": "File",
             "type": "string"
           },
+          "replaces": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A document of the same type that this upload replaces",
+            "title": "Replaces"
+          },
           "type": {
             "$ref": "#/components/schemas/DocumentType"
           }
@@ -1476,6 +1489,18 @@
             "title": "Redaction Count",
             "type": "integer"
           },
+          "replaced_by_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaced By Id"
+          },
           "status": {
             "$ref": "#/components/schemas/DocumentStatus"
           },
@@ -1508,6 +1533,7 @@
           "uploaded_at",
           "confirmed_at",
           "deleted_at",
+          "replaced_by_id",
           "proposal"
         ],
         "title": "DocumentDetail",
@@ -1559,6 +1585,18 @@
             "title": "Redaction Count",
             "type": "integer"
           },
+          "replaced_by_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaced By Id"
+          },
           "status": {
             "$ref": "#/components/schemas/DocumentStatus"
           },
@@ -1590,7 +1628,8 @@
           "page_count",
           "uploaded_at",
           "confirmed_at",
-          "deleted_at"
+          "deleted_at",
+          "replaced_by_id"
         ],
         "title": "DocumentOut",
         "type": "object"
@@ -7630,7 +7669,7 @@
     },
     "/docs": {
       "get": {
-        "description": "The user's documents, newest first.",
+        "description": "The user's documents that have not been replaced, newest first.",
         "operationId": "list_documents",
         "responses": {
           "200": {
@@ -7669,7 +7708,7 @@
         ]
       },
       "post": {
-        "description": "Store an uploaded document for extraction.",
+        "description": "Store an uploaded document for extraction, retiring the one it replaces.",
         "operationId": "upload_document",
         "requestBody": {
           "content": {
@@ -7701,6 +7740,26 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "413": {
             "content": {
