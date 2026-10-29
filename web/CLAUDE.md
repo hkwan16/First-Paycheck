@@ -83,7 +83,8 @@ src/app/dev/screens/{link,account,spending,confirm,confirm/manual,confirm/benefi
                     confirm/failed,confirm/confirmed,decisions,why,why/fallback,why-index,check-in,
                     check-in/complete,check-in-index,plan,plan/empty}  a screen on the sample data, no
                     API (development only); `account` is Link with the header's account menu
-src/test/           setup.ts (jest-dom, MSW lifecycle, db reset), render.tsx, fake-xhr.ts,
+src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, queued animation frames settled
+                    before jsdom closes: animation-frames.ts), render.tsx, fake-xhr.ts,
                     fake-download.ts (object URLs and anchor clicks recorded, no navigation),
                     fixtures/sample.ts (the Acme / J. Rivera dataset), fixtures/documents.ts (the
                     Acme pay stub as the API proposes it), fixtures/decisions.ts (profile, 401(k)

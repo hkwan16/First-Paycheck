@@ -1556,3 +1556,16 @@ issues:
     labels: ["area:api", "area:evals", "area:infra"]
     milestone: M10
     priority: Medium
+  - title: "Web tests settle Recharts' queued animation frames before jsdom closes"
+    body: >-
+      CI on main at 300cfe5 failed web-test with two unhandled
+      "ReferenceError: cancelAnimationFrame is not defined" from
+      limits.test.tsx while all 1470 tests passed. Recharts batches its store
+      updates through Redux Toolkit's autoBatchEnhancer, which queues an
+      animation frame and a 100 ms Node timer; when a file ends before the
+      frame runs, vitest closes jsdom and the timer calls the removed global.
+      Settle the queued frames in the shared afterAll. Failing test first.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: High
+    status: done
