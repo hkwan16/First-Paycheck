@@ -77,7 +77,7 @@ Take a document the user uploads (a pay stub, an offer letter or a benefits summ
 
 ### Documents table and statuses
 
-22. `documents.status` is one of `uploaded`, `extracting`, `proposed`, `confirmed`, `manual_entry_required`, `failed`. `status_reason` is set exactly when the status is `manual_entry_required` or `failed` (`refused`, `no_readable_page`, `budget`, `extraction_failed`, `unreadable_file`, `expired`, `no_model`: the worker has no gateway, or the API rejected its key or model id (spec 003 rule 24), so the user types the fields from the redacted lines). `confirmed_at` is set exactly when the status is `confirmed`.
+22. `documents.status` is one of `uploaded`, `extracting`, `proposed`, `confirmed`, `manual_entry_required`, `failed`. `status_reason` is set exactly when the status is `manual_entry_required` or `failed` (`refused`, `no_readable_page`, `budget`, `extraction_failed`, `unreadable_file`, `expired`, `no_model`: the worker has no gateway (outside production only, spec 003 rule 12a), or the API rejected its key or model id (spec 003 rule 24), so the user types the fields from the redacted lines). `confirmed_at` is set exactly when the status is `confirmed`.
 23. `page_count` is null until a document has been read, then the real page count.
 
 ## Hand-worked examples

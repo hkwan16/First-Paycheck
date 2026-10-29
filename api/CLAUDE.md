@@ -144,8 +144,11 @@ Rules:
   `ServiceSession` (`SET LOCAL ROLE app_api`), the one granted function.
 - `jobs/services.py:default_services` builds the worker's Plaid provider
   factory and gateway. Missing Plaid credentials fail sync jobs (and retry),
-  never the worker; a missing or rejected model key is "no model" (spec 003
-  rule 12a). Handlers are registered in `jobs/registry.py`.
+  never the worker; a rejected model key is "no model" (spec 003 rule 12a),
+  and so is a missing one outside production. `APP_ENV=production` without
+  `ANTHROPIC_API_KEY` is a settings error at startup, like `LLM_FAKE`
+  (`app/config.py:_production_guards`). Handlers are registered in
+  `jobs/registry.py`.
 - `sync/categorize.py`: normalization, the `RuleBook`, the `categorize.run`
   job (rules, reuse of earlier LLM labels, then 50 merchants per gateway call)
   and `record_user_label` for `PATCH /transactions/{id}` (spec 003).
