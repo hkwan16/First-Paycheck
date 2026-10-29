@@ -24,6 +24,7 @@ import {
   createDocument,
   recurringJobId,
   recurringJobStates,
+  replaceDocument,
   scriptJob,
 } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
@@ -800,7 +801,33 @@ describe('LinkScreen documents', () => {
     expect(xhr.requests).toHaveLength(0);
   });
 
-  it('replaces a document with a new upload of the same type', async () => {
+  it('replaces a document: the upload names it, and its row gives way to the new one', async () => {
+    const xhr = installFakeXhr();
+    db.documents = [
+      { ...sampleBenefitsDocument, status: 'manual_entry_required', status_reason: 'no_model' },
+    ];
+    const { user } = renderLink();
+    const benefitsRows = () =>
+      within(docsCard()).queryAllByRole('group', { name: /^Benefits summary/ });
+    const row = await within(docsCard()).findByRole('group', { name: /^Benefits summary/ });
+    await user.click(within(row).getByRole('button', { name: 'Replace benefits summary' }));
+    await user.upload(within(row).getByLabelText('New benefits summary file'), pdf('new.pdf'));
+    await waitFor(() => expect(xhr.requests).toHaveLength(1));
+    expect(xhr.last().field('type')).toBe('benefits');
+    expect(xhr.last().field('replaces')).toBe(BENEFITS_DOC_ID);
+    expect((xhr.last().field('file') as File).name).toBe('new.pdf');
+
+    // The API stores the new document and retires the old one (spec 004 rule 24).
+    const created = replaceDocument(BENEFITS_DOC_ID);
+    act(() => xhr.last().respond(201, { document_id: created.id }));
+    await waitFor(() => expect(row).not.toBeInTheDocument());
+    expect(benefitsRows()).toHaveLength(1);
+    expect(
+      await within(docsCard()).findByRole('progressbar', { name: 'Reading benefits summary' }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the document when its replacement is refused', async () => {
     const xhr = installFakeXhr();
     db.documents = [sampleBenefitsDocument];
     const { user } = renderLink();
@@ -808,8 +835,18 @@ describe('LinkScreen documents', () => {
     await user.click(within(row).getByRole('button', { name: 'Replace benefits summary' }));
     await user.upload(within(row).getByLabelText('New benefits summary file'), pdf('new.pdf'));
     await waitFor(() => expect(xhr.requests).toHaveLength(1));
-    expect(xhr.last().field('type')).toBe('benefits');
-    expect((xhr.last().field('file') as File).name).toBe('new.pdf');
+    act(() =>
+      xhr.last().respond(409, {
+        error: {
+          code: 'document_replaced',
+          message: 'This document was replaced by a newer upload',
+        },
+      }),
+    );
+    expect(await within(docsCard()).findByRole('alert')).toHaveTextContent(
+      'new.pdf was not uploaded. This document was replaced by a newer upload',
+    );
+    expect(row).toBeInTheDocument();
   });
 
   it('starts reading an uploaded document on request', async () => {

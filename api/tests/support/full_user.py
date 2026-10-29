@@ -113,7 +113,9 @@ def populate_every_table(connection: Connection, user_id: uuid.UUID) -> FullUser
 
     stub_document = make_document(connection, user_id, with_blob=False)
     make_pay_stub(connection, user_id, stub_document)
-    make_document(connection, user_id)  # with its blob
+    replacement = make_document(connection, user_id)  # with its blob
+    # Retired by the upload above (spec 004 rule 24): the same-user key must cascade too.
+    make_document(connection, user_id, with_blob=False, deleted_at=NOW, replaced_by_id=replacement)
     benefits_document = make_document(connection, user_id, type="benefits", with_blob=False)
 
     v1 = make_decision(connection, user_id, CalculatorKind.K401_MATCH, K401_INPUTS, created_at=NOW)

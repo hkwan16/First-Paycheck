@@ -49,6 +49,21 @@ describe('uploadDocument', () => {
     await expect(done).resolves.toEqual({ document_id: 'doc-1' });
   });
 
+  it('names the document it replaces, and only when it replaces one', async () => {
+    const replacing = uploadDocument({ file: pdf(), type: 'benefits', replaces: 'doc-0' });
+    await flush();
+    expect(xhr.last().field('replaces')).toBe('doc-0');
+    expect(xhr.last().field('type')).toBe('benefits');
+    xhr.last().respond(201, { document_id: 'doc-1' });
+    await expect(replacing).resolves.toEqual({ document_id: 'doc-1' });
+
+    const plain = uploadDocument({ file: pdf(), type: 'pay_stub' });
+    await flush();
+    expect(xhr.last().field('replaces')).toBeNull();
+    xhr.last().respond(201, { document_id: 'doc-2' });
+    await plain;
+  });
+
   it('reports upload progress as a whole percent', async () => {
     const progress: number[] = [];
     const done = uploadDocument({

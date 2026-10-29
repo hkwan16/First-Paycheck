@@ -1,6 +1,6 @@
 # 004: Upload, ingest and redaction
 
-Status: Implemented, M2.
+Status: Implemented, M2. Rules 24-31 (replacing a document) added after the October 29 alpha, where Replace left the old document listed beside its replacement (issue #134).
 
 ## Goal
 
@@ -12,13 +12,14 @@ Take a document the user uploads (a pay stub, an offer letter or a benefits summ
 |---|---|---|
 | `POST /docs` `file` | multipart file part | 1 byte to 10 MB (10,485,760 bytes); a PDF, PNG or JPEG by its leading bytes |
 | `POST /docs` `type` | multipart form field | `pay_stub`, `offer_letter`, `benefits` |
+| `POST /docs` `replaces` | optional multipart form field | The id of one of the user's documents of the same `type` that has not been replaced (rules 24-31) |
 | Stored bytes | `document_blobs.bytes` | As uploaded |
 | OCR settings | constants in `ingest/ocr.py` | Tesseract `--psm 6`, English |
 
 ## Outputs
 
 - `POST /docs` (201): `{document_id}`. The `documents` row starts `uploaded`. FastAPI's Swagger UI, which defaults to `/docs`, is served at `/api-docs` instead.
-- `GET /docs`: the user's documents, newest first: `{id, type, status, status_reason, redaction_count, page_count, uploaded_at, confirmed_at, deleted_at}`.
+- `GET /docs`: the user's documents that have not been replaced, newest first: `{id, type, status, status_reason, redaction_count, page_count, uploaded_at, confirmed_at, deleted_at, replaced_by_id}`. `GET /docs/{id}` returns the same fields for any of the user's documents, replaced or not, plus `proposal` (spec 005).
 - `prepare_document(bytes, content_type) -> PreparedDocument` (worker only): `page_count`, per page its number, `source` (`text` or `ocr`), redacted lines, redaction count, OCR mean confidence, and either the model input (`TextPage` with redacted text, or `ImagePage` with a redacted PNG) or a withheld reason.
 - `chunk_words(text) -> list[str]`: retrieval chunks for `benefits_chunks`.
 
@@ -80,6 +81,19 @@ Take a document the user uploads (a pay stub, an offer letter or a benefits summ
 22. `documents.status` is one of `uploaded`, `extracting`, `proposed`, `confirmed`, `manual_entry_required`, `failed`. `status_reason` is set exactly when the status is `manual_entry_required` or `failed` (`refused`, `no_readable_page`, `budget`, `extraction_failed`, `unreadable_file`, `expired`, `no_model`: the worker has no gateway (outside production only, spec 003 rule 12a), or the API rejected its key or model id (spec 003 rule 24), so the user types the fields from the redacted lines). `confirmed_at` is set exactly when the status is `confirmed`.
 23. `page_count` is null until a document has been read, then the real page count.
 
+### Replacing a document
+
+The Link screen's Replace button on a document's row uploads a new file in that document's place. Before rule 24 the API had no notion of it: Replace sent a plain upload, so the old document stayed listed beside the new one.
+
+24. **Replace.** `POST /docs` with `replaces = <document id>` stores the new document as rule 3 does and, in the same transaction, *retires* the document it names: that document's `replaced_by_id` becomes the new document's id. The named document is locked (`SELECT ... FOR UPDATE`) before anything is written, so of two concurrent replacements of one document only the first succeeds; the second sees it replaced (rule 29). A document is replaced at most once and replaces at most one (`UNIQUE (replaced_by_id)`); `(replaced_by_id, user_id)` references `documents (id, user_id)`, so a replacement is always the same user's.
+25. **What retiring does.** The retired document's blob is deleted (`store.delete`) and its `deleted_at` set to now unless it was already set; its `proposal` is cleared, because nothing will review it again. Its row stays (documents have no DELETE, spec 001), and so do its `status`, `status_reason`, `confirmed_at`, `page_count` and `redaction_count`: they record what happened to it before it was replaced. A retired document always has `deleted_at` (`CHECK (replaced_by_id IS NULL OR deleted_at IS NOT NULL)`).
+26. **Confirmed values are kept.** Retiring a `confirmed` document removes nothing that was confirmed from it: its `pay_stubs` row, its `benefits_plans` and `benefits_chunks`, and the profile's match and vesting stay. The replacement is an upload like any other, read and then only a proposal until the user confirms it; once they do, its values lead the way any newer confirm does (`GET /pay-stubs` is newest pay date first, `GET /benefits-plans` newest confirmed summary first). So a user who replaces a confirmed pay stub and never confirms the new one keeps the values they confirmed.
+27. **Where a retired document shows.** `GET /docs` lists only documents whose `replaced_by_id` is null, so the replacement takes the replaced document's place in the list. `GET /docs/{id}` still answers for a retired document, with `replaced_by_id` set and `proposal` null, so a screen still open on it can say it was replaced and link to the replacement.
+28. **A retired document is final.** `POST /docs/{id}/extract` and `POST /docs/{id}/confirm` on it are 409 `document_replaced`, checked before `document_confirmed` and `document_deleted`. An `ingest.extract` job queued or running for it writes nothing and ends `{"status": "skipped"}`: a job that has not read the blob finds none, and one that already has finds the document no longer current when it comes to write (spec 005 rule 10). A model call it already made is spent.
+29. **Refusals.** A `replaces` id the user cannot see (unknown, or another user's: row-level security hides it) is 404 `not_found`, never 403. A document of another `type` is 422 `replace_type_mismatch`; one already replaced is 409 `document_replaced`; a value that is not a UUID is 422. Every refused upload, these and rules 1, 2 and 5's (415, 413, 422, 429), rolls back the whole request: no new document is stored and the named one is untouched.
+30. **Any status can be replaced**: `uploaded`, `extracting`, `proposed`, `manual_entry_required`, `failed` (an expired one included) and `confirmed`. A replacement that later turns out unreadable (`failed`, `unreadable_file`) does not bring the retired document back; the user replaces the failed one in turn.
+31. **Limits and retention.** A replacement is one upload against rule 5's limit. Retention (rule 21) never touches a retired document, which already has `deleted_at` and no blob.
+
 ## Hand-worked examples
 
 ### Redaction (`tests/unit/ingest/test_redact.py::test_redaction_table`)
@@ -114,16 +128,37 @@ Row 4: the label is on the line above, inside the 60-character window, and the d
 
 Working for 1,000 words: the stride is 400 - 50 = 350, so chunks start at 0, 350 and 700; the third ends at word 1,000, the final word, so it is the last.
 
-### Rate limit (`tests/integration/test_docs_flow.py::test_upload_rate_limit`)
+### Rate limit (`tests/integration/test_docs_flow.py::test_rate_limit_is_ten_per_clock_hour`)
 
 Ten uploads in one hour succeed; the eleventh is 429 with `Retry-After` between 1 and 3,600; no document row is written for it.
+
+### Replace (`tests/integration/test_docs_replace.py`)
+
+A is the user's pay stub with a blob unless the row says otherwise; B is the upload that names it in `replaces`. "Untouched" means A's row, blob and proposal are as they were and no B exists.
+
+| # | A before | Request | Result |
+|---|---|---|---|
+| 1 | `manual_entry_required` (`no_model`), proposal of source lines (the October 29 alpha) | pay stub PDF, `replaces = A` | 201 `{document_id: B}`. `GET /docs` lists B (`uploaded`) and not A. A keeps `manual_entry_required` (`no_model`), gains `replaced_by_id = B` and `deleted_at = now`, loses its blob and proposal. `GET /docs/A` answers 200 with `replaced_by_id = B`, `proposal` null |
+| 2 | `confirmed`, with its `pay_stubs` row | pay stub PDF, `replaces = A` | 201. `GET /docs` lists B only; `GET /pay-stubs` still returns A's stub; A's `deleted_at` keeps its confirm time |
+| 3 | `confirmed` benefits summary, its plans, chunks and the profile's match | benefits PDF, `replaces = A` | 201. `GET /benefits-plans` and the profile's match unchanged; A's chunks kept |
+| 4 | `extracting` under job J, which has not run | pay stub PDF, `replaces = A`, then J runs | 201; J succeeds with `{"status": "skipped"}`; A stays `extracting`, retired |
+| 5 | `extracting` under job J, which has read the blob and is waiting on the model | as row 4; J then writes | J ends `{"status": "skipped"}`; A's status and proposal are not written |
+| 6 | `proposed` | `POST /docs/A/confirm` and `POST /docs/A/extract` after row 1's replace | 409 `document_replaced` both; no `pay_stubs` row, no job |
+| 7 | a benefits summary | pay stub PDF, `replaces = A` | 422 `replace_type_mismatch`; untouched |
+| 8 | already replaced by B | pay stub PDF, `replaces = A` | 409 `document_replaced`; no third document |
+| 9 | (any) | a GIF, `replaces = A` | 415; untouched |
+| 10 | (none: a random id) | pay stub PDF, `replaces = <random>` | 404 `not_found`; nothing stored |
+| 11 | user A's, user B asks | user B: pay stub PDF, `replaces = A` | 404 `not_found`; nothing stored for B; A untouched (`tests/rls/test_cross_user.py`) |
+| 12 | 7 days old, `uploaded`, then replaced | the scheduler tick's `expire_unconfirmed` | A is not counted or changed again; B (new) is not expired |
 
 ## Edge cases
 
 - A PDF whose every page is withheld (all scanned and unreadable) has no usable page; spec 005 marks it `manual_entry_required` (`no_readable_page`).
 - A PNG declared as `application/pdf` by the client is stored as `image/png` (rule 1).
 - A document deleted by retention while its extract job waits: the job finds no blob and finishes with `{"status": "skipped"}`.
-- Re-uploading the same file creates a second document; uploads are not deduplicated.
+- Re-uploading the same file creates a second document; uploads are not deduplicated. Replace (rule 24) is the way one upload takes another's place.
+- Two Replace presses on one row before the list refreshes: the first upload retires the document, the second is 409 `document_replaced` and stores nothing (rule 29).
+- A retired benefits summary's chunks stay searchable for explanations, like any confirmed summary's (rule 26); `retrieval/benefits_search.py` searches every chunk the user has, not only the newest summary's.
 
 ## Out of scope
 

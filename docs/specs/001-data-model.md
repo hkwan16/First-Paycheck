@@ -66,7 +66,7 @@ Every job handler, after the privileged dequeue, opens a user-scoped session wit
 
 ### Retention and deletion
 
-24. **Raw uploads.** `POST /docs/{id}/confirm` deletes the `document_blobs` row and sets `documents.deleted_at` in the same transaction that writes `pay_stubs` or `benefits_plans`. The `documents` row, its proposal and its redaction count are kept.
+24. **Raw uploads.** `POST /docs/{id}/confirm` deletes the `document_blobs` row and sets `documents.deleted_at` in the same transaction that writes `pay_stubs` or `benefits_plans`. The `documents` row, its proposal and its redaction count are kept. Replacing a document (spec 004 rule 25) deletes its blob and proposal and keeps its row.
 25. **Unlinking** (`DELETE /sync/items/{id}`) deletes the `sync_items` row; `ON DELETE CASCADE` removes its `accounts` and, through them, their `transactions`, `balance_snapshots` and `holdings`. `goals.account_id` is set to null (`ON DELETE SET NULL (account_id)`, Postgres 15 column-list syntax, so `user_id` is untouched). The encrypted access token goes with the row.
 26. **Confirmed data** (`profiles`, `pay_stubs`, `benefits_plans`, `benefits_chunks`, `decisions`, `explanations`, `goals`, `calendar_events`, `check_ins`, `check_in_findings`, `recurring_charges`) is kept while the account exists.
 27. **`llm_calls`** stores counts, cost, latency and status, never prompt or output text, and is kept for cost reporting.
@@ -143,6 +143,7 @@ One row per upload, kept after the file is deleted.
 | `redaction_count` | `integer` | `NOT NULL DEFAULT 0`, `CHECK (redaction_count >= 0)` |
 | `confirmed_at` | `timestamptz` | Set on confirm; `CHECK ((status = 'confirmed') = (confirmed_at IS NOT NULL))` |
 | `deleted_at` | `timestamptz` | Set when the blob is deleted |
+| `replaced_by_id` | `uuid` | Null until a newer upload replaces this document (spec 004 rules 24-31); `UNIQUE`; FK `(replaced_by_id, user_id) -> documents (id, user_id)`; `CHECK (replaced_by_id <> id)`; `CHECK (replaced_by_id IS NULL OR deleted_at IS NOT NULL)` |
 
 Indexes: `(user_id, created_at DESC)`. `UNIQUE (id, user_id)`.
 
@@ -454,6 +455,7 @@ Reference data, no `user_id` (RLS exception).
 | `0014_delete_account_fn` | `delete_user_account(uuid)`: deletes one `auth.users` row so every user table cascades (spec 017) |
 | `0015_loan_account_kind` | Nothing new. `account_kind` gains `loan` after `credit` (spec 002 rule 4). The downgrade maps `loan` accounts back to `credit` and rebuilds the type with its five 0002 labels |
 | `0016_rule_match_contains` | Nothing new. `rule_match` gains `contains` after `prefix`, and `category_rules` the check `ck_category_rules_contains_is_seed_money_in` (spec 003 rule 3c). It clears the `rule` and `llm` labels of money-in rows with a spending category (the old precedence's paycheck-as-dining) so the next categorize run's rules pass labels them again under spec 003 rule 4. The downgrade deletes the `contains` rows, drops the check and rebuilds the type with its two 0002 labels; the cleared labels stay cleared |
+| `0017_document_replaced_by` | Nothing new. `documents.replaced_by_id` with its unique key, same-user foreign key and two checks (spec 004 rule 24). The downgrade drops them; replaced documents then list again, with no file |
 
 CI runs upgrade, downgrade, upgrade and `alembic check` on every pull request.
 

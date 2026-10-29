@@ -430,6 +430,35 @@ describe('ConfirmScreen document states', () => {
     );
   });
 
+  it('says a replaced document was replaced and opens the one that replaced it', async () => {
+    db.documents = [
+      sampleDocument({
+        id: 'doc-new',
+        status: 'proposed',
+        uploaded_at: SAMPLE_NOW,
+      }),
+      sampleDocument({
+        status: 'manual_entry_required',
+        status_reason: 'no_model',
+        deleted_at: SAMPLE_NOW,
+        replaced_by_id: 'doc-new',
+      }),
+    ];
+    renderConfirm();
+    expect(
+      await screen.findByText('This pay stub was replaced by a newer upload.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: FIELDS })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Open the new pay stub/ })).toHaveAttribute(
+      'href',
+      '/setup/confirm/doc-new',
+    );
+    expect(screen.getByRole('link', { name: 'Back to documents' })).toHaveAttribute(
+      'href',
+      '/setup/link',
+    );
+  });
+
   it('says offer letters are kept but not read', async () => {
     db.documents = [{ ...sampleBenefitsDocument, type: 'offer_letter' }];
     renderConfirm(BENEFITS_DOC_ID);

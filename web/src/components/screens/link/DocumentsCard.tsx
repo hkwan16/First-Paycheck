@@ -92,7 +92,8 @@ export function DocumentsCard() {
     }
   };
 
-  const send = async (file: File, documentType: DocumentType) => {
+  /** Upload a file; `replaces` names the document a row's Replace retires with it. */
+  const send = async (file: File, documentType: DocumentType, replaces?: string) => {
     const key = ++sequence.current;
     const setPercent = (percent: number) =>
       setUploads((current) => current.map((u) => (u.key === key ? { ...u, percent } : u)));
@@ -101,6 +102,7 @@ export function DocumentsCard() {
       const { document_id } = await upload.mutateAsync({
         file,
         type: documentType,
+        replaces,
         onProgress: setPercent,
       });
       if (READABLE_TYPES.has(documentType)) void read(document_id, documentType);
@@ -133,7 +135,7 @@ export function DocumentsCard() {
             jobId={jobs[doc.id]}
             starting={starting.has(doc.id)}
             onRead={(d) => void read(d.id, d.type)}
-            onReplace={(d, file) => void send(file, d.type)}
+            onReplace={(d, file) => void send(file, d.type, d.id)}
           />
         ))}
         <div className="flex flex-col gap-3">

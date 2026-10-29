@@ -171,8 +171,8 @@ Rules:
   `0004_decisions`. After that the chain runs `0008_goals_and_birth_year`,
   `0011_no_model_reason`, `0009_w4_calendar_kind`, `0012_checkin_findings`,
   `0013_plan_export_job`, `0014_delete_account_fn`, `0015_loan_account_kind`,
-  `0016_rule_match_contains` (each revises the one before it); the head is
-  `0016_rule_match_contains`.
+  `0016_rule_match_contains`, `0017_document_replaced_by` (each revises the one
+  before it); the head is `0017_document_replaced_by`.
 - Adding an enum label is `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with
   `AFTER` when the order means something, as `by_kind` does for
   `account_kind`); the downgrade maps the rows that use it and rebuilds the
@@ -199,6 +199,14 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   pdfplumber, pypdfium2, pytesseract or PIL; `tests/unit/test_boundaries.py`
   enforces it and checks `import app.main` loads none of them. The upload
   route sniffs magic bytes only.
+- **Replace** (spec 004 rules 24-31): `POST /docs` with the form field
+  `replaces` stores the upload and, in the same transaction, retires the named
+  document (same user and type, locked, not already replaced): it gets
+  `replaced_by_id`, loses its blob and proposal, leaves `GET /docs`, and
+  extract and confirm answer 409 `document_replaced`; the extract handler
+  skips it. What was confirmed from it (pay stub, plans, chunks, the profile's
+  match) stays. `documents.proposal` is `JSONB(none_as_null=True)`, so
+  clearing it writes SQL NULL (the check refuses JSON null).
 - `ingest/store.py` is the only module that touches `document_blobs` (also
   enforced). Retention is `store.expire_unconfirmed(now)` in the scheduler tick
   (7 days), which also prunes `rate_limit_counters` (`app/ratelimit.py`).

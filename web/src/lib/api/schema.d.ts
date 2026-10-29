@@ -355,13 +355,13 @@ export interface paths {
     };
     /**
      * List Documents
-     * @description The user's documents, newest first.
+     * @description The user's documents that have not been replaced, newest first.
      */
     get: operations['list_documents'];
     put?: never;
     /**
      * Upload Document
-     * @description Store an uploaded document for extraction.
+     * @description Store an uploaded document for extraction, retiring the one it replaces.
      */
     post: operations['upload_document'];
     delete?: never;
@@ -1090,6 +1090,11 @@ export interface components {
        * @description A PDF, PNG or JPEG of at most 10 MB
        */
       file: string;
+      /**
+       * Replaces
+       * @description A document of the same type that this upload replaces
+       */
+      replaces?: string | null;
       type: components['schemas']['DocumentType'];
     };
     /** CalculatorDecisions */
@@ -1513,6 +1518,8 @@ export interface components {
       proposal: components['schemas']['Proposal'] | null;
       /** Redaction Count */
       redaction_count: number;
+      /** Replaced By Id */
+      replaced_by_id: string | null;
       status: components['schemas']['DocumentStatus'];
       status_reason: components['schemas']['DocumentStatusReason'] | null;
       type: components['schemas']['DocumentType'];
@@ -1537,6 +1544,8 @@ export interface components {
       page_count: number | null;
       /** Redaction Count */
       redaction_count: number;
+      /** Replaced By Id */
+      replaced_by_id: string | null;
       status: components['schemas']['DocumentStatus'];
       status_reason: components['schemas']['DocumentStatusReason'] | null;
       type: components['schemas']['DocumentType'];
@@ -4377,6 +4386,24 @@ export interface operations {
       };
       /** @description Unauthorized */
       401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

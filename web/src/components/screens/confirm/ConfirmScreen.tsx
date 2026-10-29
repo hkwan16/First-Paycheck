@@ -14,6 +14,7 @@ import type { Confirmed, DocumentDetail, DocumentType } from '@/lib/api/types';
 import { documentTypeLabel, statusReasonText } from '@/lib/documents';
 import { formatNumber } from '@/lib/money';
 import { pageTitle } from '@/lib/page-title';
+import { confirmRoute } from '@/lib/routes';
 import { BenefitsReview } from './BenefitsReview';
 import { ConfirmReview } from './ConfirmReview';
 
@@ -100,6 +101,28 @@ function BenefitsConfirmed({ result }: { result: Confirmed }) {
         The original file is deleted.
       </Notice>
       <ToDecisions label="Continue to decisions" />
+    </Status>
+  );
+}
+
+/**
+ * A document a newer upload replaced (spec 004 rule 27): its file is gone and
+ * it cannot be confirmed, so point to the document that took its place.
+ */
+function Replaced({ type, replacedBy }: { type: DocumentType; replacedBy: string }) {
+  const noun = documentTypeLabel(type).toLowerCase();
+  return (
+    <Status type={type}>
+      <Notice title={`This ${noun} was replaced by a newer upload.`}>
+        Its file was deleted when the new one arrived, so there is nothing to review here.
+      </Notice>
+      <div className="flex flex-wrap gap-3">
+        <Button href={confirmRoute(replacedBy)} variant="primary">
+          Open the new {noun}
+          <ArrowRightIcon />
+        </Button>
+        <Button href="/setup/link">Back to documents</Button>
+      </div>
     </Status>
   );
 }
@@ -220,6 +243,9 @@ function ConfirmContent({ query }: { query: ReturnType<typeof useDocument> }) {
   }
 
   const document = query.data;
+  if (document.replaced_by_id) {
+    return <Replaced type={document.type} replacedBy={document.replaced_by_id} />;
+  }
   if (!isReviewable(document)) return <NotReviewable document={document} />;
   if (!document.proposal) {
     return (

@@ -13,6 +13,11 @@ import type { AccountKind, AmountSign, CsvImport, DocumentCreated, DocumentType 
 export interface UploadDocumentOptions {
   file: File;
   type: DocumentType;
+  /**
+   * A document of the same type this upload takes the place of: the API
+   * retires it in the same request (spec 004 rule 24).
+   */
+  replaces?: string;
   /** Whole percent of the file sent, 0-100. */
   onProgress?: (percent: number) => void;
   signal?: AbortSignal;
@@ -110,16 +115,18 @@ async function postForm<T>(
   throw new UploadError(answer.status, answer.body, parseRetryAfter(answer.retryAfter));
 }
 
-/** Upload one document; resolves with the new document's id. */
+/** Upload one document, or its replacement; resolves with the new document's id. */
 export function uploadDocument({
   file,
   type,
+  replaces,
   onProgress,
   signal,
 }: UploadDocumentOptions): Promise<DocumentCreated> {
   const form = () => {
     const data = new FormData();
     data.append('type', type);
+    if (replaces !== undefined) data.append('replaces', replaces);
     data.append('file', file, file.name);
     return data;
   };

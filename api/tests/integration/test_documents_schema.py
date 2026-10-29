@@ -170,6 +170,59 @@ def test_blob_size_matches_its_bytes(db_connection: Connection, user_a: FixtureU
         )
 
 
+REPLACE = "UPDATE documents SET replaced_by_id = :by, deleted_at = now() WHERE id = :id"
+
+
+def test_a_document_cannot_replace_itself(db_connection: Connection, user_a: FixtureUser) -> None:
+    document = make_document(db_connection, user_a.id, with_blob=False)
+    with pytest.raises(IntegrityError, match="ck_documents_replaced_by_other"):
+        as_user(db_connection, user_a, REPLACE, by=document, id=document)
+
+
+def test_a_replaced_document_has_no_file(db_connection: Connection, user_a: FixtureUser) -> None:
+    old = make_document(db_connection, user_a.id, with_blob=False)
+    new = make_document(db_connection, user_a.id)
+    with pytest.raises(IntegrityError, match="ck_documents_replaced_means_deleted"):
+        as_user(
+            db_connection,
+            user_a,
+            "UPDATE documents SET replaced_by_id = :by WHERE id = :id",
+            by=new,
+            id=old,
+        )
+
+
+def test_a_replacement_is_the_same_users(
+    db_connection: Connection, user_a: FixtureUser, user_b: FixtureUser
+) -> None:
+    old = make_document(db_connection, user_a.id, with_blob=False)
+    other = make_document(db_connection, user_b.id)
+    with pytest.raises(IntegrityError, match="fk_documents_replaced_by_id_documents"):
+        db_connection.execute(text(REPLACE), {"by": other, "id": old})
+
+
+def test_a_document_replaces_at_most_one(db_connection: Connection, user_a: FixtureUser) -> None:
+    first = make_document(db_connection, user_a.id, with_blob=False)
+    second = make_document(db_connection, user_a.id, with_blob=False)
+    new = make_document(db_connection, user_a.id)
+    as_user(db_connection, user_a, REPLACE, by=new, id=first)
+    with pytest.raises(IntegrityError, match="uq_documents_replaced_by_id"):
+        as_user(db_connection, user_a, REPLACE, by=new, id=second)
+
+
+def test_deleting_a_user_removes_replaced_documents(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    old = make_document(db_connection, user_a.id, with_blob=False)
+    new = make_document(db_connection, user_a.id)
+    as_user(db_connection, user_a, REPLACE, by=new, id=old)
+    db_connection.execute(text("DELETE FROM auth.users WHERE id = :id"), {"id": user_a.id})
+    remaining = db_connection.execute(
+        text("SELECT count(*) FROM documents WHERE user_id = :u"), {"u": user_a.id}
+    ).scalar_one()
+    assert remaining == 0
+
+
 def test_users_cannot_delete_documents(db_connection: Connection, user_a: FixtureUser) -> None:
     document = make_document(db_connection, user_a.id)
     with pytest.raises(DBAPIError, match="permission denied"):

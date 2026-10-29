@@ -483,4 +483,5 @@ def test_list_is_newest_first(
         "uploaded_at",
         "confirmed_at",
         "deleted_at",
+        "replaced_by_id",
     }

@@ -251,25 +251,28 @@ describe('useConfirmDocument', () => {
     expect(db.payStubs).toHaveLength(0);
   });
 
-  it('passes other errors through and refreshes the document on a state conflict', async () => {
-    server.use(
-      http.post(apiUrl('/docs/:id/confirm'), () =>
-        HttpResponse.json(
-          { error: { code: 'document_confirmed', message: 'This document is already confirmed' } },
-          { status: 409 },
+  it.each([
+    ['document_confirmed', 'This document is already confirmed'],
+    ['document_replaced', 'This document was replaced by a newer upload'],
+  ])(
+    'passes other errors through and refreshes the document on a state conflict (%s)',
+    async (code, message) => {
+      server.use(
+        http.post(apiUrl('/docs/:id/confirm'), () =>
+          HttpResponse.json({ error: { code, message } }, { status: 409 }),
         ),
-      ),
-    );
-    const { result, queryClient } = renderHookWithClient(() => useConfirmDocument());
-    queryClient.setQueryData(queryKeys.document(PAY_STUB_DOC_ID), {});
-    act(() => result.current.mutate({ documentId: PAY_STUB_DOC_ID, values: sampleValues }));
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(result.current.error).not.toBeInstanceOf(PayStubUnbalanced);
-    expect(apiErrorMessage(result.current.error, 'x')).toBe('This document is already confirmed');
-    expect(queryClient.getQueryState(queryKeys.document(PAY_STUB_DOC_ID))?.isInvalidated).toBe(
-      true,
-    );
-  });
+      );
+      const { result, queryClient } = renderHookWithClient(() => useConfirmDocument());
+      queryClient.setQueryData(queryKeys.document(PAY_STUB_DOC_ID), {});
+      act(() => result.current.mutate({ documentId: PAY_STUB_DOC_ID, values: sampleValues }));
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect(result.current.error).not.toBeInstanceOf(PayStubUnbalanced);
+      expect(apiErrorMessage(result.current.error, 'x')).toBe(message);
+      expect(queryClient.getQueryState(queryKeys.document(PAY_STUB_DOC_ID))?.isInvalidated).toBe(
+        true,
+      );
+    },
+  );
 
   it('sends a benefits summary under benefits and says when the profile changed', async () => {
     benefitsWaiting();

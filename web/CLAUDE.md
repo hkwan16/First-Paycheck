@@ -287,7 +287,11 @@ next is a real disabled button, never a dead link).
   wrapped by `useImportCsv`) go over XMLHttpRequest, because fetch cannot report upload progress.
   They share `sessionTokens` with the fetch middleware (one refresh and one resend on a 401; a
   401 `account_deleted` signs out at once), and fail with `UploadError`, an `ApiError`. `useUploadDocument` wraps the document upload; the Link documents card then calls
-  `useExtractDocument` and follows the job with `useJob`. A CSV import refused with 422
+  `useExtractDocument` and follows the job with `useJob`. A row's Replace sends `replaces` (the
+  row's document id) with the upload, and the API retires that document in the same request (spec
+  004 rules 24-31): it leaves `GET /docs`, so the refreshed list shows the new row in its place.
+  Nothing is removed on the client first; a refused replacement keeps the row and says why. In
+  tests, `replaceDocument(id)` (msw/handlers.ts) does to `db` what the API does. A CSV import refused with 422
   `csv_invalid` carries its row errors: `csvProblems(error)` reads `{ errors, total }` (the first
   50 and how many in all); the Link screen's `CsvImport` lists them, offers Try again on 409
   `import_conflict`, and follows the two job ids the import returns. `lib/documents.ts` maps a
@@ -470,6 +474,10 @@ offer letter states).
   and vesting changed) and links to Decisions. A benefits summary nothing could be read from is
   not typed in here: Confirm and Link point to the decision cards. Its lines are not linked to
   fields, so the source pane highlights nothing (`linked={false}`).
+- **Replaced**: a document with `replaced_by_id` (open in an old tab, or reached by Back) says it
+  was replaced and links to the replacement (`confirmRoute(replaced_by_id)`) and back to the
+  documents; the API refuses to confirm it (409 `document_replaced`, one of the state conflicts
+  that re-read the document).
 
 ## Decisions screen
 
