@@ -23,9 +23,9 @@ const PAY_STUB_TITLE = 'Check what we read from your pay stub';
 const titleFor = (type: DocumentType | undefined) =>
   type === 'benefits' ? 'Check what we read from your benefits summary' : PAY_STUB_TITLE;
 
-/** The browser tab's title, by the same rule as the heading (`titleFor`). */
+/** The browser tab's title: "Confirm" and the document's type. */
 const tabTitleFor = (type: DocumentType) =>
-  pageTitle(type === 'benefits' ? 'Confirm benefits summary' : 'Confirm pay stub');
+  pageTitle(`Confirm ${documentTypeLabel(type).toLowerCase()}`);
 
 function BackToDocuments() {
   return (

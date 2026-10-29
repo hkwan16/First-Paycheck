@@ -438,8 +438,8 @@ What the audit found and fixed:
 reviews one (`ConfirmScreen`, which also covers the extracting, failed, confirmed, benefits and
 offer letter states).
 
-- **Tab title** follows the document's type, like the heading: "Confirm benefits summary" or
-  "Confirm pay stub" (`tabTitleFor`). The page's `metadata` cannot know the type, so it names the
+- **Tab title** names the document's type (`tabTitleFor`, from `documentTypeLabel`): "Confirm
+  pay stub", "Confirm benefits summary" or "Confirm offer letter". The page's `metadata` cannot know the type, so it names the
   step until the document loads; then the screen renders React's `<title>` (`pageTitle` from
   `lib/page-title.ts`, the root layout's template), which React places ahead of the metadata's.
   The side nav keeps the mockup's "Confirm pay stub": step 2 is the pay stub's.

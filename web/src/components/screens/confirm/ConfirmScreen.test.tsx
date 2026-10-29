@@ -434,6 +434,7 @@ describe('ConfirmScreen document states', () => {
     db.documents = [{ ...sampleBenefitsDocument, type: 'offer_letter' }];
     renderConfirm(BENEFITS_DOC_ID);
     expect(await screen.findByText(/Offer letters are kept but not read yet/)).toBeInTheDocument();
+    expect(document.title).toBe('Confirm offer letter | First Paycheck');
   });
 
   it('names the browser tab after the pay stub', async () => {
