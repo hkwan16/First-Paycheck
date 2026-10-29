@@ -137,18 +137,21 @@ class Settings(BaseSettings):
             return self
         problems = [
             f"{name.upper()} is required in production"
-            for name in ("database_url", "database_url_privileged", "supabase_url", "cors_origins")
+            for name in (
+                "database_url",
+                "database_url_privileged",
+                "supabase_url",
+                "cors_origins",
+                # Without a model, categorization would quietly run rules only and
+                # every document go to manual entry (spec 003 rule 12a, #133).
+                "anthropic_api_key",
+            )
             if not getattr(self, name)
         ]
         if self.supabase_jwks:
             problems.append("SUPABASE_JWKS (inline test keys) is not allowed in production")
         if self.llm_fake:
             problems.append("LLM_FAKE is not allowed in production")
-        # Running with no model is for development, tests, CI and evals (spec 003
-        # rule 12a). In production a missing key would quietly turn categorization
-        # into rules only and every document into manual entry (issue #133).
-        if self.anthropic_api_key is None or not self.anthropic_api_key.get_secret_value():
-            problems.append("ANTHROPIC_API_KEY is required in production")
         if problems:
             raise ValueError("; ".join(problems))
         return self
