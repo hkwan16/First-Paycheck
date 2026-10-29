@@ -1522,6 +1522,9 @@ issues:
     labels: ["area:api", "area:infra", "type:bug"]
     milestone: M10
     priority: High
+    status: done
+    # Fixed October 29 in #138: the key joins the required production settings;
+    # production runs dad1165 with it.
   - title: "Replacing a document supersedes the old one"
     body: >-
       Found on October 29 on production: Replace on a pay stub and a benefits
@@ -1556,6 +1559,9 @@ issues:
     labels: ["area:api", "area:evals", "area:infra"]
     milestone: M10
     priority: Medium
+    status: done
+    # Done October 29 in #139: Sonnet scored accuracy 0.9670 and llm_accuracy
+    # 0.9474 (Haiku 0.9573 and 0.8947); Render's env group set to Sonnet.
   - title: "Web tests settle Recharts' queued animation frames before jsdom closes"
     body: >-
       CI on main at 300cfe5 failed web-test with two unhandled
