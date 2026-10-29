@@ -33,6 +33,7 @@ test('uploads a pay stub, reviews every field and continues to Spending', async 
   await waitForHydration(page);
   const fields = page.getByRole('region', { name: 'Extracted fields' });
   await expect(fields).toBeVisible();
+  await expect(page).toHaveTitle('Confirm pay stub | First Paycheck');
   await expect(
     page.getByRole('complementary', { name: 'Source, as the AI saw it' }).getByRole('img', {
       name: 'Redacted',
