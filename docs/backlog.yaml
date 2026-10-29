@@ -1491,3 +1491,68 @@ issues:
     # Fixed October 22 with failing tests first: spec 007 rule 25, a share is
     # null when income is 0 or the share would pass 1,000.0 in either direction;
     # the tiles and the diagram show "n/a, income too small to compare".
+  # Found on October 29 in the first production run with an Anthropic key, on
+  # e2e@firstpaycheck.test with the synthetic stub-01.pdf and summary-01.pdf.
+  - title: "The 401(k) card and its explanation start from the pay stub's contribution rate"
+    body: >-
+      Found on October 29 on production: the confirmed pay stub shows $109.62
+      of $3,653.85 gross going to the 401(k), which is 3%, yet the 401(k) card
+      starts at 0% (Match401kCard.tsx falls back to 0 when no decision is
+      saved) and says "You leave the whole $3,800 match behind". After saving
+      5%, the verified explanation said "You are already contributing 5%",
+      because explain/v1 calls the decision's rate the current contribution.
+      Change specs 005, 006 and 008 first: the pay stub's rate is computed in
+      calc/ and returned with the stub, the card starts from it, and the
+      explanation compares the chosen rate with the rate on the pay stub.
+      Failing tests first. Done when the e2e account's card starts at 3% and
+      a new explanation describes 5% as a change from 3%.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: High
+  - title: "Production refuses to start without ANTHROPIC_API_KEY"
+    body: >-
+      Found on October 29: the key was saved on Render as ABTHROPIC_API_KEY,
+      so the worker started with no model, logged one WARNING and turned every
+      document into manual entry while categorization ran rules only. Nothing
+      failed, so the typo went unnoticed until a manual test. Change spec 003
+      rule 12a first: running without a model stays supported outside
+      production, but APP_ENV=production with no ANTHROPIC_API_KEY is a
+      settings error at startup, like LLM_FAKE already is. Failing test first.
+      Done when a production Settings without the key raises.
+    labels: ["area:api", "area:infra", "type:bug"]
+    milestone: M10
+    priority: High
+  - title: "Replacing a document supersedes the old one"
+    body: >-
+      Found on October 29 on production: Replace on a pay stub and a benefits
+      summary in manual entry uploaded a new document and left the old one
+      listed with "Manual entry needed", so Accounts and documents showed two
+      pay stubs and two benefits summaries. Change spec 004 first so a
+      replacement retires the document it replaces, then fix the API or the
+      web client. Failing test first. Done when Replace leaves one row per
+      document on the e2e account.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+  - title: "The benefits summary review page has its own title"
+    body: >-
+      Found on October 29 on production: /setup/confirm/{id} for a benefits
+      summary has the browser title "Confirm pay stub | First Paycheck" while
+      the page reads "Check what we read from your benefits summary". The
+      title follows the document type. Failing test first.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+  - title: "Categorize with Sonnet 5.5 instead of Haiku 5.5"
+    body: >-
+      The October 29 production run labeled Rocket Money (a budgeting app
+      charge of $21.54) as a savings transfer at 90% confidence, which raises
+      the savings rate, and Mosquito Joe (pest control) as other. The first
+      live categorization eval with Haiku scored accuracy 0.957 and
+      llm_accuracy 0.895. Change spec 003 and the LLM_MODEL_CATEGORIZE
+      default, .env.example and render.yaml to claude-sonnet-5-5, run the
+      categorization eval on Sonnet and record both runs. Done when production
+      categorizes with Sonnet.
+    labels: ["area:api", "area:evals", "area:infra"]
+    milestone: M10
+    priority: Medium
