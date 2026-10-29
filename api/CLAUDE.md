@@ -116,7 +116,10 @@ Rules:
   run by default.
 - The SDK is built on `httpx2`, which `respx` cannot patch: gateway tests pass
   `http_client=httpx2.Client(transport=httpx2.MockTransport(...))`.
-- Model ids come from settings (`LLM_MODEL_*`), never literals in code.
+- Model ids come from settings (`LLM_MODEL_*`), never literals in code. Every
+  purpose runs on `claude-sonnet-5-5` (categorize moved off Haiku in #136).
+  `render.yaml` pins each id, so `tests/unit/test_config.py` checks that it and
+  `.env.example` match the `Settings` defaults.
 
 ## Sync, Plaid and jobs (from M1)
 

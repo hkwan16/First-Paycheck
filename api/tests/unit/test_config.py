@@ -7,11 +7,13 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from app.config import REPO_ROOT, Settings
 
 ENV_EXAMPLE = REPO_ROOT / ".env.example"
+RENDER_BLUEPRINT = REPO_ROOT / "render.yaml"
 
 
 @pytest.fixture(autouse=True)
@@ -177,3 +179,39 @@ def test_env_example_has_no_unknown_api_variables() -> None:
     web_only = {key for key in _env_example_keys() if key.startswith("NEXT_PUBLIC_")}
     unknown = _env_example_keys() - known - web_only
     assert not unknown, f"no Settings field reads these .env.example keys: {sorted(unknown)}"
+
+
+def test_categorize_defaults_to_sonnet() -> None:
+    """Issue #136: Haiku 5.5 mislabeled merchants the eval and production showed."""
+    assert make().llm_model_categorize == "claude-sonnet-5-5"
+
+
+def _model_defaults() -> dict[str, str]:
+    return {
+        name.upper(): str(field.default)
+        for name, field in Settings.model_fields.items()
+        if name.startswith("llm_model_")
+    }
+
+
+def test_env_example_model_ids_match_the_defaults() -> None:
+    documented = {
+        key: value
+        for key, value in (
+            line.split("=", 1) for line in ENV_EXAMPLE.read_text().splitlines() if "=" in line
+        )
+        if key.startswith("LLM_MODEL_")
+    }
+    assert documented == _model_defaults()
+
+
+def test_render_blueprint_model_ids_match_the_defaults() -> None:
+    """render.yaml pins every model id, so a changed default alone never reaches production."""
+    blueprint = yaml.safe_load(RENDER_BLUEPRINT.read_text())
+    deployed = {
+        var["key"]: var["value"]
+        for group in blueprint["envVarGroups"]
+        for var in group["envVars"]
+        if var["key"].startswith("LLM_MODEL_")
+    }
+    assert deployed == _model_defaults()

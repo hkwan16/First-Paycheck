@@ -1,6 +1,7 @@
-"""The categorization suite (LLM, spec 003 rule 29): the seed rules, then Haiku
-for every merchant no rule knows, over the labeled rows of
-``evals/fixtures/transactions.csv``, with no database.
+"""The categorization suite (LLM, spec 003 rule 29): the seed rules, then the
+categorize model (``LLM_MODEL_CATEGORIZE``, Sonnet 5.5) for every merchant no
+rule knows, over the labeled rows of ``evals/fixtures/transactions.csv``, with
+no database.
 
 It mirrors ``categorize.run`` (spec 003 rules 8-10): each unknown non-empty
 ``merchant_norm`` and direction (money out, money in) goes to the model once,

@@ -23,6 +23,8 @@ class Price:
 
 
 PRICES: dict[str, Price] = {
+    # No purpose runs on Haiku since #136; its price stays because earlier
+    # llm_calls rows name it and spec 003's cost examples check its arithmetic.
     "claude-haiku-5-5": Price(
         input=Decimal("0.10"),
         output=Decimal("0.50"),
