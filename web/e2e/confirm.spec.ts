@@ -16,8 +16,10 @@ test.describe.configure({ mode: 'serial' });
 test.skip(!e2eUser(), NO_E2E_USER);
 test.skip(!e2eApiUrl(), NO_E2E_API);
 
-test('uploads a pay stub, reviews every field and continues to Spending', async ({ page }) => {
-  test.setTimeout(240_000);
+test('uploads a pay stub, replaces it, reviews every field and continues to Spending', async ({
+  page,
+}) => {
+  test.setTimeout(360_000);
   await openLink(page);
   const docs = page.getByRole('region', { name: 'Documents' });
   await docs.getByLabel('Document type').selectOption('pay_stub');
@@ -26,6 +28,20 @@ test('uploads a pay stub, reviews every field and continues to Spending', async 
   // Newest first: the upload is the first pay stub row once it lands.
   const row = docs.getByRole('group', { name: /^Pay stub/ }).first();
   await expect(row.getByText('Review needed')).toBeVisible({ timeout: 180_000 });
+
+  // Replace it through the row's own file picker: the new upload retires the
+  // old document (spec 004 rule 24), so its row leaves the list.
+  const replaced = await row.getByRole('link', { name: 'Review pay stub' }).getAttribute('href');
+  expect(replaced).toMatch(/^\/setup\/confirm\/[^/]+$/);
+  const chooser = page.waitForEvent('filechooser');
+  await row.getByRole('button', { name: 'Replace pay stub' }).click();
+  await (await chooser).setFiles(FIXTURE);
+  await expect(docs.locator(`a[href="${replaced}"]`)).toHaveCount(0, { timeout: 60_000 });
+  await expect(row.getByText('Review needed')).toBeVisible({ timeout: 180_000 });
+  await expect(row.getByRole('link', { name: 'Review pay stub' })).not.toHaveAttribute(
+    'href',
+    replaced!,
+  );
   await expect(row.getByText(/^[1-9]\d* items? redacted$/)).toBeVisible();
 
   await row.getByRole('link', { name: 'Review pay stub' }).click();
