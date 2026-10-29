@@ -51,7 +51,7 @@ envVarGroups:
       - key: LLM_MODEL_EXTRACT
         value: claude-sonnet-5-5
       - key: LLM_MODEL_CATEGORIZE
-        value: claude-haiku-5-5
+        value: claude-sonnet-5-5
       - key: LLM_MODEL_EXPLAIN
         value: claude-sonnet-5-5
       - key: LLM_DAILY_BUDGET_CENTS

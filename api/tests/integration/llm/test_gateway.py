@@ -78,7 +78,7 @@ def message(
         "id": "msg_test",
         "type": "message",
         "role": "assistant",
-        "model": "claude-haiku-5-5",
+        "model": "claude-sonnet-5-5",
         "content": [{"type": "text", "text": body}],
         "stop_reason": stop_reason,
         "stop_sequence": None,
@@ -161,7 +161,7 @@ def test_categorize_sends_minimal_data_and_records_the_call(
 
     assert batch == CategoryBatch.model_validate(GOOD)
     sent = api.requests[0]
-    assert sent["model"] == "claude-haiku-5-5"
+    assert sent["model"] == "claude-sonnet-5-5"
     assert sent["system"][0]["cache_control"] == {"type": "ephemeral"}
     assert sent["output_config"]["effort"] == "low"
     assert sent["output_config"]["format"]["type"] == "json_schema"
@@ -191,16 +191,17 @@ def test_categorize_sends_minimal_data_and_records_the_call(
     assert api.headers[0]["x-api-key"] == "sk-ant-test"
 
     [row] = ledger(db_connection, user_a)
-    # Haiku: (200 + 100) uncached-plus-writes input; cost uses each rate:
-    # (200 * 0.10 + 120 * 0.50 + 2000 * 0.01 + 100 * 0.125) * 100 = 11250.
+    # Sonnet (spec 003 rule 26; categorize moved off Haiku in #136): (200 + 100)
+    # uncached-plus-writes input; cost uses each rate:
+    # (200 * 2.00 + 120 * 10.00 + 2000 * 0.20 + 100 * 2.50) * 100 = 225000.
     assert row == {
         "purpose": "categorize",
-        "model": "claude-haiku-5-5",
+        "model": "claude-sonnet-5-5",
         "prompt_version": "categorize/v2",
         "input_tokens": 300,
         "output_tokens": 120,
         "cache_read_tokens": 2_000,
-        "cost_microcents": 11_250,
+        "cost_microcents": 225_000,
         "latency_ms": row["latency_ms"],
         "status": "ok",
         "job_id": job_id,
@@ -228,7 +229,7 @@ def test_refusal_raises_before_output_is_read(
     assert (row["status"], row["output_tokens"], row["cost_microcents"]) == (
         "refusal",
         120,
-        11_250,
+        225_000,  # the same usage at Sonnet's rates, as in the first test
     )
 
 

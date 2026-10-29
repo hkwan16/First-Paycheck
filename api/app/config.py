@@ -74,7 +74,7 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr | None = None
     llm_fake: bool = False
     llm_model_extract: str = "claude-sonnet-5-5"
-    llm_model_categorize: str = "claude-haiku-5-5"
+    llm_model_categorize: str = "claude-sonnet-5-5"
     llm_model_explain: str = "claude-sonnet-5-5"
     llm_daily_budget_cents: int = Field(default=50, ge=0)
 

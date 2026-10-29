@@ -7,11 +7,13 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from app.config import REPO_ROOT, Settings
 
 ENV_EXAMPLE = REPO_ROOT / ".env.example"
+RENDER_BLUEPRINT = REPO_ROOT / "render.yaml"
 
 
 @pytest.fixture(autouse=True)
@@ -169,13 +171,14 @@ def test_dotenv_is_ignored_when_app_env_is_test(
     assert Settings(_env_file=env_file).log_level == "INFO"
 
 
-def _env_example_keys() -> set[str]:
-    keys = set()
+def _env_example() -> dict[str, str]:
+    """Each ``KEY=value`` line of .env.example; comments and blank lines are skipped."""
+    pairs = {}
     for line in ENV_EXAMPLE.read_text().splitlines():
-        match = re.match(r"^([A-Z][A-Z0-9_]*)=", line)
+        match = re.match(r"^([A-Z][A-Z0-9_]*)=(.*)$", line)
         if match:
-            keys.add(match.group(1))
-    return keys
+            pairs[match.group(1)] = match.group(2)
+    return pairs
 
 
 def _settings_env_names() -> dict[str, set[str]]:
@@ -191,7 +194,7 @@ def _settings_env_names() -> dict[str, set[str]]:
 
 
 def test_env_example_documents_every_setting() -> None:
-    documented = _env_example_keys()
+    documented = _env_example().keys()
     missing = {
         field for field, aliases in _settings_env_names().items() if not aliases & documented
     }
@@ -200,6 +203,36 @@ def test_env_example_documents_every_setting() -> None:
 
 def test_env_example_has_no_unknown_api_variables() -> None:
     known = set().union(*_settings_env_names().values())
-    web_only = {key for key in _env_example_keys() if key.startswith("NEXT_PUBLIC_")}
-    unknown = _env_example_keys() - known - web_only
+    web_only = {key for key in _env_example() if key.startswith("NEXT_PUBLIC_")}
+    unknown = _env_example().keys() - known - web_only
     assert not unknown, f"no Settings field reads these .env.example keys: {sorted(unknown)}"
+
+
+def test_categorize_defaults_to_sonnet() -> None:
+    """Issue #136: Haiku 5.5 mislabeled merchants the eval and production showed."""
+    assert make().llm_model_categorize == "claude-sonnet-5-5"
+
+
+def _model_defaults() -> dict[str, str]:
+    return {
+        name.upper(): str(field.default)
+        for name, field in Settings.model_fields.items()
+        if name.startswith("llm_model_")
+    }
+
+
+def test_env_example_model_ids_match_the_defaults() -> None:
+    documented = {k: v for k, v in _env_example().items() if k.startswith("LLM_MODEL_")}
+    assert documented == _model_defaults()
+
+
+def test_render_blueprint_model_ids_match_the_defaults() -> None:
+    """render.yaml pins every model id, so a changed default alone never reaches production."""
+    blueprint = yaml.safe_load(RENDER_BLUEPRINT.read_text())
+    deployed = {
+        var["key"]: var["value"]
+        for group in blueprint["envVarGroups"]
+        for var in group["envVars"]
+        if var["key"].startswith("LLM_MODEL_")
+    }
+    assert deployed == _model_defaults()

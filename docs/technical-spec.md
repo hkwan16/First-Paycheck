@@ -36,7 +36,7 @@ flowchart TB
   subgraph Ext["External services"]
     direction LR
     Plaid["<b>Plaid</b><br/>Transactions, Balances, Investments<br/>Webhooks on new data"]
-    Claude["<b>Claude API</b><br/>Sonnet 5.5, Haiku 5.5<br/>Redacted content only"]
+    Claude["<b>Claude API</b><br/>Sonnet 5.5<br/>Redacted content only"]
   end
 
   subgraph Supabase["Supabase · row-level security on every table"]
@@ -182,7 +182,7 @@ The API's OpenAPI document is committed as `api/openapi.json` (exported by `pyth
 | `GET /net-worth` | → balance time series per account kind and total | No |
 | `GET /holdings` | → latest positions per investment and retirement account | No |
 
-Categorization runs as a background job queued by every sync. Rules and user corrections are applied first; only unknown merchants go to Haiku 5.5. `/spending/summary` and `/cashflow` return every total the Spending screen and its cash-flow diagram show, so the client never sums money.
+Categorization runs as a background job queued by every sync. Rules and user corrections are applied first; only unknown merchants go to Sonnet 5.5. `/spending/summary` and `/cashflow` return every total the Spending screen and its cash-flow diagram show, so the client never sums money.
 
 **Calculators and decisions**
 
@@ -238,7 +238,7 @@ Categorization runs as a background job queued by every sync. Rules and user cor
 - **Frontend:** TypeScript, Next.js (React), Tailwind CSS, TanStack Query over types generated from the committed OpenAPI document (`openapi-typescript`), Recharts, Plaid Link.
 - **Backend:** Python 3.12, FastAPI, Pydantic v2, versioned IRS Pub 15-T tables and yearly federal brackets and standard deduction in `api/calc/data/<year>.json`.
 - **Bank data:** plaid-python (Transactions, Balances, Investments, webhooks), CSV importer behind the same provider interface.
-- **Parsing, LLM, retrieval:** pdfplumber, pandas, Tesseract OCR (pytesseract); Anthropic SDK (Sonnet 5.5, Haiku 5.5; Sonnet 5.5 vision for redacted images) behind one gateway with a per-call cost ledger; curated IRS citation tables; Postgres full-text search over chunked benefits text.
+- **Parsing, LLM, retrieval:** pdfplumber, pandas, Tesseract OCR (pytesseract); Anthropic SDK (Sonnet 5.5 for extraction, categorization and explanations; Sonnet 5.5 vision for redacted images) behind one gateway with a per-call cost ledger; curated IRS citation tables; Postgres full-text search over chunked benefits text.
 - **Data, auth, storage:** Supabase (PostgreSQL with row-level security, Auth) reached through the Supavisor pooler; raw uploads in a `document_blobs` table under row-level security; SQLAlchemy + Alembic, Postgres-backed job queue with a separate worker and scheduler, application-level encryption for provider tokens. PDF export: WeasyPrint.
 - **Testing:** pytest, Hypothesis, Vitest, Playwright, custom eval runner, Plaid sandbox fixtures.
 - **CI/CD, hosting:** GitHub Actions (lint, tests, evals, OpenAPI type drift; merges blocked on regressions), Vercel, Render Free (the API and the job worker supervised in one container by `python -m app.serve`; migrations and seeds run from the deploy workflow; a scheduled health ping prevents spin-down).
