@@ -145,13 +145,14 @@ def test_dotenv_is_ignored_when_app_env_is_test(
     assert Settings(_env_file=env_file).log_level == "INFO"
 
 
-def _env_example_keys() -> set[str]:
-    keys = set()
+def _env_example() -> dict[str, str]:
+    """Each ``KEY=value`` line of .env.example; comments and blank lines are skipped."""
+    pairs = {}
     for line in ENV_EXAMPLE.read_text().splitlines():
-        match = re.match(r"^([A-Z][A-Z0-9_]*)=", line)
+        match = re.match(r"^([A-Z][A-Z0-9_]*)=(.*)$", line)
         if match:
-            keys.add(match.group(1))
-    return keys
+            pairs[match.group(1)] = match.group(2)
+    return pairs
 
 
 def _settings_env_names() -> dict[str, set[str]]:
@@ -167,7 +168,7 @@ def _settings_env_names() -> dict[str, set[str]]:
 
 
 def test_env_example_documents_every_setting() -> None:
-    documented = _env_example_keys()
+    documented = _env_example().keys()
     missing = {
         field for field, aliases in _settings_env_names().items() if not aliases & documented
     }
@@ -176,8 +177,8 @@ def test_env_example_documents_every_setting() -> None:
 
 def test_env_example_has_no_unknown_api_variables() -> None:
     known = set().union(*_settings_env_names().values())
-    web_only = {key for key in _env_example_keys() if key.startswith("NEXT_PUBLIC_")}
-    unknown = _env_example_keys() - known - web_only
+    web_only = {key for key in _env_example() if key.startswith("NEXT_PUBLIC_")}
+    unknown = _env_example().keys() - known - web_only
     assert not unknown, f"no Settings field reads these .env.example keys: {sorted(unknown)}"
 
 
@@ -195,13 +196,7 @@ def _model_defaults() -> dict[str, str]:
 
 
 def test_env_example_model_ids_match_the_defaults() -> None:
-    documented = {
-        key: value
-        for key, value in (
-            line.split("=", 1) for line in ENV_EXAMPLE.read_text().splitlines() if "=" in line
-        )
-        if key.startswith("LLM_MODEL_")
-    }
+    documented = {k: v for k, v in _env_example().items() if k.startswith("LLM_MODEL_")}
     assert documented == _model_defaults()
 
 
