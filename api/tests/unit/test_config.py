@@ -99,6 +99,7 @@ PRODUCTION = {
     "database_url_privileged": "postgresql://postgres:x@pooler:5432/postgres",
     "supabase_url": "https://abc.supabase.co",
     "cors_origins": ["https://first-paycheck.vercel.app"],
+    "anthropic_api_key": "sk-ant-test",
 }
 
 
@@ -107,7 +108,14 @@ def test_production_settings_are_accepted_when_complete() -> None:
 
 
 @pytest.mark.parametrize(
-    "missing", ["database_url", "database_url_privileged", "supabase_url", "cors_origins"]
+    "missing",
+    [
+        "database_url",
+        "database_url_privileged",
+        "supabase_url",
+        "cors_origins",
+        "anthropic_api_key",
+    ],
 )
 def test_production_requires_core_settings(missing: str) -> None:
     values = {k: v for k, v in PRODUCTION.items() if k != missing}
@@ -123,6 +131,24 @@ def test_production_forbids_an_inline_jwks() -> None:
 def test_production_forbids_the_fake_llm() -> None:
     with pytest.raises(ValidationError, match="LLM_FAKE"):
         make(**PRODUCTION, llm_fake=True)
+
+
+def test_production_refuses_a_blank_model_key() -> None:
+    with pytest.raises(ValidationError, match="ANTHROPIC_API_KEY"):
+        make(**{**PRODUCTION, "anthropic_api_key": "  "})
+
+
+def test_production_refuses_a_misspelled_model_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Issue #133: the key saved on Render as ABTHROPIC_API_KEY is no key at all."""
+    values = {k: v for k, v in PRODUCTION.items() if k != "anthropic_api_key"}
+    monkeypatch.setenv("ABTHROPIC_API_KEY", "sk-ant-typo")
+    with pytest.raises(ValidationError, match="ANTHROPIC_API_KEY is required in production"):
+        make(**values)
+
+
+@pytest.mark.parametrize("app_env", ["development", "test"])
+def test_no_model_key_is_allowed_outside_production(app_env: str) -> None:
+    assert make(app_env=app_env).anthropic_api_key is None
 
 
 def test_dotenv_is_read_outside_tests(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

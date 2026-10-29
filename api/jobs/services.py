@@ -1,12 +1,14 @@
 """The worker's real collaborators, built once from settings.
 
-A missing credential never stops the worker: Plaid and the token cipher are
+A missing Plaid credential never stops the worker: Plaid and the token cipher are
 built on first use, so a sync job fails with a clear error and is retried,
-while every other job kind keeps running. The gateway is built at startup;
-without ``ANTHROPIC_API_KEY`` (and with ``LLM_FAKE`` off) there is none, so
-categorize runs its rules only (``stopped: "no_model"``) and extraction goes to
-manual entry (``no_model``) until the key is set (specs 003 rule 12a, 005 rule
-12). A key the API rejects ends those jobs the same way, call by call.
+while every other job kind keeps running. The gateway is built at startup.
+Outside production, without ``ANTHROPIC_API_KEY`` (and with ``LLM_FAKE`` off)
+there is none, so categorize runs its rules only (``stopped: "no_model"``) and
+extraction goes to manual entry (``no_model``) until the key is set (specs 003
+rule 12a, 005 rule 12). Production never gets here without a key: settings
+refuse to load (``app/config.py``). A key the API rejects ends those jobs the
+same way, call by call, in every environment.
 """
 
 from __future__ import annotations

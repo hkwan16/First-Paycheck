@@ -3,7 +3,9 @@
 Every variable here is documented in the repo's ``.env.example``; a unit test
 keeps the two in sync. Settings that only matter to a later milestone are
 optional, and the module that needs them fails with a clear message when
-they are missing. ``APP_ENV=production`` turns on fail-fast checks.
+they are missing. ``APP_ENV=production`` turns on fail-fast checks: the core
+database, auth and CORS settings and ``ANTHROPIC_API_KEY`` are required, and
+test-only switches (``SUPABASE_JWKS``, ``LLM_FAKE``) are refused.
 """
 
 from __future__ import annotations
@@ -142,6 +144,11 @@ class Settings(BaseSettings):
             problems.append("SUPABASE_JWKS (inline test keys) is not allowed in production")
         if self.llm_fake:
             problems.append("LLM_FAKE is not allowed in production")
+        # Running with no model is for development, tests, CI and evals (spec 003
+        # rule 12a). In production a missing key would quietly turn categorization
+        # into rules only and every document into manual entry (issue #133).
+        if self.anthropic_api_key is None or not self.anthropic_api_key.get_secret_value():
+            problems.append("ANTHROPIC_API_KEY is required in production")
         if problems:
             raise ValueError("; ".join(problems))
         return self
