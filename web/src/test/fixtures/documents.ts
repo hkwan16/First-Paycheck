@@ -148,6 +148,7 @@ export function sampleDocument(overrides: Partial<DocumentSummary> = {}): Docume
     uploaded_at: SAMPLE_UPLOADED_AT,
     confirmed_at: null,
     deleted_at: null,
+    replaced_by_id: null,
     ...overrides,
   };
 }

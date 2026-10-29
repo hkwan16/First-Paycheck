@@ -144,10 +144,30 @@ export function createDocument(type: DocumentType): DocumentSummary {
     uploaded_at: SAMPLE_NOW,
     confirmed_at: null,
     deleted_at: null,
+    replaced_by_id: null,
   };
   db.documents.unshift(document);
   return document;
 }
+
+/**
+ * Store an upload that replaces `documentId`, the way `POST /docs` with
+ * `replaces` does (spec 004 rules 24-27): the new document leads the list, the
+ * old one keeps its row, loses its file and proposal, and leaves `GET /docs`.
+ */
+export function replaceDocument(documentId: string): DocumentSummary {
+  const old = db.documents.find((d) => d.id === documentId);
+  if (!old) throw new Error(`No document ${documentId} to replace`);
+  const created = createDocument(old.type);
+  Object.assign(old, { replaced_by_id: created.id, deleted_at: old.deleted_at ?? SAMPLE_NOW });
+  db.proposals.delete(old.id);
+  return created;
+}
+
+const REPLACED = {
+  code: 'document_replaced',
+  message: 'This document was replaced by a newer upload',
+};
 
 /** What the extraction job writes when it succeeds. */
 function finishExtraction(documentId: string) {
@@ -505,26 +525,43 @@ export const handlers = [
     return HttpResponse.json({ recurring_job_id: jobId });
   }),
 
-  http.get(apiUrl('/docs'), () => HttpResponse.json(db.documents)),
+  http.get(apiUrl('/docs'), () =>
+    HttpResponse.json(db.documents.filter((d) => d.replaced_by_id === null)),
+  ),
 
   http.post(apiUrl('/docs'), async ({ request }) => {
     const form = await request.formData();
     const type = form.get('type');
     const file = form.get('file');
+    const replaces = form.get('replaces');
     if (type !== 'pay_stub' && type !== 'benefits' && type !== 'offer_letter') {
       return invalid('type: Input should be pay_stub, offer_letter or benefits');
+    }
+    if (replaces !== null) {
+      const old = db.documents.find((d) => d.id === replaces);
+      if (!old) return notFound('Document not found');
+      if (old.replaced_by_id !== null) return appError(409, REPLACED.code, REPLACED.message);
+      if (old.type !== type) {
+        return appError(
+          422,
+          'replace_type_mismatch',
+          `A ${type} upload cannot replace a ${old.type} document`,
+        );
+      }
     }
     if (!(file instanceof File) || file.size === 0) {
       return appError(422, 'empty_file', 'The file is empty');
     }
-    return HttpResponse.json({ document_id: createDocument(type).id }, { status: 201 });
+    const created = typeof replaces === 'string' ? replaceDocument(replaces) : createDocument(type);
+    return HttpResponse.json({ document_id: created.id }, { status: 201 });
   }),
 
   http.get<{ id: string }>(apiUrl('/docs/:id'), ({ params }) => {
     const document = db.documents.find((d) => d.id === params.id);
     if (!document) return notFound('Document not found');
     const reviewable =
-      document.status === 'proposed' || document.status === 'manual_entry_required';
+      document.replaced_by_id === null &&
+      (document.status === 'proposed' || document.status === 'manual_entry_required');
     const detail: DocumentDetail = {
       ...document,
       proposal: reviewable ? (db.proposals.get(document.id) ?? null) : null,
@@ -535,6 +572,7 @@ export const handlers = [
   http.post<{ id: string }>(apiUrl('/docs/:id/extract'), ({ params }) => {
     const document = db.documents.find((d) => d.id === params.id);
     if (!document) return notFound('Document not found');
+    if (document.replaced_by_id !== null) return appError(409, REPLACED.code, REPLACED.message);
     if (document.status === 'confirmed') {
       return appError(409, 'document_confirmed', 'This document is already confirmed');
     }
@@ -555,6 +593,7 @@ export const handlers = [
   http.post<{ id: string }, ConfirmIn>(apiUrl('/docs/:id/confirm'), async ({ params, request }) => {
     const document = db.documents.find((d) => d.id === params.id);
     if (!document) return notFound('Document not found');
+    if (document.replaced_by_id !== null) return appError(409, REPLACED.code, REPLACED.message);
     if (document.status === 'confirmed') {
       return appError(409, 'document_confirmed', 'This document is already confirmed');
     }

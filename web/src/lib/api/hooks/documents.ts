@@ -72,6 +72,8 @@ export function useDocument(documentId: string) {
 export interface UploadDocumentVariables {
   file: File;
   type: DocumentType;
+  /** The document this upload replaces (the Link row's Replace), which leaves the list. */
+  replaces?: string;
   /** Whole percent sent, for a progress bar. */
   onProgress?: (percent: number) => void;
 }
@@ -148,7 +150,12 @@ export class PayStubUnbalanced extends ApiError {
 }
 
 /** Codes that mean the document changed state under the screen: re-read it. */
-const STATE_CONFLICTS = new Set(['document_confirmed', 'document_deleted', 'document_not_ready']);
+const STATE_CONFLICTS = new Set([
+  'document_confirmed',
+  'document_deleted',
+  'document_not_ready',
+  'document_replaced',
+]);
 
 /** A pay stub's values, or a benefits summary's plans and match: the document's own type. */
 export type ConfirmDocumentVariables =
