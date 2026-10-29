@@ -358,6 +358,13 @@ test.describe('the cash-flow Sankey', () => {
   });
 });
 
+test('the Confirm screen names the browser tab after the document it reviews', async ({ page }) => {
+  await open(page, screenAt('/dev/screens/confirm/benefits'));
+  await expect(page).toHaveTitle('Confirm benefits summary | First Paycheck');
+  await open(page, screenAt('/dev/screens/confirm'));
+  await expect(page).toHaveTitle('Confirm pay stub | First Paycheck');
+});
+
 test('the CSV import panel opens next to the bank link and stays accessible', async ({ page }) => {
   const errors = watchErrors(page);
   await tallWindow(page);

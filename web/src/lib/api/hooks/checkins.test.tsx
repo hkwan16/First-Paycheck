@@ -1,5 +1,5 @@
 import { act, waitFor } from '@testing-library/react';
-import { delay, http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   checkInJob,
@@ -48,6 +48,19 @@ function setup() {
 const election = (detail: CheckInDetail | undefined) =>
   detail?.findings.find((f) => f.id === electionId);
 
+/**
+ * Holds a mocked response until the test calls `open()`, so the optimistic
+ * state can be checked before the server answers. A fixed delay instead races
+ * the polling `waitFor` on a loaded machine and misses the window.
+ */
+function gate() {
+  let open!: () => void;
+  const opened = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return { opened, open };
+}
+
 describe('useCheckIns', () => {
   it('lists check-ins newest month first with their counts', async () => {
     const { result } = renderHookWithClient(() => useCheckIns());
@@ -82,9 +95,10 @@ describe('useCheckIn', () => {
 
 describe('useUpdateFinding', () => {
   it('marks a finding done at once, sends only user_action, then keeps the server copy', async () => {
+    const answer = gate();
     server.use(
       http.patch(apiUrl('/check-ins/:id/findings/:fid'), async ({ params }) => {
-        await delay(200);
+        await answer.opened;
         const checkIn = checkinDb.checkIns.find((c) => c.id === params.id)!;
         const finding = checkIn.findings.find((f) => f.id === params.fid)!;
         Object.assign(finding, { user_action: 'done', user_action_at: '2026-11-16T18:00:00Z' });
@@ -101,6 +115,7 @@ describe('useUpdateFinding', () => {
     expect(result.current.detail.data?.handled_count).toBe(1);
     expect(result.current.update.isPending).toBe(true);
 
+    answer.open();
     await waitFor(() => expect(result.current.update.isSuccess).toBe(true));
     await waitFor(() =>
       expect(election(result.current.detail.data)?.user_action_at).toBe('2026-11-16T18:00:00Z'),
@@ -126,9 +141,10 @@ describe('useUpdateFinding', () => {
   });
 
   it('puts the finding back when the server refuses, and reports the reason', async () => {
+    const refusal = gate();
     server.use(
       http.patch(apiUrl('/check-ins/:id/findings/:fid'), async () => {
-        await delay(200);
+        await refusal.opened;
         return HttpResponse.json(
           { error: { code: 'not_found', message: 'Finding not found' } },
           { status: 404 },
@@ -141,6 +157,7 @@ describe('useUpdateFinding', () => {
 
     act(() => result.current.update.mutate({ findingId: electionId, type: 'done' }));
     await waitFor(() => expect(election(result.current.detail.data)?.user_action).toBe('done'));
+    refusal.open();
     await waitFor(() => expect(result.current.update.isError).toBe(true));
     expect(result.current.detail.data).toEqual(before);
     expect(result.current.update.error).toMatchObject({
@@ -151,16 +168,18 @@ describe('useUpdateFinding', () => {
 
   it('rolls back and reports only the refused finding when another one is in flight', async () => {
     const other = 'f1000000-0000-4000-8000-000000000002';
+    const refusal = gate();
+    const success = gate();
     server.use(
       http.patch(apiUrl('/check-ins/:id/findings/:fid'), async ({ params }) => {
-        await delay(100);
         if (params.fid === electionId) {
+          await refusal.opened;
           return HttpResponse.json(
             { error: { code: 'internal_error', message: 'Try again' } },
             { status: 500 },
           );
         }
-        await delay(200);
+        await success.opened;
         const finding = checkinDb.checkIns[0]!.findings.find((f) => f.id === params.fid)!;
         Object.assign(finding, { user_action: 'done', user_action_at: '2026-11-16T18:00:00Z' });
         checkinDb.checkIns[0]!.handled_count = 1;
@@ -181,6 +200,8 @@ describe('useUpdateFinding', () => {
       result.current.update.mutate({ findingId: other, type: 'done' });
     });
     await waitFor(() => expect(result.current.detail.data?.handled_count).toBe(2));
+    // The refusal comes back while the other change is still in flight.
+    refusal.open();
     await waitFor(() => expect(election(result.current.detail.data)?.user_action).toBeNull());
     const second = result.current.detail.data?.findings.find((f) => f.id === other);
     expect(second?.user_action).toBe('done');
@@ -189,6 +210,8 @@ describe('useUpdateFinding', () => {
     expect(refused).toMatchObject([
       [electionId, { status: 500, error: { code: 'internal_error', message: 'Try again' } }],
     ]);
+    success.open();
+    await waitFor(() => expect(result.current.update.isSuccess).toBe(true));
   });
 
   it('refreshes that check-in and the list once the server answers', async () => {

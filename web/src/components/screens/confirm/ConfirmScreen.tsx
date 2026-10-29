@@ -13,6 +13,7 @@ import { isReviewable, useDocument } from '@/lib/api/hooks';
 import type { Confirmed, DocumentDetail, DocumentType } from '@/lib/api/types';
 import { documentTypeLabel, statusReasonText } from '@/lib/documents';
 import { formatNumber } from '@/lib/money';
+import { pageTitle } from '@/lib/page-title';
 import { BenefitsReview } from './BenefitsReview';
 import { ConfirmReview } from './ConfirmReview';
 
@@ -21,6 +22,10 @@ const PAY_STUB_TITLE = 'Check what we read from your pay stub';
 /** The page title for a document of this type; anything but a benefits summary is a pay stub's. */
 const titleFor = (type: DocumentType | undefined) =>
   type === 'benefits' ? 'Check what we read from your benefits summary' : PAY_STUB_TITLE;
+
+/** The browser tab's title: "Confirm" and the document's type. */
+const tabTitleFor = (type: DocumentType) =>
+  pageTitle(`Confirm ${documentTypeLabel(type).toLowerCase()}`);
 
 function BackToDocuments() {
   return (
@@ -182,6 +187,22 @@ function NotReviewable({ document }: { document: DocumentDetail }) {
  */
 export function ConfirmScreen({ documentId }: { documentId: string }) {
   const query = useDocument(documentId);
+  const type = query.data?.type;
+  return (
+    <>
+      {/*
+       * The page's metadata can only name the step (a pay stub, as the heading
+       * reads until the document loads); once its type is known, React's
+       * <title> goes ahead of that one in the head. Keyed by type, so a new
+       * element is placed whenever the type changes.
+       */}
+      {type && <title key={type}>{tabTitleFor(type)}</title>}
+      <ConfirmContent query={query} />
+    </>
+  );
+}
+
+function ConfirmContent({ query }: { query: ReturnType<typeof useDocument> }) {
   // Kept here: confirming refetches the document as confirmed, which ends the review.
   const [benefitsResult, setBenefitsResult] = useState<Confirmed | null>(null);
 

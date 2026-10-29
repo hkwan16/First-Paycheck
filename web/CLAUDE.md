@@ -78,7 +78,7 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
                     documents.ts, decisions.ts, deep-equal.ts, features.ts, findings.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts,
-                    page-hydration.ts, log-error.ts
+                    page-hydration.ts, page-title.ts, log-error.ts
 src/app/dev/screens/{link,account,spending,confirm,confirm/manual,confirm/benefits,confirm/extracting,
                     confirm/failed,confirm/confirmed,decisions,why,why/fallback,why-index,check-in,
                     check-in/complete,check-in-index,plan,plan/empty}  a screen on the sample data, no
@@ -438,6 +438,12 @@ What the audit found and fixed:
 `/setup/confirm` opens the newest pay stub waiting for review (else a benefits summary); `/setup/confirm/[documentId]`
 reviews one (`ConfirmScreen`, which also covers the extracting, failed, confirmed, benefits and
 offer letter states).
+
+- **Tab title** names the document's type (`tabTitleFor`, from `documentTypeLabel`): "Confirm
+  pay stub", "Confirm benefits summary" or "Confirm offer letter". The page's `metadata` cannot know the type, so it names the
+  step until the document loads; then the screen renders React's `<title>` (`pageTitle` from
+  `lib/page-title.ts`, the root layout's template), which React places ahead of the metadata's.
+  The side nav keeps the mockup's "Confirm pay stub": step 2 is the pay stub's.
 
 - **State** is `confirmReducer` (`screens/confirm/confirmReducer.ts`), ported from the mockup's
   script: `select`, `toggle`, `edit`/`draft`/`save`/`cancel`, `confirmAll`. Every value is a

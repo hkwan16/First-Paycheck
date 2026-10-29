@@ -434,6 +434,12 @@ describe('ConfirmScreen document states', () => {
     db.documents = [{ ...sampleBenefitsDocument, type: 'offer_letter' }];
     renderConfirm(BENEFITS_DOC_ID);
     expect(await screen.findByText(/Offer letters are kept but not read yet/)).toBeInTheDocument();
+    expect(document.title).toBe('Confirm offer letter | First Paycheck');
+  });
+
+  it('names the browser tab after the pay stub', async () => {
+    await renderLoaded();
+    expect(document.title).toBe('Confirm pay stub | First Paycheck');
   });
 
   it('says so when the document does not exist', async () => {
@@ -626,6 +632,18 @@ describe('ConfirmScreen benefits summary', () => {
       'href',
       '/setup/decisions',
     );
+  });
+
+  it.each([
+    ['proposed', () => screen.findByRole('region', { name: BENEFITS_FIELDS })],
+    ['extracting', () => screen.findByRole('progressbar', { name: 'Reading benefits summary' })],
+    ['confirmed', () => screen.findByText('This benefits summary is confirmed.')],
+    ['manual_entry_required', () => screen.findByText(/Enter your health plans/)],
+  ] as const)('names the browser tab after the benefits summary when %s', async (status, shown) => {
+    if (status !== 'proposed') db.documents = [{ ...sampleBenefitsDocument, status }];
+    renderConfirm(BENEFITS_DOC_ID);
+    await shown();
+    expect(document.title).toBe('Confirm benefits summary | First Paycheck');
   });
 
   it('follows a benefits summary still being read', async () => {
