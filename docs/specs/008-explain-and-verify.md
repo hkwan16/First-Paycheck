@@ -1,16 +1,17 @@
 # 008: Explain, verify, citations and retrieval
 
-Status: Implemented, M3.
+Status: Implemented, M3. Rule 7a, `explain/v2`, `fallback/v2` and the `rate_framing` eval metric added for issue 132: the explanation tells the rate the person chose from the rate their pay stub shows.
 
 ## Goal
 
-Explain a saved decision in plain words from the calculator's own numbers, the curated IRS passages for that calculator and the user's benefits text, and show the explanation only after plain code has checked that every number in it is one the calculator produced or the user confirmed and every citation is a curated passage. A draft that fails gets one retry with the failure attached; a second failure shows the plain calculator result, flagged as a fallback. Code: `api/retrieval/` (citations, benefits search, the explain context), `api/verify/` (number extraction, checks, the draft-verify-retry-fallback flow and the fallback text), `api/llm/prompts/explain/v1.md`, `ExplanationDraft` in `api/llm/schemas.py`, `Gateway.explain`, routes `POST /explain` and `GET /decisions/{id}/explanation`, the seed `api/db/seed/irs_citations/k401.yaml`, and the eval suites `explain` and `explain-smoke`.
+Explain a saved decision in plain words from the calculator's own numbers, the curated IRS passages for that calculator and the user's benefits text, and show the explanation only after plain code has checked that every number in it is one the calculator produced or the user confirmed and every citation is a curated passage. A draft that fails gets one retry with the failure attached; a second failure shows the plain calculator result, flagged as a fallback. Code: `api/retrieval/` (citations, benefits search, the explain context), `api/verify/` (number extraction, checks, the draft-verify-retry-fallback flow and the fallback text), `api/llm/prompts/explain/v2.md` (v1 is kept for the rows it wrote), `ExplanationDraft` in `api/llm/schemas.py`, `Gateway.explain`, routes `POST /explain` and `GET /decisions/{id}/explanation`, the seed `api/db/seed/irs_citations/k401.yaml`, and the eval suites `explain` and `explain-smoke`.
 
 ## Inputs
 
 - `POST /explain`: `decision_id` (uuid) and `force` (bool, default false).
 - `GET /decisions/{id}/explanation`: the decision id.
 - The decision's `inputs` and `result` (spec 007 rule 3), the `irs_citations` rows for its calculator and `tax_year`, and up to three of the user's `benefits_chunks` that match the calculator's search query.
+- The user's newest confirmed pay stub's `retirement_contribution_pct` (spec 005 rule 24b), or null when no stub is confirmed (rule 7a). It is read when the explanation runs and never stored on the decision.
 
 ## Outputs
 
@@ -30,22 +31,23 @@ Explain a saved decision in plain words from the calculator's own numbers, the c
 ### The context and the prompt
 
 7. **Facts.** `retrieval/context.py` turns a decision into `ExplainContext`: the calculator, `tax_year`, a list of facts (`label`, `value`) with every money value written as dollars with cents (`$2,400.00`) and every percentage as `5%` or `4.5%`, the allowed citations (`key`, `title`, `passage`) and the benefits passages. Only redacted text is ever in `benefits_chunks` (spec 004), so nothing unredacted reaches the model.
-8. **Prompt** `llm/prompts/explain/v1.md` (model `explain`, schema `ExplanationDraft`) tells the model to use only the facts' numbers, written exactly as given or as whole dollars, to cite only the given keys and at least one, and to avoid dates, ages and any other figure. A released prompt file is never edited.
+7a. **The rate the pay stub shows (`k401_match`, issue 132).** A decision's `contribution_pct` is the rate the person chose; payroll keeps taking the old rate until they change their election with their employer, so it is not what they contribute now. `POST /explain` reads, in its first session, the newest confirmed pay stub (`pay_date DESC, created_at DESC`, as `GET /pay-stubs` lists them) and passes its `retirement_contribution_pct` (spec 005 rule 24b) on as `pay_stub_pct`, null without a stub; calculators other than `k401_match` ignore it. It goes into the explanation only, never into the decision: decisions are immutable (spec 007) and a stub confirmed after the save can show a different rate, so the same decision explained after a new stub may be explained differently, and each run's rows keep what was written then. In the context: the first fact is `Contribution rate you chose` (the decision's rate) and, when a stub rate is known, the second is `401(k) contribution rate your latest pay stub shows` (formatted like every percentage, `3%`); the facts about the match and the yearly contribution say "at the rate you chose". Which case holds is decided once, by `calc/pay_stub.py:stub_rate(chosen, pay_stub_pct)`, comparing the two rates by value (`3.00` equals `3`): `StubRate.CHOSEN` (the stub shows the chosen rate: it is in effect now), `StubRate.OTHER` (the stub shows another rate: that is what goes in now, and the chosen rate takes effect once the election is changed with the employer) or `StubRate.NONE` (no pay stub is confirmed: what goes in now is not known). The context's one note (no digits), the fallback's stub sentence and its full-match sentence (rule 17) and the eval's `rate_framing` (rule 24) are each looked up by that value. `retrieval/context.py:explain_setup` builds the context, the allowed numbers, the citation keys and the fallback (rule 17) from the same `pay_stub_pct`, for the route and the eval suites alike.
+8. **Prompt** `llm/prompts/explain/v2.md` (model `explain`, schema `ExplanationDraft`) tells the model to use only the facts' numbers, written exactly as given or as whole dollars, to cite only the given keys and at least one, and to avoid dates, ages and any other figure. For a 401(k) decision it explains the rate the person chose, keeps it apart from the rate their pay stub shows (what goes in now), and describes the chosen rate with "would" or "will" unless a note says the stub shows it, never as something the person already contributes or gets. Nothing in code rejects a draft for its wording: the verifier checks numbers and citations (rule 14), and how often drafts frame the rate correctly is measured by the eval (rule 24, `rate_framing`). It describes a match formula only by the tiers the facts give, never by a tier's width ("50% of the next 2%"), and writes no percentage from the benefits passages that the facts do not hold (a vesting schedule, "100% vested"): the live eval's remaining number failures were those. `explain/v1` told the model to "say what the person gets at their current contribution" with only the chosen rate in the facts, so it called a chosen rate the current one ("You are already contributing 5%" for a stub at 3%); it stays on disk for the rows it wrote, and the gateway sends v2. A released prompt file is never edited.
 9. **Draft schema.** `ExplanationDraft`: `concept` (one sentence naming the idea), `text` (two to five short paragraphs), `numbers` (list of `NumberClaim`: `value` as written in the text and a `label`), `what_ifs` (up to three short strings) and `citation_keys`.
 10. **Gateway.** `Gateway.explain(user_id, context, feedback=None)` sends the context as JSON (and, on a retry, the verifier's feedback) and returns an `ExplanationDraft`, with the budget, refusal branch, validation and ledger every gateway call has. `FakeGateway` writes a draft from the facts and cites the first allowed key, so it verifies.
 
 ### Verification (no LLM)
 
 11. **`verify/numbers.py:extract_numbers(text)`** finds every number in `text` and returns `NumberToken(raw, value, kind)` with `kind` in `money` (a `$`, with an optional leading `-`), `percent` (followed by `%` or the word `percent`) or `plain`. It reads `$1,234.56`, `1234`, `6%`, `6.0%`, `-$12`. It skips digits that belong to a word or a code reference: statute numbers followed by a parenthesis (`401(k)`, `402(g)`, `414(v)`) and their numbered subsections (`401(a)(17)`), form names (`W-4`, `W-2`, `1040`, preceded by "Form"), Form W-4 step numbers (`Step 2`, `Steps 3`, added for spec 014) and digits glued to letters (`3rd`, `k401`, `4(c)`).
-12. **Allowed numbers** (`verify/allowed.py:AllowedNumbers.from_decision(inputs, result)`): every value in the decision's inputs and result, walked recursively. Keys with a `_cents` part (`salary_cents`, `employer_match_cents_full`) give money values, allowed both exactly (`$2,400.00`, `$2,400`) and as whole dollars rounded half up (`$46` for 4,615 cents). Keys with a `_pct` or `_rate` part (`contribution_pct`, `employee_pct_upto`, `marginal_rate_used`) give percentages. `tax_year` is an allowed year; `pay_periods_per_year` is an allowed count; any other integer input (`age`) is an allowed plain number. Booleans and strings are skipped.
+12. **Allowed numbers** (`verify/allowed.py:AllowedNumbers.from_decision(inputs, result)`): every value in the decision's inputs and result, walked recursively. Keys with a `_cents` part (`salary_cents`, `employer_match_cents_full`) give money values, allowed both exactly (`$2,400.00`, `$2,400`) and as whole dollars rounded half up (`$46` for 4,615 cents). Keys with a `_pct` or `_rate` part (`contribution_pct`, `employee_pct_upto`, `marginal_rate_used`) give percentages. `tax_year` is an allowed year; `pay_periods_per_year` is an allowed count; any other integer input (`age`) is an allowed plain number. Booleans and strings are skipped. The pay stub's rate (rule 7a) is allowed too: `retrieval/context.py:pay_stub_numbers` gives `{"pay_stub_contribution_pct": "3.00"}` for a `k401_match` decision with a stub rate (nothing otherwise), which `from_decision` reads as a percentage like any `_pct` key.
 13. **Matching.** A money token matches when its magnitude equals an allowed money value exactly, or, written without cents, equals an allowed whole-dollar value. A percent token matches an allowed percentage by value (`6%`, `6.0%` and `6.00%` are the same). A plain token matches an allowed year, count or plain number, or a money value in dollars (`2,400` for 240,000 cents). The sign of a money token is ignored: `-$12` reads as a drop of $12.
 14. **`verify/verify.py:verify_explanation(draft, allowed_numbers, allowed_citation_keys)`** extracts numbers from `concept`, `text`, every `what_ifs` entry and every `NumberClaim` value, and returns `Verification`: `numbers_checked`, `numbers_unmatched` (the raw tokens that matched nothing), `citations_checked`, `citations_unknown` (keys not allowed), `has_citation` and `passed` (no unmatched number, no unknown key, at least one citation). `feedback()` describes each failure in one line for the retry.
 
 ### The flow (`verify/flow.py`) and storage
 
 15. **Draft, verify, retry once, fall back.** Attempt 1 drafts and verifies. If it fails, attempt 2 drafts again with the feedback appended and verifies. If that fails too, a fallback row follows. A gateway error (`LLMError`: budget, refusal, schema, unavailable) ends the run at once with the fallback; nothing is retried after a refusal or a spent budget.
-16. **Every attempt is a row.** Each drafted attempt writes one `explanations` row (`attempt` 1 or 2, `verified` from the check, `fallback = false`); the fallback writes one more row (`attempt` = the next number, `verified = false`, `fallback = true`). `retries` on every row is the number of retries made in the run so far (0 or 1). `prompt_version` is the explain prompt's (`explain/v1`) on drafted rows and `fallback/v1` (`verify/fallback.py:FALLBACK_VERSION`) on the fallback row, whose text no prompt wrote.
-17. **Fallback text** (`verify/fallback.py`) is the plain calculator result written by code, for `k401_match`: the full-match percentage, the match at the current and full-match percentage, the dollars missed, the per-paycheck cost before and after federal tax with the marginal rate, the deferral limit and, when they apply, the capped and compensation-capped notes. Its citations are the result's `citation_keys` that the seed holds, so a fallback is cited too.
+16. **Every attempt is a row.** Each drafted attempt writes one `explanations` row (`attempt` 1 or 2, `verified` from the check, `fallback = false`); the fallback writes one more row (`attempt` = the next number, `verified = false`, `fallback = true`). `retries` on every row is the number of retries made in the run so far (0 or 1). `prompt_version` is the explain prompt's (`explain/v2`) on drafted rows and `fallback/v2` (`verify/fallback.py:FALLBACK_VERSION`) on the fallback row, whose text no prompt wrote. `fallback/v1` wrote "You already earn the full match" at any chosen rate; v2 is rule 17's text.
+17. **Fallback text** (`verify/fallback.py`) is the plain calculator result written by code, for `k401_match`: the rate chosen and, when the pay stub's rate is known, either that the stub shows the same rate or the stub's rate and that the chosen rate takes effect once the election is changed with the employer; "You already earn the full match" only when the stub shows the chosen rate; the full-match percentage, the match at the chosen and full-match percentage, the dollars missed, the per-paycheck cost before and after federal tax with the marginal rate, the deferral limit and, when they apply, the capped and compensation-capped notes. Its citations are the result's `citation_keys` that the seed holds, so a fallback is cited too.
 18. **Table `explanations`.** `decision_id` (composite same-user foreign key, `ON DELETE CASCADE`) or `finding_id` (no foreign key until `0005`), `CHECK (num_nonnulls(decision_id, finding_id) = 1)`; `attempt smallint CHECK (attempt BETWEEN 1 AND 3)`; `retries smallint CHECK (retries IN (0, 1))`; `concept`, `text` (`NOT NULL`); `numbers`, `what_ifs`, `citations` (`jsonb` arrays, default `[]`; `citations` holds keys); `prompt_version`; `verified`, `fallback` with `CHECK (NOT (verified AND fallback))`; `verification jsonb` (the counts of rule 14, an object); `created_at timestamptz DEFAULT clock_timestamp()`, so rows written in one transaction keep their order. Append-only: the owner policy with `SELECT` and `INSERT` grants. Index `(decision_id, created_at)`.
 19. **Latest.** The latest explanation of a decision is its row with the greatest `(created_at, attempt)`.
 20. **Idempotent `POST /explain`.** Without `force`, when the decision already has a verified explanation, the latest verified row is returned and nothing is generated. Otherwise (none yet, only fallbacks, or `force = true`) a new run starts.
@@ -55,8 +57,8 @@ Explain a saved decision in plain words from the calculator's own numbers, the c
 
 ## Evals
 
-24. **`explain`** (LLM, `make eval-llm`): 10 synthetic decisions (`evals/fixtures/explain/decisions.json`, each a `k401_match` input whose result the suite computes with `calc/k401.py`) through the real flow with `LLMGateway`, an in-memory ledger charged against `--max-cost-cents`, and the seed citations read from the YAML. Metrics: `first_try_verified` (share verified on attempt 1), `no_fallback` (1 minus the fallback rate) and `cited` (share whose final row has at least one citation). Baseline at the targets: `no_fallback >= 0.95` (technical spec: fallback rate at most 5%), `cited = 1.0`, `first_try_verified >= 0.8`. Raises `SuiteUnavailable` without `ANTHROPIC_API_KEY`.
-25. **`explain-smoke`** (free, `make eval`): the same flow with `ScriptedGateway` (a `FakeGateway` that answers from a script, in `llm/gateway.py`) over three scenarios: verified on the first try, a failing draft then a verified one, and two failing drafts. Metric `flow_correct`: the share of scenarios whose rows (count, `verified`, `fallback`, `attempt`, `retries`) match the expected run. Baseline 1.0.
+24. **`explain`** (LLM, `make eval-llm`): 29 synthetic decisions (`evals/fixtures/explain/decisions.json`, each a `k401_match` input whose result the suite computes with `calc/k401.py`, and the rate its pay stub shows, `pay_stub_contribution_pct`, or null for no stub; 10 since M3, 19 more for issue 132, with issue 132's stub-01 case and a stub rate other than the chosen rate in 14 of them, so that one flaky draft moves a metric by under 4 points rather than 10) through the real flow with `LLMGateway`, an in-memory ledger charged against `--max-cost-cents`, and the seed citations read from the YAML. Metrics: `first_try_verified` (share verified on attempt 1), `no_fallback` (1 minus the fallback rate), `cited` (share whose final row has at least one citation) and `rate_framing`: over the 18 decisions whose stub rate differs from the chosen rate or is null, the share whose final row (a draft or the fallback) does not claim the chosen rate is already in effect. `rate_framing` is scored by an eval heuristic, `evals/suites/explain.py:rate_claim`, case-insensitive patterns over each sentence of `concept`, `text` and `what_ifs`. The bug's claim has the person as its subject, so a sentence counts when "you", "you're", "you are", "you've" or "you have" is followed by "already" and then "at", "in" or "on", or a word starting contribut, put, sav, earn, get, got, receiv, captur, collect, pay, paid, tak, deposit, hav, enrol or maxim ("You are already contributing 5%", "You're already at 5%", "you already put 5% in"), or when a sentence that names the rate chosen ("chose" or "chosen") says it is "already in effect". A rate as the subject is a statement about the rate, true at any stub: "The 5% you chose already earns the full match" says 5% is enough, and "The 4% your pay stub shows already earns the full match" is about the stub. A first version that flagged "already" before those words whatever the subject flagged five such sentences in three live runs and none of the bug's claim. It measures and never gates a draft. Baseline at the targets: `no_fallback >= 0.95` (technical spec: fallback rate at most 5%), `cited = 1.0`, `first_try_verified >= 0.8`; `rate_framing` has no baseline yet. Raises `SuiteUnavailable` without `ANTHROPIC_API_KEY`.
+25. **`explain-smoke`** (free, `make eval`): the same flow with `ScriptedGateway` (a `FakeGateway` that answers from a script, in `llm/gateway.py`) over six scenarios: verified on the first try, a failing draft then a verified one, and two failing drafts on a 401(k) decision; the same pass and fail-twice on a W-4 decision (spec 014 rule 19); and, on issue 132's decision (5% chosen, the stub at 3%), a first try that states the stub's rate and verifies. Metric `flow_correct`: the share of scenarios whose rows (count, `verified`, `fallback`, `attempt`, `retries`) match the expected run. Baseline 1.0.
 
 ## Hand-worked examples
 
@@ -85,6 +87,49 @@ Allowed: money 60,000.00, 1,800.00, 2,400.00, 600.00, 3,000.00, 46.15, 40.62, 24
 | citation keys `["k401.made_up"]` | no | unknown `k401.made_up` |
 | citation keys `[]` | no | no citation |
 
+### The rate the pay stub shows (rules 7a and 12), on spec 006 example 11
+
+Issue 132's decision: the stub-01 salary (9,500,010 cents, biweekly), 100% up to 3% and 50% up to 5%, the person chose 5%; the newest stub shows 3.00 (spec 005 rule 24b, row 1). The context starts `Contribution rate you chose: 5%`, `401(k) contribution rate your latest pay stub shows: 3%`, `Contribution rate that earns the full match: 5%`, and its note says the stub shows another rate. `tests/unit/verify/test_fallback_and_context.py`:
+
+| Pay stub rate | Draft text | Passed | Problem |
+|---|---|---|---|
+| 3.00 | `Your pay stub shows 3% going to your 401(k) now. At the 5% you chose, your employer adds $3,800.00 a year.` | yes | none |
+| 3.69 | `Your latest pay stub shows 3.69%.` | yes | none (the stub's rate is allowed) |
+| none | `Your latest pay stub shows 3.69%.` | no | `3.69%` |
+
+The fallback for the first row starts "At the 5% you chose, you put in $4,750.01 a year and your employer adds $3,800.00. Your latest pay stub shows 3% going to your 401(k), so the rate you chose takes effect once you change your election with your employer. That rate earns the full match of $3,800.00 a year." and goes on to the limit; it does not claim the chosen rate is in effect, and verifies.
+
+### The stub's case (rule 7a), `tests/unit/calc/test_pay_stub.py`
+
+| Chosen | Pay stub rate | `stub_rate` |
+|---|---|---|
+| 5 | none | `none` |
+| 5 | 5.00 | `chosen` |
+| 0 | 0.00 | `chosen` |
+| 4 | 3.99 | `other` |
+| 5 | 3.00 | `other` |
+
+### Rate framing (rule 24), `evals/tests/test_explain_suites.py`
+
+| Final text | Claims the chosen rate is in effect |
+|---|---|
+| `You are already contributing 5%, which is the rate that earns the full match.` | yes |
+| `You're already at 5%.` | yes |
+| `You already earn the full match.` | yes |
+| `you already put 5% in` | yes |
+| `The 5% you chose is already in effect.` | yes |
+| `The 5% you chose already earns the full match, so the match you miss is $0.00.` | no |
+| `The 4% your pay stub shows already earns the full match.` | no |
+| `Because the rate you chose already earns the full match, moving to the full-match rate would cost you an extra $0.00 per paycheck before tax and $0.00 after federal income tax.` | no |
+| `Going from 5% to the full-match rate costs $0.00 extra per paycheck before tax and $0.00 after federal income tax, using your 32% marginal rate, because the rate you chose already earns the full match.` | no |
+| `Going from 5% to the full-match rate costs you an extra $0.00 per paycheck before tax and $0.00 after federal income tax, because the rate already earning the full match is the one on your pay stub.` | no |
+| `You are already choosing the full-match rate.` | no |
+| `Your pay stub shows 3% now. At the 5% you chose, your employer would add $3,800.00 a year.` | no |
+
+The five "no" rows that start with a rate or a cost are final explanations from the live runs.
+
+A run of the stub-differs and no-stub decisions where two of 18 final rows make the claim scores `rate_framing` 16/18.
+
 ### The flow (`api/tests/integration/test_explain.py`)
 
 | Test | Gateway | Rows | Final |
@@ -92,6 +137,7 @@ Allowed: money 60,000.00, 1,800.00, 2,400.00, 600.00, 3,000.00, 46.15, 40.62, 24
 | `test_pass_first_try` | one good draft | 1: attempt 1 verified | verified, retries 0 |
 | `test_fail_then_pass` | bad, good | 2: attempt 1 unverified, attempt 2 verified | verified, retries 1 |
 | `test_fail_twice_falls_back` | bad, bad | 3: two unverified, attempt 3 fallback | fallback with the calculator result, retries 1 |
+| `test_context_has_the_pay_stub_rate` | the fake's draft | 1: attempt 1 verified | the model was sent the newest stub's 3% beside the chosen 5% |
 | `test_gateway_error_falls_back` | refusal | 1: attempt 1 fallback | fallback, retries 0 |
 | `test_idempotent_post` | good | second POST adds no row | same id |
 | `test_force_regenerates` | good, good | `force=true` adds a row | new id |
@@ -102,6 +148,9 @@ Allowed: money 60,000.00, 1,800.00, 2,400.00, 600.00, 3,000.00, 46.15, 40.62, 24
 
 - A decision whose `tax_year` has no seeded citations: the allowed list is empty, every draft fails `has_citation`, and the fallback carries no citations. The seed ships 2026 only; a new tax year needs its passages before its decisions can be explained with citations.
 - A number the user typed (salary) is allowed because inputs are allowed; a number the model derived (a monthly figure) is not, by design.
+- No confirmed pay stub (rule 7a): the context has no stub fact, the note says what goes in now is not known, and `rate_framing` counts the decision. The 401(k) card needs a confirmed stub before it can save, so in practice this is an eval or a test.
+- A stub with no retirement line shows 0.00 (spec 005 rule 24b): a person who chose 0% is then contributing it, and `rate_framing` leaves the decision out.
+- The two rates are compared by value at two places: a stub at 3.99 against a chosen 4 differs, and the explanation says the chosen rate is not in effect yet. Spec 015's check-in compares cents with a one-cent tolerance instead, because it judges whether payroll applied the election; the explanation only states both rates.
 - A model that echoes a citation passage's figures (for example "$8,000" catch-up for a 30-year-old) fails verification unless the figure is also a result or input value; the prompt tells it not to.
 
 ## Out of scope
