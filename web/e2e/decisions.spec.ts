@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page, type Response } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { formatMoney } from '../src/lib/money';
 import { e2eApiUrl, NO_E2E_API } from './support/api';
 import { e2eUser, NO_E2E_USER, waitForHydration } from './support/auth';
@@ -238,17 +238,14 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
   // Move away from whatever is saved, so there is a version to save.
   const extra = w4.getByLabel('Step 4(c): extra withholding each paycheck');
   const entry = (await extra.inputValue()) === '25.00' ? '50.00' : '25.00';
-  // The calculator's answers, newest last. The client streams the request body,
-  // so the answer for the new entry is told apart by when it came: the first
-  // one after the change (the card asks once per set of inputs).
-  const answers: Response[] = [];
-  page.on('response', (response) => {
-    if (new URL(response.url()).pathname === '/calc/w4' && response.request().method() === 'POST')
-      answers.push(response);
-  });
-  const before = answers.length;
+  // The calculator's answer to the new entry. Its rule 10a figures do not
+  // depend on Step 4(c), so any answer after the change states them.
+  const answer = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/calc/w4' && response.request().method() === 'POST',
+    { timeout: 15_000 },
+  );
   await extra.fill(entry);
-  await expect.poll(() => answers.length, { timeout: 15_000 }).toBeGreaterThan(before);
 
   const result = w4.getByRole('group', { name: 'Calculator result' });
   await expect(result).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
@@ -257,7 +254,7 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
 
   // Beside the entries, what the confirmed stub's withholding leaves at tax time
   // (spec 014 rule 10a, issue 153), in the calculator's own figure.
-  const body = (await answers.at(-1)!.json()) as { current_refund_cents: number | null };
+  const body = (await (await answer).json()) as { current_refund_cents: number | null };
   expect(body.current_refund_cents).not.toBeNull();
   const current = body.current_refund_cents!;
   const amount = formatMoney(Math.abs(current));
