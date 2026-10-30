@@ -156,6 +156,12 @@ test('links a finding to the decision step it affects', async ({ page }) => {
       /^\/setup\/decisions\/(emergency-fund|401k|health-plan|w4)$/,
     );
   }
+  // Issue 170: the W-4 hand-in reminder Decisions saved names the W-4 step too.
+  const w4 = findings.getByRole('listitem', { name: 'Give your employer your updated Form W-4' });
+  await expect(w4.getByRole('link', { name: /^Affects: / })).toHaveAttribute(
+    'href',
+    '/setup/decisions/w4',
+  );
   test.skip(count === 0, 'No finding this month affects a decision');
   const href = (await affects.first().getAttribute('href'))!;
   await affects.first().click();

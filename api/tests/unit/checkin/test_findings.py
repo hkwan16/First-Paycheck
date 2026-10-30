@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import datetime as dt
 from decimal import Decimal
+from typing import get_args
 
 import pytest
 from pydantic import TypeAdapter
 
 from checkin.findings import (
     FINDERS,
+    Affects,
     BalanceFact,
     DeductionChangePayload,
     ElectionMismatchPayload,
@@ -20,6 +22,7 @@ from checkin.findings import (
     RecurringPayload,
     UpcomingDeadlinePayload,
     all_findings,
+    calendar_affects,
     deduction_change,
     election_mismatch,
     goal_off_pace,
@@ -349,11 +352,21 @@ def test_upcoming_deadlines() -> None:
         (CalendarKind.GOAL_REVIEW, "emergency_fund"),
         (CalendarKind.GOAL_TARGET, "emergency_fund"),
         (CalendarKind.TAX_SEASON, "w4"),
+        # Issue 170: the W-4 hand-in reminder had no entry, so no Affects link.
+        (CalendarKind.W4_SUBMIT, "w4"),
     ],
 )
 def test_deadline_affects_by_kind(kind: CalendarKind, affects: str) -> None:
     found = only(upcoming_deadline(facts(events=[event(kind, "2026-11-30")])))
     assert found.payload.affects == affects
+
+
+@pytest.mark.parametrize("kind", list(CalendarKind))
+def test_every_calendar_kind_affects_a_calculator(kind: CalendarKind) -> None:
+    """Rule 7: the mapping is total, so a new calendar kind cannot lose its link."""
+    assert calendar_affects(kind) in get_args(Affects)
+    found = only(upcoming_deadline(facts(events=[event(kind, "2026-11-30")])))
+    assert found.payload.affects == calendar_affects(kind)
 
 
 def test_seven_days_is_still_soon() -> None:
