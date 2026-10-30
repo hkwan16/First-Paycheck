@@ -1709,6 +1709,10 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: High
+    status: done
+    # Fixed October 30: spec 008 rules 19a and 19b. Each explanation stores a
+    # digest of the context it was written from (migration 0019); one whose
+    # facts or prompt changed since reads "Out of date" with "Write it again".
   - title: "The Why pages offer an explanation the emergency fund can never have"
     body: >-
       Spec 011 says an emergency fund decision is never explained, and the
@@ -1721,6 +1725,10 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Medium
+    status: done
+    # Fixed October 30: spec 011 rule 18 and spec 008 rule 22a. The emergency
+    # fund's Why page shows the calculator's result and offers no explanation,
+    # and every API error message is a sentence, never an identifier.
   - title: "A document that fell back to manual entry while reading was off can never be read again"
     body: >-
       Two e2e documents uploaded while the model key was misnamed on Render
