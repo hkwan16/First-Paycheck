@@ -676,7 +676,7 @@ describe('LinkScreen documents', () => {
     );
     expect(within(benefits).getByRole('link', { name: 'Go to decisions' })).toHaveAttribute(
       'href',
-      '/setup/decisions',
+      '/setup/decisions/health-plan',
     );
   });
 

@@ -143,6 +143,29 @@ describe('PlanScreen with every decision saved', () => {
     ]);
     expect(items[3]).toHaveTextContent('Due Nov 14, 2026');
   });
+
+  it("links each date's badge to its decision's step (spec 018 rule 4)", async () => {
+    await open();
+    const calendar = region('Next 90 days');
+    expect(
+      within(calendar)
+        .getAllByRole('link')
+        .map((link) => [link.textContent, link.getAttribute('href')]),
+    ).toEqual([
+      ['401(k) match', '/setup/decisions/401k'],
+      ['Emergency fund', '/setup/decisions/emergency-fund'],
+      ['W-4, federal only', '/setup/decisions/w4'],
+      ['Health plan', '/setup/decisions/health-plan'],
+    ]);
+  });
+
+  it('goes back to the last decision step', async () => {
+    await open();
+    expect(screen.getByRole('link', { name: 'Back to decisions' })).toHaveAttribute(
+      'href',
+      '/setup/decisions/w4',
+    );
+  });
 });
 
 describe('PlanScreen with some decisions saved', () => {
@@ -156,9 +179,9 @@ describe('PlanScreen with some decisions saved', () => {
         .getAllByRole('link')
         .map((link) => [link.textContent, link.getAttribute('href')]),
     ).toEqual([
-      ['Emergency fund', '/setup/decisions#emergency-fund-title'],
-      ['Health plan', '/setup/decisions#health-plan-title'],
-      ['W-4, federal only', '/setup/decisions#w4-title'],
+      ['Emergency fund', '/setup/decisions/emergency-fund'],
+      ['Health plan', '/setup/decisions/health-plan'],
+      ['W-4, federal only', '/setup/decisions/w4'],
     ]);
     expect(screen.getAllByRole('heading', { level: 2, name: '401(k) match' })).toHaveLength(1);
     expect(within(region('Goals')).getByText(/No goals yet/)).toBeInTheDocument();
@@ -172,7 +195,7 @@ describe('PlanScreen with nothing saved', () => {
     expect(await screen.findByText('No decisions saved yet.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Go to decisions' })).toHaveAttribute(
       'href',
-      '/setup/decisions',
+      '/setup/decisions/emergency-fund',
     );
     expect(screen.queryByRole('button', { name: 'Download PDF' })).toBeNull();
   });

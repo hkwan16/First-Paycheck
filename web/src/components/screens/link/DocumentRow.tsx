@@ -11,7 +11,7 @@ import { RelativeTime } from '@/components/ui/RelativeTime';
 import { isReviewable, useJob } from '@/lib/api/hooks';
 import type { DocumentSummary, DocumentType } from '@/lib/api/types';
 import { formatNumber } from '@/lib/money';
-import { confirmRoute } from '@/lib/routes';
+import { confirmRoute, decisionRouteFor } from '@/lib/routes';
 import { documentStatusBadge, documentTypeLabel, statusReasonText } from '@/lib/documents';
 
 /** The upload types the API can read today; an offer letter is stored only. */
@@ -145,7 +145,7 @@ export function DocumentRow({ doc, jobId, starting, onRead, onReplace }: Documen
             </Button>
           )}
           {!reading && unreadBenefits && (
-            <Button size="sm" href="/setup/decisions">
+            <Button size="sm" href={decisionRouteFor('health_plan')}>
               Go to decisions
             </Button>
           )}

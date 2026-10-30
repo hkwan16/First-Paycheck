@@ -10,15 +10,14 @@ describe('SideNav', () => {
     const nav = screen.getByRole('navigation', { name: 'Setup steps' });
     expect(within(nav).getByText('Setup')).toHaveClass('uppercase', 'text-micro');
     expect(within(nav).getByText('Your plan')).toBeInTheDocument();
-    const lists = within(nav).getAllByRole('list');
-    expect(lists).toHaveLength(2);
+    const [setup, plan] = within(nav)
+      .getAllByRole('list')
+      .filter((list) => list.parentElement?.tagName === 'NAV');
     expect(
-      within(lists[0] as HTMLElement)
-        .getAllByRole('listitem')
-        .map((li) => li.textContent),
+      [...(setup as HTMLElement).children].map((li) => li.firstElementChild?.textContent),
     ).toEqual(['1Accounts and documents', '2Confirm pay stub', '3Spending map', '4Decisions']);
     expect(
-      within(lists[1] as HTMLElement)
+      within(plan as HTMLElement)
         .getAllByRole('listitem')
         .map((li) => li.textContent),
     ).toEqual(['Why this decision', 'Plan and calendar', 'Monthly check-in']);
@@ -33,10 +32,6 @@ describe('SideNav', () => {
     expect(screen.getByRole('link', { name: 'Spending map' })).toHaveAttribute(
       'href',
       '/setup/spending',
-    );
-    expect(screen.getByRole('link', { name: 'Decisions' })).toHaveAttribute(
-      'href',
-      '/setup/decisions',
     );
     expect(screen.getByRole('link', { name: 'Plan and calendar' })).toHaveAttribute(
       'href',
@@ -122,13 +117,98 @@ describe('SideNav', () => {
   });
 });
 
+const ALL = ['emergency_fund', '401k_match', 'health_plan', 'w4'] as const;
+
+/** The nested list of steps under Decisions. */
+const steps = () =>
+  within(screen.getByRole('link', { name: /^Decisions/ }).closest('li') as HTMLElement).getByRole(
+    'list',
+  );
+
+describe('SideNav decision steps (spec 018)', () => {
+  it('nests the four steps under Decisions in step order, each linking to its page', () => {
+    render(<SideNav calculators={ALL} />);
+    const links = within(steps()).getAllByRole('link');
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Emergency fund', '/setup/decisions/emergency-fund'],
+      ['401(k) match', '/setup/decisions/401k'],
+      ['Health plan', '/setup/decisions/health-plan'],
+      ['W-4', '/setup/decisions/w4'],
+    ]);
+    for (const link of links) expect(link).toHaveClass('min-h-11');
+  });
+
+  it('links Decisions to the first live step', () => {
+    const { unmount } = render(<SideNav calculators={ALL} />);
+    expect(screen.getByRole('link', { name: 'Decisions' })).toHaveAttribute(
+      'href',
+      '/setup/decisions/emergency-fund',
+    );
+    unmount();
+    render(<SideNav calculators={['401k_match']} />);
+    expect(screen.getByRole('link', { name: 'Decisions' })).toHaveAttribute(
+      'href',
+      '/setup/decisions/401k',
+    );
+  });
+
+  it('marks the current step as the page, and not Decisions', () => {
+    render(<SideNav calculators={ALL} current="health_plan" />);
+    expect(screen.getByRole('link', { name: 'Health plan' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Decisions' })).not.toHaveAttribute('aria-current');
+    expect(document.querySelectorAll('[aria-current]')).toHaveLength(1);
+  });
+
+  it('checks off each saved step, and Decisions once every live one is', () => {
+    render(<SideNav calculators={ALL} done={{ decisions: true, '401k_match': true, w4: true }} />);
+    const k401 = screen.getByRole('link', { name: '401(k) match, done' });
+    expect(k401.querySelector('[aria-hidden="true"]')).toHaveClass(
+      ...toneSoft.confirmed.split(' '),
+    );
+    expect(screen.getByRole('link', { name: 'W-4, done' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Health plan' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Decisions, done' })).toBeInTheDocument();
+  });
+
+  it('mutes a step that is not live, says After alpha, and still links to its page', () => {
+    render(<SideNav calculators={['401k_match']} />);
+    for (const [name, href] of [
+      ['Emergency fund', '/setup/decisions/emergency-fund'],
+      ['Health plan', '/setup/decisions/health-plan'],
+      ['W-4', '/setup/decisions/w4'],
+    ]) {
+      const link = screen.getByRole('link', { name: `${name}, After alpha` });
+      expect(link).toHaveAttribute('href', href);
+      expect(link).toHaveClass('text-ink-3');
+    }
+    const live = screen.getByRole('link', { name: '401(k) match' });
+    expect(live).not.toHaveClass('text-ink-3');
+    expect(within(steps()).getAllByText('After alpha')).toHaveLength(3);
+  });
+
+  it('gives the steps a wrapping row of their own under the nav breakpoint', () => {
+    render(<SideNav calculators={ALL} />);
+    const decisions = screen.getByRole('link', { name: 'Decisions' }).closest('li');
+    expect(decisions).toHaveClass('max-nav:basis-full');
+    expect(steps()).toHaveClass('max-nav:flex-row', 'max-nav:flex-wrap');
+  });
+});
+
 describe('navKeyForPath', () => {
   it.each([
     ['/setup/link', 'link'],
     ['/setup/confirm/doc_1', 'confirm'],
     ['/setup/confirm', 'confirm'],
     ['/setup/spending', 'spending'],
-    ['/setup/decisions', 'decisions'],
+    ['/setup/decisions/emergency-fund', 'emergency_fund'],
+    ['/setup/decisions/401k', '401k_match'],
+    ['/setup/decisions/health-plan', 'health_plan'],
+    ['/setup/decisions/w4', 'w4'],
+    ['/setup/decisions', undefined],
+    ['/setup/decisions/roth', undefined],
     ['/why/dec_1', 'why'],
     ['/why', 'why'],
     ['/plan', 'plan'],

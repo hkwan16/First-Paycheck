@@ -59,13 +59,16 @@ baselines in that same image (mount `web/` read-only, copy it without `node_modu
 ## Layout
 
 ```
-src/app/            routes. (auth)/sign-in; (app)/setup/{link,confirm,confirm/[documentId],spending,decisions},
+src/app/            routes. (auth)/sign-in; (app)/setup/{link,confirm,confirm/[documentId],spending},
+                    (app)/setup/decisions/{emergency-fund,401k,health-plan,w4} (one step each;
+                    /setup/decisions itself is the proxy's redirect to the first live step),
                     (app)/why (index of saved decisions), (app)/why/[decisionId], (app)/plan,
                     (app)/check-in (list of check-ins), (app)/check-in/[checkInId]; (app)/error.tsx
                     (the segment's error boundary); dev/kit
 src/app/auth/callback/route.ts  exchanges the email-link code for a session
 src/proxy.ts        Next 16 proxy (formerly middleware): refreshes the Supabase session, sends
-                    signed-out requests for (app) screens to /sign-in, forwards the requested path
+                    signed-out requests for (app) screens to /sign-in, forwards the requested path,
+                    and redirects /setup/decisions to the first live decision step
 src/components/ui/  design system (below)
 src/components/chrome/  app frame (below)
 src/components/screens/<screen>/  one 'use client' screen component per page
@@ -76,11 +79,13 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     upload.ts, download.ts, keys.ts, errors.ts, hooks/), auth/ (next-path, protected,
                     validation, errors, account), supabase/ (env, client, server, proxy),
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
-                    documents.ts, decisions.ts, deep-equal.ts, features.ts, findings.ts, periods.ts,
+                    documents.ts, decisions.ts, decision-steps.ts, deep-equal.ts, features.ts,
+                    findings.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts,
                     page-hydration.ts, page-title.ts, log-error.ts
 src/app/dev/screens/{link,account,spending,confirm,confirm/manual,confirm/benefits,confirm/extracting,
-                    confirm/failed,confirm/confirmed,decisions,why,why/fallback,why-index,check-in,
+                    confirm/failed,confirm/confirmed,decisions/{emergency-fund,401k,health-plan,w4,
+                    after-alpha},why,why/fallback,why-index,check-in,
                     check-in/complete,check-in-index,plan,plan/empty}  a screen on the sample data, no
                     API (development only); `account` is Link with the header's account menu
 src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, queued animation frames settled
@@ -144,9 +149,10 @@ comment.
 Chrome (`components/chrome`): `Wordmark`, `Header` (`chips`, `account` slot, `minimal`),
 `HeaderAccount` (server: "Sample data" chip and `UserMenu` from the Supabase user), `UserMenu` (the
 user chip as a disclosure button with "Sign out" and "Delete account"; see "Deleting the account"),
-`DeleteAccountConfirm`, `NavStep`, `SideNav`
-(`current`, `done` from `lib/setup-progress.ts`, `hrefs` for id-bound screens; wraps into a chip
-row under 780px), `AppSideNav` (current item from the URL), `Shell` (header, nav column
+`DeleteAccountConfirm`, `NavStep` (`size` md 22px, sm 18px for a decision step), `SideNav`
+(`current`, `done` from `lib/setup-progress.ts`, `hrefs` for id-bound screens, `calculators`;
+"Decisions" nests its four steps, see "Decisions screen"; wraps into a chip row under 780px),
+`AppSideNav` (current item from the URL), `Shell` (header, nav column
 `1 1 200px` up to 240px, main `999 1 560px`, skip link), `PageTitle` (`title`, `lead`, `aside`,
 `eyebrow`), `StepFooter` (`back`, `next` with `primary`, `disabled` and `loading`; a disabled
 next is a real disabled button, never a dead link).
@@ -486,11 +492,37 @@ offer letter states).
 
 ## Decisions screen
 
-`/setup/decisions` (`DecisionsScreen`) shows one card per calculator in the mockup's order
-(emergency fund, 401(k), health plan, W-4) with an "n of 4 saved" badge that counts every saved
-calculator. Every calculator has a card; one off in `features.calculators` is a muted "After
-alpha" placeholder. Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
+Spec 018. Decisions is four steps, one page per calculator, in the mockup's order: emergency
+fund (`/setup/decisions/emergency-fund`), 401(k) (`/401k`), health plan (`/health-plan`), W-4
+(`/w4`, last because it reads the saved 401(k) and health plan). Each `page.tsx` renders
+`DecisionStepScreen` with its `calculator`: an eyebrow "Decision n of 4" with the "n of 4 saved"
+badge (every saved calculator), the step's question as the h1 (`STEP_TEXT` in
+`lib/decision-steps.ts`, which also has the tab title, the nav label and the footer's name), the
+lead (live calculators only), the one card in its `CardErrorBoundary` in a `max-w-3xl` column,
+and a `StepFooter` from `stepFooter(calculator, live)` (`step-footer.ts`): Back to the previous
+live step or Spending, next to the next live step or "See your plan". Steps that are not live
+are skipped, so the alpha walks Spending, 401(k), Plan. A calculator off in
+`features.calculators` still has its page, showing the muted "After alpha" `PlaceholderCard`.
+Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
 (`decision-format.ts`).
+
+- **`/setup/decisions`** has no page: the proxy answers it with a 307 to `firstDecisionRoute()`
+  (the first live step), after the sign-in check.
+- **Links** into Decisions use the builders in `lib/routes.ts`, never a fragment:
+  `decisionStepRoute(id)` or `decisionKindRoute(kind)` for one calculator (Plan's "Still to
+  decide" and calendar badges, check-in "Affects", the W-4 card's links to the 401(k) and health
+  plan, Why's "Re-run the calculator", the Spending diagram's 401(k) link);
+  `decisionRouteFor('health_plan')` for a benefits summary's way on (the health plan step when it
+  is live, else the entry); `firstDecisionRoute()` for Decisions in general (Spending's next, the
+  empty Why index and Plan, the nav's "Decisions"); `lastDecisionRoute()` for the Plan's Back.
+- **Side nav**: "Decisions" holds a nested list of the four steps (labels from `STEP_TEXT`),
+  indented behind a hairline, each a 44px link with an 18px `NavStep` (a dot, or a check once
+  done). The current step has `aria-current="page"`; "Decisions" never does on a step. A step is
+  done when its calculator is live and saved (`setupProgress`, keyed by the calculator id);
+  "Decisions" when every live one is. A step that is not live is muted with "After alpha" under
+  its label (its name ends ", After alpha") and still links to its placeholder page. Under 780px
+  the "Decisions" item takes the full row and its steps wrap as a row of their own beneath it
+  (two by two at 390px). `navKeyForPath` returns the calculator id for a step's path.
 
 - **`Match401kCard`** always renders the same `DecisionCard` frame (a region named by its title)
   and swaps its body: skeleton, error, a link to Confirm when there is no confirmed pay stub,
@@ -538,7 +570,7 @@ alpha" placeholder. Cards share `DecisionCard`, `SaveButton`, `AmountField` and 
   the age from the birth year (null without one: no catch-up), and, read-only under "From your
   decisions", the saved 401(k) decision's `contribution_pct` and the saved health plan's chosen
   plan's premium per paycheck (`fromDecisions` in `w4-format.ts`). Either one not saved is sent
-  as zero, the card says so, and links to that card. The person sets the filing status (from
+  as zero, the card says so, and links to that step. The person sets the filing status (from
   the profile until changed), Step 2(c), the other jobs' wages and withholding, Steps 3 and
   4(a)-(c) and the deductions they expect to claim (empty means the Step 4(b) entry). The result
   is the calculator's: a balance due takes the `off` tone, a refund stays neutral (never
@@ -572,8 +604,8 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
 - **What changed** (`FindingsCard`, `FindingRow`): findings in the API's order. Each has a
   severity tile (`severityTone`: alert `off`, warning `warning`, info `blue`; neutral once
   handled), its kind, and its text from one small component per payload kind (`FindingText.tsx`),
-  which prints payload fields only, formatted, signs included. "Affects" links to the calculators
-  or the Spending map. Done and Dismiss become Undo; focus moves to the button that replaces the
+  which prints payload fields only, formatted, signs included. "Affects" links to that
+  calculator's step or the Spending map. Done and Dismiss become Undo; focus moves to the button that replaces the
   one pressed (and back on a rollback), and a polite status line says what changed. The badge
   reads `handled_count` and `finding_count`; a completed check-in shows a confirmed notice.
 - **Cash flow against the plan** (`PlanLinesCard`): `cash_flow.plan` lines as a table. Each
@@ -620,7 +652,7 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
 
 - **Completeness**: an "n of 4 decisions saved" badge (`completenessText`, counting the API's
   two lists; `confirmed` when nothing is missing) and "Still to decide" linking each missing
-  calculator to its card on Decisions (`DECISION_ANCHORS`, the card headings' ids).
+  calculator to its step (`decisionKindRoute`).
 - **Decisions** (`DecisionSummary`): one `DecisionCard` per saved decision in the API's order,
   with "v{n} · Saved {date}", the API's `figures` by their labels (`figureText` formats by
   `kind`: money, a percentage as stored, a count, text; a null `months_to_target` reads "Not
@@ -631,7 +663,7 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
 - **Your paycheck** (`PaycheckCard`): the newest confirmed stub's gross and take-home tiles and
   its deductions, or a link to Confirm. **Goals** (`GoalsCard`): status badge, contribution,
   target and date, progress bar. **Next 90 days** (`PlanCalendarCard`): `calendar` through
-  `calendar_through`, each event in its decision's hue (`eventHue`) with a badge to its card.
+  `calendar_through`, each event in its decision's hue (`eventHue`) with a badge to its step.
 - **Export** (`ExportCard`): Download PDF starts `useExportPlan`, shows `JobProgress` while the
   job runs, downloads once it succeeds (once per job), then says "Downloaded {name}." with
   Download again. A dead job offers Try again (a new export); a failed download offers Try
@@ -676,7 +708,9 @@ for the amounts over one SVG of cubic bands. Not d3-sankey and not a chart libra
    render numbers with `<Money>`/`<Num>` exactly as the API returns them.
 3. Keep `page.tsx` a thin server component that renders the screen and exports `metadata`.
 4. Link id-bound screens with the builders in `lib/routes.ts` (`confirmRoute(id)`, `whyRoute(id)`,
-   `checkInRoute(id)`): Next's typed `Route` accepts dynamic segments only as literals.
+   `checkInRoute(id)`): Next's typed `Route` accepts dynamic segments only as literals. Link a
+   decision through its builders too (`decisionStepRoute`, `firstDecisionRoute`; see "Decisions
+   screen"), never `/setup/decisions`, which only redirects.
 5. Cache Components is on: anything reading cookies, headers, the URL (`usePathname`) or other
    request data must sit inside `<Suspense>`, or the build fails with a blocking-route error.
    Never put an interactive form in a Suspense fallback: it is replaced when the real content
@@ -769,23 +803,27 @@ parallel tests. `confirm.spec.ts` (project `authenticated-confirm`) uploads
 `e2e/fixtures/acme-paystub.pdf`, a synthetic stub with an example SSN the API must redact and a
 masked account number (regenerate it with `node e2e/fixtures/make-acme-paystub.mjs`), waits for
 the read, confirms every field and continues to Spending. `decisions.spec.ts` (project
-`authenticated-decisions`, after confirm) fills in the plan details if the profile has none,
+`authenticated-decisions`, after confirm) opens `/setup/decisions` (redirected to the first
+step) and takes the side nav to the 401(k) step, fills in the plan details if the profile has none,
 saves a 401(k) decision, changes it and saves the next version, then opens its explanation and
 accepts verified, fallback, or "not available" when the API has no model; it then saves an
 emergency fund version (typing the essentials and savings over what the e2e user's linked data
 fills in, so the target is the same every run) and pauses and resumes its goal, and saves a health
 plan choice (typing two synthetic plans when no benefits summary is confirmed) with an enrollment
-deadline, and saves a W-4 version that reads those two decisions, with its reminder. Decisions cannot be
+deadline (reaching that step through the 401(k)'s footer), and saves a W-4 version that reads
+those two decisions, with its reminder, then checks every step is done in the nav and follows the
+footer to the plan. Decisions cannot be
 deleted, so it reads the current version instead of assuming v1. `plan.spec.ts` (project
 `authenticated-plan`, after decisions) reads the four decisions back on `/plan` (and the nav's
-done mark), downloads the `.ics` and checks its first line is `BEGIN:VCALENDAR`, and exports the
+done mark, the calendar badges' and Back's step routes), downloads the `.ics` and checks its first line is `BEGIN:VCALENDAR`, and exports the
 PDF through the worker, checking the `GET /plan/export/{id}` response is `application/pdf` and
 the saved file starts with `%PDF-`. `check-in.spec.ts` (project
 `authenticated-check-in`, after decisions, whose dates due within 30 days become the month's
 findings) presses Check in now on the list and waits for the worker's run, finds this month's
 check-in at the top of the list and opens it, runs it again from its own page, marks a finding
 done and then dismissed, undoing each (checking every step survives a reload and leaving it open),
-and opens a check-in that is not the user's. Never use a real document as a fixture.
+follows a finding's "Affects" link to its decision step, and opens a check-in that is not the
+user's. Never use a real document as a fixture.
 
 ### Local real-API stack
 
@@ -808,7 +846,8 @@ or `plan.spec.ts`'s export waits out its budget while the job fails with "cannot
 `alpha.spec.ts` (project `alpha`) is the whole alpha as a new user (`E2E_ALPHA_USER_*`, which the
 stack makes per run; against a hosted API, a fresh confirmed user): it signs in through the form,
 links the sandbox bank and fixes a category, uploads and confirms the Acme stub, reads the
-Spending tiles, saves the 401(k) at 4% as v1 and a change as v2, and expects "Verified against
+Spending tiles, goes on to Decisions (the emergency fund step) and through its footer to the 401(k),
+saves it at 4% as v1 and a change as v2, and expects "Verified against
 calculator" with an irs.gov source (what the fake model produces).
 
 ## Feature flags

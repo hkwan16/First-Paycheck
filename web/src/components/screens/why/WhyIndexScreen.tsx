@@ -11,7 +11,7 @@ import { apiErrorMessage } from '@/lib/api/errors';
 import { useDecisions } from '@/lib/api/hooks';
 import { formatDate } from '@/lib/dates';
 import { calculatorIdOf, CALCULATOR_LABELS } from '@/lib/decisions';
-import { whyRoute } from '@/lib/routes';
+import { firstDecisionRoute, whyRoute } from '@/lib/routes';
 import { CALCULATOR_CARDS } from '../decisions/DecisionCard';
 
 /** `/why`: every current decision, each linking to its explanation. */
@@ -38,7 +38,7 @@ export function WhyIndexScreen() {
         <Card gap={14} aria-label="Saved decisions">
           <p className="m-0">No decisions saved yet.</p>
           <div>
-            <Button href="/setup/decisions" variant="primary">
+            <Button href={firstDecisionRoute()} variant="primary">
               Go to decisions
             </Button>
           </div>

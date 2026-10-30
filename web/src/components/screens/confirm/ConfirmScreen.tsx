@@ -14,7 +14,7 @@ import type { Confirmed, DocumentDetail, DocumentType } from '@/lib/api/types';
 import { documentTypeLabel, statusReasonText } from '@/lib/documents';
 import { formatNumber } from '@/lib/money';
 import { pageTitle } from '@/lib/page-title';
-import { confirmRoute } from '@/lib/routes';
+import { confirmRoute, decisionRouteFor } from '@/lib/routes';
 import { BenefitsReview } from './BenefitsReview';
 import { ConfirmReview } from './ConfirmReview';
 
@@ -39,7 +39,7 @@ function BackToDocuments() {
 function ToDecisions({ label }: { label: string }) {
   return (
     <div>
-      <Button href="/setup/decisions" variant="primary">
+      <Button href={decisionRouteFor('health_plan')} variant="primary">
         {label}
         <ArrowRightIcon />
       </Button>

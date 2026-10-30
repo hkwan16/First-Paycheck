@@ -103,7 +103,7 @@ describe('WhyScreen, verified', () => {
     );
     expect(within(next).getByRole('link', { name: 'Re-run the calculator' })).toHaveAttribute(
       'href',
-      '/setup/decisions',
+      '/setup/decisions/401k',
     );
     expect(within(next).getByRole('link', { name: 'See the plan' })).toHaveAttribute(
       'href',
@@ -133,6 +133,10 @@ describe('WhyScreen, fallback', () => {
     expect(fallback).toHaveTextContent('Match you miss per year$0');
     expect(screen.queryByRole('region', { name: 'Your numbers' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('matches calculator')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Re-run the calculator' })).toHaveAttribute(
+      'href',
+      '/setup/decisions/401k',
+    );
   });
 
   it('tries again with force, waits for the run, and shows the verified explanation', async () => {

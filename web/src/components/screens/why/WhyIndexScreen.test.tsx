@@ -30,7 +30,7 @@ describe('WhyIndexScreen', () => {
     expect(await screen.findByText('No decisions saved yet.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Go to decisions' })).toHaveAttribute(
       'href',
-      '/setup/decisions',
+      '/setup/decisions/emergency-fund',
     );
   });
 });

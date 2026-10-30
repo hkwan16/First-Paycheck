@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { markPageHydrated, resetPageHydration } from '@/lib/page-hydration';
 import { NOVEMBER_ID } from '@/test/fixtures/checkins';
 import { samplePayStub } from '@/test/fixtures/documents';
-import { db } from '@/test/msw/db';
+import { db, savedDecision } from '@/test/msw/db';
 import { partialPlan } from '@/test/fixtures/plan';
 import { planDb } from '@/test/msw/plan-handlers';
 import { server } from '@/test/msw/server';
@@ -26,6 +26,24 @@ describe('AppSideNav', () => {
       'aria-current',
       'page',
     );
+  });
+
+  it('marks the decision step for the current path, not Decisions (spec 018 rule 7)', () => {
+    pathname.current = '/setup/decisions/w4';
+    render(<AppSideNav />);
+    expect(screen.getByRole('link', { name: 'W-4' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Decisions' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('checks off a step once GET /decisions has its calculator (spec 018 rule 8)', async () => {
+    savedDecision();
+    pathname.current = '/setup/decisions/401k';
+    render(<AppSideNav />);
+    expect(await screen.findByRole('link', { name: '401(k) match, done' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Emergency fund' })).toBeInTheDocument();
   });
 
   it('passes done marks through', () => {

@@ -285,7 +285,7 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
     const popover = within(card()).getByRole('group', { name: '401(k), not elected' });
     expect(
       within(popover).getByRole('link', { name: 'See what a 401(k) match is worth' }),
-    ).toHaveAttribute('href', '/setup/decisions');
+    ).toHaveAttribute('href', '/setup/decisions/401k');
   });
 
   it('stacks bars instead under 640 px, with the same amounts and no scale', async () => {
@@ -497,7 +497,7 @@ describe('SpendingScreen transactions', () => {
     await renderSpending();
     expect(screen.getByRole('link', { name: /Use these numbers in decisions/ })).toHaveAttribute(
       'href',
-      '/setup/decisions',
+      '/setup/decisions/emergency-fund',
     );
   });
 });

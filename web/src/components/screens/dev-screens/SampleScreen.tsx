@@ -12,7 +12,7 @@ import { CheckInScreen } from '@/components/screens/check-in/CheckInScreen';
 import { checkInWindow } from '@/components/screens/check-in/checkin-format';
 import { NET_WORTH_MONTHS } from '@/components/screens/check-in/NetWorthCard';
 import { ConfirmScreen } from '@/components/screens/confirm/ConfirmScreen';
-import { DecisionsScreen } from '@/components/screens/decisions/DecisionsScreen';
+import { DecisionStepScreen } from '@/components/screens/decisions/DecisionStepScreen';
 import { LinkScreen } from '@/components/screens/link/LinkScreen';
 import { PlanScreen } from '@/components/screens/plan/PlanScreen';
 import { SpendingScreen } from '@/components/screens/spending/SpendingScreen';
@@ -22,7 +22,9 @@ import { $api } from '@/lib/api/client';
 import { ACCOUNT_COUNT_LIMIT, TRANSACTIONS_PAGE_SIZE } from '@/lib/api/hooks';
 import { queryKeys } from '@/lib/api/keys';
 import type { CheckInDetail, Decision } from '@/lib/api/types';
+import { CALCULATORS, type CalculatorId } from '@/lib/features';
 import { checkInRoute } from '@/lib/routes';
+import type { SetupProgress } from '@/lib/setup-progress';
 import {
   SAMPLE_PERIOD,
   sampleCashflow,
@@ -93,7 +95,11 @@ export type SampleScreenName =
   | 'confirm-confirmed'
   | 'account'
   | 'spending'
-  | 'decisions'
+  | 'decisions-emergency-fund'
+  | 'decisions-401k'
+  | 'decisions-health-plan'
+  | 'decisions-w4'
+  | 'decisions-after-alpha'
   | 'why'
   | 'why-fallback'
   | 'why-index'
@@ -188,6 +194,22 @@ function seedCheckIns(seed: Seed, november: CheckInDetail) {
 
 const CHECK_IN_HREFS = { checkIn: checkInRoute(NOVEMBER_ID) };
 
+const ALPHA: readonly CalculatorId[] = ['401k_match'];
+
+/** Every saved decision's step done, and Decisions with them. */
+const ALL_DECIDED: Partial<SetupProgress> = {
+  decisions: true,
+  ...Object.fromEntries(CALCULATORS.map((id) => [id, true])),
+};
+
+/** A decision step with every calculator live and saved. */
+const decisionStep = (calculator: CalculatorId) => ({
+  nav: calculator,
+  render: () => <DecisionStepScreen calculator={calculator} calculators={CALCULATORS} />,
+  seed: seedAllDecided,
+  done: ALL_DECIDED,
+});
+
 const SCREENS: Record<
   SampleScreenName,
   {
@@ -198,6 +220,10 @@ const SCREENS: Record<
     seed?: (seed: Seed) => void;
     /** Id-bound nav links, as AppSideNav gives them from API data. */
     hrefs?: Partial<Record<NavKey, Route>>;
+    /** Done marks, as AppSideNav reads them from API data. */
+    done?: Partial<SetupProgress>;
+    /** Live calculators, for the nav's decision steps; every one unless given. */
+    calculators?: readonly CalculatorId[];
   }
 > = {
   link: { nav: 'link', render: () => <LinkScreen showSandboxLink={false} /> },
@@ -226,13 +252,18 @@ const SCREENS: Record<
     nav: 'spending',
     render: () => <SpendingScreen showSankey initialPeriod={SAMPLE_PERIOD} />,
   },
-  // Every calculator live and saved.
-  decisions: {
-    nav: 'decisions',
-    render: () => (
-      <DecisionsScreen calculators={['emergency_fund', '401k_match', 'health_plan', 'w4']} />
-    ),
-    seed: seedAllDecided,
+  // Every calculator live and saved: one sample per step.
+  'decisions-emergency-fund': decisionStep('emergency_fund'),
+  'decisions-401k': decisionStep('401k_match'),
+  'decisions-health-plan': decisionStep('health_plan'),
+  'decisions-w4': decisionStep('w4'),
+  // The alpha (calculators=401k_match) with its 401(k) saved: a step that is off.
+  'decisions-after-alpha': {
+    nav: 'emergency_fund',
+    render: () => <DecisionStepScreen calculator="emergency_fund" calculators={ALPHA} />,
+    seed: seedDecided,
+    done: { '401k_match': true, decisions: true },
+    calculators: ALPHA,
   },
   why: {
     nav: 'why',
@@ -363,7 +394,7 @@ export function seededClient(screen: SampleScreenName = 'link') {
 
 export function SampleScreen({ screen }: { screen: SampleScreenName }) {
   const [client] = useState(() => seededClient(screen));
-  const { nav, render, hrefs, accountMenu = false } = SCREENS[screen];
+  const { nav, render, hrefs, done, calculators, accountMenu = false } = SCREENS[screen];
   const context = `${SAMPLE_USER.employer} · ${SAMPLE_USER.frequency}`;
   return (
     <QueryClientProvider client={client}>
@@ -375,7 +406,7 @@ export function SampleScreen({ screen }: { screen: SampleScreenName }) {
             <Header chips={[context, SAMPLE_USER.name]} />
           )
         }
-        nav={<SideNav current={nav} hrefs={hrefs} />}
+        nav={<SideNav current={nav} hrefs={hrefs} done={done} calculators={calculators} />}
       >
         {render()}
       </Shell>

@@ -19,4 +19,16 @@ describe('NavStep', () => {
     expect(step).not.toHaveTextContent('1');
     expect(step?.querySelector('svg')).not.toBeNull();
   });
+
+  it('draws a smaller 18px circle for a sub-step, with a smaller check when done', () => {
+    const { container, rerender } = render(<NavStep size="sm">·</NavStep>);
+    expect(container.firstElementChild).toHaveClass('size-[18px]', 'bg-ink/7');
+    rerender(
+      <NavStep size="sm" done>
+        ·
+      </NavStep>,
+    );
+    expect(container.firstElementChild).toHaveClass('size-[18px]');
+    expect(container.querySelector('svg')).toHaveAttribute('width', '10');
+  });
 });

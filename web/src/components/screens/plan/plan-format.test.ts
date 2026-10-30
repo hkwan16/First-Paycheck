@@ -3,7 +3,6 @@ import type { PlanFigure } from '@/lib/api/types';
 import { samplePlan } from '@/test/fixtures/plan';
 import {
   completenessText,
-  DECISION_ANCHORS,
   eventHue,
   explanationView,
   figureText,
@@ -68,17 +67,6 @@ describe('completenessText', () => {
         missing: ['emergency_fund', 'health_plans', 'w4'],
       }),
     ).toBe('1 of 4 decisions saved');
-  });
-});
-
-describe('DECISION_ANCHORS', () => {
-  it('opens each calculator card on the Decisions screen', () => {
-    expect(DECISION_ANCHORS).toEqual({
-      emergency_fund: '/setup/decisions#emergency-fund-title',
-      k401_match: '/setup/decisions#k401-title',
-      health_plans: '/setup/decisions#health-plan-title',
-      w4: '/setup/decisions#w4-title',
-    });
   });
 });
 

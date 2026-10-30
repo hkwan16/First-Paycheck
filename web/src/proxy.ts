@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { REQUEST_PATH_HEADER, requestPath } from '@/lib/auth/next-path';
 import { requiresSignIn } from '@/lib/auth/protected';
-import { signInRoute } from '@/lib/routes';
+import { DECISIONS_PATH, firstDecisionRoute, signInRoute } from '@/lib/routes';
 import { updateSession } from '@/lib/supabase/proxy';
 
 /**
@@ -9,6 +9,10 @@ import { updateSession } from '@/lib/supabase/proxy';
  * sends a signed-out request for a signed-in screen to /sign-in?next=<path>,
  * and tells the (app) guard which path was requested (layouts cannot read the
  * URL), overwriting any value the client sent.
+ *
+ * It also sends the old one-page Decisions address to the first live decision
+ * step (spec 018 rule 3), after the sign-in check so a signed-out person comes
+ * back through it.
  *
  * Redirecting here, before anything renders, is the main guard. The (app)
  * layout's AuthGate stays as the backstop for a token that verifies but whose
@@ -20,6 +24,9 @@ export async function proxy(request: NextRequest) {
   const session = await updateSession(request, { [REQUEST_PATH_HEADER]: path });
   if (session.signedIn === false && requiresSignIn(request.nextUrl.pathname)) {
     return session.redirectTo(new URL(signInRoute({ next: path }), request.url));
+  }
+  if (request.nextUrl.pathname === DECISIONS_PATH) {
+    return session.redirectTo(new URL(firstDecisionRoute(), request.url));
   }
   return session.response;
 }

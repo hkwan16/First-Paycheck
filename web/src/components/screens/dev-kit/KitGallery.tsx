@@ -171,7 +171,7 @@ export function KitGallery() {
           <Button href="/plan" variant="primary">
             See the plan
           </Button>
-          <Button href="/setup/decisions">Re-run the calculator</Button>
+          <Button href="/setup/decisions/401k">Re-run the calculator</Button>
         </Row>
         <div className="max-w-sm">
           <Button variant="primary" block>
@@ -202,7 +202,7 @@ export function KitGallery() {
           <Badge tone="warning" solid icon={<AlertIcon size={12} strokeWidth={1.4} />}>
             Could not verify the explanation
           </Badge>
-          <Badge tone="plum" href="/setup/decisions">
+          <Badge tone="plum" href="/setup/decisions/401k">
             Affects: 401(k) match
             <ArrowSmallIcon />
           </Badge>
@@ -694,7 +694,7 @@ export function KitGallery() {
           status="3 left to confirm"
         />
         <StepFooter
-          back={{ href: '/setup/decisions', label: 'Back to decisions' }}
+          back={{ href: '/setup/decisions/w4', label: 'Back to decisions' }}
           next={{ href: '/plan', label: 'Preview the November check-in' }}
         />
       </Section>

@@ -1,3 +1,4 @@
+import type { Route } from 'next';
 import type { ReactNode } from 'react';
 import { AlertIcon, CheckIcon, WhatIfIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/Badge';
@@ -189,8 +190,11 @@ export function VerifiedBody({
   );
 }
 
-/** From the mockup's "What happens next": the check this decision scheduled. */
-export function NextSteps({ event }: { event: CalendarEvent | undefined }) {
+/**
+ * From the mockup's "What happens next": the check this decision scheduled,
+ * and the way back to its calculator's step (`rerun`).
+ */
+export function NextSteps({ event, rerun }: { event: CalendarEvent | undefined; rerun: Route }) {
   return (
     <Card aria-labelledby="next-title" gap={14}>
       <h2 id="next-title" className="m-0">
@@ -207,7 +211,7 @@ export function NextSteps({ event }: { event: CalendarEvent | undefined }) {
         )}
       </p>
       <div className="flex flex-wrap items-center gap-3">
-        <Button href="/setup/decisions" size="sm">
+        <Button href={rerun} size="sm">
           Re-run the calculator
         </Button>
         <Button href="/plan" size="sm" variant="primary">

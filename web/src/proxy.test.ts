@@ -69,6 +69,36 @@ describe('proxy', () => {
     }
   });
 
+  it('sends /setup/decisions to the first live decision step (spec 018 rule 3)', async () => {
+    const response = await proxy(new NextRequest('http://localhost:3000/setup/decisions'));
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/setup/decisions/emergency-fund',
+    );
+  });
+
+  it('redirects /setup/decisions when auth is off too', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
+    const response = await proxy(new NextRequest('http://localhost:3000/setup/decisions'));
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/setup/decisions/emergency-fund',
+    );
+  });
+
+  it('signs a signed-out person in before the decisions redirect', async () => {
+    mocks.getClaims.mockResolvedValueOnce({ data: null, error: null });
+    const response = await proxy(new NextRequest('http://localhost:3000/setup/decisions'));
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/sign-in?next=/setup/decisions',
+    );
+  });
+
+  it('leaves a decision step alone', async () => {
+    const response = await proxy(new NextRequest('http://localhost:3000/setup/decisions/w4'));
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+    expect(response.headers.get('location')).toBeNull();
+  });
+
   it('lets a signed-in request through to the signed-in screens', async () => {
     const response = await proxy(new NextRequest('http://localhost:3000/setup/confirm/doc_1'));
     expect(response.headers.get('x-middleware-next')).toBe('1');

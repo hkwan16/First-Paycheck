@@ -11,7 +11,9 @@ import { e2eUser, NO_E2E_USER, waitForHydration } from './support/auth';
  * goal. The health plan: type two synthetic plans when no benefits summary is
  * confirmed, choose one and save it with an enrollment deadline. The W-4:
  * read the saved 401(k) rate and health premium, change Step 4(c) and save a
- * version with its reminder to hand the form in. The e2e user
+ * version with its reminder to hand the form in. Each calculator is its own
+ * step (spec 018): the old address redirects to the first, the side nav and
+ * the footers move between them. The e2e user
  * keeps its decisions between runs (they cannot be deleted), so each test
  * reads which version is current instead of assuming v1.
  */
@@ -33,10 +35,24 @@ async function setContribution(slider: Locator, percent: number) {
   await slider.fill(String(percent));
 }
 
+/** The side nav's link to a decision step, done or not ("401(k) match, done"). */
+const navStep = (page: Page, name: string) =>
+  page
+    .getByRole('navigation', { name: 'Setup steps' })
+    .getByRole('link', { name: new RegExp(`^${name.replace(/[()]/g, '\\$&')}(\\s*, done)?$`) });
+
 test('calculates, saves a version, saves the next one over it and opens why', async ({ page }) => {
   test.setTimeout(120_000);
+  // The one-page address redirects to the first step; the nav opens the 401(k).
   await page.goto('/setup/decisions');
+  await expect(page).toHaveURL('/setup/decisions/emergency-fund');
   await waitForHydration(page);
+  await navStep(page, '401(k) match').click();
+  await expect(page).toHaveURL('/setup/decisions/401k');
+  await expect(navStep(page, '401(k) match')).toHaveAttribute('aria-current', 'page');
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'How much to put in your 401(k)' }),
+  ).toBeVisible();
   await expect(card(page)).not.toHaveAttribute('aria-busy', 'true', { timeout: 30_000 });
 
   const form = card(page).getByRole('form', { name: 'Your plan details' });
@@ -95,7 +111,7 @@ async function savedVersion(save: Locator) {
 
 test('saves an emergency fund version and pauses and resumes its goal', async ({ page }) => {
   test.setTimeout(120_000);
-  await page.goto('/setup/decisions');
+  await page.goto('/setup/decisions/emergency-fund');
   await waitForHydration(page);
   const fund = page.getByRole('region', { name: 'Emergency fund' });
   const transfer = fund.getByLabel('Monthly transfer to savings');
@@ -140,8 +156,11 @@ test('saves an emergency fund version and pauses and resumes its goal', async ({
 
 test('compares health plans, chooses one and saves it with its deadline', async ({ page }) => {
   test.setTimeout(120_000);
-  await page.goto('/setup/decisions');
+  // From the 401(k) step, its footer goes on to the health plan.
+  await page.goto('/setup/decisions/401k');
   await waitForHydration(page);
+  await page.getByRole('link', { name: 'Next: health plan' }).click();
+  await expect(page).toHaveURL('/setup/decisions/health-plan');
   const health = page.getByRole('region', { name: 'Health plan' });
   const form = health.getByRole('form', { name: 'Your health plan options' });
   const usage = health.getByRole('group', { name: 'Expected healthcare use' });
@@ -200,7 +219,7 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
   page,
 }) => {
   test.setTimeout(120_000);
-  await page.goto('/setup/decisions');
+  await page.goto('/setup/decisions/w4');
   await waitForHydration(page);
   const w4 = page.getByRole('region', { name: 'W-4, federal only' });
   const status = w4.getByRole('group', { name: 'Filing status' });
@@ -233,4 +252,20 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
     'href',
     /^\/why\/[^/]+$/,
   );
+
+  // Every step is saved: each is checked off in the nav, and Decisions with them.
+  // Chromium reads the hidden ", done" as its own word.
+  for (const name of ['Emergency fund', '401\\(k\\) match', 'Health plan', 'W-4', 'Decisions']) {
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Setup steps' })
+        .getByRole('link', { name: new RegExp(`^${name}\\s*, done$`) }),
+    ).toBeVisible({ timeout: 30_000 });
+  }
+  await expect(page.getByRole('link', { name: 'Back to health plan' })).toHaveAttribute(
+    'href',
+    '/setup/decisions/health-plan',
+  );
+  await page.getByRole('link', { name: 'See your plan' }).click();
+  await expect(page).toHaveURL('/plan');
 });

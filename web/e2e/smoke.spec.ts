@@ -75,9 +75,33 @@ const SCREENS: readonly Screen[] = [
     sample: true,
   },
   {
-    path: '/dev/screens/decisions',
-    name: 'decisions',
-    heading: 'Four decisions for your first month',
+    path: '/dev/screens/decisions/emergency-fund',
+    name: 'decisions-emergency-fund',
+    heading: 'How much to keep for emergencies',
+    sample: true,
+  },
+  {
+    path: '/dev/screens/decisions/401k',
+    name: 'decisions-401k',
+    heading: 'How much to put in your 401(k)',
+    sample: true,
+  },
+  {
+    path: '/dev/screens/decisions/health-plan',
+    name: 'decisions-health-plan',
+    heading: 'Which health plan to choose',
+    sample: true,
+  },
+  {
+    path: '/dev/screens/decisions/w4',
+    name: 'decisions-w4',
+    heading: 'What to put on your W-4',
+    sample: true,
+  },
+  {
+    path: '/dev/screens/decisions/after-alpha',
+    name: 'decisions-after-alpha',
+    heading: 'How much to keep for emergencies',
     sample: true,
   },
   {
@@ -470,8 +494,10 @@ test('reduced motion keeps feedback but drops every movement', async ({ page }) 
   expect(now.animations).toEqual([]);
   expect(now.moving).toEqual([]);
 
-  await open(page, screenAt('/dev/screens/decisions'));
-  expect((await motion(page)).moving).toEqual([]);
+  for (const step of ['emergency-fund', '401k', 'health-plan', 'w4']) {
+    await open(page, screenAt(`/dev/screens/decisions/${step}`));
+    expect((await motion(page)).moving, step).toEqual([]);
+  }
 
   // The Sankey's popover fades instead of growing (desktop only).
   if ((page.viewportSize()?.width ?? 0) >= 640) {
