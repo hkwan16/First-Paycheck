@@ -34,6 +34,17 @@ export function ledgerNote(skipped: SpendingSummary['ledger_rows_skipped']): str
   return `${formatNumber(skipped.count)} rows on loan, investment and retirement accounts are left out: they are those accounts' own ledgers, not money you spent or received.`;
 }
 
+/**
+ * The period's confirmed pay stubs, as a count: "2 pay stubs", "1 pay stub",
+ * "no pay stub" (`paycheck_count`, spec 007 rules 26 and 26a). Never
+ * "paychecks": a paycheck can be deposited with no stub confirmed for it, and
+ * income is those deposits, a separate statement.
+ */
+export function payStubsText(count: number): string {
+  if (count === 0) return 'no pay stub';
+  return `${formatNumber(count)} ${count === 1 ? 'pay stub' : 'pay stubs'}`;
+}
+
 /** Below this confidence an AI label is shown as a warning: worth a look. */
 export const LOW_CONFIDENCE = 0.7;
 

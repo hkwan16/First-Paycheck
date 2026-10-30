@@ -50,7 +50,7 @@ describe('SampleScreen', () => {
       'aria-current',
       'page',
     );
-    expect(screen.getByRole('region', { name: 'October 1 to 17 · 2 paychecks' })).toHaveTextContent(
+    expect(screen.getByRole('region', { name: 'October 1 to 17 · 2 pay stubs' })).toHaveTextContent(
       '$3,992.08',
     );
     const flow = screen.getByRole('region', { name: 'Where each dollar of October pay went' });

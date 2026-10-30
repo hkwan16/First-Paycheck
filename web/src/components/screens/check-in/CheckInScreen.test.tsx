@@ -164,7 +164,7 @@ describe('CheckInScreen', () => {
     const card = await screen.findByRole('region', {
       name: 'November cash flow against the plan',
     });
-    expect(within(card).getByText('November 1 to 16 · 1 paycheck')).toBeInTheDocument();
+    expect(within(card).getByText('November 1 to 16 · 1 pay stub')).toBeInTheDocument();
     const row = within(card).getByRole('row', { name: /^401\(k\) from pay stubs/ });
     expect(row).toHaveTextContent('$54.17');
     expect(row).toHaveTextContent('$108.33');

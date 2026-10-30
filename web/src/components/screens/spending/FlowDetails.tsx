@@ -69,8 +69,8 @@ export function FlowDetails({ node, flow, transactions, masks, kinds }: FlowDeta
       if (stubs === 0) {
         return (
           <Muted>
-            No pay stub is confirmed for this period. <Link href="/setup/confirm">Confirm one</Link>{' '}
-            to see gross pay and withholding.
+            No confirmed pay stub was paid in this period.{' '}
+            <Link href="/setup/confirm">Confirm one from it</Link> to see gross pay and withholding.
           </Muted>
         );
       }

@@ -187,7 +187,7 @@ describe('layoutCashFlow', () => {
     const noStubs = layoutCashFlow(flow, 928);
 
     expect(node(noStubs, 'gross')).toMatchObject({
-      name: 'No confirmed pay stub',
+      name: 'No pay stub this period',
       zero: true,
       cents: 0,
     });

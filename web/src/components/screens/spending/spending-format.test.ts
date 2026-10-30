@@ -5,6 +5,7 @@ import {
   ledgerNote,
   monthName,
   NO_SHARE,
+  payStubsText,
   periodText,
   shareText,
   sourceBadge,
@@ -96,5 +97,17 @@ describe('ledgerNote', () => {
 
   it('says nothing when no row was left out', () => {
     expect(ledgerNote({ count: 0, net_cents: 0 })).toBeNull();
+  });
+});
+
+describe('payStubsText', () => {
+  // Spec 007 rule 26a (issue 164): the count is pay stubs in the period, not paychecks.
+  it.each([
+    [0, 'no pay stub'],
+    [1, '1 pay stub'],
+    [2, '2 pay stubs'],
+    [1234, '1,234 pay stubs'],
+  ])('says %i as "%s"', (count, text) => {
+    expect(payStubsText(count)).toBe(text);
   });
 });

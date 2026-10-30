@@ -5,8 +5,8 @@ import { Card } from '@/components/ui/Card';
 import { Money } from '@/components/ui/Money';
 import type { CheckInCashFlow, PlanLine } from '@/lib/api/types';
 import { cn } from '@/lib/cn';
-import { formatMoney, formatNumber } from '@/lib/money';
-import { ledgerNote, monthName, periodText } from '../spending/spending-format';
+import { formatMoney } from '@/lib/money';
+import { ledgerNote, monthName, payStubsText, periodText } from '../spending/spending-format';
 import { planBarValue, planStatusText, planStatusTone } from './checkin-format';
 
 function Line({ line }: { line: PlanLine }) {
@@ -75,7 +75,6 @@ export function PlanLinesCard({
   className?: string;
 }) {
   const flow = cashFlow.cash_flow;
-  const paychecks = flow.withholding.paycheck_count;
   const ledgers = ledgerNote(flow.spending.ledger_rows_skipped);
   return (
     <Card aria-labelledby="plan-lines-title" gap={14} className={cn('@container', className)}>
@@ -84,8 +83,7 @@ export function PlanLinesCard({
           {monthName(flow.start)} cash flow against the plan
         </h2>
         <span className="text-tiny text-ink-3">
-          {periodText(flow.start, flow.end)} · {formatNumber(paychecks)}{' '}
-          {paychecks === 1 ? 'paycheck' : 'paychecks'}
+          {periodText(flow.start, flow.end)} · {payStubsText(flow.withholding.paycheck_count)}
         </span>
       </div>
       <table className="w-full border-collapse text-control tabular-nums">

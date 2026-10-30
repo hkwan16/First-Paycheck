@@ -132,7 +132,7 @@ test('a new user goes from sign-in to a verified 401(k) explanation', async ({ p
 
   await test.step('see the Spending tiles', async () => {
     await waitForHydration(page);
-    const summary = page.getByRole('region', { name: /Your month so far|paychecks?$/ });
+    const summary = page.getByRole('region', { name: /Your month so far|pay stubs?$/ });
     await expect(summary).toBeVisible();
     for (const tile of ['Income', 'Essentials', 'Flexible', 'Savings']) {
       await expect(summary.getByText(tile, { exact: true })).toBeVisible();
