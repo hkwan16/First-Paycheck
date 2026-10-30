@@ -138,7 +138,7 @@ def _version(*, fallback: bool) -> str:
 
 
 def is_stale(row: Explanation, setup: ExplainSetup) -> bool:
-    """Rule 19a: written from another context (or an unknown one, before 0018) or
+    """Rule 19a: written from another context (or an unknown one, before 0019) or
     by another prompt or fallback version than a run would use now."""
     return row.context_digest != setup.digest or row.prompt_version != _version(
         fallback=row.fallback

@@ -209,7 +209,7 @@ def test_a_benefits_summary_makes_it_stale(
 def test_a_row_without_a_digest_is_stale(
     script: Script, client_as: Client, user_a: FixtureUser, db_connection: Connection
 ) -> None:
-    """Issue 161 as production has it: an explain/v1 row from before 0018."""
+    """Issue 161 as production has it: an explain/v1 row from before 0019."""
     client = client_as(user_a)
     confirm_stub(db_connection, user_a)
     decision_id = save(client, ISSUE_132)
