@@ -163,7 +163,7 @@ def test_fail_twice_falls_back(
     script(BAD, BAD)
     out = explain(client_as(user_a), decision)
     assert (out["attempt"], out["retries"], out["verified"], out["fallback"]) == (3, 1, False, True)
-    assert out["prompt_version"] == "fallback/v2"
+    assert out["prompt_version"] == "fallback/v3"
     # The plain calculator result, cited.
     assert "$1,800.00" in out["text"]
     assert "$600.00" in out["text"]
@@ -177,7 +177,7 @@ def test_fail_twice_falls_back(
     assert rows(db_connection, decision) == [
         (1, 0, False, False, "explain/v2"),
         (2, 1, False, False, "explain/v2"),
-        (3, 1, False, True, "fallback/v2"),
+        (3, 1, False, True, "fallback/v3"),
     ]
 
 
@@ -251,7 +251,7 @@ def test_fallback_states_the_pay_stub_rate(
     decision_id = save(client_as(user_a), ISSUE_132)
     script(REFUSAL_REPLY)
     out = explain(client_as(user_a), decision_id)
-    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v2")
+    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v3")
     assert "Your latest pay stub shows 3% going to your 401(k)" in out["text"]
     assert "already" not in out["text"]
 
@@ -262,7 +262,7 @@ def test_gateway_error_falls_back(
     script(REFUSAL_REPLY)
     out = explain(client_as(user_a), decision)
     assert (out["attempt"], out["retries"], out["fallback"]) == (1, 0, True)
-    assert rows(db_connection, decision) == [(1, 0, False, True, "fallback/v2")]
+    assert rows(db_connection, decision) == [(1, 0, False, True, "fallback/v3")]
     # The refusal is in the ledger.
     statuses = db_connection.execute(
         text("SELECT status::text FROM llm_calls WHERE user_id = :u AND purpose = 'explain'"),
@@ -502,7 +502,7 @@ def test_health_plan_fallback_is_cited(
     decision_id = save_other(client, "health_plans", "/calc/health-plans", inputs)
     script(BAD, BAD)
     out = explain(client, decision_id)
-    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v2")
+    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v3")
     assert [c["key"] for c in out["citations"]] == [
         "health.hdhp_definition",
         "health.hsa_limit",
@@ -569,7 +569,7 @@ def test_w4_fallback_is_cited(script: Script, client_as: Client, user_a: Fixture
     decision_id = save_other(client, "w4", "/calc/w4", W4_EXAMPLE_5)
     script(BAD, BAD)
     out = explain(client, decision_id)
-    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v2")
+    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v3")
     assert out["verification"]["numbers_unmatched"] == []
     assert [c["key"] for c in out["citations"]] == [
         "w4.percentage_method",

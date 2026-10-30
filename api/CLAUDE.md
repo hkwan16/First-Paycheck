@@ -317,7 +317,7 @@ explanation, `GET /calendar` shows the check it implies.
   looked up by it. It never goes into the decision, which is immutable. The
   verifier checks numbers and citations only; whether drafts call the chosen
   rate the one in effect is the explain eval's `rate_framing` metric, read by
-  `Gateway.judge_rate_claim`, not a check. The gateway sends `explain/v2`; fallback rows are `fallback/v2`.
+  `Gateway.judge_rate_claim`, not a check. The gateway sends `explain/v2`; fallback rows are `fallback/v3`.
 - **No transaction across a model call.** `POST /explain` takes `UserSessions`
   (a factory, `app/deps.py`): read in one session, call the gateway with none
   open, write in a second. `LlmGateway` is lazy, so a 404 or a stored verified
@@ -455,7 +455,9 @@ kinds `goal_contribution` and `goal_review`, `profiles.birth_year` and
 - **Explain for health plans.** Facts are numbers only; plan names and usage
   go in `retrieval/context.py:health_notes`. `name_numbers` lets digits in a
   plan's name pass the verifier, and `AllowedNumbers` matches money by
-  magnitude (a negative expected cost is printed as `-$403.00`). Citations:
+  magnitude. A negative net cost is written as an amount ahead, `$403.00 ahead`
+  (`verify/format.py:net_cost`, spec 012 rule 17), in the facts, the fallback and
+  the PDF, where the plan's cost figures have kind `net_cost`. Citations:
   `db/seed/irs_citations/health_plans.yaml`. An emergency-fund decision has no
   IRS citation to give, so explaining one is 422 `explanation_unavailable`.
 - **Birth year.** `profiles.birth_year` (1900 to the current year, the upper

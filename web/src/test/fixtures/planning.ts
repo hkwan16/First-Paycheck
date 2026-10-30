@@ -22,9 +22,11 @@ import { SAVINGS_ID } from './sample';
 
 /*
  * The M6 sample: J. Rivera's emergency fund (essentials of $1,823.25 a month
- * from the sample spending summary, $2,140.00 in Chase Savings) and Acme's two
- * medical plans from the benefits summary the Link mockup lists. Every
- * calculator result here was computed by the API's own calculators
+ * from the sample spending summary, $2,140.00 in Chase Savings) and Acme's
+ * three medical plans from the benefits summary the Link mockup lists: the
+ * mockup's Bronze HSA and Gold PPO, and a Saver HDHP that comes out ahead at
+ * low use (spec 012 rule 17). Every calculator result here was computed by
+ * the API's own calculators
  * (emergency-fund-results.json and health-plans-results.json, written by
  * make-emergency-fund-results.py and make-health-plans-results.py); nothing
  * is worked out in TypeScript. Invented data only.
@@ -94,6 +96,21 @@ export const GOLD_PPO: HealthPlanOption = {
   employer_hsa_cents: 0,
 };
 
+/**
+ * Acme's third plan: a high-deductible plan whose $1,000 of employer HSA money
+ * is more than its $240 of premiums and low use's $500 of care, so the
+ * calculator's low cost is negative and the card says it comes out ahead.
+ */
+export const SAVER_HDHP: HealthPlanOption = {
+  name: 'Saver HDHP',
+  kind: 'hdhp',
+  premium_per_period_cents: 1_000,
+  deductible_cents: 320_000,
+  coinsurance_pct: '20.00',
+  oop_max_cents: 650_000,
+  employer_hsa_cents: 100_000,
+};
+
 /** A plan typed by hand on the health plan card (no benefits summary confirmed). */
 export const SILVER_HMO: HealthPlanOption = {
   name: 'Silver HMO',
@@ -108,12 +125,12 @@ export const SILVER_HMO: HealthPlanOption = {
 /** The enrollment deadline the sample benefits summary prints. */
 export const ENROLLMENT_DEADLINE = '2026-11-14';
 
-/** The sample's health plan inputs: both Acme plans, medium usage, nothing chosen yet. */
+/** The sample's health plan inputs: the three Acme plans, medium usage, nothing chosen yet. */
 export function sampleHealthPlansInputs(
   overrides: Partial<HealthPlansInput> = {},
 ): HealthPlansInput {
   return {
-    plans: [{ ...BRONZE_HSA }, { ...GOLD_PPO }],
+    plans: [{ ...BRONZE_HSA }, { ...GOLD_PPO }, { ...SAVER_HDHP }],
     pay_periods_per_year: 24,
     salary_cents: 6_500_000,
     filing_status: 'single',
@@ -133,7 +150,7 @@ export const sampleHealthPlans = (overrides: Partial<HealthPlansInput> = {}) =>
   known(sampleHealthPlansInputs(overrides), healthPlansResult, 'health-plans-results.json');
 
 /** `GET /benefits-plans` after the sample benefits summary is confirmed. */
-export const sampleBenefitsPlans: readonly BenefitsPlan[] = [BRONZE_HSA, GOLD_PPO].map(
+export const sampleBenefitsPlans: readonly BenefitsPlan[] = [BRONZE_HSA, GOLD_PPO, SAVER_HDHP].map(
   (plan, index) => ({
     ...plan,
     coinsurance_pct: String(plan.coinsurance_pct),
@@ -280,7 +297,7 @@ const sourceLine = (text: string): SourceLine => ({
 });
 
 /**
- * The sample benefits summary as the API proposes it (spec 013 rule 8): two
+ * The sample benefits summary as the API proposes it (spec 013 rule 8): three
  * plans, the match tiers 100% of the first 3% and 50% of the next 2% (bounds
  * computed in code, so the second carries the "Cumulative" note) and a
  * three-year vesting schedule. Benefits lines are not linked to fields.
@@ -292,6 +309,7 @@ export const sampleBenefitsProposal: Proposal = {
   plans: [
     { fields: planFields(BRONZE_HSA, [0.97, 0.95, 0.96, 0.94, 0.93, 0.92, 0.86, 0.9]) },
     { fields: planFields(GOLD_PPO, [0.97, 0.96, 0.96, 0.95, 0.94, 0.82, 0.99, 0.9]) },
+    { fields: planFields(SAVER_HDHP, [0.96, 0.95, 0.95, 0.94, 0.93, 0.93, 0.91, 0.9]) },
   ],
   match_tiers: [
     {
@@ -330,6 +348,12 @@ export const sampleBenefitsProposal: Proposal = {
     'DEDUCTIBLE 250.00',
     'COINSURANCE AFTER DEDUCTIBLE 10%',
     'OUT-OF-POCKET MAXIMUM 3,000.00',
+    'SAVER HDHP (HIGH DEDUCTIBLE)',
+    'PREMIUM PER PAYCHECK 10.00',
+    'DEDUCTIBLE 3,200.00',
+    'COINSURANCE AFTER DEDUCTIBLE 20%',
+    'OUT-OF-POCKET MAXIMUM 6,500.00',
+    'ACME HSA CONTRIBUTION 1,000.00',
     'ENROLL BY 11/14/2026',
     '401(K) ACME MATCHES 100% OF THE FIRST 3% AND 50% OF THE NEXT 2%',
     'VESTING 3-YEAR CLIFF',
@@ -340,7 +364,7 @@ export const sampleBenefitsProposal: Proposal = {
 
 /** The sample summary's values as the Confirm screen sends them once every field is confirmed. */
 export const sampleBenefitsValues: BenefitsValues = {
-  plans: [BRONZE_HSA, GOLD_PPO].map((plan) => ({
+  plans: [BRONZE_HSA, GOLD_PPO, SAVER_HDHP].map((plan) => ({
     ...plan,
     coinsurance_pct: String(plan.coinsurance_pct),
     enrollment_deadline: ENROLLMENT_DEADLINE,

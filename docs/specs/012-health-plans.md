@@ -1,6 +1,6 @@
 # 012: Health plan comparison calculator
 
-Status: Implemented, M6. Every example is a test; the 2026 HSA and HDHP constants were verified against Rev. Proc. 2025-19 on 2026-10-21.
+Status: Implemented, M6. Every example is a test; the 2026 HSA and HDHP constants were verified against Rev. Proc. 2025-19 on 2026-10-21. Rule 17 (a negative net cost reads as coming out ahead) added 2026-10-30, issue 154.
 
 ## Goal
 
@@ -43,8 +43,8 @@ Compare the health plans an employer offers on what each one would cost the user
 | `plans[].employee_hsa_cents` | `Cents` | The user's own contribution the plan allows (rule 4). |
 | `plans[].hsa_capped` | bool | True when `employee_hsa_cents` was cut to the limit. |
 | `plans[].hsa_tax_savings_cents` | `Cents` | Federal income tax that contribution saves (rule 5). |
-| `plans[].low_cost_cents`, `medium_cost_cents`, `high_cost_cents` | `SignedCents` | Expected annual net cost at each scenario (rule 7). Can be negative. |
-| `plans[].worst_case_cents` | `SignedCents` | Net cost when spending reaches the out-of-pocket maximum. |
+| `plans[].low_cost_cents`, `medium_cost_cents`, `high_cost_cents` | `SignedCents` | Expected annual net cost at each scenario (rule 7). Can be negative; shown as an amount ahead (rule 17). |
+| `plans[].worst_case_cents` | `SignedCents` | Net cost when spending reaches the out-of-pocket maximum. Can be negative too (rule 17). |
 | `pairs` | list of `PlanPair` | One per pair `i < j`, in order `(0,1), (0,2), ..., (1,2), ...`. |
 | `pairs[].plan_a_index`, `plan_b_index` | int | The pair. |
 | `pairs[].cheaper_at_zero_index` | int or null | The plan cheaper with no medical spending; null on a tie. |
@@ -85,7 +85,15 @@ Notation: `P` pay periods, `S` salary, for plan `k`: `prem_k`, `D_k`, `c_k`, `M_
 13. Saving a `health_plans` decision follows spec 007 (validate, recompute, compare, store the server's values).
 14. `selected_plan_index` must be set; a null is 422 `plan_not_selected` and nothing is saved.
 15. When `enrollment_deadline` is set and not before the request's UTC date, the save adds a calendar event `enrollment_deadline` titled "Health plan enrollment deadline", due on that date and linked to the decision. A later version dismisses the earlier version's `upcoming` `enrollment_deadline` events in the same transaction. `DecisionSaved.calendar_event_id` is the new event's id or null; `goal_id` is null.
-16. **Explain.** `retrieval/context.py` turns a health-plan decision into facts, each a number (the rate, the three scenario spends, the HSA limit and HDHP thresholds, each plan's yearly premiums, deductible, coinsurance, maximum, employer and employee HSA amounts, tax savings, three scenario costs and worst case, every pair's break-even spends, the salary, paychecks per year and tax year), notes in words (the expected usage and the cheapest plan at it, the plan picked, pairs whose cheaper plan never changes, a capped HSA contribution, a plan labeled `hdhp` below the thresholds, a negative cost) and up to three benefits passages from the user's `benefits_chunks` for the query `health plan deductible coinsurance out-of-pocket premium HSA`. Plan names are the user's confirmed text, so `retrieval/context.py:name_numbers` passes the numbers inside them ("Gold PPO 2", "Silver $500") to `AllowedNumbers` as allowed values. A negative money value (example 3's low cost) is allowed by its magnitude, matching spec 008 rule 13, which already ignores a money token's sign. `verify/fallback.py` writes the code-only fallback from the same numbers, cited with the result's `citation_keys` the seed holds (`api/db/seed/irs_citations/health_plans.yaml`).
+16. **Explain.** `retrieval/context.py` turns a health-plan decision into facts, each a number (the rate, the three scenario spends, the HSA limit and HDHP thresholds, each plan's yearly premiums, deductible, coinsurance, maximum, employer and employee HSA amounts, tax savings, three scenario costs and worst case, every pair's break-even spends, the salary, paychecks per year and tax year), notes in words (the expected usage and the cheapest plan at it, the plan picked, pairs whose cheaper plan never changes, a capped HSA contribution, a plan labeled `hdhp` below the thresholds, a negative cost and how to write it, rule 17) and up to three benefits passages from the user's `benefits_chunks` for the query `health plan deductible coinsurance out-of-pocket premium HSA`. Plan names are the user's confirmed text, so `retrieval/context.py:name_numbers` passes the numbers inside them ("Gold PPO 2", "Silver $500") to `AllowedNumbers` as allowed values. The four net-cost facts are written as rule 17 says ("$403.00 ahead"), so a draft that repeats one repeats the wording; a negative money value (example 3's low cost) is allowed by its magnitude either way, matching spec 008 rule 13, which already ignores a money token's sign. `verify/fallback.py` writes the code-only fallback from the same numbers, in rule 17's words, cited with the result's `citation_keys` the seed holds (`api/db/seed/irs_citations/health_plans.yaml`).
+
+### Showing a net cost
+
+17. **A negative net cost reads as coming out ahead.** The four net costs (`low_cost_cents`, `medium_cost_cents`, `high_cost_cents`, `worst_case_cents`) are `SignedCents`, and each can be negative: example 3's low cost is -40,300, and a worst case is negative when the employer's HSA money is more than the premiums plus the out-of-pocket maximum (an eligible `hdhp` with no premium, a 170,000 deductible and maximum and 200,000 from the employer costs -30,000 at worst). A negative net cost means the plan leaves the person with more than it takes: the employer's HSA money and the tax saved outweigh the premiums and the care. Printed as "-$403" it reads as an error, so wherever a net cost is shown, a negative one is written as its amount followed by "ahead", with no minus sign: -40,300 is "$403 ahead" in whole dollars and "$403.00 ahead" with cents. Zero and positive costs stay plain money ("$0", "$2,025"). Nothing else in the result is signed: premiums, the plan terms, HSA amounts, tax savings and `break_even_spends_cents` are `Cents`, so they stay plain money.
+    - **Why "ahead".** It states the fact (the person ends the year that much ahead) in one plain word that fits a table cell under a cost heading and needs no sign. "Saved" or "savings" would blur into the "Your HSA tax savings" row; "back", "refund" or "credit" promise cash that never arrives (the employer's money stays in the HSA for care, and the tax saved shows up as lower withholding); a "+" is still a sign to decode.
+    - **The sign stays the API's.** The calculator returns signed cents and nothing re-signs, compares or recomputes them. Each surface only chooses the words from the sign the API sent, through one pure helper on each side: `web/src/lib/money.ts:formatNetCost` and `api/verify/format.py:net_cost`. The web helper starts from `formatMoney`'s own text, so a cost that rounds to $0 in whole dollars is "$0", never "$0 ahead". The words are shared because one saved decision is read on four surfaces (the health plan step, the Plan page, the Why page's fallback text and the PDF), and a person moving between them should see one number written one way.
+    - **Where.** On the health plan step, the comparison table's three usage rows and its worst-case row, and the headline. The headline of a cheapest plan that costs something stays "Gold PPO costs the least at medium use: $2,025 a year"; "costs the least at low use: $403 ahead a year" reads oddly, so a cheapest plan that comes out ahead reads "Bronze HSA costs the least at low use and leaves you $403 ahead a year". Break-even notes print spending, not costs, and do not change. On the Plan page and in the PDF the expected cost and worst case are figures of kind `net_cost` (spec 016 rule 3), so the kind, not a key or a label, says which figures take these words. The fallback explanation says "costs you the least and leaves you $403.00 ahead a year" and "which leaves you $403.00 ahead a year at that use" (example 3 at low use below); the explain context writes the four cost facts the same way and its negative-cost note tells the model to keep that wording.
+    - **No color.** An amount ahead keeps the cell's ink: a tone marks a state (web/CLAUDE.md, "Color means something"), and the word carries the meaning.
 
 ## 2026 constants
 
@@ -163,13 +171,27 @@ Each row is one test in `api/tests/unit/calc/test_health_plans_examples.py` and 
 
 The examples were worked by hand and then cross-checked with a throwaway `Decimal` script; the tests, not the script, are the record.
 
+### Writing net costs (rule 17)
+
+Tested in `web/src/lib/money.test.ts` (`formatNetCost`) and `api/tests/unit/verify/test_fallback_and_context.py` (`net_cost`).
+
+| Net cost (cents) | Whole dollars (the comparison table and headline) | With cents (Plan page, PDF, explanations) |
+|---|---|---|
+| 202,500 | $2,025 | $2,025.00 |
+| 0 | $0 | $0.00 |
+| -40 | $0 (rounds to zero, so nothing is ahead) | $0.40 ahead |
+| -40,300 (example 3, low) | $403 ahead | $403.00 ahead |
+| -59,650 | $597 ahead (half up, as `formatMoney` rounds) | $596.50 ahead |
+
+Example 3 at `expected_usage = low` with Bronze HSA picked: the headline is "Bronze HSA costs the least at low use and leaves you $403 ahead a year", and the fallback opens "At low medical use, about $500.00 of care a year, Bronze HSA costs you the least and leaves you $403.00 ahead a year: the employer's HSA money and the tax an HSA contribution saves are more than its premiums and your share of the care." With Gold PPO picked instead it adds "You picked Gold PPO, which costs $2,125.00 a year at that use."
+
 ## Edge cases
 
 - One plan: `pairs` is empty, the plan is recommended.
 - A plan with 0% coinsurance stops costing more at its deductible; its `worst_case_cents` still uses the stated maximum, which the scenarios never reach.
 - A plan with 100% coinsurance pays nothing until the maximum; `cap = M`.
 - Coinsurance so low that a plan reaches its maximum only past $1,000,000 of spending: the scan stops at $1,000,000 (rule 8).
-- Negative net costs are allowed (`SignedCents`); a cost can never be below `-(H + hsa_limit)`.
+- Negative net costs are allowed (`SignedCents`); a cost can never be below `-(H + hsa_limit)`. Every surface writes one as an amount ahead (rule 17).
 - `employer_hsa_cents` above the HSA limit: the employee room is 0; the employer amount still counts as given.
 - `usage_*_cents` not strictly ascending, `selected_plan_index` out of range, an empty plan list or more than 8 plans: 422.
 

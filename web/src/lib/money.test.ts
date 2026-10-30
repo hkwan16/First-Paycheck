@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatMoney,
+  formatNetCost,
   formatNumber,
+  netCost,
   formatPct,
   formatRate,
   formatTransactionAmount,
@@ -44,6 +46,37 @@ describe('formatMoney', () => {
 
   it.each([1.5, Number.NaN, Infinity, 2 ** 53])('rejects %s, which is not integer cents', (bad) => {
     expect(() => formatMoney(bad)).toThrow(RangeError);
+  });
+});
+
+describe('formatNetCost', () => {
+  // Spec 012 rule 17's table: a negative net cost reads as coming out ahead.
+  it.each([
+    [202_500, '$2,025', '$2,025.00'],
+    [0, '$0', '$0.00'],
+    [-40, '$0', '$0.40 ahead'],
+    [-40_300, '$403 ahead', '$403.00 ahead'],
+    [-59_650, '$597 ahead', '$596.50 ahead'],
+  ])('writes %i cents as %s, or %s with cents', (cents, whole, withCents) => {
+    expect(formatNetCost(cents, { decimals: 0 })).toBe(whole);
+    expect(formatNetCost(cents)).toBe(withCents);
+  });
+
+  it('never prints a minus sign', () => {
+    for (const cents of [-1, -50, -40_300, -123_456_789]) {
+      expect(formatNetCost(cents)).not.toContain('-');
+      expect(formatNetCost(cents, { decimals: 0 })).not.toContain('-');
+    }
+  });
+
+  it('splits the amount from whether it is ahead, for a sentence of its own', () => {
+    expect(netCost(-40_300, { decimals: 0 })).toEqual({ amount: '$403', ahead: true });
+    expect(netCost(202_500, { decimals: 0 })).toEqual({ amount: '$2,025', ahead: false });
+    expect(netCost(-40, { decimals: 0 })).toEqual({ amount: '$0', ahead: false });
+  });
+
+  it('rejects what is not integer cents', () => {
+    expect(() => formatNetCost(1.5)).toThrow(RangeError);
   });
 });
 

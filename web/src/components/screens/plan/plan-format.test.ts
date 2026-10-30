@@ -25,6 +25,9 @@ describe('figureText', () => {
   it('formats each kind of figure exactly as the API sent it', () => {
     expect(figureText(fig('money', 546_975))).toBe('$5,469.75');
     expect(figureText(fig('money', -12_345))).toBe('-$123.45');
+    // A health plan's net cost: a negative one comes out ahead (spec 012 rule 17).
+    expect(figureText(fig('net_cost', 202_500))).toBe('$2,025.00');
+    expect(figureText(fig('net_cost', -40_300))).toBe('$403.00 ahead');
     expect(figureText(fig('percent', '39.12'))).toBe('39.12%');
     expect(figureText(fig('percent', '4.00'))).toBe('4%');
     expect(figureText(fig('count', 12))).toBe('12');
@@ -39,6 +42,7 @@ describe('figureText', () => {
   it('refuses a value of the wrong type rather than guessing', () => {
     expect(() => figureText(fig('money', '12'))).toThrow(TypeError);
     expect(() => figureText(fig('percent', 4))).toThrow(TypeError);
+    expect(() => figureText(fig('net_cost', '12'))).toThrow(TypeError);
   });
 
   it('formats every figure of the sample plan', () => {

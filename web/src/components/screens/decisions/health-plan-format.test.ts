@@ -8,10 +8,12 @@ import {
   GOLD_PPO,
   sampleBenefitsPlans,
   sampleHealthPlans,
+  SAVER_HDHP,
   SILVER_HMO,
 } from '@/test/fixtures/planning';
 import {
   costAt,
+  costText,
   draftFromOption,
   EMPTY_PLAN_DRAFT,
   hdhpNotice,
@@ -52,7 +54,7 @@ describe('plansFromBenefits', () => {
   it("takes the newest summary's plans, in its order, with its enrollment deadline", () => {
     const older = { ...sampleBenefitsPlans[0]!, id: 'old', document_id: 'older-doc', name: 'Old' };
     expect(plansFromBenefits([...sampleBenefitsPlans, older])).toEqual({
-      plans: [BRONZE_HSA, GOLD_PPO],
+      plans: [BRONZE_HSA, GOLD_PPO, SAVER_HDHP],
       deadline: ENROLLMENT_DEADLINE,
       left: 0,
     });
@@ -86,13 +88,33 @@ describe('costAt', () => {
   });
 });
 
+describe('costText', () => {
+  it("writes the API's net cost in whole dollars, a negative one as an amount ahead", () => {
+    const { result } = sampleHealthPlans({ expected_usage: 'low' });
+    const [bronze, , saver] = result.plans;
+    expect(costText(bronze!.low_cost_cents)).toBe('$650');
+    expect(costText(saver!.low_cost_cents)).toBe('$260 ahead');
+    expect(costText(saver!.worst_case_cents)).toBe('$5,740');
+    expect(costText(-30_000)).toBe('$300 ahead');
+  });
+});
+
 describe('headline', () => {
   it('names the cheapest plan at the expected usage and its yearly cost', () => {
     expect(headline(sampleHealthPlans().result, 'medium')).toBe(
       'Gold PPO costs the least at medium use: $2,025 a year',
     );
-    expect(headline(sampleHealthPlans({ expected_usage: 'low' }).result, 'low')).toBe(
-      'Bronze HSA costs the least at low use: $650 a year',
+    expect(headline(sampleHealthPlans({ expected_usage: 'high' }).result, 'high')).toBe(
+      'Gold PPO costs the least at high use: $2,725 a year',
+    );
+  });
+
+  it('says a cheapest plan that comes out ahead leaves you that much ahead (spec 012 rule 17)', () => {
+    const { result } = sampleHealthPlans({ expected_usage: 'low' });
+    // The API's sign: Saver HDHP's low cost is negative.
+    expect(result.plans[2]!.low_cost_cents).toBe(-26_000);
+    expect(headline(result, 'low')).toBe(
+      'Saver HDHP costs the least at low use and leaves you $260 ahead a year',
     );
   });
 });
@@ -186,7 +208,7 @@ describe('hsaEffect', () => {
 describe('hdhpNotice', () => {
   it('names a plan labeled high-deductible that misses the HSA rules', () => {
     const { result } = sampleHealthPlans({
-      plans: [{ ...BRONZE_HSA, deductible_cents: 150_000 }, GOLD_PPO],
+      plans: [{ ...BRONZE_HSA, deductible_cents: 150_000 }, GOLD_PPO, SAVER_HDHP],
       employee_hsa_cents: 100_000,
     });
     expect(hdhpNotice(result.plans[0]!, result, 2026)).toBe(

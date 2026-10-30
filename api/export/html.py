@@ -17,7 +17,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from app.plan import PlanFigure, PlanOut
 from db.enums import CalculatorKind, CalendarKind, GoalKind, GoalStatus
-from verify.format import dollars, percent
+from verify.format import dollars, net_cost, percent
 
 __all__ = ["render_html"]
 
@@ -53,6 +53,8 @@ def figure_value(figure: PlanFigure) -> str:
     value = figure.value
     if figure.kind == "money" and isinstance(value, int):
         return dollars(value)
+    if figure.kind == "net_cost" and isinstance(value, int):
+        return net_cost(value)
     if figure.kind == "percent" and isinstance(value, str):
         return percent(Decimal(value))
     if figure.kind == "count" and (value is None or isinstance(value, int)):

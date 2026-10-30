@@ -17,15 +17,16 @@ from calc.k401 import K401MatchInput, K401MatchResult
 from calc.pay_stub import StubRate, stub_rate
 from calc.w4 import W4Input, W4Result
 from llm.schemas import ExplanationDraft, NumberClaim
-from verify.format import dollars, percent
+from verify.format import dollars, net_cost, percent
 
 __all__ = ["FALLBACK_VERSION", "fallback_draft"]
 
 # Stored as a fallback row's prompt_version: the text comes from this module,
 # not a prompt, so a change to it is a new version here. v2 (issue 132): the
 # 401(k) text speaks of the rate chosen, states the pay stub's rate, and says
-# "already" only when the stub shows the rate chosen.
-FALLBACK_VERSION = "fallback/v2"
+# "already" only when the stub shows the rate chosen. v3 (issue 154): a
+# negative health plan cost reads as an amount ahead (spec 012 rule 17).
+FALLBACK_VERSION = "fallback/v3"
 
 K401_CONCEPT = "Your employer's 401(k) match and what it costs you to earn all of it."
 HEALTH_CONCEPT = "Comparing health plans by what each costs you in a year, not just by the premium."
@@ -140,18 +141,30 @@ def _health(data: HealthPlansInput, result: HealthPlansResult) -> tuple[str, lis
             "high": plan.high_cost_cents,
         }[data.expected_usage]
 
+    # A negative net cost reads as coming out ahead (spec 012 rule 17).
     best = result.recommended_index
-    best_cost = dollars(cost_at_usage(best))
-    sentences = [
+    best_cost = net_cost(cost_at_usage(best))
+    opening = (
         f"At {data.expected_usage} medical use, about {dollars(usage)} of care a year,"
-        f" {names[best]} costs you the least: {best_cost} a year after premiums, your share of"
-        " the care, the employer's HSA money and the tax an HSA contribution saves."
-    ]
+        f" {names[best]} costs you the least"
+    )
+    if cost_at_usage(best) < 0:
+        opening += (
+            f" and leaves you {best_cost} a year: the employer's HSA money and the tax an HSA"
+            " contribution saves are more than its premiums and your share of the care."
+        )
+    else:
+        opening += (
+            f": {best_cost} a year after premiums, your share of the care, the employer's HSA"
+            " money and the tax an HSA contribution saves."
+        )
+    sentences = [opening]
     claims = [NumberClaim(value=best_cost, label=f"{names[best]} yearly cost")]
     selected = result.selected_index
     if selected is not None and selected != best:
-        picked = dollars(cost_at_usage(selected))
-        sentences.append(f"You picked {names[selected]}, which costs {picked} a year at that use.")
+        picked = net_cost(cost_at_usage(selected))
+        verb = "leaves you" if cost_at_usage(selected) < 0 else "costs"
+        sentences.append(f"You picked {names[selected]}, which {verb} {picked} a year at that use.")
         claims.append(NumberClaim(value=picked, label=f"{names[selected]} yearly cost"))
     for pair in result.pairs:
         if pair.break_even_spends_cents:

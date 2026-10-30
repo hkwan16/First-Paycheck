@@ -9,6 +9,7 @@ import {
   sampleHealthDecision,
   sampleHealthPlans,
   sampleHealthPlansInputs,
+  SAVER_HDHP,
   SILVER_HMO,
 } from '@/test/fixtures/planning';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
@@ -44,7 +45,9 @@ const result = () => within(card()).getByRole('group', { name: 'Calculator resul
 const usage = () => within(card()).getByRole('group', { name: 'Expected healthcare use' });
 const choice = () => within(card()).getByRole('group', { name: 'The plan you will enroll in' });
 const table = () => within(card()).getByRole('table', { name: 'Expected yearly cost by plan' });
-const saveButton = () => within(card()).getByRole('button', { name: /^Save|^Saved/ });
+// "Save this decision", "Save as v2", "Saved as v1"; not the plan named "Saver HDHP".
+const saveButton = () =>
+  within(card()).getByRole('button', { name: /^(Save this decision|Save as v\d+|Saved as v\d+)$/ });
 const settle = () => act(() => vi.advanceTimersByTimeAsync(CALC_DEBOUNCE_MS));
 
 function renderCard() {
@@ -83,7 +86,7 @@ describe('HealthPlanCard from a confirmed benefits summary', () => {
     await renderReady();
 
     expect(card()).toHaveTextContent(
-      '2 plans from your benefits summary. Enrollment closes Nov 14, 2026.',
+      '3 plans from your benefits summary. Enrollment closes Nov 14, 2026.',
     );
     expect(seen.calc).toEqual([sampleHealthPlans().inputs]);
     expect(within(usage()).getByRole('button', { name: 'Medium · about $3,000' })).toHaveAttribute(
@@ -92,17 +95,23 @@ describe('HealthPlanCard from a confirmed benefits summary', () => {
     );
     expect(result()).toHaveTextContent('Gold PPO costs the least at medium use: $2,025 a year');
     expect(rows()).toEqual([
-      ['', 'Bronze HSAHigh deductible (HDHP)', 'Gold PPOPPOCheapest at medium use'],
-      ['Premium per year', '$750', '$1,500'],
-      ['Deductible', '$1,800', '$250'],
-      ['Coinsurance', '20%', '10%'],
-      ['Out-of-pocket maximum', '$3,500', '$3,000'],
-      ['Employer HSA money', '$600', 'None'],
-      ['Your HSA tax savings', '$0', 'No HSA'],
-      ['Low use · about $500', '$650', '$1,775'],
-      ['Medium use · about $3,000', '$2,190', '$2,025'],
-      ['High use · about $10,000', '$3,590', '$2,725'],
-      ['Worst case', '$3,650', '$4,500'],
+      [
+        '',
+        'Bronze HSAHigh deductible (HDHP)',
+        'Gold PPOPPOCheapest at medium use',
+        'Saver HDHPHigh deductible (HDHP)',
+      ],
+      ['Premium per year', '$750', '$1,500', '$240'],
+      ['Deductible', '$1,800', '$250', '$3,200'],
+      ['Coinsurance', '20%', '10%', '20%'],
+      ['Out-of-pocket maximum', '$3,500', '$3,000', '$6,500'],
+      ['Employer HSA money', '$600', 'None', '$1,000'],
+      ['Your HSA tax savings', '$0', 'No HSA', '$0'],
+      // Saver HDHP's low cost is negative in the API's result (spec 012 rule 17).
+      ['Low use · about $500', '$650', '$1,775', '$260 ahead'],
+      ['Medium use · about $3,000', '$2,190', '$2,025', '$2,240'],
+      ['High use · about $10,000', '$3,590', '$2,725', '$3,800'],
+      ['Worst case', '$3,650', '$4,500', '$5,740'],
     ]);
     expect(
       within(result()).getByText(/The cheaper plan changes at \$1,800 and \$19,300/),
@@ -113,10 +122,28 @@ describe('HealthPlanCard from a confirmed benefits summary', () => {
       within(choice())
         .getAllByRole('button')
         .map((b) => b.getAttribute('aria-pressed')),
-    ).toEqual(['false', 'false']);
+    ).toEqual(['false', 'false', 'false']);
     expect(saveButton()).toBeDisabled();
     expect(card()).toHaveTextContent('Choose the plan you will enroll in to save.');
     expect(within(card()).getByLabelText('Enrollment deadline')).toHaveValue('2026-11-14');
+  });
+
+  it('says a plan that comes out ahead is ahead, with no minus sign (spec 012 rule 17)', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    const { user } = await renderReady();
+    await user.click(within(usage()).getByRole('button', { name: 'Low · about $500' }));
+    await settle();
+    await waitFor(() =>
+      expect(result()).toHaveTextContent(
+        'Saver HDHP costs the least at low use and leaves you $260 ahead a year',
+      ),
+    );
+    expect(within(table()).getAllByRole('columnheader')[2]).toHaveTextContent(
+      'Cheapest at low use',
+    );
+    expect(rows()[7]).toEqual(['Low use · about $500', '$650', '$1,775', '$260 ahead']);
+    expect(result()).not.toHaveTextContent('-$');
   });
 
   it('sends one request when the usage changes and measures the debounce', async () => {
@@ -158,7 +185,7 @@ describe('HealthPlanCard from a confirmed benefits summary', () => {
   it('warns about a plan labeled high-deductible that misses the HSA rules', async () => {
     decisionsReady();
     planningDb.benefitsPlans = sampleBenefitsPlans.map((plan) =>
-      plan.kind === 'hdhp' ? { ...plan, deductible_cents: 150_000 } : { ...plan },
+      plan.name === BRONZE_HSA.name ? { ...plan, deductible_cents: 150_000 } : { ...plan },
     );
     renderCard();
     // The results fixture has this plan only with a $1,000 HSA contribution.
@@ -349,7 +376,7 @@ describe('HealthPlanCard without a benefits summary', () => {
       within(form)
         .getAllByLabelText('Plan name')
         .map((input) => (input as HTMLInputElement).value),
-    ).toEqual([BRONZE_HSA.name, GOLD_PPO.name]);
+    ).toEqual([BRONZE_HSA.name, GOLD_PPO.name, SAVER_HDHP.name]);
     await user.click(within(form).getByRole('button', { name: 'Cancel' }));
     expect(within(card()).queryByRole('form', { name: 'Your health plan options' })).toBeNull();
   });

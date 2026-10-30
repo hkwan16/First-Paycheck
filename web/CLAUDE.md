@@ -381,7 +381,7 @@ next is a real disabled button, never a dead link).
   missing case is a 500), saving either decision applies its effects (the goal and its
   contribution and review events; the enrollment deadline event), and a benefits confirm writes
   plans and the profile's match. Helpers: `savedEmergencyFund()`, `savedHealthPlan()`,
-  `benefitsConfirmed()` (the two sample plans), `benefitsWaiting()` (the sample summary proposed).
+  `benefitsConfirmed()` (the three sample plans), `benefitsWaiting()` (the sample summary proposed).
   `POST /calc/w4` answers from `w4-results.json` (`make-w4-results.py`, which also writes the
   case each suggestion leads to once applied); a saved W-4 adds the `w4_submit` reminder, and
   `savedW4()` seeds v1 (the sample reading the saved 401(k) and Gold PPO decisions).
@@ -563,7 +563,14 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
 - **`HealthPlanCard`** (spec 012): compares the newest confirmed summary's plans (up to
   `MAX_PLANS`, the API's limit), the saved decision's, or plans typed in `PlanOptionsForm`. Usage
   low, medium or high; the comparison table marks the cheapest at that usage and the chosen plan,
-  with break-even notes, the HSA tax effect and the HDHP notice from the result. Saving needs a
+  with break-even notes, the HSA tax effect and the HDHP notice from the result. A net cost (the
+  usage rows, the worst case, the headline) can be negative when the employer's HSA money and the
+  tax saved outweigh premiums and care; it reads as coming out ahead, never with a minus sign
+  (spec 012 rule 17): `costText` ("$260 ahead") over `formatNetCost`/`netCost` in `lib/money.ts`,
+  which only word the API's sign, and `headline` says "Saver HDHP costs the least at low use and
+  leaves you $260 ahead a year". No color: the word carries it. The Plan page's `net_cost`
+  figures read the same way (`figureText`). The sample's third plan, Saver HDHP, comes out ahead
+  at low use. Saving needs a
   chosen plan (a 422 `plan_not_selected` says so); an enrollment deadline adds a calendar event,
   shown under the card.
 - **`W4Card`** (spec 014): salary and pay schedule from the profile and the confirmed pay stub,
@@ -655,8 +662,8 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
   calculator to its step (`decisionKindRoute`).
 - **Decisions** (`DecisionSummary`): one `DecisionCard` per saved decision in the API's order,
   with "v{n} · Saved {date}", the API's `figures` by their labels (`figureText` formats by
-  `kind`: money, a percentage as stored, a count, text; a null `months_to_target` reads "Not
-  within 10 years"; a value of the wrong type throws rather than guessing), and the explanation:
+  `kind`: money, a net cost (negative reads "$260.00 ahead"), a percentage as stored, a count,
+  text; a null `months_to_target` reads "Not within 10 years"; a value of the wrong type throws rather than guessing), and the explanation:
   a `confirmed` "Verified explanation" badge linking to Why, a warning notice for a fallback, or
   "Explanation not written yet. Write it". An emergency fund is never explained (spec 011), so
   it shows none (`explanationView`).

@@ -289,7 +289,7 @@ describe('useConfirmDocument', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(bodies).toEqual([{ benefits: sampleBenefitsValues }]);
     expect(result.current.data?.profile_updated).toBe(true);
-    expect(result.current.data?.plans).toHaveLength(2);
+    expect(result.current.data?.plans).toHaveLength(3);
     expect(queryClient.getQueryState(queryKeys.benefitsPlans())?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(queryKeys.profile())?.isInvalidated).toBe(true);
   });

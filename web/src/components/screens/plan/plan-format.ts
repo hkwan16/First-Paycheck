@@ -9,12 +9,13 @@ import type {
 } from '@/lib/api/types';
 import { calculatorIdOf } from '@/lib/decisions';
 import type { Hue } from '@/lib/design/tone';
-import { formatMoney, formatNumber, formatRate } from '@/lib/money';
+import { formatMoney, formatNetCost, formatNumber, formatRate } from '@/lib/money';
 import { CALCULATOR_CARDS } from '../decisions/DecisionCard';
 
 /*
  * Words for the Plan screen (spec 016). Every figure is a field of
- * `GET /plan`, formatted as its `kind` says; nothing is added, compared or
+ * `GET /plan`, formatted as its `kind` says (a negative `net_cost` reads as an
+ * amount ahead, spec 012 rule 17); nothing is added, compared or
  * rounded here.
  */
 
@@ -39,6 +40,9 @@ export function figureText(figure: PlanFigure): string {
   switch (figure.kind) {
     case 'money':
       return formatMoney(expect(figure, isNumber));
+    case 'net_cost':
+      // A health plan's yearly net cost: a negative one reads as an amount ahead.
+      return formatNetCost(expect(figure, isNumber));
     case 'percent':
       return formatRate(expect(figure, isString));
     case 'count':

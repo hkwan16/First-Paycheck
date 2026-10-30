@@ -123,9 +123,9 @@ def test_health_figures_follow_the_selected_plan_and_usage(
     health = by_calculator(get_plan(client_as, user_a))["health_plans"]
     assert [(f["key"], f["label"], f["kind"]) for f in health["figures"]] == [
         ("result.plans[0].name", "Plan", "text"),
-        ("result.plans[0].medium_cost_cents", "Expected cost a year at medium use", "money"),
+        ("result.plans[0].medium_cost_cents", "Expected cost a year at medium use", "net_cost"),
         ("result.plans[0].annual_premium_cents", "Premiums a year", "money"),
-        ("result.plans[0].worst_case_cents", "Worst case a year", "money"),
+        ("result.plans[0].worst_case_cents", "Worst case a year", "net_cost"),
     ]
     assert health["figures"][0]["value"] == "Bronze HSA"
 

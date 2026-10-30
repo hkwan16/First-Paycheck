@@ -42,6 +42,32 @@ export function formatMoney(cents: number, options: FormatMoneyOptions = {}): st
   return `${sign}$${wholeNumber.format(dollars)}${fraction}`;
 }
 
+export interface NetCost {
+  /** The amount with no sign: `"$403"`. */
+  amount: string;
+  /** True when the API's net cost is negative: the person comes out that much ahead. */
+  ahead: boolean;
+}
+
+/**
+ * A yearly net cost the API computed (spec 012 rule 17), split into its
+ * unsigned amount and whether it is ahead. The sign is the API's; this reads
+ * it from `formatMoney`'s own text, so an amount that rounds to `$0` is never
+ * ahead.
+ */
+export function netCost(cents: number, options: { decimals?: 0 | 2 } = {}): NetCost {
+  const text = formatMoney(cents, options);
+  return text.startsWith('-')
+    ? { amount: text.slice(1), ahead: true }
+    : { amount: text, ahead: false };
+}
+
+/** A yearly net cost as a person reads it: `"$2,025.00"`, or `"$403.00 ahead"` when negative. */
+export function formatNetCost(cents: number, options: { decimals?: 0 | 2 } = {}): string {
+  const { amount, ahead } = netCost(cents, options);
+  return ahead ? `${amount} ahead` : amount;
+}
+
 export type TransactionFlow = 'in' | 'out' | 'none';
 
 /**

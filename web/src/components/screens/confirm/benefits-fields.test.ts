@@ -4,6 +4,7 @@ import {
   BRONZE_HSA,
   ENROLLMENT_DEADLINE,
   GOLD_PPO,
+  SAVER_HDHP,
   sampleBenefitsProposal,
 } from '@/test/fixtures/planning';
 import { benefitsValues, initBenefitsState, reviewSections } from './benefits-fields';
@@ -34,7 +35,7 @@ describe('initBenefitsState', () => {
   it('gives every plan, tier and the vesting field a key of its own, in the proposal order', () => {
     const state = initBenefitsState(proposal());
     expect(state.fields.map((f) => f.key)).toEqual([
-      ...[0, 1].flatMap((i) =>
+      ...[0, 1, 2].flatMap((i) =>
         [
           'name',
           'kind',
@@ -159,6 +160,7 @@ describe('reviewSections', () => {
     expect(sections.plans.map((plan) => [plan.title, plan.fields.length])).toEqual([
       ['Plan 1: Bronze HSA', 8],
       ['Plan 2: Gold PPO', 8],
+      ['Plan 3: Saver HDHP', 8],
     ]);
     expect(sections.tiers.map((tier) => [tier.title, tier.fields.length])).toEqual([
       ['Tier 1', 2],
@@ -172,7 +174,7 @@ describe('benefitsValues', () => {
   it('sends the confirmed plans and the 401(k) match with vesting', () => {
     const state = run(initBenefitsState(proposal()), { type: 'confirmAll' });
     expect(benefitsValues(state.fields)).toEqual({
-      plans: [BRONZE_HSA, GOLD_PPO].map((plan) => ({
+      plans: [BRONZE_HSA, GOLD_PPO, SAVER_HDHP].map((plan) => ({
         ...plan,
         enrollment_deadline: ENROLLMENT_DEADLINE,
       })),
