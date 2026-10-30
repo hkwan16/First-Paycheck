@@ -26,7 +26,7 @@ from retrieval.benefits_search import BenefitsPassage
 from retrieval.citations import Citation
 from verify.allowed import AllowedNumbers
 from verify.fallback import fallback_draft
-from verify.format import dollars, percent
+from verify.format import dollars, net_cost, percent
 from verify.numbers import extract_numbers
 
 __all__ = [
@@ -187,8 +187,10 @@ BELOW_HDHP_NOTE = (
     " out-of-pocket for an HSA, so no HSA contribution is counted for it."
 )
 NEGATIVE_COST_NOTE = (
-    "A negative yearly cost means the employer's HSA money and the tax saved are more than"
-    " the premiums and care."
+    "A cost written as an amount ahead means the employer's HSA money and the tax saved are"
+    " more than the premiums and care, so the plan leaves the person that much ahead for the"
+    " year. Write it the same way, as the amount followed by the word ahead, never with a minus"
+    " sign."
 )
 
 
@@ -266,12 +268,12 @@ def _health_facts(data: HealthPlansInput, result: HealthPlansResult) -> list[Exp
                 ),
             ]
         facts += [
-            fact(f"{name}: cost per year at low medical use", dollars(cost.low_cost_cents)),
-            fact(f"{name}: cost per year at medium medical use", dollars(cost.medium_cost_cents)),
-            fact(f"{name}: cost per year at high medical use", dollars(cost.high_cost_cents)),
+            fact(f"{name}: cost per year at low medical use", net_cost(cost.low_cost_cents)),
+            fact(f"{name}: cost per year at medium medical use", net_cost(cost.medium_cost_cents)),
+            fact(f"{name}: cost per year at high medical use", net_cost(cost.high_cost_cents)),
             fact(
                 f"{name}: cost per year at the out-of-pocket maximum",
-                dollars(cost.worst_case_cents),
+                net_cost(cost.worst_case_cents),
             ),
         ]
     for pair in result.pairs:

@@ -84,9 +84,9 @@ function figuresOf(decision: Decision): PlanFigure[] {
       const usage = String(decision.inputs.expected_usage);
       return [
         f(`${plan}.name`, 'Plan', 'text'),
-        f(`${plan}.${usage}_cost_cents`, `Expected cost a year at ${usage} use`, 'money'),
+        f(`${plan}.${usage}_cost_cents`, `Expected cost a year at ${usage} use`, 'net_cost'),
         f(`${plan}.annual_premium_cents`, 'Premiums a year', 'money'),
-        f(`${plan}.worst_case_cents`, 'Worst case a year', 'money'),
+        f(`${plan}.worst_case_cents`, 'Worst case a year', 'net_cost'),
       ];
     }
     case 'w4': {

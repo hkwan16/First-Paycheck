@@ -4319,6 +4319,7 @@
           "kind": {
             "enum": [
               "money",
+              "net_cost",
               "percent",
               "count",
               "text"

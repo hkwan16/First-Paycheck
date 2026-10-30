@@ -43,7 +43,9 @@ CALENDAR_WINDOW = dt.timedelta(days=90)
 
 _current_decisions = table("current_decisions", column("id"))
 
-FigureKind = Literal["money", "percent", "count", "text"]
+# ``net_cost`` is money too: a yearly net cost whose negative value reads as an
+# amount ahead (spec 012 rule 17), so clients pick those words by kind.
+FigureKind = Literal["money", "net_cost", "percent", "count", "text"]
 ExplanationStatus = Literal["verified", "fallback", "none"]
 
 
@@ -151,10 +153,10 @@ def _health_plans(data: dict[str, Any]) -> list[PlanFigure]:
     return [
         _figure(data, f"{plan}.name", "Plan", "text"),
         _figure(
-            data, f"{plan}.{usage}_cost_cents", f"Expected cost a year at {usage} use", "money"
+            data, f"{plan}.{usage}_cost_cents", f"Expected cost a year at {usage} use", "net_cost"
         ),
         _figure(data, f"{plan}.annual_premium_cents", "Premiums a year", "money"),
-        _figure(data, f"{plan}.worst_case_cents", "Worst case a year", "money"),
+        _figure(data, f"{plan}.worst_case_cents", "Worst case a year", "net_cost"),
     ]
 
 

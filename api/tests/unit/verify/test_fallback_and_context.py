@@ -18,6 +18,7 @@ from retrieval.citations import Citation
 from retrieval.context import (
     CAPPED_NOTE,
     COMPENSATION_NOTE,
+    NEGATIVE_COST_NOTE,
     NO_STUB_NOTE,
     STUB_DIFFERS_NOTE,
     STUB_SAME_NOTE,
@@ -29,7 +30,7 @@ from retrieval.context import (
 from tests.unit.calc import test_health_plans_examples as health_examples
 from verify.allowed import AllowedNumbers
 from verify.fallback import fallback_draft
-from verify.format import dollars, percent
+from verify.format import dollars, net_cost, percent
 from verify.numbers import extract_numbers
 from verify.verify import verify_explanation
 
@@ -107,6 +108,15 @@ def test_formatting() -> None:
     assert percent(Decimal("4.50")) == "4.5%"
     assert percent(Decimal("100.00")) == "100%"
     assert percent(Decimal("0.25")) == "0.25%"
+
+
+def test_net_cost_reads_as_coming_out_ahead() -> None:
+    """Spec 012 rule 17: a negative net cost is an amount ahead, never a minus sign."""
+    assert net_cost(202_500) == "$2,025.00"
+    assert net_cost(0) == "$0.00"
+    assert net_cost(-40) == "$0.40 ahead"
+    assert net_cost(-40_300) == "$403.00 ahead"
+    assert net_cost(-59_650) == "$596.50 ahead"
 
 
 def test_context_for_example_1() -> None:
@@ -337,6 +347,16 @@ HEALTH_EXAMPLES: dict[str, tuple[list[dict[str, Any]], int, int, dict[str, Any]]
     "6": ([A, B], 1_500_000, 100_000, {}),
     "7": ([B, B_TWIN], 6_500_000, 100_000, {}),
     "8": ([A, B], 6_500_000, 100_000, {"expected_usage": "high", "selected_plan_index": 1}),
+    # Example 3 at low use, where Bronze HSA comes out $403.00 ahead (spec 012 rule 17).
+    "3-low": ([A, B], 9_000_000, 500_000, {"expected_usage": "low"}),
+    "3-low-gold": ([A, B], 9_000_000, 500_000, {"expected_usage": "low", "selected_plan_index": 1}),
+    # Two plans that come out ahead at low use; the one picked is not the cheapest.
+    "3-low-both-ahead": (
+        [{**A, "name": "Free Bronze HSA", "premium_per_period_cents": 0}, A],
+        9_000_000,
+        500_000,
+        {"expected_usage": "low", "selected_plan_index": 1},
+    ),
 }
 HEALTH_SEEDED = [
     citation(key)
@@ -441,6 +461,48 @@ def test_health_fallback_for_example_1_reads_plainly() -> None:
     assert "$9,400.00" in draft.text
     assert "$120.00" in draft.text
     assert draft.citation_keys == ["health.hsa_limit"]
+
+
+def test_health_fallback_writes_a_negative_cost_as_coming_out_ahead() -> None:
+    """Spec 012 rule 17's example: example 3 at low use."""
+    inputs, result = health_decision("3-low")
+    draft = fallback_draft("health_plans", inputs, result, {"health.hsa_limit"})
+    assert draft.text.startswith(
+        "At low medical use, about $500.00 of care a year, Bronze HSA costs you the least and"
+        " leaves you $403.00 ahead a year: the employer's HSA money and the tax an HSA"
+        " contribution saves are more than its premiums and your share of the care."
+    )
+    assert "-$" not in draft.text
+    assert draft.numbers[0].value == "$403.00 ahead"
+
+    inputs, result = health_decision("3-low-gold")
+    draft = fallback_draft("health_plans", inputs, result, {"health.hsa_limit"})
+    assert "You picked Gold PPO, which costs $2,125.00 a year at that use." in draft.text
+    assert "-$" not in draft.text
+
+
+def test_health_fallback_names_a_picked_plan_that_comes_out_ahead() -> None:
+    inputs, result = health_decision("3-low-both-ahead")
+    draft = fallback_draft("health_plans", inputs, result, {"health.hsa_limit"})
+    assert "Free Bronze HSA costs you the least and leaves you $1,053.00 ahead a year" in (
+        draft.text
+    )
+    assert "You picked Bronze HSA, which leaves you $403.00 ahead a year at that use." in (
+        draft.text
+    )
+    assert "-$" not in draft.text
+    assert [claim.value for claim in draft.numbers[:2]] == ["$1,053.00 ahead", "$403.00 ahead"]
+
+
+def test_health_context_writes_net_costs_as_coming_out_ahead() -> None:
+    inputs, result = health_decision("3-low")
+    context = explain_context("health_plans", inputs, result, HEALTH_SEEDED, [])
+    facts = {fact.label: fact.value for fact in context.facts}
+    assert facts["Bronze HSA: cost per year at low medical use"] == "$403.00 ahead"
+    assert facts["Bronze HSA: cost per year at medium medical use"] == "$1,057.00"
+    assert all("-$" not in fact.value for fact in context.facts)
+    assert NEGATIVE_COST_NOTE in context.notes
+    assert "ahead" in NEGATIVE_COST_NOTE
 
 
 def test_numbers_in_plan_names_are_allowed() -> None:

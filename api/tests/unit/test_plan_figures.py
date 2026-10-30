@@ -8,8 +8,10 @@ import pytest
 
 from app.plan import PlanFigure, figures
 from calc.emergency_fund import EmergencyFundInput, emergency_fund
+from calc.health_plans import HealthPlansInput, health_plans
 from calc.w4 import W4Input, w4
 from db.enums import CalculatorKind
+from tests.unit.calc import test_health_plans_examples as health_examples
 
 
 def w4_figures(**entries: Any) -> list[PlanFigure]:
@@ -106,3 +108,26 @@ def test_unreachable_fund_has_a_null_months_figure() -> None:
     )
     months = next(figure for figure in found if figure.key == "result.months_to_target")
     assert (months.kind, months.value) == ("count", None)
+
+
+def test_health_costs_are_net_cost_figures_with_the_api_sign() -> None:
+    """Spec 016 rule 3 and spec 012 rule 17: example 3 at low use comes out ahead."""
+    inputs = HealthPlansInput.model_validate(
+        {
+            **health_examples.payload(
+                [health_examples.A, health_examples.B], 9_000_000, 500_000, expected_usage="low"
+            ),
+            "selected_plan_index": 0,
+        }
+    )
+    found = figures(
+        CalculatorKind.HEALTH_PLANS,
+        inputs.model_dump(mode="json"),
+        health_plans(inputs).model_dump(mode="json"),
+    )
+    assert [(figure.key, figure.kind, figure.value) for figure in found] == [
+        ("result.plans[0].name", "text", "Bronze HSA"),
+        ("result.plans[0].low_cost_cents", "net_cost", -40_300),
+        ("result.plans[0].annual_premium_cents", "money", 65_000),
+        ("result.plans[0].worst_case_cents", "net_cost", 309_700),
+    ]

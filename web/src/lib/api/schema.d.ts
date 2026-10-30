@@ -2685,7 +2685,7 @@ export interface components {
        * Kind
        * @enum {string}
        */
-      kind: 'money' | 'percent' | 'count' | 'text';
+      kind: 'money' | 'net_cost' | 'percent' | 'count' | 'text';
       /** Label */
       label: string;
       /** Value */
