@@ -1758,6 +1758,9 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: Medium
+    status: done
+    # Fixed October 30: spec 011 rules 17a-17b. PATCH /goals re-projects target_date the way a save does;
+    # the card starts from the goal's contribution and offers a new version.
   - title: "A paused emergency fund goal still says it is on pace"
     body: >-
       Pausing the goal shows "Paused" next to "On pace to reach it by Jan 6,
@@ -1765,6 +1768,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed October 30: a paused goal shows no pace on the card, the Plan page or the PDF.
   - title: "Focus falls to the page when the pressed control in a decision card goes away"
     body: >-
       In the 401(k) card, Cancel and Save plan details close the form and
@@ -1776,6 +1781,9 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Medium
+    status: done
+    # Fixed October 30: one hook, web/src/lib/focus-handoff.ts, and a rule in web/CLAUDE.md;
+    # every case has a test of where focus lands.
   - title: "Using the benefits summary drops the saved health plan choice even when the plans match"
     body: >-
       The health plan editor's "Use your benefits summary" clears the chosen
@@ -1786,6 +1794,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed October 30: choiceAmong keeps the choice when a plan with every term the same is still there.
   - title: "The W-4 reminder line reads as a broken sentence"
     body: >-
       Under the W-4 card: "Give your employer your updated Form W-4 is on
@@ -1794,6 +1804,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed October 30: "On your calendar for Nov 6, 2026: Give your employer your updated Form W-4."
   - title: "The W-4 reminder's check-in finding has no Affects link"
     body: >-
       Every upcoming-date finding names the part of the plan it affects
@@ -1822,6 +1834,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed October 30: spec 018 rule 6a. Step links land at the top (land-at-top.ts).
   - title: "The CSV import panel still reports an import into an account that was removed"
     body: >-
       After importing a CSV into a new account and removing that account,
