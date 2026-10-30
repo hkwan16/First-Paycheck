@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useReducer, type Dispatch, type ReactNode } from 'react';
+import { useCallback, useId, useReducer, type Dispatch, type ReactNode } from 'react';
 import { PageTitle } from '@/components/chrome/PageTitle';
 import { StepFooter } from '@/components/chrome/StepFooter';
 import { Bar } from '@/components/ui/Bar';
@@ -51,11 +51,16 @@ export function BenefitsReview({ document, proposal, onConfirmed }: BenefitsRevi
   const sections = reviewSections(state.fields);
   const confirm = useConfirmDocument();
 
-  const dispatch: Dispatch<ConfirmAction> = (action) => {
-    // An answer from the server describes the values it was sent; any change makes it stale.
-    if (action.type !== 'select' && confirm.isError) confirm.reset();
-    dispatchState(action);
-  };
+  // Stable, so a memoized FieldRow renders again only when its own field changes.
+  const { isError, reset } = confirm;
+  const dispatch = useCallback<Dispatch<ConfirmAction>>(
+    (action) => {
+      // An answer from the server describes the values it was sent; any change makes it stale.
+      if (action.type !== 'select' && isError) reset();
+      dispatchState(action);
+    },
+    [isError, reset],
+  );
 
   const submit = () =>
     confirm.mutate(
@@ -149,9 +154,9 @@ export function BenefitsReview({ document, proposal, onConfirmed }: BenefitsRevi
         <SourcePane
           id={sourceId}
           className="min-w-0 flex-[1_1_320px]"
-          lines={proposal.source_lines ?? []}
+          lines={proposal.source_lines}
           redactionCount={document.redaction_count}
-          withheldPages={proposal.withheld_pages ?? []}
+          withheldPages={proposal.withheld_pages}
           selectedKey={state.selected}
           selectedLabel={selected?.label ?? null}
           linked={false}

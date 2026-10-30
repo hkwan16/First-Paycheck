@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, type Dispatch, type KeyboardEvent } from 'react';
+import { memo, useEffect, useId, useRef, type Dispatch, type KeyboardEvent } from 'react';
 import { CheckIcon, EditIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -29,9 +29,11 @@ export interface FieldRowProps {
  * Focus follows the edit: into the input when it opens, back to Edit when it
  * closes, and onto the input when a save is refused. A field in a group (a
  * benefits plan or tier) is named with it, "Plan 2: Deductible", since every
- * plan has one; the group's heading shows it on screen.
+ * plan has one; the group's heading shows it on screen. Memoized: the
+ * reducer keeps every other field's object as it was, so a keystroke renders
+ * only the row being typed in (the parent passes a stable `dispatch`).
  */
-export function FieldRow({
+export const FieldRow = memo(function FieldRow({
   field,
   selected,
   manual,
@@ -232,4 +234,4 @@ export function FieldRow({
       </div>
     </div>
   );
-}
+});
