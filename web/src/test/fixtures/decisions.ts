@@ -67,6 +67,43 @@ export const cappedK401: K401Case = knownCase({
   age: 30,
 });
 
+/**
+ * Issue 132's user at a whole contribution percentage (0 to 15): the stub-01
+ * salary (365,385 x 26), 100% up to 3% then 50% up to 5%, single, 24.
+ */
+export function stub01K401Inputs(contributionPct = 3): K401MatchInput {
+  return {
+    salary_cents: 9_500_010,
+    pay_periods_per_year: 26,
+    match_tiers: [
+      { employee_pct_upto: '3.00', employer_pct: '100.00' },
+      { employee_pct_upto: '5.00', employer_pct: '50.00' },
+    ],
+    contribution_pct: `${contributionPct}.00`,
+    tax_year: 2026,
+    filing_status: 'single',
+    age: 24,
+  };
+}
+
+/** Issue 132's user at a contribution percentage, with the API's result. */
+export const stub01K401 = (contributionPct = 3) => knownCase(stub01K401Inputs(contributionPct));
+
+/** `GET /profile` for issue 132's user: the plan details from stub-01 and the benefits summary. */
+export const stub01Profile: Profile = {
+  ...emptyProfile,
+  salary_cents: 9_500_010,
+  pay_frequency: 'biweekly',
+  filing_status: 'single',
+  match_tiers: [
+    { employee_pct_upto: '3.00', employer_pct: '100.00' },
+    { employee_pct_upto: '5.00', employer_pct: '50.00' },
+  ],
+  // 24 by the end of 2026.
+  birth_year: 2002,
+  updated_at: '2026-10-17T15:58:30Z',
+};
+
 /** `GET /profile` for the sample user, with the plan details the 401(k) card needs. */
 export const sampleProfile: Profile = {
   ...emptyProfile,
@@ -180,9 +217,9 @@ export function sampleFallbackExplanation(overrides: Partial<Explanation> = {}):
   return sampleExplanation({
     id: 'e0000000-0000-4000-8000-000000000003',
     concept: "Your employer's 401(k) match and what it costs you to earn all of it.",
-    text: 'At 4% of pay you put in $2,600.00 a year and your employer adds $2,600.00. You already earn the full match of $2,600.00 a year. Your 2026 limit on 401(k) contributions is $24,500.00.',
+    text: 'At the 4% you chose, you put in $2,600.00 a year and your employer adds $2,600.00. Your latest pay stub shows 0% going to your 401(k), so the rate you chose takes effect once you change your election with your employer. That rate earns the full match of $2,600.00 a year. Your 2026 limit on 401(k) contributions is $24,500.00.',
     numbers: [
-      { value: '$2,600.00', label: 'Your yearly contribution' },
+      { value: '$2,600.00', label: 'Your yearly contribution at the rate you chose' },
       { value: '$2,600.00', label: 'Full employer match per year' },
     ],
     what_ifs: [],
@@ -190,7 +227,7 @@ export function sampleFallbackExplanation(overrides: Partial<Explanation> = {}):
     fallback: true,
     attempt: 3,
     retries: 1,
-    prompt_version: 'fallback/v1',
+    prompt_version: 'fallback/v2',
     verification: {
       numbers_checked: 5,
       numbers_unmatched: [],

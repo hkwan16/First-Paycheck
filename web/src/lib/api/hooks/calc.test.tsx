@@ -91,6 +91,33 @@ describe('useCalc', () => {
     expect(result.current.inputs).toEqual(sampleK401Inputs(5));
   });
 
+  it('names the inputs of the result it keeps on screen while the next one is asked for', async () => {
+    const { result, rerender } = renderCalc(sampleK401Inputs(2));
+    await waitFor(() => expect(result.current.isCurrent).toBe(true));
+    // Hold the next answer until the test lets it go.
+    let answer: () => void = () => {};
+    const answered = new Promise<void>((resolve) => (answer = resolve));
+    server.use(
+      http.post(apiUrl(PATH), async () => {
+        await answered;
+        return HttpResponse.json(sampleK401(5).result);
+      }),
+    );
+
+    rerender({ inputs: sampleK401Inputs(5) });
+    await act(() => vi.advanceTimersByTimeAsync(CALC_DEBOUNCE_MS));
+    await waitFor(() => expect(result.current.isBusy).toBe(true));
+    // The request for 5% is out; the 2% result and its inputs stay together.
+    expect(result.current.data).toEqual(sampleK401(2).result);
+    expect(result.current.inputs).toEqual(sampleK401Inputs(2));
+    expect(result.current.isCurrent).toBe(false);
+
+    answer();
+    await waitFor(() => expect(result.current.isCurrent).toBe(true));
+    expect(result.current.data).toEqual(sampleK401(5).result);
+    expect(result.current.inputs).toEqual(sampleK401Inputs(5));
+  });
+
   it('never asks again for inputs it has already calculated', async () => {
     const bodies = calcBodies();
     const { result, rerender, queryClient } = renderCalc(sampleK401Inputs(2));

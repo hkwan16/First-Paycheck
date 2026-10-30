@@ -1,7 +1,7 @@
 import { apiErrorCode, apiErrorMessage } from '@/lib/api/errors';
 import { ResultMismatch } from '@/lib/api/hooks';
-import type { DecisionSaveState } from '@/lib/decisions';
-import type { K401MatchResult, MatchTier, MatchTierIn } from '@/lib/api/types';
+import { percentInput, type DecisionSaveState } from '@/lib/decisions';
+import type { K401MatchInput, K401MatchResult, MatchTier, MatchTierIn } from '@/lib/api/types';
 import type { Tone } from '@/lib/design/tone';
 import { formatMoney, formatRate, parseMoney } from '@/lib/money';
 
@@ -67,19 +67,34 @@ export function saveErrorText(error: unknown): string {
   }
 }
 
+/** The two rates a 401(k) headline weighs, as the two-place strings the API sends. */
+export interface HeadlineRates {
+  /** The contribution the result is for, as sent to the calculator (`"5.00"`). */
+  chosen: K401MatchInput['contribution_pct'];
+  /** What the newest pay stub shows going in now (spec 005 rule 24b), or null. */
+  payStub: string | null;
+}
+
 /**
  * The 401(k) result panel's headline, from the calculator's own amounts. It
  * only asks whether an amount the API returned is zero; it never derives one.
+ * It speaks in the present only at the rate the pay stub shows, the one in
+ * effect; any other rate is a choice (spec 006 rule 14, issue 132), so a
+ * person whose stub shows a contribution is never told they leave the whole
+ * match behind. The rates are compared as the API's strings, never as numbers.
  */
-export function matchHeadline(result: K401MatchResult): string {
+export function matchHeadline(result: K401MatchResult, rates: HeadlineRates): string {
   if (result.employer_match_cents_full === 0) return 'Your plan has no employer match';
+  const chosen = typeof rates.chosen === 'string' ? rates.chosen : percentInput(rates.chosen);
+  const inEffect = rates.payStub !== null && rates.payStub === chosen;
+  const lead = inEffect ? 'You' : `At ${formatRate(chosen)} you would`;
   if (result.missed_cents === 0) {
-    return `You capture the full ${dollars(result.employer_match_cents_full)} match`;
+    return `${lead} capture the full ${dollars(result.employer_match_cents_full)} match`;
   }
   if (result.employer_match_cents_current === 0) {
-    return `You leave the whole ${dollars(result.missed_cents)} match behind`;
+    return `${lead} leave the whole ${dollars(result.missed_cents)} match behind`;
   }
-  return `You leave ${dollars(result.missed_cents)} of match behind`;
+  return `${lead} leave ${dollars(result.missed_cents)} of match behind`;
 }
 
 /**

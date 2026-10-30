@@ -195,7 +195,10 @@ next is a real disabled button, never a dead link).
   waits `CALC_DEBOUNCE_MS` (150 ms) after the inputs stop changing, keeps the previous result on
   screen while the next one loads (`placeholderData: keepPreviousData`), and returns `isBusy`
   for the result panel's `aria-busy` and `isCurrent` (the result is for the inputs on screen; only
-  then can it be saved). Pass `null` inputs while the form is incomplete. Its `staleTime` is
+  then can it be saved). Each query caches `{ inputs, result }` (`Calculated`), so `calc.inputs`
+  is always the inputs `calc.data` was calculated from, also while a kept result waits for the
+  next: label a result from `calc.inputs`, never from the inputs on screen. Seed a calculator
+  query (`SampleScreen`) with that shape. Pass `null` inputs while the form is incomplete. Its `staleTime` is
   `'static'` when the client default is (the sample QueryClient), so it never reads the clock
   while rendering; otherwise `Infinity`, which still lets a 422 refetch it.
 - **Decisions**: `useDecisions`, `useDecision(id)`, `useCalendar`, and
@@ -353,10 +356,12 @@ next is a real disabled button, never a dead link).
   `LinkScreen.test.tsx`), and the test calls the callbacks the widget would.
 - Screen tests cannot name status colors (ESLint): test a tone through a pure helper
   (`sourceBadge`, `saveBadgeTone`) or in the `components/ui` tests.
-- Decisions: `decisionsReady()` seeds a confirmed pay stub (with `SAMPLE_ANNUAL_SALARY_CENTS`, the
-  API's figure for it; the confirm handler keeps it only for the sample's gross and frequency,
-  else null) and a profile with match tiers;
-  `savedDecision()` adds v1 at 4%. `POST /calc/401k-match` answers from
+- Decisions: `decisionsReady()` seeds a confirmed pay stub (with `SAMPLE_ANNUAL_SALARY_CENTS` and
+  `SAMPLE_RETIREMENT_CONTRIBUTION_PCT`, the API's figures for it; the confirm handler keeps them
+  only for the sample's gross with its frequency or its retirement line, else null) and a profile
+  with match tiers; `savedDecision()` adds v1 at 4%. `stub01Ready()` is issue 132's user instead:
+  `stub01PayStub()` (stub-01, $109.62 of $3,653.85, `"3.00"`) and `stub01Profile`, with
+  `stub01K401(pct)` results. `POST /calc/401k-match` answers from
   `fixtures/k401-results.json`, results the API's own calculator produced; a case not in it is a
   500 `test_fixture_missing`, never a result worked out in the test. To add cases, edit
   `make-k401-results.py`, run it from the repo root with
@@ -499,11 +504,18 @@ alpha" placeholder. Cards share `DecisionCard`, `SaveButton`, `AmountField` and 
   are examples that say so (`examplePlaceholder`: "for example 65,000.00", "for example 1996"),
   from the same `SALARY_EXAMPLE` and `BIRTH_YEAR_EXAMPLE` as what to fix ("like 65,000.00").
   Never show a bare figure as a placeholder: a person reads it as a value already entered.
-  Inputs come from the confirmed pay stub and profile; the contribution starts from the saved
-  decision. The calculator still takes `age`, which is `ageAtYearEnd(tax_year, birth_year)`
-  (`lib/decisions.ts`), a difference of years.
+  Inputs come from the confirmed pay stub and profile. The contribution starts from the saved
+  decision, else the newest stub's `retirement_contribution_pct` (spec 005 rule 24b, the rate
+  payroll applies now), else 0 (spec 006 rule 14, issue 132: starting at 0 told someone whose stub
+  shows a contribution that they left the whole match behind). The intro names that rate beside
+  the stub's dollars. The calculator still takes `age`, which is
+  `ageAtYearEnd(tax_year, birth_year)` (`lib/decisions.ts`), a difference of years.
 - Every figure in the result (`K401ResultRows`, `K401Notices`, `matchHeadline`) is a field of the
-  calculator's result. Percent inputs are sent as the API stores them, two-place strings
+  calculator's result. `matchHeadline(result, { chosen, payStub })` speaks in the present ("You
+  leave $950 of match behind") only when the result's rate is the stub's, compared as the API's
+  two-place strings; any other rate is a choice ("At 5% you would capture the full $3,800
+  match"). The rate is `calc.inputs.contribution_pct`, the result's own, so the previous result
+  shown while the next loads keeps naming its own rate. Percent inputs are sent as the API stores them, two-place strings
   (`percentInput`), so a saved decision compares equal to the inputs on screen.
 - Save is enabled only when `useCalc` says the result is current. A 422 `result_mismatch`
   refetches the result and asks to save again; a 409 reloads the decisions and says another save

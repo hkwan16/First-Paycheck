@@ -18,12 +18,21 @@ export type CalcInput<P extends CalcPath> =
 export type CalcResult<P extends CalcPath> =
   CalcOperation<P>['responses'][200]['content']['application/json'];
 
+/**
+ * What a calculator query caches: the result with the inputs it was calculated
+ * from, so a result kept on screen while the next loads still names its own.
+ */
+export interface Calculated<P extends CalcPath> {
+  inputs: CalcInput<P>;
+  result: CalcResult<P>;
+}
+
 export interface CalcState<P extends CalcPath> {
   /** The latest result; while new inputs load, the previous one stays. */
   data: CalcResult<P> | undefined;
   /**
-   * The inputs `data` was calculated from; null while there is no result of
-   * its own yet (none at all, or the previous one kept on screen).
+   * The inputs `data` was calculated from, kept with it while the next result
+   * loads; null while there is no result.
    */
   inputs: CalcInput<P> | null;
   error: unknown;
@@ -57,11 +66,15 @@ export function useCalc<P extends CalcPath>(path: P, inputs: CalcInput<P> | null
 
   const query = useQuery({
     queryKey: queryKeys.calc(path, settled),
-    queryFn: ({ signal }) =>
-      unwrap<CalcResult<P>>(
+    queryFn: async ({ signal }): Promise<Calculated<P>> => {
+      // The query runs only once the inputs have settled.
+      const body = settled as CalcInput<P>;
+      const result = await unwrap<CalcResult<P>>(
         // A generic `P` does not narrow openapi-fetch's body type; the cast spans the union.
-        fetchClient.POST(path as CalcPath, { body: settled as CalcInput<CalcPath>, signal }),
-      ),
+        fetchClient.POST(path as CalcPath, { body: body as CalcInput<CalcPath>, signal }),
+      );
+      return { inputs: body, result };
+    },
     enabled: settled !== null,
     staleTime: staticClient ? 'static' : Infinity,
     placeholderData: keepPreviousData,
@@ -73,8 +86,8 @@ export function useCalc<P extends CalcPath>(path: P, inputs: CalcInput<P> | null
   // Fresh: the data is this query's own, not the previous result kept on screen.
   const fresh = query.isSuccess && !query.isPlaceholderData;
   return {
-    data: query.data,
-    inputs: fresh ? settled : null,
+    data: query.data?.result,
+    inputs: query.data?.inputs ?? null,
     error: query.error,
     isError: query.isError,
     isBusy: settling || query.isFetching,
