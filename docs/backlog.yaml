@@ -1667,6 +1667,10 @@ issues:
     labels: ["area:web"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed October 30: spec 012 rule 17, a negative net cost reads as "$X
+    # ahead" on the step, the Plan page (figure kind net_cost), the PDF and
+    # the fallback text (fallback/v3).
   - title: "The side nav does not push a decision below the fold on a phone"
     body: >-
       On a 390px phone the side nav renders above the page, and with the four
