@@ -1616,7 +1616,10 @@ issues:
     labels: ["area:api", "area:evals"]
     milestone: M10
     priority: Low
-    status: todo
+    status: done
+    # Fixed October 30 in categorize/v3: memberships and pledges to nonprofits
+    # are gifts_donations, and the prompt's definitions now agree with the
+    # seed rules (spec 003 rules 9a-9b). Live accuracy 1.0 in three runs.
   - title: "Seed rules stop matching inside unrelated merchant names"
     body: >-
       The free categorization-rules suite shows three seed rules matching
@@ -1630,4 +1633,7 @@ issues:
     labels: ["area:api", "area:evals", "type:bug"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Fixed October 30: spec 003 rule 3d, a seed prefix rule names one
+    # merchant; 15 over-broad rules narrowed. categorization-rules precision
+    # 0.9714 to 1.0 with no correct rule label lost.
