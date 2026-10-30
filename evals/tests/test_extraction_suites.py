@@ -94,6 +94,18 @@ def test_one_wrong_field_per_stub() -> None:
     )
 
 
+def test_one_case_is_a_field_a_stub_or_a_stub_with_an_ssn() -> None:
+    """evals/CLAUDE.md: a metric tolerates one case's worth (spec 005 rule 26)."""
+    fixtures = text_fixtures()
+    with_ssn = sum(fixture.labels["ssn"] is not None for fixture in fixtures)
+    result = extraction.score(fixtures, LabelReader([f.labels for f in fixtures]))
+    assert result.case_worth == {
+        "field_accuracy": pytest.approx(1 / (13 * len(fixtures))),
+        "document_accuracy": pytest.approx(1 / len(fixtures)),
+        "redaction_recall": pytest.approx(1 / with_ssn),
+    }
+
+
 def test_the_reader_sees_only_redacted_text() -> None:
     fixtures = text_fixtures()
     reader = LabelReader([f.labels for f in fixtures])

@@ -7,7 +7,8 @@ the ``ingest.extract`` job runs it, so the cumulative tiers scored are the ones
 code computes from the bands the model reads. The gateway records to an
 in-memory ledger that charges the run's ``Budget`` before the result is read.
 
-Metrics (higher is better, 2-point tolerance):
+Metrics (higher is better; each tolerates one case's worth or 2 points,
+whichever is larger, as evals/CLAUDE.md says):
 
 - ``plan_field_accuracy``: of the 8 fields of every labeled plan (matched in
   order), the share whose proposed value equals the label. A missing plan's
@@ -23,6 +24,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import replace
 from typing import Any, Protocol
 
 from app.config import Settings
@@ -126,6 +128,12 @@ def score(fixtures: Sequence[Fixture], reader: BenefitsReader) -> SuiteResult:
         },
         cases=count,
         failures=failures,
+        # One case: a labeled plan field, a summary.
+        case_worth={
+            "plan_field_accuracy": 1 / plan_fields if plan_fields else 0.0,
+            "retirement_accuracy": 1 / count if count else 0.0,
+            "document_accuracy": 1 / count if count else 0.0,
+        },
     )
 
 
@@ -151,12 +159,7 @@ def run(budget: Budget) -> SuiteResult:
         ledger=MemoryLedger(on_record=charge),
     )
     result = score(load_fixtures(), gateway)
-    return SuiteResult(
-        metrics=result.metrics,
-        cases=result.cases,
-        failures=result.failures,
-        cost_cents=sum(spent),
-    )
+    return replace(result, cost_cents=sum(spent))
 
 
 SUITE = Suite(name="benefits-extraction", llm=True, run=run)

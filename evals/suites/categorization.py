@@ -10,7 +10,8 @@ its label applies to every row of that merchant and direction. The real
 ``LLMGateway`` records to an in-memory ledger that charges the run's
 ``Budget`` before the answer is read, so ``--max-cost-cents`` is a hard cap.
 
-Metrics (higher is better, 2-point tolerance):
+Metrics (higher is better; each tolerates one case's worth or 2 points,
+whichever is larger, as evals/CLAUDE.md says):
 
 - ``accuracy``: the share of all rows whose final category equals the label
   (an unlabeled row is wrong).
@@ -21,8 +22,9 @@ Metrics (higher is better, 2-point tolerance):
 from __future__ import annotations
 
 import uuid
+from collections import Counter
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 from app.config import Settings
@@ -120,6 +122,8 @@ def score(
                 by_unit[(item.merchant, is_money_in(item.amount_cents))] = assignment.category
 
     right = llm_rows = llm_right = 0
+    # The rows each model answer decides: every row of its merchant and direction.
+    unit_rows: Counter[Unit] = Counter()
     for row in rows:
         if row.id in planned.rule_labels:
             right += planned.rule_labels[row.id] == row.category
@@ -127,12 +131,15 @@ def score(
         unit = unit_of(row)
         label = by_unit.get(unit)
         llm_rows += 1
+        if unit[0]:
+            unit_rows[unit] += 1
         if label == row.category:
             right += 1
             llm_right += 1
         elif unit in by_unit:
             failures.append(f"{row.id}: {unit[0]} expected {row.category}, model said {label}")
     count = len(rows)
+    largest = max(unit_rows.values(), default=0)
     return SuiteResult(
         metrics={
             "accuracy": right / count if count else 1.0,
@@ -140,6 +147,12 @@ def score(
         },
         cases=count,
         failures=failures,
+        # One case is one model answer, a merchant and direction's label, and it
+        # decides every row of that unit, so the largest unit is the most one decides.
+        case_worth={
+            "accuracy": largest / count if count else 0.0,
+            "llm_accuracy": largest / llm_rows if llm_rows else 0.0,
+        },
     )
 
 
@@ -165,12 +178,7 @@ def run(budget: Budget) -> SuiteResult:
         ledger=MemoryLedger(on_record=charge),
     )
     result = score(read_csv(DEFAULT_CSV), gateway)
-    return SuiteResult(
-        metrics=result.metrics,
-        cases=result.cases,
-        failures=result.failures,
-        cost_cents=sum(spent),
-    )
+    return replace(result, cost_cents=sum(spent))
 
 
 SUITE = Suite(name="categorization", llm=True, run=run)

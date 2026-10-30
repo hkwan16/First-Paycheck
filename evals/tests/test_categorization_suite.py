@@ -64,6 +64,24 @@ def test_a_perfect_labeler_scores_every_llm_row() -> None:
     assert result.metrics["accuracy"] == pytest.approx(rules_correct_share() + llm_rows / 515)
 
 
+def test_one_case_is_a_merchant_label_with_all_its_rows() -> None:
+    """evals/CLAUDE.md: a metric tolerates one case's worth. One label covers every
+    row of its merchant and direction (spec 003 rule 10), so the most one case
+    decides is the largest such group: 14 ``sunrise bakery`` rows of the 95 the
+    model labels and of all 515."""
+    result = categorization.score(ROWS, LabelLabeler())
+    assert result.case_worth == {
+        "accuracy": pytest.approx(14 / 515),
+        "llm_accuracy": pytest.approx(14 / 95),
+    }
+
+
+def test_no_unknown_merchant_means_no_model_case() -> None:
+    known = [row for row in ROWS if row.id in categorization.plan(ROWS).rule_labels]
+    result = categorization.score(known, LabelLabeler())
+    assert result.case_worth == {"accuracy": 0.0, "llm_accuracy": 0.0}
+
+
 def test_batches_are_what_categorize_run_sends() -> None:
     labeler = LabelLabeler()
     categorization.score(ROWS, labeler)

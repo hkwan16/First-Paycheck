@@ -6,7 +6,8 @@ Each stub goes through ``prepare_document`` (read, OCR, redact), the real
 runs it. The gateway records to an in-memory ledger that charges the run's
 ``Budget`` before the result is read, so ``--max-cost-cents`` is a hard cap.
 
-Metrics (higher is better, 2-point tolerance):
+Metrics (higher is better; each tolerates one case's worth or 2 points,
+whichever is larger, as evals/CLAUDE.md says):
 
 - ``field_accuracy``: of the 13 scored fields per stub (pay frequency, the
   three dates and the nine money fields including the computed other
@@ -20,6 +21,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import replace
 from typing import Protocol
 
 from app.config import Settings
@@ -98,6 +100,12 @@ def score(fixtures: Sequence[Fixture], reader: PayStubReader) -> SuiteResult:
         },
         cases=count,
         failures=failures,
+        # One case: a field, a stub, a stub that prints an SSN.
+        case_worth={
+            "field_accuracy": 1 / (count * len(SCORED_FIELDS)) if count else 0.0,
+            "document_accuracy": 1 / count if count else 0.0,
+            "redaction_recall": 1 / with_ssn if with_ssn else 0.0,
+        },
     )
 
 
@@ -123,12 +131,7 @@ def run(budget: Budget) -> SuiteResult:
         ledger=MemoryLedger(on_record=charge),
     )
     result = score(load_fixtures(), gateway)
-    return SuiteResult(
-        metrics=result.metrics,
-        cases=result.cases,
-        failures=result.failures,
-        cost_cents=sum(spent),
-    )
+    return replace(result, cost_cents=sum(spent))
 
 
 SUITE = Suite(name="extraction", llm=True, run=run)
