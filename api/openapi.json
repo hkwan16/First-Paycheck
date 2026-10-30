@@ -6139,6 +6139,20 @@
             "description": "Age reached by December 31 of tax_year, for the 401(k) catch-up",
             "title": "Age"
           },
+          "current_withholding_per_paycheck_cents": {
+            "anyOf": [
+              {
+                "maximum": 100000000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Federal income tax withheld each paycheck now, from the newest confirmed pay stub, for the comparison only; null means none to compare with",
+            "title": "Current Withholding Per Paycheck Cents"
+          },
           "deductions_cents": {
             "default": 0,
             "description": "Step 4(b), for the year",
@@ -6294,6 +6308,34 @@
             "title": "Citation Keys",
             "type": "array"
           },
+          "current_annual_withholding_cents": {
+            "anyOf": [
+              {
+                "maximum": 100000000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Withheld in the year if every paycheck withholds the current amount; null without one",
+            "title": "Current Annual Withholding Cents"
+          },
+          "current_refund_cents": {
+            "anyOf": [
+              {
+                "maximum": 100000000000.0,
+                "minimum": -100000000000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The refund (negative, balance due) at the current withholding, against the same tax; null without it",
+            "title": "Current Refund Cents"
+          },
           "health_premium_annual_cents": {
             "maximum": 100000000000.0,
             "minimum": 0.0,
@@ -6407,6 +6449,8 @@
           "projected_tax_cents",
           "projected_tax_after_credits_cents",
           "projected_refund_cents",
+          "current_annual_withholding_cents",
+          "current_refund_cents",
           "suggestion",
           "suggested_extra_withholding_cents",
           "suggested_deductions_cents",

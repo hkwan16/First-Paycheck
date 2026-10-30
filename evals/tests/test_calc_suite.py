@@ -162,10 +162,10 @@ def test_every_new_calculator_example_is_a_case(spec: str, rows: int) -> None:
 
 
 def test_every_spec_014_example_is_a_case() -> None:
-    """Spec 014's example table (rows 1, 2a, 2b, 3 to 10) by test name (`spec-014-x-y`)."""
+    """Spec 014's example tables (rows 1, 2a, 2b, 3 to 15) by test name (`spec-014-x-y`)."""
     text = (SPECS / "014-w4.md").read_text()
     names = re.findall(r"^\| \w+ \| `test_(\w+)`", text, flags=re.MULTILINE)
-    assert len(names) == 11
+    assert len(names) == 16
     ids = {case.id for case in calc.load_cases()}
     for name in names:
         assert f"spec-014-{name.replace('_', '-')}" in ids, name

@@ -288,6 +288,128 @@ def test_401k_capped_at_402g() -> None:
     )
 
 
+# ------------------------------------------- rule 10a: at the stub's withholding
+
+COMPARISON = {"current_annual_withholding_cents", "current_refund_cents"}
+
+
+def comparison(result: W4Result) -> tuple[int | None, int | None]:
+    return result.current_annual_withholding_cents, result.current_refund_cents
+
+
+def test_stub_withholds_less_than_the_entries() -> None:
+    """The e2e account (issue 153): stub-01's $272.44 a paycheck leaves $3,918.70 due."""
+    result = run(
+        9_500_010,
+        26,
+        k401_contribution_pct="5",
+        age=24,
+        health_premium_per_paycheck_cents=400,
+        current_withholding_per_paycheck_cents=27_244,
+    )
+    expect(
+        result,
+        taxable_pp=346_716,
+        aaw=8_154_610,
+        rate="22",
+        withheld_pp=42_316,
+        withheld_yr=1_100_216,
+        taxable_income=7_404_610,
+        tax=1_100_214,
+        tax_after=1_100_214,
+        refund=2,
+        k401=475_001,
+        keys=[*BASE_KEYS, PRETAX],
+    )
+    assert comparison(result) == (708_344, -391_870)
+
+
+def test_stub_withholds_more_than_the_entries() -> None:
+    result = run(
+        6_500_000,
+        24,
+        k401_contribution_pct="4",
+        age=30,
+        health_premium_per_paycheck_cents=6_250,
+        current_withholding_per_paycheck_cents=29_776,
+    )
+    expect(
+        result,
+        taxable_pp=253_750,
+        aaw=5_230_000,
+        rate="12",
+        withheld_pp=21_367,
+        withheld_yr=512_808,
+        taxable_income=4_480_000,
+        tax=512_800,
+        tax_after=512_800,
+        refund=8,
+        k401=260_000,
+        keys=[*BASE_KEYS, PRETAX],
+    )
+    assert comparison(result) == (714_624, 201_824)
+
+
+def test_stub_comparison_counts_other_jobs() -> None:
+    result = run(
+        5_000_000,
+        26,
+        other_jobs_wages_cents=2_000_000,
+        other_jobs_withholding_cents=39_000,
+        current_withholding_per_paycheck_cents=14_700,
+    )
+    expect(
+        result,
+        taxable_pp=192_308,
+        aaw=4_140_000,
+        rate="12",
+        withheld_pp=14_692,
+        withheld_yr=381_992,
+        taxable_income=5_390_000,
+        tax=657_000,
+        tax_after=657_000,
+        refund=-236_008,
+        suggestion="increase_extra_withholding",
+        suggested_4c=9_100,
+        suggested_refund=592,
+        keys=[*BASE_KEYS, MULTIPLE_JOBS],
+    )
+    assert comparison(result) == (382_200, -235_800)
+
+
+def test_stub_withholds_nothing() -> None:
+    result = run(6_500_000, 26, current_withholding_per_paycheck_cents=0)
+    expect(
+        result,
+        taxable_pp=250_000,
+        aaw=5_640_000,
+        rate="12",
+        withheld_pp=21_615,
+        withheld_yr=561_990,
+        taxable_income=4_890_000,
+        tax=562_000,
+        tax_after=562_000,
+        refund=-10,
+    )
+    assert comparison(result) == (0, -562_000)
+
+
+def test_no_stub_no_comparison() -> None:
+    result = run(6_500_000, 26, current_withholding_per_paycheck_cents=None)
+    assert comparison(result) == (None, None)
+    assert result == run(6_500_000, 26)
+    with_stub = run(6_500_000, 26, current_withholding_per_paycheck_cents=0)
+    assert result.model_dump(exclude=COMPARISON) == with_stub.model_dump(exclude=COMPARISON)
+
+
+def test_result_without_the_comparison_still_reads() -> None:
+    """A result stored before rule 10a has neither field; it reads as null (rule 17a)."""
+    stored = run(6_500_000, 26).model_dump(mode="json")
+    for key in COMPARISON:
+        stored.pop(key, None)
+    assert comparison(W4Result.model_validate(stored)) == (None, None)
+
+
 # ------------------------------------------------------------------ edge cases
 
 
@@ -382,6 +504,8 @@ def test_tax_year_without_constants_is_invalid() -> None:
         {"age": 131},
         {"filing_status": "married_filing_separately"},
         {"surprise": 1},
+        {"current_withholding_per_paycheck_cents": -1},
+        {"current_withholding_per_paycheck_cents": 272.44},
     ],
 )
 def test_invalid_inputs(change: dict[str, Any]) -> None:

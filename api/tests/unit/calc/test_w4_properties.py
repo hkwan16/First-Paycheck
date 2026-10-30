@@ -15,7 +15,9 @@ settings.register_profile("ci", derandomize=True, max_examples=150)
 settings.register_profile("dev", max_examples=100)
 settings.load_profile("ci" if os.environ.get("CI") else "dev")
 
-SIGNED = {"projected_refund_cents", "suggested_refund_cents"}
+SIGNED = {"projected_refund_cents", "suggested_refund_cents", "current_refund_cents"}
+# Rule 10a: null exactly when there is no current withholding to compare with.
+COMPARISON = {"current_annual_withholding_cents", "current_refund_cents"}
 
 
 @st.composite
@@ -38,6 +40,7 @@ def entries(draw: st.DrawFn) -> dict[str, Any]:
         "expected_deductions_cents": draw(st.none() | st.integers(0, 3_000_000)),
         "other_jobs_wages_cents": draw(st.integers(0, 10_000_000)),
         "other_jobs_withholding_cents": draw(st.integers(0, 1_500_000)),
+        "current_withholding_per_paycheck_cents": draw(st.none() | st.integers(0, 500_000)),
     }
 
 
@@ -56,6 +59,9 @@ def test_money_outputs_are_ints_and_non_negative(salary: int, rest: dict[str, An
     result = w4(build(salary, rest)).model_dump()
     for key, value in result.items():
         if key.endswith("_cents"):
+            if key in COMPARISON and rest["current_withholding_per_paycheck_cents"] is None:
+                assert value is None, key
+                continue
             assert type(value) is int, key
             if key not in SIGNED:
                 assert value >= 0, key
@@ -83,6 +89,36 @@ def test_outputs_add_up(salary: int, rest: dict[str, Any]) -> None:
         - result.projected_tax_after_credits_cents
     )
     assert result.projected_tax_after_credits_cents <= result.projected_tax_cents
+
+
+@given(SALARY, entries())
+def test_the_comparison_adds_up(salary: int, rest: dict[str, Any]) -> None:
+    """Rule 10a: the same tax, so the two refunds differ only by withholding."""
+    data = build(salary, rest)
+    result = w4(data)
+    current = data.current_withholding_per_paycheck_cents
+    if current is None:
+        assert result.current_annual_withholding_cents is None
+        assert result.current_refund_cents is None
+        return
+    periods = data.pay_periods_per_year
+    assert result.current_annual_withholding_cents == current * periods
+    assert result.current_refund_cents == (
+        current * periods
+        + data.other_jobs_withholding_cents
+        - result.projected_tax_after_credits_cents
+    )
+    assert (
+        result.projected_refund_cents - result.current_refund_cents
+        == (result.withholding_per_paycheck_cents - current) * periods
+    )
+
+
+@given(SALARY, entries())
+def test_the_comparison_changes_nothing_else(salary: int, rest: dict[str, Any]) -> None:
+    data = build(salary, rest)
+    without = w4(data.model_copy(update={"current_withholding_per_paycheck_cents": None}))
+    assert w4(data).model_dump(exclude=COMPARISON) == without.model_dump(exclude=COMPARISON)
 
 
 @given(SALARY, entries())

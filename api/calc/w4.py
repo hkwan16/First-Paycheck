@@ -5,7 +5,9 @@ percentage method for automated payroll systems (Worksheet 1A and the annual
 tables in ``calc/data/pub15t_<year>.json``); the projected tax follows the tax
 year's brackets and standard deduction (``calc/data/<year>.json``). The
 suggestion finds the whole-dollar Step 4(c), or failing that Step 4(b), entry
-that brings the projected refund or balance due closest to zero. Every
+that brings the projected refund or balance due closest to zero. Rule 10a sets
+beside it the refund or balance due at the withholding the newest confirmed
+pay stub shows, against the same tax. Every
 intermediate value is an exact ``Decimal``; each output is rounded once, half
 up, to whole cents.
 """
@@ -105,6 +107,11 @@ class W4Input(BaseModel):
     other_jobs_withholding_cents: Cents = Field(
         default=0, description="Federal income tax those jobs withhold in the year"
     )
+    current_withholding_per_paycheck_cents: Cents | None = Field(
+        default=None,
+        description="Federal income tax withheld each paycheck now, from the newest confirmed"
+        " pay stub, for the comparison only; null means none to compare with",
+    )
 
     @field_validator("tax_year")
     @classmethod
@@ -124,7 +131,9 @@ class W4Input(BaseModel):
 
 
 class W4Result(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    # The rule 10a fields default to null so a result stored before them still
+    # validates (spec 014 rule 17a); every response sends them all the same.
+    model_config = ConfigDict(frozen=True, json_schema_serialization_defaults_required=True)
 
     k401_annual_cents: Cents
     k401_capped: bool
@@ -140,6 +149,16 @@ class W4Result(BaseModel):
     projected_tax_after_credits_cents: Cents
     projected_refund_cents: SignedCents = Field(
         description="Positive is a refund, negative a balance due"
+    )
+    current_annual_withholding_cents: Cents | None = Field(
+        default=None,
+        description="Withheld in the year if every paycheck withholds the current amount;"
+        " null without one",
+    )
+    current_refund_cents: SignedCents | None = Field(
+        default=None,
+        description="The refund (negative, balance due) at the current withholding, against"
+        " the same tax; null without it",
     )
     suggestion: Suggestion
     suggested_extra_withholding_cents: Cents = Field(description="Step 4(c) to use, per paycheck")
@@ -285,6 +304,13 @@ def w4(data: W4Input) -> W4Result:
         other = data.other_jobs_withholding_cents - tax_after_credits
         refund = annual + other
 
+        # Rule 10a: the same tax, at what the newest stub withholds each paycheck.
+        current_annual: int | None = None
+        current_refund: int | None = None
+        if data.current_withholding_per_paycheck_cents is not None:
+            current_annual = data.current_withholding_per_paycheck_cents * periods
+            current_refund = current_annual + other
+
         # Rules 11 to 14: the suggestion.
         extra = data.extra_withholding_cents
         added = 0
@@ -317,6 +343,8 @@ def w4(data: W4Input) -> W4Result:
             projected_tax_cents=round_half_up(tax),
             projected_tax_after_credits_cents=tax_after_credits,
             projected_refund_cents=refund,
+            current_annual_withholding_cents=current_annual,
+            current_refund_cents=current_refund,
             suggestion=suggestion,
             suggested_extra_withholding_cents=extra,
             suggested_deductions_cents=suggested_deductions,

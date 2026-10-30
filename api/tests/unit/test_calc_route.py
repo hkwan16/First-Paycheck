@@ -153,8 +153,11 @@ W4_EXAMPLE_5: dict[str, Any] = {
 
 
 def test_w4_over_http(client: TestClient) -> None:
-    """Spec 014 example 5, with the defaults filled in by the model."""
-    response = client.post("/calc/w4", json=W4_EXAMPLE_5)
+    """Spec 014 example 13 (example 5 with a stub withholding $147.00), with the
+    defaults filled in by the model."""
+    response = client.post(
+        "/calc/w4", json={**W4_EXAMPLE_5, "current_withholding_per_paycheck_cents": 14_700}
+    )
     assert response.status_code == 200, response.text
     assert response.json() == {
         "k401_annual_cents": 0,
@@ -170,6 +173,8 @@ def test_w4_over_http(client: TestClient) -> None:
         "projected_tax_cents": 657_000,
         "projected_tax_after_credits_cents": 657_000,
         "projected_refund_cents": -236_008,
+        "current_annual_withholding_cents": 382_200,
+        "current_refund_cents": -235_800,
         "suggestion": "increase_extra_withholding",
         "suggested_extra_withholding_cents": 9_100,
         "suggested_deductions_cents": 0,
