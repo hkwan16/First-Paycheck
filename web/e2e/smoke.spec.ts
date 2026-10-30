@@ -235,9 +235,87 @@ for (const screen of SCREENS) {
       expect(walk.unreached, 'controls Tab never reached').toEqual([]);
       expect(walk.unseen, 'controls focused without a visible focus ring').toEqual([]);
       expect(walk.obscured, 'controls focused under the sticky header').toEqual([]);
+      // A collapsed side nav hides its links; the walk opened it and walked them too.
+      expect(walk.stillCollapsed, 'side nav controls the walk never opened').toEqual([]);
+    });
+
+    test('shows its heading in the first screenful', async ({ page }) => {
+      await open(page, screen);
+      const viewport = page.viewportSize()!;
+      const heading = await page
+        .getByRole('heading', { level: 1, name: screen.heading })
+        .boundingBox();
+      expect(heading, 'the h1 has a box').not.toBeNull();
+      expect(heading!.y + heading!.height, 'the bottom of the h1').toBeLessThanOrEqual(
+        viewport.height,
+      );
+      // Spec 018 rule 11: under 780px the side nav is one control before the page.
+      const nav = page.getByRole('navigation', { name: 'Setup steps' });
+      if (sampleWithNav(screen) && viewport.width < NAV_BREAKPOINT) {
+        const box = (await nav.boundingBox())!;
+        expect(box.height, 'the side nav before the page').toBeLessThanOrEqual(80);
+      }
     });
   });
 }
+
+/** The `nav` breakpoint token (48.75rem): the side nav collapses below it. */
+const NAV_BREAKPOINT = 780;
+
+/** The sample screens render in the app frame, with the side nav. */
+const sampleWithNav = (screen: Screen) => screen.sample === true;
+
+const isPhone = (page: Page) => (page.viewportSize()?.width ?? 1280) < NAV_BREAKPOINT;
+
+test.describe('the side nav (spec 018 rules 11-17)', () => {
+  test('collapses to one control on a phone that opens the list in place and closes on Escape', async ({
+    page,
+  }) => {
+    test.skip(!isPhone(page), 'The control is the phone presentation');
+    const errors = watchErrors(page);
+    await tallWindow(page);
+    await open(page, screenAt('/dev/screens/decisions/401k'));
+    const nav = page.getByRole('navigation', { name: 'Setup steps' });
+    // Chromium reads each hidden comma as its own word ("match , done , 1 of 4").
+    const control = nav.getByRole('button', {
+      name: /^Decisions: 401\(k\) match\s*, done\s*, 1 of 4 setup steps done$/,
+    });
+    await expect(control).toHaveAttribute('aria-expanded', 'false');
+    await expect(nav.getByRole('link', { name: 'Spending map' })).toBeHidden();
+
+    await control.click();
+    await expect(control).toHaveAttribute('aria-expanded', 'true');
+    const current = nav.getByRole('link', { name: /^401\(k\) match\s*, done$/ });
+    await expect(current).toBeVisible();
+    await expect(current).toHaveAttribute('aria-current', 'page');
+    // The page moves down under the list rather than being covered by it.
+    const list = (await nav
+      .locator(`#${await control.getAttribute('aria-controls')}`)
+      .boundingBox())!;
+    const heading = (await page.getByRole('heading', { level: 1 }).boundingBox())!;
+    expect(heading.y).toBeGreaterThan(list.y + list.height);
+    expect(await blockingViolations(page)).toEqual([]);
+    await expect(nav).toHaveScreenshot('nav-open.png');
+
+    await current.focus();
+    await page.keyboard.press('Escape');
+    await expect(control).toHaveAttribute('aria-expanded', 'false');
+    await expect(control).toBeFocused();
+    await expect(current).toBeHidden();
+    expect(errors).toEqual([]);
+  });
+
+  test('is the whole list at desktop width, with no control', async ({ page }) => {
+    test.skip(isPhone(page), 'The list is the desktop presentation');
+    await open(page, screenAt('/dev/screens/decisions/401k'));
+    const nav = page.getByRole('navigation', { name: 'Setup steps' });
+    const control = nav.locator('button');
+    await expect(control).toHaveCount(1);
+    await expect(control).toBeHidden();
+    await expect(nav.getByRole('link', { name: /^401\(k\) match\s*, done$/ })).toBeVisible();
+    await expect(nav.getByRole('link', { name: /^Plan and calendar/ })).toBeVisible();
+  });
+});
 
 interface TabWalk {
   trapped: boolean;
@@ -246,6 +324,37 @@ interface TabWalk {
   unreached: string[];
   unseen: string[];
   obscured: string[];
+  /** Side nav controls still collapsed when the walk ended (their links never walked). */
+  stillCollapsed: string[];
+}
+
+/** The side nav's phone control while its list is collapsed (spec 018 rule 12). */
+const COLLAPSED_NAV = 'nav[aria-label="Setup steps"] > button[aria-expanded="false"]';
+
+/**
+ * Tag the controls a person can Tab to that are not tagged yet, numbering on
+ * from `from`, and return their names. Run again after a disclosure opens to
+ * add the controls it shows.
+ */
+function tagStops(page: Page, from: number) {
+  return page.evaluate((start) => {
+    const selector = 'a[href], button, input, select, textarea, summary, [tabindex]';
+    const names: string[] = [];
+    for (const element of document.querySelectorAll<HTMLElement>(selector)) {
+      if (element.dataset.tabStop !== undefined) continue;
+      if (element.tabIndex < 0 || element.matches(':disabled')) continue;
+      if (element instanceof HTMLInputElement && element.type === 'hidden') continue;
+      if (element.closest('[inert], [hidden]')) continue;
+      if (!element.checkVisibility({ visibilityProperty: true })) continue;
+      element.dataset.tabStop = String(start + names.length);
+      const label =
+        element.getAttribute('aria-label') ??
+        element.textContent?.trim().replace(/\s+/g, ' ').slice(0, 40) ??
+        '';
+      names.push(`${element.tagName.toLowerCase()} "${label}"`);
+    }
+    return names;
+  }, from);
 }
 
 /**
@@ -254,26 +363,13 @@ interface TabWalk {
  * and report the controls never reached, those focused with no visible ring
  * (an outline on the control, or on the nearest ancestor that draws one for a
  * visually hidden input, as the drop zone does), and those the sticky header
- * covers. Focus that never leaves is a trap.
+ * covers. Focus that never leaves is a trap. On a phone the side nav is a
+ * collapsed disclosure: when Tab reaches its control the walk presses Enter,
+ * as a person would, tags the links it shows and walks them too, so a
+ * collapsed list never hides a control from the audit.
  */
 async function tabWalk(page: Page): Promise<TabWalk> {
-  const stops = await page.evaluate(() => {
-    const selector = 'a[href], button, input, select, textarea, summary, [tabindex]';
-    const names: string[] = [];
-    for (const element of document.querySelectorAll<HTMLElement>(selector)) {
-      if (element.tabIndex < 0 || element.matches(':disabled')) continue;
-      if (element instanceof HTMLInputElement && element.type === 'hidden') continue;
-      if (element.closest('[inert], [hidden]')) continue;
-      if (!element.checkVisibility({ visibilityProperty: true })) continue;
-      element.dataset.tabStop = String(names.length);
-      const label =
-        element.getAttribute('aria-label') ??
-        element.textContent?.trim().replace(/\s+/g, ' ').slice(0, 40) ??
-        '';
-      names.push(`${element.tagName.toLowerCase()} "${label}"`);
-    }
-    return names;
-  });
+  const stops = await tagStops(page, 0);
 
   const reached = new Set<number>();
   const unseen = new Set<string>();
@@ -284,6 +380,10 @@ async function tabWalk(page: Page): Promise<TabWalk> {
   // Controls that appear on focus (a row's Save and Cancel) are extra stops, so allow for them.
   for (let press = 0; press < 2 * stops.length + 20; press += 1) {
     await page.keyboard.press('Tab');
+    if (await page.evaluate((s) => document.activeElement?.matches(s), COLLAPSED_NAV)) {
+      await page.keyboard.press('Enter');
+      stops.push(...(await tagStops(page, stops.length)));
+    }
     const focus = await page.evaluate(() => {
       const element = document.activeElement as HTMLElement | null;
       if (!element || element === document.body) return null;
@@ -326,12 +426,20 @@ async function tabWalk(page: Page): Promise<TabWalk> {
     if (!focus.ringed) unseen.add(stops[index]!);
     if (focus.covered) obscured.add(stops[index]!);
   }
+  const stillCollapsed = await page.evaluate(
+    (s) =>
+      [...document.querySelectorAll<HTMLElement>(s)]
+        .filter((element) => element.checkVisibility({ visibilityProperty: true }))
+        .map((element) => element.textContent?.trim() ?? ''),
+    COLLAPSED_NAV,
+  );
   return {
     trapped,
     trail,
     unreached: stops.filter((_, index) => !reached.has(index)),
     unseen: [...unseen],
     obscured: [...obscured],
+    stillCollapsed,
   };
 }
 
