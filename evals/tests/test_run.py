@@ -93,12 +93,12 @@ def test_an_llm_metric_over_few_cases_allows_one_case() -> None:
 def test_a_reported_case_worth_replaces_one_over_cases() -> None:
     result = SuiteResult(
         metrics={"accuracy": 0.9, "llm_accuracy": 0.9, "rules": 1.0},
-        cases=515,
-        case_worth={"accuracy": 14 / 515, "llm_accuracy": 14 / 95},
+        cases=528,
+        case_worth={"accuracy": 14 / 528, "llm_accuracy": 14 / 114},
     )
     assert run.tolerances(result, llm=True) == {
-        "accuracy": pytest.approx(14 / 515),
-        "llm_accuracy": pytest.approx(14 / 95),
+        "accuracy": pytest.approx(14 / 528),
+        "llm_accuracy": pytest.approx(14 / 114),
         "rules": 0.02,
     }
 
@@ -241,14 +241,14 @@ def test_cli_gives_an_llm_metric_over_few_cases_one_case(tmp_path: Path) -> None
 
 
 def test_cli_uses_the_case_worth_a_suite_reports(tmp_path: Path) -> None:
-    """One label covers 14 of the 95 rows the model labels: losing it passes,
-    losing one row more fails, though the suite has 515 cases."""
+    """One label covers 14 of the 114 rows the model labels: losing it passes,
+    losing one row more fails, though the suite has 528 cases."""
 
     def labels(score: float) -> Suite:
-        return fixed("labels", llm=True, cases=515, case_worth={"score": 14 / 95}, score=score)
+        return fixed("labels", llm=True, cases=528, case_worth={"score": 14 / 114}, score=score)
 
-    assert run_one(tmp_path, labels(1 - 14 / 95), baseline=1.0) == 0
-    assert run_one(tmp_path, labels(1 - 15 / 95), baseline=1.0) == 1
+    assert run_one(tmp_path, labels(1 - 14 / 114), baseline=1.0) == 0
+    assert run_one(tmp_path, labels(1 - 15 / 114), baseline=1.0) == 1
 
 
 def test_a_stopped_run_still_writes_its_report(tmp_path: Path) -> None:

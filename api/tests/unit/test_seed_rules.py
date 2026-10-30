@@ -106,6 +106,75 @@ def test_seed_rules_label_a_refund_with_its_merchants_category(
     assert found.category == category
 
 
+@pytest.mark.parametrize(
+    ("raw", "amount_cents", "category"),
+    [
+        # Spec 003 rule 3d: a narrowed rule still labels the merchant it names.
+        ("SHELL OIL 57442", 4_800, "transport"),
+        ("SHELL 57442", 4_800, "transport"),
+        ("RENT PAYMENT AB123", 210_000, "housing"),
+        ("RENT", 210_000, "housing"),
+        ("SPECTRUM", 7_999, "phone_internet"),
+        ("OPTIMUM", 6_500, "phone_internet"),
+        ("SPRINT WIRELESS", 6_500, "phone_internet"),
+        ("PROGRESSIVE *INSURANCE", 13_800, "insurance"),
+        ("PROGRESSIVE INS PREM", 13_800, "insurance"),
+        ("NATIONWIDE INSURANCE", 9_000, "insurance"),
+        ("TRAVELERS INSURANCE", 9_000, "insurance"),
+        ("LEMONADE INSURANCE", 1_500, "insurance"),
+        ("PEACOCK TV", 799, "subscriptions"),
+        ("ADOBE *CREATIVE CLD", 5_999, "subscriptions"),
+        ("ADOBE *ACROPRO SUBS", 1_999, "subscriptions"),
+        ("CLIPPER SERVICE", 2_000, "transport"),
+        ("CLIPPER CARD", 2_000, "transport"),
+        ("EQUINOX FITNESS", 26_000, "personal_care"),
+        ("VANGUARD BUY INVESTMENT", 50_000, "savings_investment"),
+        ("VANGUARD SELL INVESTMENT", -50_000, "savings_investment"),
+        ("FIDELITY INVESTMENTS", 50_000, "savings_investment"),
+        ("TARGET 00012345", 4_200, "shopping"),
+        ("TARGET 00012345 SAN JOSE CA", 4_200, "shopping"),
+        # A brand's licensed store in another category has its own, longer rule.
+        ("TARGET OPTICAL 00123", 18_000, "healthcare"),
+    ],
+)
+def test_seed_rules_name_the_merchant(raw: str, amount_cents: int, category: str) -> None:
+    found = apply_rules(
+        normalize_merchant(raw), RuleBook(read_seed_rules()), amount_cents=amount_cents
+    )
+    assert found is not None, raw
+    assert found.category == category
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        # Spec 003 rule 3d: another merchant whose name begins with a seed
+        # rule's ordinary word. Each was labeled by that word's prefix rule
+        # (issue #148: rent the runway housing, shell beach surf shop transport).
+        "RENT THE RUNWAY AB123",
+        "SHELL BEACH SURF SHOP",
+        "RENT-A-CENTER #12",
+        "SHELL SHACK 0042",
+        "SPECTRUM HEALTH 0042",
+        "OPTIMUM DENTAL CARE",
+        "SPRINT MART #12",
+        "PROGRESSIVE PHYSICAL THERAPY",
+        "NATIONWIDE CHILDRENS HOSPITAL",
+        "TRAVELERS INN #12",
+        "LEMONADE RESTAURANT",
+        "PEACOCK INDIAN CUISINE",
+        "ADOBE GRILL",
+        "CLIPPER BARBER SHOP",
+        "EQUINOX BISTRO",
+        "VANGUARD CLEANING SYSTEMS",
+        "FIDELITY NATIONAL TITLE",
+    ],
+)
+def test_a_seed_word_inside_another_name_reaches_the_model(raw: str) -> None:
+    found = apply_rules(normalize_merchant(raw), RuleBook(read_seed_rules()), amount_cents=5_000)
+    assert found is None, (raw, found)
+
+
 def test_seed_contains_rows_are_the_income_markers() -> None:
     contains = {
         rule.merchant_norm: rule.category

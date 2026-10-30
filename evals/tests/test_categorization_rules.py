@@ -30,9 +30,9 @@ def test_generation_is_deterministic_and_seed_dependent() -> None:
 def test_rows_are_well_formed() -> None:
     with gen.DEFAULT_CSV.open(newline="") as handle:
         rows = list(csv.DictReader(handle))
-    assert len(rows) == 515
+    assert len(rows) == 528
     assert list(rows[0]) == ["id", "merchant_raw", "amount_cents", "posted_at", "category"]
-    assert len({row["id"] for row in rows}) == 515
+    assert len({row["id"] for row in rows}) == 528
     assert {row["category"] for row in rows} <= set(CATEGORIES)
     income = [int(row["amount_cents"]) for row in rows if row["category"] == "income"]
     assert income
@@ -41,43 +41,54 @@ def test_rows_are_well_formed() -> None:
 
 def test_suite_scores_rules_only() -> None:
     result = categorization_rules.run(Budget(0))
-    assert result.cases == 515
+    assert result.cases == 528
     assert set(result.metrics) == {"rules_precision", "rules_coverage"}
-    assert 0.9 <= result.metrics["rules_precision"] < 1.0
+    # Issue #148: no seed rule labels a row wrongly, so none is listed.
+    assert result.metrics["rules_precision"] == 1.0
+    assert result.failures == []
     # Some merchants no rule knows: they are the LLM's share.
     assert 0.5 < result.metrics["rules_coverage"] < 1.0
     assert result.cost_cents == 0.0
-    # Every rule mistake is listed.
-    assert result.failures
-    assert all("expected" in failure for failure in result.failures)
 
 
 def test_scoring_on_hand_made_rows() -> None:
     rows = [
         gen.Row(1, "SAFEWAY #12", 1000, gen.START, "groceries"),
-        gen.Row(2, "RENT THE RUNWAY", 5000, gen.START, "shopping"),
+        gen.Row(2, "SAFEWAY #99", 5000, gen.START, "dining"),
         gen.Row(3, "ZZ UNHEARD OF", 100, gen.START, "other"),
         gen.Row(4, "#1234", 100, gen.START, "other"),
     ]
     result = categorization_rules.score(rows)
     assert result.metrics == {"rules_precision": 0.5, "rules_coverage": 0.5}
-    assert result.failures == ["2: rent the runway expected shopping, rules said housing"]
+    assert result.failures == ["2: safeway expected dining, rules said groceries"]
 
 
 def test_the_hand_written_rows_follow_the_seeded_ones() -> None:
     rows = gen.generate()
-    assert [row.id for row in rows] == list(range(1, 516))
-    assert [row.merchant_raw for row in rows[500:]] == [case[0] for case in gen.SIGN_CASES]
+    assert [row.id for row in rows] == list(range(1, 529))
+    assert [row.merchant_raw for row in rows[500:515]] == [case[0] for case in gen.SIGN_CASES]
+    assert [row.merchant_raw for row in rows[515:]] == [case[0] for case in gen.NAME_CASES]
 
 
 def test_rules_follow_the_direction_on_the_hand_written_rows() -> None:
     """Spec 003 rules 3b and 5a: paychecks named like merchants are income, the
     bank descriptors are labeled, and refunds keep their merchant's category."""
-    rows = gen.generate()[500:]
+    rows = gen.generate()[500:515]
     result = categorization_rules.score(rows)
     assert result.failures == []
     assert result.metrics["rules_precision"] == 1.0
     assert result.metrics["rules_coverage"] == 1.0
+
+
+def test_a_seed_word_inside_another_name_is_left_to_the_model() -> None:
+    """Spec 003 rule 3d (issue #148): the ten businesses whose names begin with
+    a seed rule's ordinary word get no rule label, and the three bare
+    descriptors after them are still labeled by the narrowed exact rules."""
+    rows = gen.generate()[515:]
+    result = categorization_rules.score(rows)
+    assert result.failures == []
+    assert result.metrics["rules_precision"] == 1.0
+    assert result.metrics["rules_coverage"] == 3 / 13
 
 
 def test_registered_with_a_baseline() -> None:

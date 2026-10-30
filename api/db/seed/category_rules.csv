@@ -31,7 +31,7 @@ credit card payment,prefix,transfer
 automatic payment thank,prefix,transfer
 autopay,prefix,transfer
 payment thank you,prefix,transfer
-rent,prefix,housing
+rent,exact,housing
 rent payment,prefix,housing
 bilt rent,prefix,housing
 rentcafe,prefix,housing
@@ -63,17 +63,18 @@ at&t,prefix,phone_internet
 att,prefix,phone_internet
 t mobile,prefix,phone_internet
 tmobile,prefix,phone_internet
-sprint,prefix,phone_internet
+sprint,exact,phone_internet
+sprint wireless,prefix,phone_internet
 comcast,prefix,phone_internet
 xfinity,prefix,phone_internet
-spectrum,prefix,phone_internet
+spectrum,exact,phone_internet
 charter communications,prefix,phone_internet
 cox communications,prefix,phone_internet
 frontier communications,prefix,phone_internet
 centurylink,prefix,phone_internet
 google fi,prefix,phone_internet
 mint mobile,prefix,phone_internet
-optimum,prefix,phone_internet
+optimum,exact,phone_internet
 whole foods,prefix,groceries
 wholefds,prefix,groceries
 trader joes,prefix,groceries
@@ -129,7 +130,9 @@ cava,prefix,dining
 uber,prefix,transport
 lyft,prefix,transport
 bart,prefix,transport
-clipper,prefix,transport
+clipper,exact,transport
+clipper service,prefix,transport
+clipper card,prefix,transport
 mta,prefix,transport
 ventra,prefix,transport
 wmata,prefix,transport
@@ -137,7 +140,8 @@ septa,prefix,transport
 mbta,prefix,transport
 caltrain,prefix,transport
 nj transit,prefix,transport
-shell,prefix,transport
+shell,exact,transport
+shell oil,prefix,transport
 chevron,prefix,transport
 exxon,prefix,transport
 exxonmobil,prefix,transport
@@ -164,21 +168,33 @@ google one,prefix,subscriptions
 amazon prime,prefix,subscriptions
 audible,prefix,subscriptions
 paramount plus,prefix,subscriptions
-peacock,prefix,subscriptions
+peacock,exact,subscriptions
+peacock tv,prefix,subscriptions
 nytimes,prefix,subscriptions
 dropbox,prefix,subscriptions
-adobe,prefix,subscriptions
+adobe,exact,subscriptions
+adobe creative,prefix,subscriptions
+adobe acropro,prefix,subscriptions
+adobe systems,prefix,subscriptions
 duolingo,prefix,subscriptions
 headspace,prefix,subscriptions
 geico,prefix,insurance
-progressive,prefix,insurance
+progressive,exact,insurance
+progressive insurance,prefix,insurance
+progressive ins,prefix,insurance
 state farm,prefix,insurance
 allstate,prefix,insurance
 liberty mutual,prefix,insurance
 farmers insurance,prefix,insurance
-nationwide,prefix,insurance
-lemonade,prefix,insurance
-travelers,prefix,insurance
+nationwide,exact,insurance
+nationwide insurance,prefix,insurance
+nationwide ins,prefix,insurance
+lemonade,exact,insurance
+lemonade insurance,prefix,insurance
+lemonade ins,prefix,insurance
+travelers,exact,insurance
+travelers insurance,prefix,insurance
+travelers ins,prefix,insurance
 metlife,prefix,insurance
 blue cross,prefix,insurance
 blue shield,prefix,insurance
@@ -192,6 +208,7 @@ one medical,prefix,healthcare
 labcorp,prefix,healthcare
 quest diagnostics,prefix,healthcare
 goodrx,prefix,healthcare
+target optical,prefix,healthcare
 amazon,prefix,shopping
 amazon.com,prefix,shopping
 amzn mktp,prefix,shopping
@@ -239,7 +256,8 @@ amtrak,prefix,travel
 great clips,prefix,personal_care
 supercuts,prefix,personal_care
 planet fitness,prefix,personal_care
-equinox,prefix,personal_care
+equinox,exact,personal_care
+equinox fitness,prefix,personal_care
 la fitness,prefix,personal_care
 ulta,prefix,personal_care
 sephora,prefix,personal_care
@@ -261,8 +279,11 @@ mohela,prefix,debt_payment
 sallie mae,prefix,debt_payment
 aidvantage,prefix,debt_payment
 affirm,prefix,debt_payment
-vanguard,prefix,savings_investment
-fidelity,prefix,savings_investment
+vanguard,exact,savings_investment
+vanguard buy,prefix,savings_investment
+vanguard sell,prefix,savings_investment
+fidelity,exact,savings_investment
+fidelity investments,prefix,savings_investment
 schwab,prefix,savings_investment
 robinhood,prefix,savings_investment
 betterment,prefix,savings_investment

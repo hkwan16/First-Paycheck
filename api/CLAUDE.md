@@ -168,7 +168,13 @@ Rules:
   (rule 4): money out goes user exact, user prefix, seed exact, seed prefix;
   money in goes user exact, user prefix, seed `contains` (income and transfer
   only, seed only), seed exact, seed prefix. So a paycheck named like a
-  restaurant is income and a refund keeps its merchant's category. The model
+  restaurant is income and a refund keeps its merchant's category. A seed
+  `prefix` rule names one merchant (rule 3d): an ordinary word that other
+  businesses also begin their names with (`rent`, `shell`, `spectrum`) is an
+  `exact` rule plus prefix rules on the longer forms that name the merchant
+  (`shell oil`), and a brand's own store in another category gets a longer
+  rule (`target optical`). `tests/unit/test_seed_rules.py` lists the names
+  each way; check a new seed row against them. The model
   labels each merchant and direction separately (`CategorizeItem.direction`,
   `categorize/v2`) and may call money in a refund. `tests/support/
   sandbox_history.py:DYNAMIC` replays Plaid's `user_transactions_dynamic`
