@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { setupProgress, type SetupFacts } from './setup-progress';
+import { setupProgress, setupStepsDone, type SetupFacts } from './setup-progress';
 
 const empty: SetupFacts = {
   accounts: 0,
@@ -94,5 +94,27 @@ describe('setupProgress', () => {
     expect(setupProgress({ ...empty, planMissingCount: null }).plan).toBe(false);
     expect(setupProgress({ ...empty, planMissingCount: 1 }).plan).toBe(false);
     expect(setupProgress({ ...empty, planMissingCount: 0 }).plan).toBe(true);
+  });
+});
+
+describe('setupStepsDone (spec 018 rule 13)', () => {
+  it('counts only the four setup steps', () => {
+    expect(
+      setupStepsDone({
+        link: true,
+        confirm: true,
+        spending: true,
+        decisions: true,
+        plan: true,
+        '401k_match': true,
+        w4: true,
+      }),
+    ).toBe(4);
+    expect(setupStepsDone({ confirm: true, plan: true, w4: true })).toBe(1);
+  });
+
+  it('counts a mark not known yet as not done', () => {
+    expect(setupStepsDone(undefined)).toBe(0);
+    expect(setupStepsDone({ link: false })).toBe(0);
   });
 });
