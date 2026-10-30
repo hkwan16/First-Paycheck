@@ -1,6 +1,6 @@
 # 011: Emergency fund calculator, goals and their calendar
 
-Status: Implemented, M6; rule 17 revised (17a, 17b) for issues 165 and 166. Every example is a test. Explaining an emergency-fund decision is out of scope until the explain verifier can run without an IRS citation (see Out of scope).
+Status: Implemented, M6; rule 17 revised (17a, 17b) for issues 165 and 166; rule 18 added for issue 162: the Why pages show the calculator's result for an emergency fund and never offer an explanation. Every example is a test. Explaining an emergency-fund decision is out of scope until the explain verifier can run without an IRS citation (see Out of scope).
 
 ## Goal
 
@@ -76,6 +76,13 @@ Notation: `E = monthly_essentials_cents`, `m = target_months`, `B = current_bala
 - *Re-project from the goal's decision* (chosen): one calculator path and one first-contribution rule for a save and a change, no new writer of decisions, and the goal's date is always the one saving the card as it stands would give.
 
 17b. **The card and a goal that differs** (web, `EmergencyFundCard`). The card's monthly transfer starts from the goal's contribution when the goal belongs to the current decision and holds another amount, so its result is the goal's projection and its save badge says the decision has changed ("Save as v2"); the field's hint names the saved decision's amount. Saving records the goal's amount as the next version, which then agrees with the goal again. The goal says when the contribution reaches the target (`On pace to reach it by ...`) only while it is active: a paused goal has no projected date to show (issue 166), a reached one says when it was reached, and an active one with no date says the target is not reached within the calculator's horizon at this amount, or that the savings already cover it.
+
+### The Why pages (issue 162)
+
+18. **No written explanation, and none offered.** An emergency fund decision is never explained (Out of scope), so no surface offers to write one or says it has one. Which calculators are explained is `web/src/lib/explanations.ts:isExplained` (`k401_match`, `health_plans`, `w4`, mirroring the API's `retrieval/context.py:BENEFITS_QUERIES`); the Plan page's `explanationView` and both Why pages use it.
+    - **The index** (`/why`, `WhyIndexScreen`) lists every current decision, the emergency fund included, since it is still a saved decision with a result to read. Its lead no longer says every decision has an explanation: "Why each decision came out the way it did. Explanations are checked against the calculator before you see them; an emergency fund has no tax rule to explain, so its page shows the calculator's result." The emergency fund's row adds "Calculator result, no written explanation" after its version and date.
+    - **Its page** (`/why/{id}`) shows no explanation and offers none (no "Write the explanation", whatever `GET /decisions/{id}/explanation` answers). The lead says the figures are the calculator's, from the person's own numbers, and nothing on the page came from a language model. A card, "No written explanation", says why: it is arithmetic on their own spending and savings, and no tax rule applies, so there is nothing to explain or cite. Under it, the saved decision's result (`CalculatorResultCard`, without the "Fallback" badge, which would say a written explanation failed): the target for its months of essentials, the suggested 3 to 6 month range, the share already saved, what is still to save, the months to reach it ("Already there", or "Not within 10 years" for a null), and the contribution per paycheck, each a field of the stored result. Its action is "Change it on its step", the emergency fund step (`decisionKindRoute`).
+    - **The API** still answers `POST /explain` for one with 422 `explanation_unavailable`, now in a sentence for people (spec 008 rule 22a): a client that asks anyway shows no identifier.
 
 ## Hand-worked examples
 
@@ -156,5 +163,5 @@ Each row is one test in `api/tests/unit/calc/test_emergency_fund_examples.py` an
 
 - Interest on the fund, inflation, and irregular contributions.
 - Custom goals (`goal_kind = custom`): the table allows them; no route creates them yet.
-- Explaining an emergency-fund decision. Spec 008's verifier requires at least one curated IRS citation and none applies; `POST /explain` on such a decision is 422 `explanation_unavailable` until a later spec settles what a non-tax explanation cites.
+- Explaining an emergency-fund decision. Spec 008's verifier requires at least one curated IRS citation and none applies; `POST /explain` on such a decision is 422 `explanation_unavailable` until a later spec settles what a non-tax explanation cites. What the Why pages show instead is rule 18.
 - Checking progress against the plan each month (the check-in's `goal_off_pace` finding, M8).
