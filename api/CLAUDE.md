@@ -192,8 +192,9 @@ Rules:
   `0004_decisions`. After that the chain runs `0008_goals_and_birth_year`,
   `0011_no_model_reason`, `0009_w4_calendar_kind`, `0012_checkin_findings`,
   `0013_plan_export_job`, `0014_delete_account_fn`, `0015_loan_account_kind`,
-  `0016_rule_match_contains`, `0017_document_replaced_by` (each revises the one
-  before it); the head is `0017_document_replaced_by`.
+  `0016_rule_match_contains`, `0017_document_replaced_by`,
+  `0018_check_in_last_run_at` (each revises the one before it); the head is
+  `0018_check_in_last_run_at`.
 - Adding an enum label is `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with
   `AFTER` when the order means something, as `by_kind` does for
   `account_kind`); the downgrade maps the rows that use it and rebuilds the
@@ -262,6 +263,13 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   errors retry and the last attempt falls back to manual entry. The handler
   writes its outcome only while the document is still `extracting` under its
   job.
+- **Reading again** (spec 004 rules 32-37, issue #163): `no_model`, `budget`
+  and `extraction_failed` say the reading was unavailable, so `POST
+  /docs/{id}/extract` reads such a document again (same limit, same redacting
+  pipeline from the stored bytes); `refused` and `no_readable_page` are what
+  reading it gave, so it is 409 `document_already_read`. `DocumentOut.
+  can_read_again` (`routers/docs.py:can_read_again`, over `READ_AGAIN_REASONS`)
+  is the one place the rule lives; the web offers Read again from it.
 - `AppError` takes `details` (machine-readable, e.g. the confirm diff) and
   `headers` (e.g. `Retry-After`). Money types and two-place percentages shared
   by calculators and request models live in `calc/types.py`.
@@ -511,7 +519,10 @@ adds the `calendar_kind` label `w4_submit`; no new table or function.
 Spec 015. Migration `0012_checkin_findings` (revises `0009_w4_calendar_kind`)
 adds `check_in_findings.key` (`UNIQUE (check_in_id, key)`, index `(user_id,
 key)`) and rebuilds `finding_action` as `done`, `dismissed`. No new table or
-function.
+function. `0018_check_in_last_run_at` adds `check_ins.last_run_at` (rule 9a):
+every run that creates or refreshes a check-in sets it to the job's clock, also
+when nothing changed, and the screen's "Compared with your plan on" reads it,
+never `updated_at`, which moves only when the row itself changes (issue #171).
 
 - **Finders** (`checkin/findings.py`) are pure, one per `finding_kind`,
   `f(Facts) -> list[Finding]`; `all_findings` runs them in rule order. Facts

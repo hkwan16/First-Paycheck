@@ -75,7 +75,7 @@ export function CheckInScreen({ checkInId }: { checkInId: string }) {
     <>
       <PageTitle
         title={checkInTitle(data.period)}
-        lead={`Compared with your plan on ${formatDate(data.updated_at)}. Each finding names the part of your plan it affects; mark it done once you have dealt with it.`}
+        lead={`Compared with your plan on ${formatDate(data.last_run_at)}. Each finding names the part of your plan it affects; mark it done once you have dealt with it.`}
         aside={
           offered ? (
             <div className="flex flex-wrap gap-2">

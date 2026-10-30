@@ -215,7 +215,7 @@ def run_check_in(
     now: dt.datetime,
     trigger: Trigger,
 ) -> CheckInRun:
-    """Rules 8-11 and 13: get or create the month's check-in and refresh it."""
+    """Rules 8-11, 9a and 13: get or create the month's check-in and refresh it."""
     # Two refreshes for one user never interleave, nor does a refresh with a
     # detection run that could flag a charge this run is about to consume.
     _lock(session, f"checkin:{user_id}")
@@ -231,6 +231,8 @@ def run_check_in(
         outcome = "created"
     elif check_in.status is not CheckinStatus.OPEN:
         return CheckInRun(outcome="skipped", check_in_id=check_in.id)
+    # Rule 9a: the run is recorded even when reconcile changes nothing.
+    check_in.last_run_at = now
 
     facts = load_facts(session, period, today)
     candidates = all_findings(facts)

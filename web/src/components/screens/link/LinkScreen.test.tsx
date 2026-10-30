@@ -6,6 +6,7 @@ import { JOB_POLL_MS } from '@/lib/api/hooks';
 import { installFakeXhr } from '@/test/fake-xhr';
 import {
   BENEFITS_DOC_ID,
+  manualEntryProposal,
   PAY_STUB_DOC_ID,
   sampleBenefitsDocument,
   sampleDocument,
@@ -290,6 +291,56 @@ describe('LinkScreen accounts', () => {
     expect(deletes).toHaveLength(1);
     expect(screen.queryByRole('group', { name: 'Credit union checking' })).toBeNull();
     expect(screen.getByRole('group', { name: 'Chase Total Checking' })).toBeInTheDocument();
+  });
+
+  it('stops reporting an import into an account once that account is removed', async () => {
+    // Issue 173: the panel still said "Imported 5 transactions into ..." after Remove.
+    db.accounts.push(structuredClone(sampleCsvAccount));
+    const categorize = '5a000000-0000-4000-8000-0000000000c1';
+    const recurring = '5a000000-0000-4000-8000-0000000000c2';
+    for (const [id, kind] of [
+      [categorize, 'categorize.run'],
+      [recurring, 'recurring.detect'],
+    ] as const) {
+      scriptJob([sampleJob({ id, kind, status: 'succeeded', progress: 100 })]);
+    }
+    const xhr = installFakeXhr();
+    const { user } = renderLink();
+    await screen.findByRole('group', { name: 'Credit union checking' });
+    await user.click(within(accountsCard()).getByRole('button', { name: 'Import a CSV' }));
+    const panel = screen.getByRole('region', { name: 'Import a CSV' });
+    const target = within(panel).getByLabelText('Import into');
+    await user.selectOptions(target, 'Credit union checking');
+    await user.upload(
+      within(panel).getByLabelText(/Choose a CSV file/),
+      new File(['Date,Description,Amount\n2026-10-01,NETFLIX.COM,-15.49\n'], 'export.csv', {
+        type: 'text/csv',
+      }),
+    );
+    await user.click(within(panel).getByRole('button', { name: 'Import CSV' }));
+    await waitFor(() => expect(xhr.requests).toHaveLength(1));
+    act(() =>
+      xhr.last().respond(200, {
+        account: sampleCsvAccount,
+        imported: 5,
+        categorize_job_id: categorize,
+        recurring_job_id: recurring,
+      }),
+    );
+    expect(
+      await within(panel).findByText('Imported 5 transactions into Credit union checking.'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Remove Credit union' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, remove Credit union' }));
+    await within(accountsCard()).findByText(/^Removed Credit union\./);
+
+    expect(within(panel).queryByText(/^Imported \d+ transactions? into /)).toBeNull();
+    expect(within(panel).queryByRole('progressbar', { name: 'Labeling categories' })).toBeNull();
+    // The account it named is gone, so a new account is the target again.
+    expect(target).toHaveValue('');
+    expect(within(panel).getByLabelText('Account type')).toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 
   it('says why removing an imported institution failed', async () => {
@@ -800,6 +851,32 @@ describe('LinkScreen documents', () => {
       'notes.docx was not uploaded. Upload a PDF, PNG or JPEG.',
     );
     expect(xhr.requests).toHaveLength(0);
+  });
+
+  it('reads a document again that went to manual entry while the AI was unavailable', async () => {
+    // Issue 163: "Automatic reading is off right now" a day after reading came back.
+    db.documents = [sampleDocument({ status: 'manual_entry_required', status_reason: 'no_model' })];
+    db.proposals.set(PAY_STUB_DOC_ID, structuredClone(manualEntryProposal));
+    const extracts = requests('POST', `/docs/${PAY_STUB_DOC_ID}/extract`);
+    const { user } = renderLink();
+    const row = await within(docsCard()).findByRole('group', { name: /^Pay stub/ });
+    expect(row).toHaveTextContent('The AI was not available when this was read');
+    expect(row).not.toHaveTextContent(/right now/);
+
+    await user.click(within(row).getByRole('button', { name: 'Read pay stub again' }));
+
+    await waitFor(() => expect(extracts).toHaveLength(1));
+    expect(
+      await within(docsCard()).findByRole('progressbar', { name: 'Reading pay stub' }),
+    ).toBeInTheDocument();
+  });
+
+  it('offers no reading again once the AI read the document and declined', async () => {
+    db.documents = [sampleDocument({ status: 'manual_entry_required', status_reason: 'refused' })];
+    renderLink();
+    const row = await within(docsCard()).findByRole('group', { name: /^Pay stub/ });
+    expect(within(row).getByRole('link', { name: 'Enter pay stub fields' })).toBeInTheDocument();
+    expect(within(row).queryByRole('button', { name: 'Read pay stub again' })).toBeNull();
   });
 
   it('replaces a document: the upload names it, and its row gives way to the new one', async () => {

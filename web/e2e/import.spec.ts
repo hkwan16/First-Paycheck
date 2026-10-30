@@ -74,6 +74,40 @@ test('importing the same file again adds no second account', async ({ page }) =>
   await expect(page.getByRole('group', { name: ACCOUNT })).toHaveCount(1);
 });
 
+test('removing the account an import made clears what the panel said about it', async ({
+  page,
+}) => {
+  // Issue 173: the panel went on reporting an import into an account that was gone.
+  const account = 'E2E CSV To Remove';
+  const bank = 'E2E Removal Bank';
+  const panel = await openImport(page);
+  await panel.getByLabel('Account type').selectOption('Checking');
+  await panel.getByLabel('Account name (optional)').fill(account);
+  await panel.getByLabel('Bank name (optional)').fill(bank);
+  await panel.getByLabel(/Choose a CSV file/).setInputFiles(FIXTURE);
+  await panel.getByRole('button', { name: 'Import CSV' }).click();
+  await expect(panel.getByText(`Imported ${ROWS} transactions into ${account}.`)).toBeVisible({
+    timeout: 30_000,
+  });
+  await expectJobsDone(panel);
+  // Once more into it, so the panel names it as the account to import into.
+  await panel.getByLabel('Import into').selectOption({ label: account });
+  await panel.getByRole('button', { name: 'Import CSV' }).click();
+  await expect(
+    panel.getByText(new RegExp(`^Imported \\d+ transactions? into ${account}\\.$`)),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(panel.getByLabel('Import into')).not.toHaveValue('');
+
+  const card = page.getByRole('region', { name: 'Bank accounts' });
+  await card.getByRole('button', { name: `Remove ${bank}` }).click();
+  await card.getByRole('button', { name: `Yes, remove ${bank}` }).click();
+  await expect(page.getByRole('group', { name: account })).toHaveCount(0, { timeout: 30_000 });
+
+  await expect(panel.getByText(/^Imported \d+ transactions? into /)).toHaveCount(0);
+  await expect(panel.getByRole('progressbar', { name: 'Labeling categories' })).toHaveCount(0);
+  await expect(panel.getByLabel('Import into')).toHaveValue('');
+});
+
 test('a file with bad rows lists them and imports nothing', async ({ page }) => {
   const panel = await openImport(page);
   await panel.getByLabel('Import into').selectOption({ label: ACCOUNT });

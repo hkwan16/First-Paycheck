@@ -31,7 +31,7 @@ import {
   sampleExplanation,
   sampleFallbackExplanation,
 } from '../fixtures/decisions';
-import { samplePayStub, sampleValues } from '../fixtures/documents';
+import { canReadAgain, samplePayStub, sampleValues } from '../fixtures/documents';
 import { sampleJob, SAMPLE_NOW, SAMPLE_SYNCED_AT } from '../fixtures/sample';
 import { checkinHandlers } from './checkin-handlers';
 import { db, emptyDb } from './db';
@@ -145,6 +145,7 @@ export function createDocument(type: DocumentType): DocumentSummary {
     confirmed_at: null,
     deleted_at: null,
     replaced_by_id: null,
+    can_read_again: false,
   };
   db.documents.unshift(document);
   return document;
@@ -168,6 +169,12 @@ const REPLACED = {
   code: 'document_replaced',
   message: 'This document was replaced by a newer upload',
 };
+
+/** A stored document as the API sends it, with `can_read_again` worked out (spec 004 rule 33). */
+const withReadAgain = (document: DocumentSummary): DocumentSummary => ({
+  ...document,
+  can_read_again: canReadAgain(document),
+});
 
 /** What the extraction job writes when it succeeds. */
 function finishExtraction(documentId: string) {
@@ -526,7 +533,7 @@ export const handlers = [
   }),
 
   http.get(apiUrl('/docs'), () =>
-    HttpResponse.json(db.documents.filter((d) => d.replaced_by_id === null)),
+    HttpResponse.json(db.documents.filter((d) => d.replaced_by_id === null).map(withReadAgain)),
   ),
 
   http.post(apiUrl('/docs'), async ({ request }) => {
@@ -563,7 +570,7 @@ export const handlers = [
       document.replaced_by_id === null &&
       (document.status === 'proposed' || document.status === 'manual_entry_required');
     const detail: DocumentDetail = {
-      ...document,
+      ...withReadAgain(document),
       proposal: reviewable ? (db.proposals.get(document.id) ?? null) : null,
     };
     return HttpResponse.json(detail);
@@ -581,6 +588,13 @@ export const handlers = [
         422,
         'extraction_unsupported',
         'offer_letter documents cannot be extracted yet',
+      );
+    }
+    if (document.status === 'manual_entry_required' && !canReadAgain(document)) {
+      return appError(
+        409,
+        'document_already_read',
+        'This document was already read; type its fields from the redacted lines',
       );
     }
     const jobId = scriptJob(extractJobStates(nextId('5a000000'), document.id), () =>

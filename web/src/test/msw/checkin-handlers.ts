@@ -91,12 +91,17 @@ const thisMonths = () => checkinDb.checkIns.find((c) => c.period === thisPeriod(
 function runCheckIn() {
   const existing = thisMonths();
   if (!existing) {
-    const created = novemberCheckIn({ period: thisPeriod(), updated_at: checkinDb.now });
+    const created = novemberCheckIn({
+      period: thisPeriod(),
+      updated_at: checkinDb.now,
+      last_run_at: checkinDb.now,
+    });
     checkinDb.checkIns.unshift(created);
     return { outcome: 'created' as const, check_in_id: created.id };
   }
   if (existing.status !== 'open') return { outcome: 'skipped' as const, check_in_id: existing.id };
-  existing.updated_at = checkinDb.now;
+  // Spec 015 rule 9a: every run is recorded; updated_at moves only when the row changes.
+  existing.last_run_at = checkinDb.now;
   return { outcome: 'refreshed' as const, check_in_id: existing.id };
 }
 

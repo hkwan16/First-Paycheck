@@ -50,7 +50,7 @@ describe('SampleScreen', () => {
       'aria-current',
       'page',
     );
-    expect(screen.getByRole('region', { name: 'October 1 to 17 · 2 paychecks' })).toHaveTextContent(
+    expect(screen.getByRole('region', { name: 'October 1 to 17 · 2 pay stubs' })).toHaveTextContent(
       '$3,992.08',
     );
     const flow = screen.getByRole('region', { name: 'Where each dollar of October pay went' });
@@ -88,6 +88,18 @@ describe('SampleScreen', () => {
     render(<SampleScreen screen="confirm-manual" />);
     const fields = await screen.findByRole('region', { name: 'Pay stub fields' });
     expect(within(fields).getAllByRole('textbox')).toHaveLength(10);
+    expect(requests).toEqual([]);
+  });
+});
+
+describe('SampleScreen after the AI was unavailable', () => {
+  it('renders manual entry that offers Read again, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="confirm-unread" />);
+    await screen.findByRole('region', { name: 'Pay stub fields' });
+    expect(screen.getByText(/^The AI was not available when this was read/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Read again' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Source, redacted' })).toBeInTheDocument();
     expect(requests).toEqual([]);
   });
 });

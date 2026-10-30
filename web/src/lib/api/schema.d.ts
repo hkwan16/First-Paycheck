@@ -1250,6 +1250,11 @@ export interface components {
        */
       id: string;
       /**
+       * Last Run At
+       * Format: date-time
+       */
+      last_run_at: string;
+      /**
        * Period
        * Format: date
        */
@@ -1290,6 +1295,11 @@ export interface components {
        * Format: uuid
        */
       id: string;
+      /**
+       * Last Run At
+       * Format: date-time
+       */
+      last_run_at: string;
       /**
        * Period
        * Format: date
@@ -1507,6 +1517,8 @@ export interface components {
     };
     /** DocumentDetail */
     DocumentDetail: {
+      /** Can Read Again */
+      can_read_again: boolean;
       /** Confirmed At */
       confirmed_at: string | null;
       /** Deleted At */
@@ -1534,6 +1546,8 @@ export interface components {
     };
     /** DocumentOut */
     DocumentOut: {
+      /** Can Read Again */
+      can_read_again: boolean;
       /** Confirmed At */
       confirmed_at: string | null;
       /** Deleted At */

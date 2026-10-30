@@ -285,7 +285,8 @@ export function layoutCashFlow(flow: CashFlow, containerWidth: number): FlowLayo
           'plum',
           null,
         )
-      : make(0, 'gross', 'gross', 'gross', 'No confirmed pay stub', 0, 'plum', null);
+      : // None paid in this period; the user may have one from another (spec 010 rule 5a).
+        make(0, 'gross', 'gross', 'gross', 'No pay stub this period', 0, 'plum', null);
 
   const lineNodes: FlowNode[] = [];
   if (stubs > 0) {

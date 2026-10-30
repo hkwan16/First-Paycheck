@@ -15,7 +15,7 @@ import datetime as dt
 import uuid
 from collections.abc import Callable
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Literal, assert_never
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -53,6 +53,7 @@ __all__ = [
     "StubFact",
     "UpcomingDeadlinePayload",
     "all_findings",
+    "calendar_affects",
     "deduction_change",
     "election_mismatch",
     "goal_off_pace",
@@ -556,16 +557,24 @@ def deduction_change(facts: Facts) -> list[Finding]:
     return found
 
 
-# Rule 7: which calculator a calendar kind belongs to.
-CALENDAR_AFFECTS: dict[CalendarKind, Affects] = {
-    CalendarKind.ELECTION_CHECK: "k401_match",
-    CalendarKind.ENROLLMENT_DEADLINE: "health_plans",
-    CalendarKind.OPEN_ENROLLMENT: "health_plans",
-    CalendarKind.GOAL_CONTRIBUTION: "emergency_fund",
-    CalendarKind.GOAL_REVIEW: "emergency_fund",
-    CalendarKind.GOAL_TARGET: "emergency_fund",
-    CalendarKind.TAX_SEASON: "w4",
-}
+def calendar_affects(kind: CalendarKind) -> Affects:
+    """Rule 7: which calculator a calendar kind belongs to.
+
+    A ``match`` rather than a dict so mypy checks it covers every kind: a new
+    ``CalendarKind`` without a case fails type checking (issue 170, where
+    ``w4_submit`` had no entry and its finding no Affects link).
+    """
+    match kind:
+        case CalendarKind.ELECTION_CHECK:
+            return "k401_match"
+        case CalendarKind.ENROLLMENT_DEADLINE | CalendarKind.OPEN_ENROLLMENT:
+            return "health_plans"
+        case CalendarKind.GOAL_CONTRIBUTION | CalendarKind.GOAL_REVIEW | CalendarKind.GOAL_TARGET:
+            return "emergency_fund"
+        case CalendarKind.TAX_SEASON | CalendarKind.W4_SUBMIT:
+            return "w4"
+        case _:
+            assert_never(kind)
 
 
 def upcoming_deadline(facts: Facts) -> list[Finding]:
@@ -579,7 +588,7 @@ def upcoming_deadline(facts: Facts) -> list[Finding]:
                 key=f"upcoming_deadline:{event.id}",
                 decision_id=event.decision_id,
                 payload=UpcomingDeadlinePayload(
-                    affects=CALENDAR_AFFECTS.get(event.kind),
+                    affects=calendar_affects(event.kind),
                     calendar_event_id=event.id,
                     calendar_kind=event.kind,
                     title=event.title,

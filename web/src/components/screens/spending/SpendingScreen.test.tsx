@@ -26,7 +26,7 @@ async function renderSpending(props: Parameters<typeof SpendingScreen>[0] = {}) 
 
 afterEach(() => server.events.removeAllListeners());
 
-const summaryRegion = () => screen.getByRole('region', { name: /paychecks?$|Your month so far/ });
+const summaryRegion = () => screen.getByRole('region', { name: /pay stubs?$|Your month so far/ });
 const tile = (label: string) => within(summaryRegion()).getByText(label).parentElement!;
 const LOAN_ID = '1a2b3c4d-0000-4000-8000-00000000a070';
 
@@ -50,9 +50,9 @@ describe('SpendingScreen summary', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       "Where October's money went",
     );
-    expect(summaryRegion()).toHaveAccessibleName('October 1 to 17 · 2 paychecks');
+    expect(summaryRegion()).toHaveAccessibleName('October 1 to 17 · 2 pay stubs');
     expect(tile('Income')).toHaveTextContent('$3,992.08');
-    expect(tile('Income')).toHaveTextContent('2 paychecks, after taxes and deductions');
+    expect(tile('Income')).toHaveTextContent('Deposits labeled income');
     expect(tile('Essentials')).toHaveTextContent('$1,823.25');
     expect(tile('Essentials')).toHaveTextContent('46% of income');
     expect(tile('Flexible')).toHaveTextContent('$249.89');
@@ -321,7 +321,11 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
     spendingDb.cashflow = flow;
     await renderSpending({ showSankey: true });
     expect(await within(card()).findByRole('button', { name: 'Essentials $6.33' })).toBeVisible();
-    expect(node('No confirmed pay stub $0.00')).toBeInTheDocument();
+    // Spec 010 rule 5a: no stub in this period, which says nothing of other months'.
+    expect(node('No pay stub this period $0.00')).toBeInTheDocument();
+    expect(summaryRegion()).toHaveAccessibleName('September 1 to 30 · no pay stub');
+    expect(tile('Income')).toHaveTextContent('Deposits labeled income');
+    expect(summaryRegion()).not.toHaveTextContent(/paycheck/);
     expect(node('Income deposited $0.00')).toBeInTheDocument();
     expect(node('Flexible $500.00')).toBeInTheDocument();
     expect(node('Spent beyond income -$506.33')).toBeInTheDocument();

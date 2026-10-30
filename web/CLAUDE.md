@@ -84,7 +84,7 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     findings.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts,
                     page-hydration.ts, page-title.ts, log-error.ts
-src/app/dev/screens/{link,account,spending,confirm,confirm/manual,confirm/benefits,confirm/extracting,
+src/app/dev/screens/{link,account,spending,confirm,confirm/manual,confirm/unread,confirm/benefits,confirm/extracting,
                     confirm/failed,confirm/confirmed,decisions/{emergency-fund,401k,health-plan,w4,
                     after-alpha},why,why/fallback,why-index,check-in,
                     check-in/complete,check-in-index,plan,plan/empty}  a screen on the sample data, no
@@ -323,7 +323,10 @@ The arrow turns over `--duration-fast`, zero under reduced motion; nothing anima
   tests, `replaceDocument(id)` (msw/handlers.ts) does to `db` what the API does. A CSV import refused with 422
   `csv_invalid` carries its row errors: `csvProblems(error)` reads `{ errors, total }` (the first
   50 and how many in all); the Link screen's `CsvImport` lists them, offers Try again on 409
-  `import_conflict`, and follows the two job ids the import returns. `lib/documents.ts` maps a
+  `import_conflict`, and follows the two job ids the import returns. It reports an import, and
+  keeps an account as the one to import into, only while the account list has that account
+  (`useImportCsv` adds the imported account to the list at once), so removing the account clears
+  both (issue 173). `lib/documents.ts` maps a
   document's status to its badge and reason text; `isReviewable`/`newestReviewable` pick what
   Confirm opens: a pay stub first, else a benefits summary that was read.
 - **Money** is formatted only. Transactions keep Plaid's sign (positive is money out):
@@ -511,9 +514,14 @@ offer letter states).
   `useConfirmDocument`, and the screen renders its diff (`MathNotice`).
 - **Manual entry**: a proposal with `manual_entry_required` starts every field empty and in edit;
   the source pane shows the redacted lines to type from, Confirm all is off, and each row saves on
-  its own.
+  its own. The notice says why in the past tense (`statusReasonText`: what happened when it was
+  read, never "right now"), and when the API says `can_read_again` (the AI was unavailable: no
+  model, a spent budget, failed attempts; spec 004 rules 32-37) it offers Read again (`ReadAgain`,
+  also under a benefits summary nothing was read from; the Link row has its own Read again).
 - **Source pane**: the redacted lines the AI saw, with redactions drawn as labeled bars
-  (`role="img"`, "Redacted") and the selected field's line marked `aria-current`.
+  (`role="img"`, "Redacted") and the selected field's line marked `aria-current`. Titled "Source, as
+  the AI saw it" only when the lines were sent (`linesSentToAi`); otherwise "Source, redacted",
+  saying they were not sent to the AI.
 - **Benefits summary** (`BenefitsReview`, spec 013): `initBenefitsState` (`benefits-fields.ts`)
   lays the proposal's plans, match tiers and vesting out as reducer fields keyed
   `plans.1.deductible_cents`, `match_tiers.0.employer_pct`, `vesting_years`, each with a `group`
@@ -860,7 +868,8 @@ diagram's buckets match the summary tiles (and that the scale badge shows only w
 gross pay or income to scale by: the sandbox bank's last month may deposit nothing), drives a node
 from the keyboard, changes the period and saves a category fix; `import.spec.ts` (project `authenticated-import`, after Spending)
 imports `e2e/fixtures/bank-export.csv` (five synthetic rows) into a new CSV account, imports it
-again without making a second account, and checks a broken file's row errors.
+again without making a second account, imports into another new account and removes it (the panel
+then reports nothing about it), and checks a broken file's row errors.
 Both change the e2e user's data, so they are ordered projects with serial files rather than
 parallel tests. `confirm.spec.ts` (project `authenticated-confirm`) uploads
 `e2e/fixtures/acme-paystub.pdf`, a synthetic stub with an example SSN the API must redact and a

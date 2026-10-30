@@ -135,6 +135,11 @@ export function DocumentRow({ doc, jobId, starting, onRead, onReplace }: Documen
               redacted
             </Badge>
           )}
+          {!reading && doc.can_read_again && (
+            <Button size="sm" onClick={() => onRead(doc)} aria-label={`Read ${lower} again`}>
+              Read again
+            </Button>
+          )}
           {!reading && isReviewable(doc) && (
             <Button
               size="sm"

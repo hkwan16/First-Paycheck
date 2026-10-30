@@ -51,6 +51,26 @@ describe('useImportCsv', () => {
     expect(invalidated([...queryKeys.cashflow(), undefined])).toBe(true);
     // Recurring charges change when the detection job finishes (useJob), not now.
     expect(invalidated(queryKeys.recurring())).toBe(false);
+    // The account it wrote is listed at once, before (or without) the refetch.
+    expect(queryClient.getQueryData(queryKeys.accounts())).toEqual([{ id: 'a1' }]);
+  });
+
+  it('lists an account imported into again only once', async () => {
+    const xhr = installFakeXhr();
+    const { result, queryClient } = renderHookWithClient(() => useImportCsv());
+    queryClient.setQueryData(queryKeys.accounts(), [{ id: 'a1', name: 'Kept' }]);
+    act(() =>
+      result.current.mutate({ file: csv(), account: { id: 'a1' }, sign: 'negative_is_out' }),
+    );
+    await waitFor(() => expect(xhr.requests).toHaveLength(1));
+    xhr.last().respond(200, {
+      account: { id: 'a1', name: 'Kept' },
+      imported: 0,
+      categorize_job_id: 'j1',
+      recurring_job_id: 'j2',
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(queryClient.getQueryData(queryKeys.accounts())).toEqual([{ id: 'a1', name: 'Kept' }]);
   });
 
   it('fails with an UploadError and changes nothing', async () => {

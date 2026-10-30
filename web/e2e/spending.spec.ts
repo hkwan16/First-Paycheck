@@ -37,7 +37,9 @@ test('lists the synced transactions with who labeled each one', async ({ page })
 
 /** The summary card, once GET /cashflow has answered (its heading names the period). */
 async function loadedSummary(page: Page) {
-  const summary = page.getByRole('region', { name: /^\w+ \d+.* to .+ · \d+ paychecks?$/ });
+  const summary = page.getByRole('region', {
+    name: /^\w+ \d+.* to .+ · (\d+ pay stubs?|no pay stub)$/,
+  });
   await expect(summary).toBeVisible({ timeout: 30_000 });
   await expect(summary).not.toHaveAttribute('aria-busy', 'true');
   return summary;
@@ -66,6 +68,13 @@ test('the cash flow and the summary tiles show the same totals from the API', as
   });
   if ((await pay.count()) > 0) await expect(scale).toBeVisible();
   else await expect(scale).toHaveCount(0);
+  // Spec 007 rule 26a and spec 010 rule 5a (issue 164): income is deposits, and
+  // the pay stubs are counted for this period only, whatever other months hold.
+  await expect(summary.getByText('Deposits labeled income', { exact: true })).toBeVisible();
+  await expect(summary).not.toContainText('paycheck');
+  await expect(
+    card.getByRole('button', { name: /^(Gross pay, \d+ stubs?|No pay stub this period) \$/ }),
+  ).toHaveCount(1);
   // Both routes compute the period with the same code (spec 010 rule 5):
   // every bucket the diagram draws matches its tile.
   for (const bucket of ['Essentials', 'Flexible', 'Savings']) {

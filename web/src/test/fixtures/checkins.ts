@@ -405,6 +405,7 @@ export function novemberCheckIn(overrides: Partial<CheckInDetail> = {}): CheckIn
     handled_count: 0,
     created_at: '2026-11-01T08:00:00Z',
     updated_at: CREATED_AT,
+    last_run_at: CREATED_AT,
     findings,
     cash_flow: { cash_flow: novemberCashflow(), plan: novemberPlan() },
     ...overrides,
@@ -456,6 +457,7 @@ export function octoberCheckIn(): CheckInDetail {
     handled_count: 2,
     created_at: '2026-10-01T08:00:00Z',
     updated_at: '2026-10-20T15:00:00Z',
+    last_run_at: '2026-10-20T15:00:00Z',
     findings,
     cash_flow: { cash_flow: emptyCashflow('2026-10-01', '2026-10-31'), plan: [] },
   };

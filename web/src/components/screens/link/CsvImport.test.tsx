@@ -3,6 +3,7 @@ import { JOB_POLL_MS } from '@/lib/api/hooks';
 import { API_BASE_URL } from '@/lib/api/base-url';
 import { installFakeXhr } from '@/test/fake-xhr';
 import { CHECKING_ID, SAMPLE_NOW, sampleAccounts, sampleJob } from '@/test/fixtures/sample';
+import { db } from '@/test/msw/db';
 import { scriptJob } from '@/test/msw/handlers';
 import { act, renderWithProviders, screen, userEvent, waitFor, within } from '@/test/render';
 import { CsvImport } from './CsvImport';
@@ -91,6 +92,8 @@ describe('CsvImport', () => {
     act(() => request.progress(1, 2));
     expect(bar).toHaveAttribute('aria-valuenow', '50');
 
+    // The API writes the account before it answers, so the list has it.
+    db.accounts.push(IMPORTED.account);
     act(() => request.respond(200, IMPORTED));
     const imported = await within(region()).findByText(
       'Imported 3 transactions into Credit union.',

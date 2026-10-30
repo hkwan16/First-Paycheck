@@ -23,7 +23,9 @@ test('04, 05, 07 and 08 the Spending screen', async ({ page }) => {
   }
   const table = page.getByRole('table', { name: 'Transactions' });
   await expect(table.getByRole('row').nth(1)).toBeVisible({ timeout: 60_000 });
-  const summary = page.getByRole('region', { name: /^\w+ \d+.* to .+ · \d+ paychecks?$/ });
+  const summary = page.getByRole('region', {
+    name: /^\w+ \d+.* to .+ · (\d+ pay stubs?|no pay stub)$/,
+  });
   await shot(summary, '07-spending-tiles');
 
   const card = page.getByRole('region', { name: /^Where each dollar of (\w+ )?pay went$/ });

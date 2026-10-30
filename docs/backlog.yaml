@@ -1734,6 +1734,9 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: Medium
+    status: done
+    # Fixed October 30: spec 004 rules 32-37. DocumentOut.can_read_again; Read again on
+    # Link and Confirm; reasons in the past tense; 409 document_already_read for the rest.
   - title: "Spending says 0 paychecks and no confirmed pay stub when the stub is in another month"
     body: >-
       The e2e account's September reads "Income $4,050.12, 0 paychecks,
@@ -1746,6 +1749,9 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Medium
+    status: done
+    # Fixed October 30: specs 007 rule 26a and 010 rule 5a. The screens say "pay stubs"
+    # in the period and "Deposits labeled income" (payStubsText).
   - title: "Changing the emergency fund contribution leaves a dead end to get the projected date back"
     body: >-
       Change contribution on the goal clears its target date (spec 011 rule
@@ -1815,6 +1821,8 @@ issues:
     labels: ["area:api", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed October 30: calendar_affects is a match over CalendarKind ending in assert_never.
   - title: "A check-in says it was compared on an older date right after Check in now"
     body: >-
       After Check in now, the October check-in says "Checked again just now.
@@ -1826,6 +1834,8 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed October 30: spec 015 rule 9a. check_ins.last_run_at (migration 0018), set on every run.
   - title: "Following a step footer on a phone lands with the nav half under the header"
     body: >-
       On a phone, following a Decisions footer link (Next or Back) lands
@@ -1844,3 +1854,5 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed October 30: the panel reports an import only while its account exists.

@@ -79,6 +79,12 @@ async function firstFinding(page: Page, findings: Locator): Promise<Locator> {
   return findings.getByRole('listitem', { name, exact: true });
 }
 
+/** Today as the screen dates a time ("Oct 30, 2026"), in the browser's zone, which is this one's. */
+const today = () =>
+  new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(
+    new Date(),
+  );
+
 async function reload(page: Page) {
   await page.reload();
   await waitForHydration(page);
@@ -101,10 +107,16 @@ test('runs this month’s check-in again, then marks a finding done, dismissed a
 
   // An open check-in for this month can be run again from its own page.
   if (await checkInNow(page).isVisible()) {
+    const before = today();
     await checkInNow(page).click();
     await expect(page.getByText('Checked again just now. This page is up to date.')).toBeVisible({
       timeout: RUN_BUDGET_MS,
     });
+    // Issue 171: the lead dates the run just made, not the check-in's last change.
+    const dates = [...new Set([before, today()])].join('|');
+    await expect(
+      page.getByText(new RegExp(`^Compared with your plan on (${dates})\\.`)),
+    ).toBeVisible();
   }
 
   const row = await firstFinding(page, findings);
@@ -156,6 +168,12 @@ test('links a finding to the decision step it affects', async ({ page }) => {
       /^\/setup\/decisions\/(emergency-fund|401k|health-plan|w4)$/,
     );
   }
+  // Issue 170: the W-4 hand-in reminder Decisions saved names the W-4 step too.
+  const w4 = findings.getByRole('listitem', { name: 'Give your employer your updated Form W-4' });
+  await expect(w4.getByRole('link', { name: /^Affects: / })).toHaveAttribute(
+    'href',
+    '/setup/decisions/w4',
+  );
   test.skip(count === 0, 'No finding this month affects a decision');
   const href = (await affects.first().getAttribute('href'))!;
   await affects.first().click();

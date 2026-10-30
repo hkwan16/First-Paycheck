@@ -164,7 +164,7 @@ describe('CheckInScreen', () => {
     const card = await screen.findByRole('region', {
       name: 'November cash flow against the plan',
     });
-    expect(within(card).getByText('November 1 to 16 · 1 paycheck')).toBeInTheDocument();
+    expect(within(card).getByText('November 1 to 16 · 1 pay stub')).toBeInTheDocument();
     const row = within(card).getByRole('row', { name: /^401\(k\) from pay stubs/ });
     expect(row).toHaveTextContent('$54.17');
     expect(row).toHaveTextContent('$108.33');
@@ -275,8 +275,9 @@ describe('Check in now on a check-in', () => {
 
   it('runs this month’s open check-in again, follows the job and reads it again', async () => {
     at('2026-11-16T18:00:00Z');
+    // Issue 171: a run that changes nothing moves last_run_at, not updated_at.
     scriptJob(checkInJobStates(checkInJobId(1)), () => {
-      checkinDb.checkIns[0]!.updated_at = '2026-11-18T09:00:00Z';
+      checkinDb.checkIns[0]!.last_run_at = '2026-11-18T09:00:00Z';
     });
     const { user } = await openAt();
     expect(screen.getByText(/Compared with your plan on Nov 16, 2026/)).toBeInTheDocument();
@@ -289,8 +290,9 @@ describe('Check in now on a check-in', () => {
     expect(
       await screen.findByText('Checked again just now. This page is up to date.'),
     ).toBeInTheDocument();
-    // The check-in was read again: the date it was compared on moved.
+    // The check-in was read again: the date it was compared on is the run's.
     expect(await screen.findByText(/Compared with your plan on Nov 18, 2026/)).toBeInTheDocument();
+    expect(checkinDb.checkIns[0]!.updated_at).toBe(novemberCheckIn().updated_at);
     // It is this check-in, so there is nothing to open.
     expect(screen.queryByRole('link', { name: 'Open it' })).toBeNull();
   });

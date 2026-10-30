@@ -112,6 +112,29 @@ def test_check_in_now_refreshes_the_open_check_in(
     assert len(check_ins(db_connection, user_a)) == 1
 
 
+def test_check_in_now_records_a_run_that_changes_nothing(
+    frozen: FastAPI, db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Rule 9a (issue 171): a refresh that changes nothing still records its run."""
+    november(db_connection, user_a)
+    client = client_as(user_a)
+    check_in_now(client)
+    run_all(db_connection)
+    check_in = str(check_ins(db_connection, user_a)[0]["id"])
+    assert client.get(f"/check-ins/{check_in}").json()["last_run_at"] == "2026-11-16T12:00:00Z"
+
+    later = dt.datetime(2026, 11, 18, 9, tzinfo=dt.UTC)
+    refresh = check_in_now(client)
+    run_all(db_connection, now=later)
+
+    result = job_row(db_connection, refresh["job_id"])["result"]
+    assert (result["outcome"], result["inserted"], result["retracted"]) == ("refreshed", 0, 0)
+    detail = client.get(f"/check-ins/{check_in}").json()
+    assert detail["last_run_at"] == "2026-11-18T09:00:00Z"
+    [listed] = client.get("/check-ins").json()
+    assert listed["last_run_at"] == "2026-11-18T09:00:00Z"
+
+
 def test_check_in_now_leaves_a_completed_check_in(
     frozen: FastAPI, db_connection: Connection, client_as: Client, user_a: FixtureUser
 ) -> None:
@@ -119,11 +142,13 @@ def test_check_in_now_leaves_a_completed_check_in(
     completed = make_check_in(
         db_connection, user_a.id, status=CheckinStatus.COMPLETED, completed_at=NOW
     )
+    before = check_ins(db_connection, user_a)[0]["last_run_at"]
 
     body = check_in_now(client_as(user_a))
-    run_all(db_connection)
+    run_all(db_connection, now=NOW + dt.timedelta(days=1))
 
     assert body["check_in_id"] == str(completed)
     assert job_row(db_connection, body["job_id"])["result"]["outcome"] == "skipped"
     assert [c["status"] for c in check_ins(db_connection, user_a)] == ["completed"]
+    assert check_ins(db_connection, user_a)[0]["last_run_at"] == before
     assert findings(db_connection, user_a) == []

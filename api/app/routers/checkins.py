@@ -59,6 +59,10 @@ class CheckInSummary(BaseModel):
     handled_count: int
     created_at: UtcDateTime
     updated_at: UtcDateTime
+    # When the finders last ran on it (spec 015 rule 9a): every run that made or
+    # refreshed it, also one that changed nothing; updated_at moves only when
+    # the check-in's own row changes.
+    last_run_at: UtcDateTime
 
 
 class FindingOut(BaseModel):
@@ -117,6 +121,7 @@ def _summary(check_in: CheckIn, total: int, handled: int) -> CheckInSummary:
         handled_count=handled,
         created_at=check_in.created_at,
         updated_at=check_in.updated_at,
+        last_run_at=check_in.last_run_at,
     )
 
 

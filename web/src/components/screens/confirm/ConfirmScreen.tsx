@@ -17,6 +17,7 @@ import { pageTitle } from '@/lib/page-title';
 import { confirmRoute, decisionRouteFor } from '@/lib/routes';
 import { BenefitsReview } from './BenefitsReview';
 import { ConfirmReview } from './ConfirmReview';
+import { ReadAgain } from './ReadAgain';
 
 const PAY_STUB_TITLE = 'Check what we read from your pay stub';
 
@@ -77,13 +78,15 @@ function Loading() {
  * A benefits summary nothing could be read from. Its plans and match are not
  * typed in here: the health plan card and the 401(k) plan details take them.
  */
-function BenefitsUnread() {
+function BenefitsUnread({ document }: { document: DocumentDetail }) {
   return (
     <Status type="benefits">
       <Notice tone="warning" title="Nothing could be read from this summary.">
+        {document.can_read_again && `${statusReasonText(document.status_reason)} `}
         Enter your health plans on the health plan card and your 401(k) match in its plan details.
         Both use only what you type.
       </Notice>
+      {document.can_read_again && <ReadAgain document={document} />}
       <ToDecisions label="Go to decisions" />
     </Status>
   );
@@ -165,7 +168,7 @@ function NotReviewable({ document }: { document: DocumentDetail }) {
       );
     case 'manual_entry_required':
       // A pay stub in manual entry is reviewable; only a benefits summary lands here.
-      return <BenefitsUnread />;
+      return <BenefitsUnread document={document} />;
     case 'extracting':
       return (
         <Status type={document.type}>
@@ -259,7 +262,7 @@ function ConfirmContent({ query }: { query: ReturnType<typeof useDocument> }) {
   }
   if (document.type === 'benefits') {
     const { plans, match_tiers } = document.proposal;
-    if (!plans?.length && !match_tiers?.length) return <BenefitsUnread />;
+    if (!plans?.length && !match_tiers?.length) return <BenefitsUnread document={document} />;
     return (
       <BenefitsReview
         key={document.id}

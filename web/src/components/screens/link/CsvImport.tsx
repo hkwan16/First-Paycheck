@@ -122,12 +122,18 @@ export function CsvImport({ id }: { id?: string }) {
   const kindId = useId();
   const nameId = useId();
   const institutionId = useId();
-  const accounts = useAccounts().data ?? [];
+  const listed = useAccounts().data;
+  const accounts = listed ?? [];
   const upload = useImportCsv();
+  // An account can be removed (Remove on the Link screen) after it was chosen
+  // here or imported into: once the list no longer has it, neither does the
+  // panel (issue 173). Until the list loads, nothing is known to be gone.
+  const gone = (id: string) => listed !== undefined && !listed.some((a) => a.id === id);
 
   const [file, setFile] = useState<File | null>(null);
   const [rejected, setRejected] = useState<string | null>(null);
-  const [accountId, setAccountId] = useState('');
+  const [chosenAccountId, setAccountId] = useState('');
+  const accountId = gone(chosenAccountId) ? '' : chosenAccountId;
   const [kind, setKind] = useState<AccountKind>('checking');
   const [name, setName] = useState('');
   const [institution, setInstitution] = useState('');
@@ -281,7 +287,9 @@ export function CsvImport({ id }: { id?: string }) {
       {upload.isError && file && (
         <ImportError error={upload.error} fileName={file.name} onRetry={start} />
       )}
-      {upload.isSuccess && <ImportJobs key={upload.data.categorize_job_id} result={upload.data} />}
+      {upload.isSuccess && !gone(upload.data.account.id) && (
+        <ImportJobs key={upload.data.categorize_job_id} result={upload.data} />
+      )}
     </section>
   );
 }

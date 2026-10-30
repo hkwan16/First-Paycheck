@@ -1,12 +1,13 @@
 import { http, HttpResponse } from 'msw';
 import type { PlaidLinkOptionsWithLinkToken } from 'react-plaid-link';
+import type * as NextNavigation from 'next/navigation';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CALC_DEBOUNCE_MS } from '@/lib/api/hooks';
 import { installFakeXhr } from '@/test/fake-xhr';
 import { DECISION_V1_ID } from '@/test/fixtures/decisions';
 import { NOVEMBER_ID } from '@/test/fixtures/checkins';
-import { sampleDocument } from '@/test/fixtures/documents';
+import { manualEntryProposal, PAY_STUB_DOC_ID, sampleDocument } from '@/test/fixtures/documents';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
 import { db, decisionsReady, savedDecision } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
@@ -23,6 +24,7 @@ import {
 } from '@/test/render';
 import { CheckInIndexScreen } from './check-in/CheckInIndexScreen';
 import { CheckInScreen } from './check-in/CheckInScreen';
+import { ConfirmScreen } from './confirm/ConfirmScreen';
 import { EmergencyFundCard } from './decisions/EmergencyFundCard';
 import { Match401kCard } from './decisions/Match401kCard';
 import { CsvImport } from './link/CsvImport';
@@ -46,6 +48,11 @@ vi.mock('react-plaid-link', () => ({
     error: null,
     exit: vi.fn(),
   }),
+}));
+// Confirm's review reads the router (it moves on after a confirm); nothing here navigates.
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof NextNavigation>()),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 vi.mock('@/lib/plaid-script', () => ({
   loadPlaidScript: () => Promise.resolve(),
@@ -153,6 +160,35 @@ const SURFACES: readonly Surface[] = [
     ui: () => <LinkScreen />,
     act: async (user) => {
       await user.click(await screen.findByRole('button', { name: 'Read pay stub' }));
+    },
+    lead: 'Could not start reading the pay stub.',
+  },
+  {
+    name: 'reading a document again',
+    route: ['post', '/docs/:id/extract'],
+    arrange: () => {
+      db.documents = [
+        sampleDocument({ status: 'manual_entry_required', status_reason: 'no_model' }),
+      ];
+    },
+    ui: () => <LinkScreen />,
+    act: async (user) => {
+      await user.click(await screen.findByRole('button', { name: 'Read pay stub again' }));
+    },
+    lead: 'Could not start reading the pay stub.',
+  },
+  {
+    name: 'reading a document again from Confirm',
+    route: ['post', '/docs/:id/extract'],
+    arrange: () => {
+      db.documents = [
+        sampleDocument({ status: 'manual_entry_required', status_reason: 'no_model' }),
+      ];
+      db.proposals.set(PAY_STUB_DOC_ID, structuredClone(manualEntryProposal));
+    },
+    ui: () => <ConfirmScreen documentId={PAY_STUB_DOC_ID} />,
+    act: async (user) => {
+      await user.click(await screen.findByRole('button', { name: 'Read again' }));
     },
     lead: 'Could not start reading the pay stub.',
   },

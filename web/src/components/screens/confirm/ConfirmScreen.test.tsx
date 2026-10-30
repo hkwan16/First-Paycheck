@@ -7,6 +7,7 @@ import {
   PAY_STUB_DOC_ID,
   sampleBenefitsDocument,
   sampleDocument,
+  sampleProposal,
   sampleValues,
 } from '@/test/fixtures/documents';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
@@ -316,6 +317,58 @@ describe('ConfirmScreen review', () => {
   });
 });
 
+describe('ConfirmScreen after the AI was unavailable', () => {
+  // Issue 163 and spec 004 rules 32-37.
+  beforeEach(() => {
+    db.documents = [sampleDocument({ status: 'manual_entry_required', status_reason: 'no_model' })];
+    db.proposals.set(PAY_STUB_DOC_ID, structuredClone(manualEntryProposal));
+  });
+
+  it('says what happened then, and that the AI never saw the lines', async () => {
+    await renderLoaded();
+    expect(
+      screen.getByText(/^The AI was not available when this was read, so nothing was filled in\./),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/right now/)).toBeNull();
+    expect(screen.queryByRole('complementary', { name: 'Source, as the AI saw it' })).toBeNull();
+    const pane = screen.getByRole('complementary', { name: 'Source, redacted' });
+    expect(pane).toHaveTextContent('These lines were redacted but not sent to the AI.');
+    expect(pane).not.toHaveTextContent('Redaction ran before extraction.');
+    expect(within(pane).getAllByRole('img', { name: 'Redacted' })).toHaveLength(2);
+  });
+
+  it('reads it again, then shows what was read', async () => {
+    const { user } = await renderLoaded();
+    await user.click(screen.getByRole('button', { name: 'Read again' }));
+
+    expect(
+      await screen.findByRole('progressbar', { name: 'Reading pay stub' }),
+    ).toBeInTheDocument();
+    // The worker reads it (spec 004 rule 36): a proposal from the redacted pages.
+    Object.assign(db.documents[0]!, { status: 'proposed', status_reason: null });
+    db.proposals.set(PAY_STUB_DOC_ID, structuredClone(sampleProposal));
+    await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));
+    expect(await screen.findByRole('region', { name: 'Extracted fields' })).toBeInTheDocument();
+    expect(sourcePane()).toBeInTheDocument();
+  });
+
+  it('says why reading again could not start', async () => {
+    server.use(
+      http.post(apiUrl('/docs/:id/extract'), () =>
+        HttpResponse.json(
+          { error: { code: 'internal_error', message: 'Database is busy' } },
+          { status: 500 },
+        ),
+      ),
+    );
+    const { user } = await renderLoaded();
+    await user.click(screen.getByRole('button', { name: 'Read again' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not start reading the pay stub. Database is busy',
+    );
+  });
+});
+
 describe('ConfirmScreen manual entry', () => {
   beforeEach(() => {
     db.documents = [sampleDocument({ status: 'manual_entry_required', status_reason: 'refused' })];
@@ -338,6 +391,8 @@ describe('ConfirmScreen manual entry', () => {
     );
     expect(within(sourcePane()).getAllByRole('img', { name: 'Redacted' })).toHaveLength(2);
     expect(sourcePane()).toHaveTextContent('Type each field from these lines.');
+    // The AI read it and declined: nothing to read again (spec 004 rule 35).
+    expect(screen.queryByRole('button', { name: 'Read again' })).toBeNull();
     expect(within(row('Gross pay')).queryByRole('button', { name: /^Cancel/ })).toBeNull();
     expect(screen.getByRole('button', { name: 'Confirm all remaining' })).toBeDisabled();
     expect(continueButton()).toBeDisabled();

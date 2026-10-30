@@ -11,8 +11,7 @@ import { maskLabel } from '@/lib/accounts';
 import { apiErrorMessage } from '@/lib/api/errors';
 import { useAccounts } from '@/lib/api/hooks';
 import type { Account, AccountKind, SpendingSummary } from '@/lib/api/types';
-import { formatNumber } from '@/lib/money';
-import { ledgerNote, periodText, shareText as share } from './spending-format';
+import { ledgerNote, payStubsText, periodText, shareText as share } from './spending-format';
 
 const list = new Intl.ListFormat('en-US', { style: 'long', type: 'conjunction' });
 
@@ -66,9 +65,6 @@ export function SummaryCard({ summary, updating, error, onRetry, picker }: Summa
   const accounts = useAccounts().data ?? [];
   const loading = summary === undefined;
   const failed = loading && error != null;
-  const paychecks =
-    summary &&
-    `${formatNumber(summary.paycheck_count)} ${summary.paycheck_count === 1 ? 'paycheck' : 'paychecks'}`;
   const covered = accountsText(accounts, summary?.account_kinds_counted);
   const ledgers = summary && ledgerNote(summary.ledger_rows_skipped);
 
@@ -78,7 +74,7 @@ export function SummaryCard({ summary, updating, error, onRetry, picker }: Summa
         <div className="flex min-w-0 flex-col gap-0.5">
           <h2 id="summary-title" className="m-0">
             {summary
-              ? `${periodText(summary.start, summary.end)} · ${paychecks}`
+              ? `${periodText(summary.start, summary.end)} · ${payStubsText(summary.paycheck_count)}`
               : 'Your month so far'}
           </h2>
           {covered && <span className="text-small text-ink-3">{covered}</span>}
@@ -103,7 +99,7 @@ export function SummaryCard({ summary, updating, error, onRetry, picker }: Summa
           label="Income"
           loading={loading}
           value={summary && <Money cents={summary.income_cents} />}
-          sub={summary && `${paychecks}, after taxes and deductions`}
+          sub={summary && 'Deposits labeled income'}
         />
         <StatTile
           tone="blue"

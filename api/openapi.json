@@ -830,6 +830,11 @@
             "title": "Id",
             "type": "string"
           },
+          "last_run_at": {
+            "format": "date-time",
+            "title": "Last Run At",
+            "type": "string"
+          },
           "period": {
             "format": "date",
             "title": "Period",
@@ -857,6 +862,7 @@
           "handled_count",
           "created_at",
           "updated_at",
+          "last_run_at",
           "findings",
           "cash_flow"
         ],
@@ -922,6 +928,11 @@
             "title": "Id",
             "type": "string"
           },
+          "last_run_at": {
+            "format": "date-time",
+            "title": "Last Run At",
+            "type": "string"
+          },
           "period": {
             "format": "date",
             "title": "Period",
@@ -948,7 +959,8 @@
           "finding_count",
           "handled_count",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "last_run_at"
         ],
         "title": "CheckInSummary",
         "type": "object"
@@ -1435,6 +1447,10 @@
       },
       "DocumentDetail": {
         "properties": {
+          "can_read_again": {
+            "title": "Can Read Again",
+            "type": "boolean"
+          },
           "confirmed_at": {
             "anyOf": [
               {
@@ -1534,6 +1550,7 @@
           "confirmed_at",
           "deleted_at",
           "replaced_by_id",
+          "can_read_again",
           "proposal"
         ],
         "title": "DocumentDetail",
@@ -1541,6 +1558,10 @@
       },
       "DocumentOut": {
         "properties": {
+          "can_read_again": {
+            "title": "Can Read Again",
+            "type": "boolean"
+          },
           "confirmed_at": {
             "anyOf": [
               {
@@ -1629,7 +1650,8 @@
           "uploaded_at",
           "confirmed_at",
           "deleted_at",
-          "replaced_by_id"
+          "replaced_by_id",
+          "can_read_again"
         ],
         "title": "DocumentOut",
         "type": "object"
