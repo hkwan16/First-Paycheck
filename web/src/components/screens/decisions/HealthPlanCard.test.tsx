@@ -442,6 +442,58 @@ describe('HealthPlanCard without a benefits summary', () => {
   });
 });
 
+describe('HealthPlanCard focus (issue 167)', () => {
+  const editPlans = () => within(card()).getByRole('button', { name: 'Edit plans' });
+  const form = () => within(card()).getByRole('form', { name: 'Your health plan options' });
+  const planName = (n: number) =>
+    within(within(form()).getByRole('group', { name: `Plan ${n}` })).getByLabelText('Plan name');
+
+  it('opens the plans on the first name and returns to Edit plans however the table closes', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const { user } = await renderReady();
+    for (const close of ['Cancel', 'Use your benefits summary', 'Compare these plans']) {
+      await user.click(editPlans());
+      expect(planName(1)).toHaveFocus();
+      await user.click(within(form()).getByRole('button', { name: close }));
+      expect(editPlans()).toHaveFocus();
+    }
+  });
+
+  it('hands focus to the usage once the first typed plans are compared', async () => {
+    decisionsReady();
+    const { user } = renderCard();
+    const typed = await within(
+      await screen.findByRole('region', { name: 'Health plan' }),
+    ).findByRole('form', { name: 'Your health plan options' });
+    const plan = within(typed).getByRole('group', { name: 'Plan 1' });
+    await user.type(within(plan).getByLabelText('Plan name'), 'Silver HMO');
+    await user.selectOptions(within(plan).getByLabelText('Plan type'), 'hmo');
+    await user.type(within(plan).getByLabelText('Premium per paycheck'), '40');
+    await user.type(within(plan).getByLabelText('Deductible'), '1,000');
+    await user.type(within(plan).getByLabelText('Coinsurance, %'), '0');
+    await user.type(within(plan).getByLabelText('Out-of-pocket maximum'), '2,500');
+    await user.click(within(typed).getByRole('button', { name: 'Compare these plans' }));
+    expect(within(usage()).getByRole('button', { pressed: true })).toHaveFocus();
+  });
+
+  it('focuses a new plan, and the plan that takes the place of one removed', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    const { user } = await renderReady();
+    await user.click(editPlans());
+    await user.click(within(form()).getByRole('button', { name: 'Add a plan' }));
+    expect(planName(4)).toHaveFocus();
+
+    await user.click(within(form()).getByRole('button', { name: 'Remove plan 2' }));
+    expect(planName(2)).toHaveFocus();
+    expect(planName(2)).toHaveValue(SAVER_HDHP.name);
+    await user.click(within(form()).getByRole('button', { name: 'Remove plan 3' }));
+    expect(planName(2)).toHaveFocus();
+  });
+});
+
 describe('HealthPlanCard before it can compare', () => {
   it('sends a person without a confirmed pay stub to confirm one', async () => {
     renderCard();

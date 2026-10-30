@@ -420,6 +420,25 @@ describe('EmergencyFundCard goal', () => {
     expect(field('Monthly transfer to savings')).not.toHaveAccessibleDescription(/From your goal/);
   });
 
+  it('keeps focus on a control in place of each one that leaves (issue 167)', async () => {
+    const { user } = await renderWithGoal();
+    const button = (name: string) => within(goal()).getByRole('button', { name });
+
+    await user.click(button('Change contribution'));
+    expect(within(goal()).getByLabelText('New monthly contribution')).toHaveFocus();
+    await user.click(button('Cancel'));
+    expect(button('Change contribution')).toHaveFocus();
+
+    await user.click(button('Change contribution'));
+    await user.click(button('Save contribution'));
+    await waitFor(() => expect(button('Change contribution')).toHaveFocus());
+
+    await user.click(button('Mark reached'));
+    await waitFor(() => expect(button('Not reached yet')).toHaveFocus());
+    await user.click(button('Not reached yet'));
+    await waitFor(() => expect(button('Mark reached')).toHaveFocus());
+  });
+
   it('says what to fix in a new contribution before sending it', async () => {
     const seen = requests();
     const { user } = await renderWithGoal();

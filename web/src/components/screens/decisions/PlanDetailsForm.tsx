@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent, type Ref } from 'react';
 import { Button } from '@/components/ui/Button';
 import { FieldError } from '@/components/ui/FieldError';
 import { Input } from '@/components/ui/Input';
@@ -12,6 +12,7 @@ import { useUpdateProfile } from '@/lib/api/hooks';
 import { apiErrorMessage } from '@/lib/api/errors';
 import type { FilingStatus, PayFrequency, PayStub, Profile } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
+import { useFocusHandoff } from '@/lib/focus-handoff';
 import { examplePlaceholder } from './decision-format';
 import {
   BIRTH_YEAR_EXAMPLE,
@@ -46,6 +47,8 @@ export interface PlanDetailsFormProps {
   onSaved: () => void;
   /** Shown as Cancel when the profile already has everything (changing it). */
   onCancel?: () => void;
+  /** The form, which takes focus (its first field) when it opens in place of a button. */
+  ref?: Ref<HTMLFormElement>;
 }
 
 /**
@@ -54,8 +57,16 @@ export interface PlanDetailsFormProps {
  * pay schedule if the stub left it out). Saved to the profile with PUT
  * /profile, which the API validates again, so each is asked for once.
  */
-export function PlanDetailsForm({ profile, payStub, onSaved, onCancel }: PlanDetailsFormProps) {
+export function PlanDetailsForm({
+  profile,
+  payStub,
+  onSaved,
+  onCancel,
+  ref,
+}: PlanDetailsFormProps) {
   const id = useId();
+  // A tier added or removed: focus the tier in its place (issue 167).
+  const focus = useFocusHandoff<`tier-${number}`>();
   const [draft, setDraft] = useState<PlanDetailsDraft>(() => draftFromProfile(profile, payStub));
   const [errors, setErrors] = useState<Partial<Record<PlanDetailsField, string>>>({});
   const [askFrequency] = useState(() => draft.payFrequency === null);
@@ -89,6 +100,7 @@ export function PlanDetailsForm({ profile, payStub, onSaved, onCancel }: PlanDet
 
   return (
     <form
+      ref={ref}
       aria-label="Your plan details"
       noValidate
       onSubmit={submit}
@@ -173,6 +185,7 @@ export function PlanDetailsForm({ profile, payStub, onSaved, onCancel }: PlanDet
                 {tierLabel(index, 'Employer adds, % of what you put in')}
               </Label>
               <Input
+                ref={focus.target(`tier-${index}`)}
                 id={fieldId(`employer-${index}`)}
                 inputMode="decimal"
                 autoComplete="off"
@@ -201,7 +214,10 @@ export function PlanDetailsForm({ profile, payStub, onSaved, onCancel }: PlanDet
             {several && (
               <Button
                 size="sm"
-                onClick={() => change({ tiers: draft.tiers.filter((_, i) => i !== index) })}
+                onClick={() => {
+                  focus.moveTo(`tier-${Math.min(index, draft.tiers.length - 2)}`);
+                  change({ tiers: draft.tiers.filter((_, i) => i !== index) });
+                }}
                 aria-label={`Remove tier ${index + 1}`}
               >
                 Remove
@@ -214,7 +230,10 @@ export function PlanDetailsForm({ profile, payStub, onSaved, onCancel }: PlanDet
           <div>
             <Button
               size="sm"
-              onClick={() => change({ tiers: [...draft.tiers, { employerPct: '', uptoPct: '' }] })}
+              onClick={() => {
+                focus.moveTo(`tier-${draft.tiers.length}`);
+                change({ tiers: [...draft.tiers, { employerPct: '', uptoPct: '' }] });
+              }}
             >
               Add a tier
             </Button>

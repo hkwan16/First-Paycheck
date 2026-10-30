@@ -1,12 +1,13 @@
 'use client';
 
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent, type Ref } from 'react';
 import { Button } from '@/components/ui/Button';
 import { FieldError } from '@/components/ui/FieldError';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import type { HealthPlanOption, PlanKind } from '@/lib/api/types';
+import { useFocusHandoff } from '@/lib/focus-handoff';
 import { AmountField } from './AmountField';
 import {
   draftFromOption,
@@ -26,6 +27,8 @@ export interface PlanOptionsFormProps {
   onCancel?: () => void;
   /** Shown when a confirmed benefits summary has plans to go back to. */
   onUseBenefits?: () => void;
+  /** The form, which takes focus (its first field) when it opens in place of a button. */
+  ref?: Ref<HTMLFormElement>;
 }
 
 const KINDS = Object.entries(PLAN_KIND_LABELS) as [PlanKind, string][];
@@ -42,8 +45,11 @@ export function PlanOptionsForm({
   onCompare,
   onCancel,
   onUseBenefits,
+  ref,
 }: PlanOptionsFormProps) {
   const id = useId();
+  // A plan added or removed: focus the name of the plan in its place (issue 167).
+  const focus = useFocusHandoff<`plan-${number}`>();
   const [drafts, setDrafts] = useState<PlanDraft[]>(() =>
     initial && initial.length > 0 ? initial.map(draftFromOption) : [{ ...EMPTY_PLAN_DRAFT }],
   );
@@ -65,6 +71,7 @@ export function PlanOptionsForm({
 
   return (
     <form
+      ref={ref}
       aria-label="Your health plan options"
       noValidate
       onSubmit={submit}
@@ -89,6 +96,7 @@ export function PlanOptionsForm({
               <div>
                 <Label htmlFor={field('name')}>Plan name</Label>
                 <Input
+                  ref={focus.target(`plan-${index}`)}
                   id={field('name')}
                   autoComplete="off"
                   maxLength={200}
@@ -171,6 +179,7 @@ export function PlanOptionsForm({
                   size="sm"
                   aria-label={`Remove plan ${index + 1}`}
                   onClick={() => {
+                    focus.moveTo(`plan-${Math.min(index, drafts.length - 2)}`);
                     setDrafts((all) => all.filter((_, i) => i !== index));
                     setErrors((all) => all.filter((_, i) => i !== index));
                   }}
@@ -187,7 +196,12 @@ export function PlanOptionsForm({
           Compare these plans
         </Button>
         {drafts.length < MAX_PLANS && (
-          <Button onClick={() => setDrafts((all) => [...all, { ...EMPTY_PLAN_DRAFT }])}>
+          <Button
+            onClick={() => {
+              focus.moveTo(`plan-${drafts.length}`);
+              setDrafts((all) => [...all, { ...EMPTY_PLAN_DRAFT }]);
+            }}
+          >
             Add a plan
           </Button>
         )}

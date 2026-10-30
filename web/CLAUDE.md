@@ -80,6 +80,7 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     validation, errors, account), supabase/ (env, client, server, proxy),
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
                     documents.ts, decisions.ts, decision-steps.ts, deep-equal.ts, features.ts,
+                    focus-handoff.ts,
                     findings.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts,
                     page-hydration.ts, page-title.ts, log-error.ts
@@ -467,7 +468,15 @@ What the audit found and fixed:
 - Keyboard: every control on every screen was reachable with a visible ring and no trap; the walk
   stays in the smoke spec so it stays true. Focus after an action that removes its control now
   moves somewhere useful: an unlink focuses its done notice, Keep my account returns to Delete
-  account.
+  account. The decision cards (issue 167) do it with one hook, `useFocusHandoff`
+  (`lib/focus-handoff.ts`): `moveTo(key)` in the handler or the mutation's `onSuccess`,
+  `ref={target(key)}` on what takes focus, focused once it is on the page and enabled (a container
+  focuses its first Tab stop). The rule: an editor that opens in place of its button focuses its
+  first field; closing it returns to the button that opens it again (or, when nothing opened it,
+  the first control of what replaced it: the 401(k) slider, the health plan usage); a swapped pair
+  (Mark reached, Not reached yet) focuses the counterpart; a removed plan or tier focuses the one
+  in its place, an added one its first field; Apply suggestion focuses the W-4 entry it filled.
+  Use it for any new control that removes itself.
 - Motion: every `animate-` and `transition` was checked (`Bar`, `Button`, `Seg`, `Skeleton`,
   `DropZone`, `FieldRow`, `UserMenu`, the Sankey's popover and bands; Recharts runs with no
   animation). Durations are tokens that reduced motion sets to zero; the indeterminate bar and the

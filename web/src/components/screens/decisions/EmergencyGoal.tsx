@@ -9,6 +9,7 @@ import { Notice } from '@/components/ui/Notice';
 import { Tile } from '@/components/ui/Tile';
 import { apiErrorMessage } from '@/lib/api/errors';
 import { useUpdateGoal } from '@/lib/api/hooks';
+import { useFocusHandoff } from '@/lib/focus-handoff';
 import type { Account, Goal, GoalPatch } from '@/lib/api/types';
 import { formatRate } from '@/lib/money';
 import { AmountField } from './AmountField';
@@ -42,6 +43,8 @@ export function EmergencyGoal({ goal, accounts, funded, horizonMonths }: Emergen
   const [draftError, setDraftError] = useState<string | null>(null);
   const badge = goalStatusBadge(goal.status);
   const account = accounts.find((a) => a.id === goal.account_id);
+  // Each action here swaps its own button for another control (issue 167).
+  const focus = useFocusHandoff<'form' | 'change' | 'reached' | 'not-reached'>();
 
   const change = (patch: GoalPatch, onSuccess?: () => void) =>
     update.mutate({ goalId: goal.id, patch }, { onSuccess });
@@ -53,7 +56,10 @@ export function EmergencyGoal({ goal, accounts, funded, horizonMonths }: Emergen
       setDraftError(read.error ?? `Enter an amount, like ${CONTRIBUTION_EXAMPLE}.`);
       return;
     }
-    change({ monthly_contribution_cents: read.cents }, () => setDraft(null));
+    change({ monthly_contribution_cents: read.cents }, () => {
+      focus.moveTo('change');
+      setDraft(null);
+    });
   };
 
   const pace = goalPace(goal, { funded, horizonMonths });
@@ -88,6 +94,7 @@ export function EmergencyGoal({ goal, accounts, funded, horizonMonths }: Emergen
 
       {draft !== null ? (
         <form
+          ref={focus.target('form')}
           aria-label="Change the monthly contribution"
           noValidate
           onSubmit={saveContribution}
@@ -108,7 +115,13 @@ export function EmergencyGoal({ goal, accounts, funded, horizonMonths }: Emergen
             <Button type="submit" size="sm" variant="primary" loading={update.isPending}>
               Save contribution
             </Button>
-            <Button size="sm" onClick={() => setDraft(null)}>
+            <Button
+              size="sm"
+              onClick={() => {
+                focus.moveTo('change');
+                setDraft(null);
+              }}
+            >
               Cancel
             </Button>
           </div>
@@ -116,7 +129,11 @@ export function EmergencyGoal({ goal, accounts, funded, horizonMonths }: Emergen
       ) : (
         <div className="flex flex-wrap gap-2">
           {goal.status === 'reached' ? (
-            <Button size="sm" onClick={() => change({ status: 'active' })}>
+            <Button
+              ref={focus.target('not-reached')}
+              size="sm"
+              onClick={() => change({ status: 'active' }, () => focus.moveTo('reached'))}
+            >
               Not reached yet
             </Button>
           ) : (
@@ -127,12 +144,18 @@ export function EmergencyGoal({ goal, accounts, funded, horizonMonths }: Emergen
               >
                 {goal.status === 'paused' ? 'Resume' : 'Pause'}
               </Button>
-              <Button size="sm" onClick={() => change({ status: 'reached' })}>
+              <Button
+                ref={focus.target('reached')}
+                size="sm"
+                onClick={() => change({ status: 'reached' }, () => focus.moveTo('not-reached'))}
+              >
                 Mark reached
               </Button>
               <Button
+                ref={focus.target('change')}
                 size="sm"
                 onClick={() => {
+                  focus.moveTo('form');
                   setDraft(amountText(goal.monthly_contribution_cents));
                   setDraftError(null);
                 }}
