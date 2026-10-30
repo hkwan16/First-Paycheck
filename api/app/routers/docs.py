@@ -60,6 +60,16 @@ EXTRACTABLE = frozenset({DocumentType.PAY_STUB, DocumentType.BENEFITS})
 CONFIRMABLE = frozenset({DocumentStatus.PROPOSED, DocumentStatus.MANUAL_ENTRY_REQUIRED})
 REVIEWABLE = CONFIRMABLE
 ACTIVE_JOB = frozenset({JobStatus.QUEUED, JobStatus.RUNNING})
+# Spec 004 rule 32: manual entry because the reading was unavailable, not
+# because of the document, so a later reading can succeed. Refused and
+# no_readable_page are what reading the document gave (rule 35).
+READ_AGAIN_REASONS = frozenset(
+    {
+        DocumentStatusReason.NO_MODEL,
+        DocumentStatusReason.BUDGET,
+        DocumentStatusReason.EXTRACTION_FAILED,
+    }
+)
 LIST_LIMIT = 100
 
 
@@ -83,6 +93,10 @@ class DocumentOut(BaseModel):
     # The upload that replaced this document (spec 004 rule 24). GET /docs lists
     # only documents without one, so it is set only on GET /docs/{id}.
     replaced_by_id: uuid.UUID | None
+    # POST /docs/{id}/extract would read it again: manual entry because the
+    # model was unavailable (no model, a spent budget, failed attempts), not
+    # because of the document (spec 004 rule 33).
+    can_read_again: bool
 
 
 class DocumentDetail(DocumentOut):
@@ -129,6 +143,18 @@ def _out(document: Document) -> DocumentOut:
         confirmed_at=document.confirmed_at,
         deleted_at=document.deleted_at,
         replaced_by_id=document.replaced_by_id,
+        can_read_again=can_read_again(document),
+    )
+
+
+def can_read_again(document: Document) -> bool:
+    """Spec 004 rule 33: manual entry the model's absence caused, on a current document."""
+    return (
+        document.status is DocumentStatus.MANUAL_ENTRY_REQUIRED
+        and document.status_reason in READ_AGAIN_REASONS
+        and document.type in EXTRACTABLE
+        and document.replaced_by_id is None
+        and document.deleted_at is None
     )
 
 
@@ -282,6 +308,14 @@ def extract_document(
         job = session.get(Job, document.extract_job_id)
         if job is not None and job.status in ACTIVE_JOB:
             return ExtractionQueued(job_id=job.id)
+    if document.status is DocumentStatus.MANUAL_ENTRY_REQUIRED and not can_read_again(document):
+        # Spec 004 rule 35: the model declined, or no page could be redacted;
+        # reading the same bytes again would end the same way.
+        raise AppError(
+            "This document was already read; type its fields from the redacted lines",
+            code="document_already_read",
+            status_code=409,
+        )
     job_id = queue.enqueue(
         session,
         user_id=user.id,

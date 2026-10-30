@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { documentStatusBadge, documentTypeLabel, statusReasonText } from './documents';
+import {
+  documentStatusBadge,
+  documentTypeLabel,
+  linesSentToAi,
+  statusReasonText,
+} from './documents';
 
 describe('documentTypeLabel', () => {
   it('names each type the way the person chose it', () => {
@@ -32,5 +37,31 @@ describe('statusReasonText', () => {
     expect(statusReasonText('extraction_failed')).toMatch(/type the fields yourself/);
     expect(statusReasonText('unreadable_file')).toMatch(/could not be opened/);
     expect(statusReasonText('expired')).toMatch(/Upload it again/);
+  });
+});
+
+describe('reasons as past events (spec 004 rule 37, issue 163)', () => {
+  it('says what happened when the document was read, never what is true now', () => {
+    expect(statusReasonText('no_model')).toBe(
+      'The AI was not available when this was read, so nothing was filled in. Read it again, or type the fields from the lines shown.',
+    );
+    expect(statusReasonText('budget')).toBe(
+      'The daily reading limit was used up when this was read, so nothing was filled in. Read it again tomorrow, or type the fields yourself.',
+    );
+    expect(statusReasonText('extraction_failed')).toBe(
+      'Reading did not finish after several tries, so nothing was filled in. Read it again, or type the fields yourself.',
+    );
+    for (const reason of ['no_model', 'budget', 'extraction_failed'] as const) {
+      expect(statusReasonText(reason)).not.toMatch(/right now|is used up|is off/);
+    }
+  });
+
+  it('knows which lines were sent to the AI', () => {
+    expect(linesSentToAi(null)).toBe(true);
+    expect(linesSentToAi('refused')).toBe(true);
+    expect(linesSentToAi('extraction_failed')).toBe(true);
+    expect(linesSentToAi('no_model')).toBe(false);
+    expect(linesSentToAi('budget')).toBe(false);
+    expect(linesSentToAi('no_readable_page')).toBe(false);
   });
 });

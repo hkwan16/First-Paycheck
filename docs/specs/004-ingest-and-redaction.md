@@ -1,6 +1,6 @@
 # 004: Upload, ingest and redaction
 
-Status: Implemented, M2. Rules 24-31 (replacing a document) added after the October 29 alpha, where Replace left the old document listed beside its replacement (issue #134).
+Status: Implemented, M2. Rules 24-31 (replacing a document) added after the October 29 alpha, where Replace left the old document listed beside its replacement (issue #134). Rules 32-37 (reading again after the model was unavailable) added for issue #163.
 
 ## Goal
 
@@ -19,7 +19,7 @@ Take a document the user uploads (a pay stub, an offer letter or a benefits summ
 ## Outputs
 
 - `POST /docs` (201): `{document_id}`. The `documents` row starts `uploaded`. FastAPI's Swagger UI, which defaults to `/docs`, is served at `/api-docs` instead.
-- `GET /docs`: the user's documents that have not been replaced, newest first: `{id, type, status, status_reason, redaction_count, page_count, uploaded_at, confirmed_at, deleted_at, replaced_by_id}`. `GET /docs/{id}` returns the same fields for any of the user's documents, replaced or not, plus `proposal` (spec 005).
+- `GET /docs`: the user's documents that have not been replaced, newest first: `{id, type, status, status_reason, redaction_count, page_count, uploaded_at, confirmed_at, deleted_at, replaced_by_id, can_read_again}` (`can_read_again`: rule 33). `GET /docs/{id}` returns the same fields for any of the user's documents, replaced or not, plus `proposal` (spec 005).
 - `prepare_document(bytes, content_type) -> PreparedDocument` (worker only): `page_count`, per page its number, `source` (`text` or `ocr`), redacted lines, redaction count, OCR mean confidence, and either the model input (`TextPage` with redacted text, or `ImagePage` with a redacted PNG) or a withheld reason.
 - `chunk_words(text) -> list[str]`: retrieval chunks for `benefits_chunks`.
 
@@ -94,6 +94,17 @@ The Link screen's Replace button on a document's row uploads a new file in that 
 30. **Any status can be replaced**: `uploaded`, `extracting`, `proposed`, `manual_entry_required`, `failed` (an expired one included) and `confirmed`. A replacement that later turns out unreadable (`failed`, `unreadable_file`) does not bring the retired document back; the user replaces the failed one in turn.
 31. **Limits and retention.** A replacement is one upload against rule 5's limit. Retention (rule 21) never touches a retired document, which already has `deleted_at` and no blob.
 
+### Reading again
+
+Two pay stubs uploaded while production's model key was saved under a misspelled name went to manual entry (`no_model`). A day after the key was fixed they still said "Automatic reading is off right now", and the only ways forward were typing every field or Replace: nothing asked for the reading again, and the notice described the moment of reading as if it were now. The Confirm screen's source pane also called the lines "Source, as the AI saw it" though no AI had seen them (issue #163).
+
+32. **Why manual entry, by who caused it.** A document is `manual_entry_required` for a reason about the reading or for one about the document. *The reading was unavailable*: `no_model` (no gateway, or the API rejected the key or model id), `budget` (the user's daily LLM budget was spent before the call) and `extraction_failed` (every attempt ended in a schema or API error, spec 005 rule 13). Nothing about the document caused them, so a later reading can succeed. *The document was read*: `refused` (the model read the redacted pages and declined) and `no_readable_page` (no page could be redacted safely, rule 12, which the same bytes would repeat). These are the outcome of reading it; the person types the fields.
+33. **`can_read_again`.** `DocumentOut.can_read_again` is true exactly when the document is `manual_entry_required` with a reason of the first kind, its type can be read (`pay_stub`, `benefits`), it has not been replaced (rule 28) and its file has not been deleted. It is the one place the rule lives; the client offers "Read again" when it is true.
+34. **Reading again.** `POST /docs/{id}/extract` on such a document queues a new `ingest.extract` job exactly as spec 005 rule 9 does from `uploaded`: status `extracting`, `status_reason` cleared, the new job's id. It counts against the extract limit (20 per user per clock hour, 429 `rate_limited` with `Retry-After`; a refused request does not count), and the job then spends the daily LLM budget like any reading. A budget still spent sends the document back to manual entry with `budget` at no cost (the gateway refuses before any HTTP).
+35. **Not again for a final outcome.** The same request on a `manual_entry_required` document with `refused` or `no_readable_page` is 409 `document_already_read`, after the 404, `document_replaced`, `document_confirmed` and `document_deleted` checks, and queues nothing.
+36. **Redaction holds.** A reading again starts from the stored bytes and runs rules 6-18 again, so the model is sent only redacted pages, never the manual-entry proposal or anything typed. The new outcome (a proposal, or manual entry with its new reason) replaces the old proposal, which held only redacted source lines.
+37. **Words say what happened then.** A reason is a past event: the notice says what happened when the document was read ("The AI was not available when this was read, so nothing was filled in."), never a claim about now ("Automatic reading is off right now"), and offers Read again when `can_read_again`. The source pane is titled "Source, as the AI saw it" only for lines that were sent to the model (a proposal, `refused`, `extraction_failed`); for `no_model`, `budget` and `no_readable_page` it is "Source, redacted" and says the lines were not sent to the AI.
+
 ## Hand-worked examples
 
 ### Redaction (`tests/unit/ingest/test_redact.py::test_redaction_table`)
@@ -150,6 +161,19 @@ A is the user's pay stub with a blob unless the row says otherwise; B is the upl
 | 10 | (none: a random id) | pay stub PDF, `replaces = <random>` | 404 `not_found`; nothing stored |
 | 11 | user A's, user B asks | user B: pay stub PDF, `replaces = A` | 404 `not_found`; nothing stored for B; A untouched (`tests/rls/test_cross_user.py`) |
 | 12 | 7 days old, `uploaded`, then replaced | the scheduler tick's `expire_unconfirmed` | A is not counted or changed again; B (new) is not expired |
+
+### Reading again (`tests/integration/test_docs_read_again.py`)
+
+| # | Document | Request | Result |
+|---|---|---|---|
+| 1 | Acme stub read by a worker with no model: `manual_entry_required` (`no_model`), proposal of redacted source lines | `GET /docs`, then `POST /docs/{id}/extract`, then the worker runs with a model | `can_read_again` true; 202 with a new job; the document `extracting`, `status_reason` null, `can_read_again` false; then `proposed` with the fields read, and the model was sent no SSN |
+| 2 | `manual_entry_required` (`budget`), file kept | `POST /docs/{id}/extract` | 202; `extracting` |
+| 3 | `manual_entry_required` (`extraction_failed`), file kept | `POST /docs/{id}/extract` | 202; `extracting` |
+| 4 | `manual_entry_required` (`refused`) | `POST /docs/{id}/extract` | 409 `document_already_read`; no job; `can_read_again` false |
+| 5 | `manual_entry_required` (`no_readable_page`) | `POST /docs/{id}/extract` | 409 `document_already_read`; no job |
+| 6 | Row 1's document, replaced by B | `GET /docs/{id}`, `POST /docs/{id}/extract` | `can_read_again` false; 409 `document_replaced` |
+| 7 | Row 1's document, 20 extract requests counted this hour | `POST /docs/{id}/extract` | 429 `rate_limited`; still `manual_entry_required` (`no_model`) |
+| 8 | Row 1's document, user B asks | `POST /docs/{id}/extract` | 404 `not_found` (`tests/rls/test_cross_user.py`) |
 
 ## Edge cases
 

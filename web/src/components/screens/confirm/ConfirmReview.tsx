@@ -12,7 +12,7 @@ import { apiErrorMessage } from '@/lib/api/errors';
 import { PayStubUnbalanced, useConfirmDocument } from '@/lib/api/hooks';
 import type { DocumentDetail, PayStubValues, Proposal } from '@/lib/api/types';
 import { formatNumber } from '@/lib/money';
-import { statusReasonText } from '@/lib/documents';
+import { linesSentToAi, statusReasonText } from '@/lib/documents';
 import {
   confirmReducer,
   initConfirmState,
@@ -23,6 +23,7 @@ import {
 import { FIELD_CHOICES } from './field-format';
 import { FieldRow } from './FieldRow';
 import { GateNotice, ServerDiff } from './MathNotice';
+import { ReadAgain } from './ReadAgain';
 import { SourcePane } from './SourcePane';
 
 export interface ConfirmReviewProps {
@@ -82,7 +83,14 @@ export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
             : 'Each field is a proposal until you confirm it. Calculators only ever read confirmed values. Select a field to see where it came from.'
         }
       />
-      {manual && reason && <Notice tone="warning">{reason}</Notice>}
+      {manual && reason && (
+        <Notice tone="warning">
+          <div className="flex flex-col gap-3">
+            <span>{reason}</span>
+            {document.can_read_again && <ReadAgain document={document} />}
+          </div>
+        </Notice>
+      )}
 
       <div className="flex flex-wrap items-start gap-6">
         <Card aria-labelledby={titleId} gap={14} className="min-w-0 flex-[1_1_460px]">
@@ -143,6 +151,7 @@ export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
           selectedKey={state.selected}
           selectedLabel={selected?.label ?? null}
           manual={manual}
+          sentToAi={linesSentToAi(document.status_reason)}
         />
       </div>
 

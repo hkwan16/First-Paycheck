@@ -1,5 +1,6 @@
 import type {
   DocumentDetail,
+  DocumentStatusReason,
   DocumentSummary,
   PayStub,
   PayStubValues,
@@ -137,8 +138,30 @@ export const manualEntryProposal: Proposal = {
   notes: null,
 };
 
+/** Reasons the reading was unavailable, which the API reads again (spec 004 rule 32). */
+const READ_AGAIN_REASONS: ReadonlySet<DocumentStatusReason> = new Set([
+  'no_model',
+  'budget',
+  'extraction_failed',
+]);
+
+/**
+ * `can_read_again` as `api/app/routers/docs.py:can_read_again` works it out
+ * (spec 004 rule 33), so the test API and the samples answer like the real one.
+ */
+export function canReadAgain(document: Omit<DocumentSummary, 'can_read_again'>): boolean {
+  return (
+    document.status === 'manual_entry_required' &&
+    document.status_reason !== null &&
+    READ_AGAIN_REASONS.has(document.status_reason) &&
+    document.type !== 'offer_letter' &&
+    document.replaced_by_id === null &&
+    document.deleted_at === null
+  );
+}
+
 export function sampleDocument(overrides: Partial<DocumentSummary> = {}): DocumentSummary {
-  return {
+  const document: Omit<DocumentSummary, 'can_read_again'> = {
     id: PAY_STUB_DOC_ID,
     type: 'pay_stub',
     status: 'proposed',
@@ -151,6 +174,7 @@ export function sampleDocument(overrides: Partial<DocumentSummary> = {}): Docume
     replaced_by_id: null,
     ...overrides,
   };
+  return { ...document, can_read_again: overrides.can_read_again ?? canReadAgain(document) };
 }
 
 export function sampleDocumentDetail(

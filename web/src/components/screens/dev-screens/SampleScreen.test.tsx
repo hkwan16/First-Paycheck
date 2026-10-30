@@ -92,6 +92,18 @@ describe('SampleScreen', () => {
   });
 });
 
+describe('SampleScreen after the AI was unavailable', () => {
+  it('renders manual entry that offers Read again, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="confirm-unread" />);
+    await screen.findByRole('region', { name: 'Pay stub fields' });
+    expect(screen.getByText(/^The AI was not available when this was read/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Read again' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Source, redacted' })).toBeInTheDocument();
+    expect(requests).toEqual([]);
+  });
+});
+
 describe('SampleScreen after Confirm', () => {
   beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) }));
   afterEach(() => {

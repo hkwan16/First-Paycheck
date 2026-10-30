@@ -89,6 +89,7 @@ export type SampleScreenName =
   | 'link'
   | 'confirm'
   | 'confirm-manual'
+  | 'confirm-unread'
   | 'confirm-benefits'
   | 'confirm-extracting'
   | 'confirm-failed'
@@ -111,6 +112,8 @@ export type SampleScreenName =
 
 /** The manual-entry variant's document: the same stub, which the AI declined to read. */
 const MANUAL_DOC_ID = '4d000000-0000-4000-8000-0000000000aa';
+/** The same stub uploaded while the AI was unavailable, which can be read again (issue 163). */
+const UNREAD_DOC_ID = '4d000000-0000-4000-8000-0000000000ae';
 /** The same stub while it is read, after it failed to open, and once confirmed. */
 const EXTRACTING_DOC_ID = '4d000000-0000-4000-8000-0000000000ab';
 const FAILED_DOC_ID = '4d000000-0000-4000-8000-0000000000ac';
@@ -235,6 +238,7 @@ const SCREENS: Record<
   },
   confirm: { nav: 'confirm', render: () => <ConfirmScreen documentId={PAY_STUB_DOC_ID} /> },
   'confirm-manual': { nav: 'confirm', render: () => <ConfirmScreen documentId={MANUAL_DOC_ID} /> },
+  'confirm-unread': { nav: 'confirm', render: () => <ConfirmScreen documentId={UNREAD_DOC_ID} /> },
   'confirm-benefits': {
     nav: 'confirm',
     render: () => <ConfirmScreen documentId={BENEFITS_DOC_ID} />,
@@ -347,6 +351,13 @@ export function seededClient(screen: SampleScreenName = 'link') {
     queryKeys.document(MANUAL_DOC_ID),
     sampleDocumentDetail(
       { id: MANUAL_DOC_ID, status: 'manual_entry_required', status_reason: 'refused' },
+      manualEntryProposal,
+    ),
+  );
+  seed(
+    queryKeys.document(UNREAD_DOC_ID),
+    sampleDocumentDetail(
+      { id: UNREAD_DOC_ID, status: 'manual_entry_required', status_reason: 'no_model' },
       manualEntryProposal,
     ),
   );

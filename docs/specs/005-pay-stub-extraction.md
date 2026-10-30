@@ -41,7 +41,7 @@ Turn the redacted pages of spec 004 into a proposal the user reviews field by fi
 
 ### The `ingest.extract` job
 
-9. `POST /docs/{id}/extract` locks the document row, and returns the current job's id when the document is `extracting` and that job is still `queued` or `running` (idempotent while running). Otherwise it queues a new `ingest.extract` job with payload `{document_id}`, sets `status = extracting`, `extract_job_id` and clears `status_reason`, and returns `{job_id}` (202). A replaced document is 409 `document_replaced` (spec 004 rule 28), a confirmed or deleted one 409 `document_confirmed` or `document_deleted`; an `offer_letter` is 422 `extraction_unsupported`.
+9. `POST /docs/{id}/extract` locks the document row, and returns the current job's id when the document is `extracting` and that job is still `queued` or `running` (idempotent while running). Otherwise it queues a new `ingest.extract` job with payload `{document_id}`, sets `status = extracting`, `extract_job_id` and clears `status_reason`, and returns `{job_id}` (202). A replaced document is 409 `document_replaced` (spec 004 rule 28), a confirmed or deleted one 409 `document_confirmed` or `document_deleted`; an `offer_letter` is 422 `extraction_unsupported`. From `manual_entry_required` it queues only when the reading was unavailable (`no_model`, `budget`, `extraction_failed`), which `can_read_again` says; after `refused` or `no_readable_page` it is 409 `document_already_read` (spec 004 rules 32-35).
 10. The job reads the blob in one short user session, then runs `prepare_document` (spec 004) and the gateway call with no transaction open, then writes the outcome in one user session, only while the document is still `extracting` under this job and has not been replaced (spec 004 rule 28).
 11. **Proposed.** With at least one usable page and a valid model answer, the document becomes `proposed` with `proposal`, `redaction_count` and `page_count`.
 12. **Manual entry.** No usable page (`no_readable_page`), a refusal (`refused`), a spent daily budget (`budget`), or no model (`no_model`: the worker has no gateway, which only happens outside production (spec 003 rule 12a), or the call raised `LLMMisconfigured` because the API rejected the key or the model id, spec 003 rule 24) makes the document `manual_entry_required` without retrying, keeping `redaction_count` and `page_count` and a proposal with the redacted source lines and no fields filled.
@@ -118,8 +118,8 @@ Line items: `FED W/H 29,776 tax field=federal_withholding_cents`, `CA SDI 3,250 
 - A stub the model reads with gross missing: the proposal shows the field null with its note; the user must type it before confirm passes rule 20.
 - Benefits text over 400 words becomes several chunks; under it, one; a benefits document with no readable text writes no chunks.
 - `POST /docs/{id}/extract` on a `failed` (unreadable) document queues another attempt while the blob exists; after retention deletes the blob it is 409.
-- A refused document can be re-extracted (the user may try again later) or confirmed by hand.
-- A key the API rejects (an unfunded account answers 401) sends the document to manual entry (`no_model`) on the job's first attempt, with one `api_error` row; once the key works, the user can extract it again.
+- A refused document is confirmed by hand: the model read it and declined, so reading again is 409 `document_already_read` (spec 004 rule 35). Before issue #163 it could be read again, though nothing on screen offered it.
+- A key the API rejects (an unfunded account answers 401) sends the document to manual entry (`no_model`) on the job's first attempt, with one `api_error` row; once the key works, the user can read it again ("Read again", spec 004 rules 32-34).
 
 ## Out of scope
 

@@ -263,6 +263,13 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   errors retry and the last attempt falls back to manual entry. The handler
   writes its outcome only while the document is still `extracting` under its
   job.
+- **Reading again** (spec 004 rules 32-37, issue #163): `no_model`, `budget`
+  and `extraction_failed` say the reading was unavailable, so `POST
+  /docs/{id}/extract` reads such a document again (same limit, same redacting
+  pipeline from the stored bytes); `refused` and `no_readable_page` are what
+  reading it gave, so it is 409 `document_already_read`. `DocumentOut.
+  can_read_again` (`routers/docs.py:can_read_again`, over `READ_AGAIN_REASONS`)
+  is the one place the rule lives; the web offers Read again from it.
 - `AppError` takes `details` (machine-readable, e.g. the confirm diff) and
   `headers` (e.g. `Retry-After`). Money types and two-place percentages shared
   by calculators and request models live in `calc/types.py`.

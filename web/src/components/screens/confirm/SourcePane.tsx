@@ -43,6 +43,12 @@ export interface SourcePaneProps {
   /** Manual entry: no field was read from a line, so nothing is highlighted. */
   manual?: boolean;
   /**
+   * Whether these lines were sent to the AI. Without a model, with the budget
+   * spent or with no readable page they were not (spec 004 rule 37), and the
+   * pane does not claim the AI saw them.
+   */
+  sentToAi?: boolean;
+  /**
    * Whether the document's lines name the field read from them. A benefits
    * summary's do not (spec 013), so nothing is highlighted and the pane says so.
    */
@@ -53,7 +59,8 @@ export interface SourcePaneProps {
 }
 
 /**
- * From the mockup's source card: the redacted lines the AI read, as a mono
+ * From the mockup's source card: the redacted lines the AI read (or, when it
+ * never got them, the lines it would have read), as a mono
  * paper panel, with the selected field's line highlighted. Redactions are
  * black bars; the original file is never shown. Memoized: a keystroke in a
  * field changes none of its props, so the pane renders again only when the
@@ -67,6 +74,7 @@ export const SourcePane = memo(function SourcePane({
   selectedKey,
   selectedLabel,
   manual = false,
+  sentToAi = true,
   linked = true,
   documentLabel = 'Redacted pay stub',
   className,
@@ -79,7 +87,7 @@ export const SourcePane = memo(function SourcePane({
     <Card as="aside" id={id} aria-labelledby={titleId} gap={12} className={className}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id={titleId} className="m-0">
-          Source, as the AI saw it
+          {sentToAi ? 'Source, as the AI saw it' : 'Source, redacted'}
         </h2>
         <Badge tone={redactionCount > 0 ? 'coral' : 'neutral'}>
           {formatNumber(redactionCount)} {redactionCount === 1 ? 'item' : 'items'} redacted
@@ -147,7 +155,10 @@ export const SourcePane = memo(function SourcePane({
               ) : (
                 <>{selectedLabel} has no line of its own in the source. </>
               ))}
-        Redaction ran before extraction. The original file is deleted when you continue.
+        {sentToAi
+          ? 'Redaction ran before extraction.'
+          : 'These lines were redacted but not sent to the AI.'}{' '}
+        The original file is deleted when you continue.
       </p>
     </Card>
   );

@@ -6,6 +6,7 @@ import { JOB_POLL_MS } from '@/lib/api/hooks';
 import { installFakeXhr } from '@/test/fake-xhr';
 import {
   BENEFITS_DOC_ID,
+  manualEntryProposal,
   PAY_STUB_DOC_ID,
   sampleBenefitsDocument,
   sampleDocument,
@@ -850,6 +851,32 @@ describe('LinkScreen documents', () => {
       'notes.docx was not uploaded. Upload a PDF, PNG or JPEG.',
     );
     expect(xhr.requests).toHaveLength(0);
+  });
+
+  it('reads a document again that went to manual entry while the AI was unavailable', async () => {
+    // Issue 163: "Automatic reading is off right now" a day after reading came back.
+    db.documents = [sampleDocument({ status: 'manual_entry_required', status_reason: 'no_model' })];
+    db.proposals.set(PAY_STUB_DOC_ID, structuredClone(manualEntryProposal));
+    const extracts = requests('POST', `/docs/${PAY_STUB_DOC_ID}/extract`);
+    const { user } = renderLink();
+    const row = await within(docsCard()).findByRole('group', { name: /^Pay stub/ });
+    expect(row).toHaveTextContent('The AI was not available when this was read');
+    expect(row).not.toHaveTextContent(/right now/);
+
+    await user.click(within(row).getByRole('button', { name: 'Read pay stub again' }));
+
+    await waitFor(() => expect(extracts).toHaveLength(1));
+    expect(
+      await within(docsCard()).findByRole('progressbar', { name: 'Reading pay stub' }),
+    ).toBeInTheDocument();
+  });
+
+  it('offers no reading again once the AI read the document and declined', async () => {
+    db.documents = [sampleDocument({ status: 'manual_entry_required', status_reason: 'refused' })];
+    renderLink();
+    const row = await within(docsCard()).findByRole('group', { name: /^Pay stub/ });
+    expect(within(row).getByRole('link', { name: 'Enter pay stub fields' })).toBeInTheDocument();
+    expect(within(row).queryByRole('button', { name: 'Read pay stub again' })).toBeNull();
   });
 
   it('replaces a document: the upload names it, and its row gives way to the new one', async () => {

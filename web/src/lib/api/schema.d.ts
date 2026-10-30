@@ -1517,6 +1517,8 @@ export interface components {
     };
     /** DocumentDetail */
     DocumentDetail: {
+      /** Can Read Again */
+      can_read_again: boolean;
       /** Confirmed At */
       confirmed_at: string | null;
       /** Deleted At */
@@ -1544,6 +1546,8 @@ export interface components {
     };
     /** DocumentOut */
     DocumentOut: {
+      /** Can Read Again */
+      can_read_again: boolean;
       /** Confirmed At */
       confirmed_at: string | null;
       /** Deleted At */
