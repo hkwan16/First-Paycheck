@@ -22,8 +22,10 @@
   },
   "explain": {
     "cited": 1.0,
-    "first_try_verified": 0.8,
-    "no_fallback": 0.95
+    "first_try_verified": 1.0,
+    "judge_accuracy": 1.0,
+    "no_fallback": 1.0,
+    "rate_framing": 1.0
   },
   "explain-smoke": {
     "flow_correct": 1.0

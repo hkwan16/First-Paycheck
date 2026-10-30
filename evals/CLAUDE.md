@@ -101,15 +101,26 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
 - `suites/explain.py` (`explain`, LLM): the real draft-verify-retry-fallback
   flow (`verify.flow.run_explain`) with `LLMGateway` over those decisions, the
   seed citations read from `api/db/seed/irs_citations/`, no database.
-  `first_try_verified`, `no_fallback`, `cited`; baseline at the spec 008
-  targets (0.8, 0.95, 1.0) until the first live run. `rate_framing` (issue
+  `first_try_verified`, `no_fallback`, `cited`. Its baseline is measured:
+  1.0 on all five metrics in three live runs on October 30, about 47 cents a
+  run (spec 008 targets 0.8, 0.95, 1.0). `rate_framing` (issue
   132): over the 18 decisions whose stub shows another rate or none, the share
-  whose final row does not claim the chosen rate is already in effect, scored
-  by `rate_claim`: "already" with the person as its subject ("You are already
-  contributing 5%") or the rate chosen called "already in effect", never a
-  rate as the subject ("The 5% you chose already earns the full match"). An
-  eval heuristic, never a gate; no baseline yet. `SuiteUnavailable` without
-  `ANTHROPIC_API_KEY`.
+  whose final row does not claim the chosen rate is already in effect, as an
+  LLM judge reads it (`Gateway.judge_rate_claim`, `judge_rate_claim/v1`, spec
+  008 rule 24a): it is sent the chosen rate, the stub's rate (null for no
+  stub), the full-match rate and the final row's words, and works out which
+  rate each present-tense sentence describes, so "If you stay at the 4% on
+  your pay stub, you already get the full match" is no claim while "You
+  already earn the full match" is one when the stub shows less. A failure
+  line quotes the judge's sentence; a judge error counts as a miss and the run
+  goes on. It measures drafts and never gates one. `judge_accuracy` checks the
+  judge: the share of the hand-labeled items in
+  `fixtures/explain/rate_claims.json` (37: 18 claims, 19 not, 7 of them live
+  sentences of a named fixture decision whose rates they carry; spec 008 rule
+  24b) it reads as labeled. When a run's `rate_framing` drops, read its
+  `judge ...` failure lines first. The judge's prompt never quotes an item (a
+  test checks). `SuiteUnavailable` without `ANTHROPIC_API_KEY`; scoring is
+  unit-tested with scripted judges.
 - `suites/explain_smoke.py` (`explain-smoke`, free): the same flow with
   `ScriptedGateway` over six scripted runs (pass, fail-then-pass,
   fail-twice on a 401(k) decision; pass and fail-twice on the W-4 decision in
@@ -166,8 +177,9 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   `document_accuracy` (30 stubs) 3.3, extraction `field_accuracy` (390 fields) and benefits
   `plan_field_accuracy` (72) 2, categorization `llm_accuracy` 14.7 and
   `accuracy` 2.7 (one label covers all 14 `sunrise bakery` rows, of the 95 the
-  model labels and the 515 in all), explain 3.4 (29 decisions) and its
-  `rate_framing` 5.6 (a share of only the 18 it scores). A metric above its baseline passes. The
+  model labels and the 515 in all), explain 3.4 (29 decisions), its
+  `rate_framing` 5.6 (a share of only the 18 it scores) and its
+  `judge_accuracy` 2.7 (37 calibration items). A metric above its baseline passes. The
   report gives each metric's tolerance under `tolerances`. `test_run.py` checks
   the rule through the CLI; each LLM suite's tests check its `case_worth`.
   A metric that does not depend on the model belongs in a free suite, which

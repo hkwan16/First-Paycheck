@@ -47,6 +47,9 @@ from llm.schemas import (
     ExplainFact,
     ExplanationDraft,
     PayStubExtraction,
+    RateClaimDraft,
+    RateClaimRequest,
+    RateClaimVerdict,
 )
 from tests.conftest import FixtureUser
 from tests.support.factories import make_job
@@ -605,3 +608,62 @@ def test_fake_explains_with_facts_that_verify(
     allowed = AllowedNumbers.from_decision({"missed_cents": 60_000, "contribution_pct": "3.00"})
     assert verify_explanation(draft, allowed, {"k401.employer_match"}).passed
     assert ledger(db_connection, user_a)[0]["prompt_version"] == "explain/v2"
+
+
+# The explain eval's rate-claim judge (spec 008 rule 24a) ---------------------------
+
+JUDGE_REQUEST = RateClaimRequest(
+    chosen_rate="5%",
+    pay_stub_rate="3%",
+    full_match_rate="5%",
+    draft=RateClaimDraft(
+        concept="Your employer matches what you put in.",
+        text="You are already contributing 5%.",
+        what_ifs=[],
+    ),
+)
+JUDGE_ANSWER = {
+    "reason": "It calls the chosen 5% current while the stub shows 3%.",
+    "claims_chosen_rate_in_effect": True,
+    "sentence": "You are already contributing 5%.",
+}
+
+
+def test_judge_rate_claim_sends_the_request_on_the_explain_model(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    api = Api(ok(JUDGE_ANSWER))
+    verdict = gateway(db_connection, api).judge_rate_claim(user_a.id, JUDGE_REQUEST)
+    assert verdict == RateClaimVerdict.model_validate(JUDGE_ANSWER)
+    [request] = api.requests
+    assert request["model"] == "claude-sonnet-5-5"
+    # The reason comes first, so the model works out which rate is meant before it answers.
+    schema = request["output_config"]["format"]["schema"]
+    assert list(schema["properties"]) == ["reason", "claims_chosen_rate_in_effect", "sentence"]
+    [sent] = request["messages"]
+    assert json.loads(sent["content"]) == JUDGE_REQUEST.model_dump(mode="json")
+    [row] = ledger(db_connection, user_a)
+    assert (row["purpose"], row["prompt_version"], row["status"]) == (
+        "explain",
+        "judge_rate_claim/v1",
+        "ok",
+    )
+    assert row["cost_microcents"] > 0
+
+
+def test_a_verdict_that_claims_without_a_sentence_is_a_schema_error(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    api = Api(ok({**JUDGE_ANSWER, "sentence": None}))
+    with pytest.raises(LLMSchemaError):
+        gateway(db_connection, api).judge_rate_claim(user_a.id, JUDGE_REQUEST)
+    assert ledger(db_connection, user_a)[0]["status"] == "schema_error"
+
+
+def test_the_judge_shares_the_budget_check(db_connection: Connection, user_a: FixtureUser) -> None:
+    api = Api()
+    with pytest.raises(LLMBudgetExceeded):
+        gateway(db_connection, api, llm_daily_budget_cents=0).judge_rate_claim(
+            user_a.id, JUDGE_REQUEST
+        )
+    assert api.requests == []

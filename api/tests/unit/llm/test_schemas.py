@@ -16,6 +16,9 @@ from llm.schemas import (
     ExtractedField,
     NumberClaim,
     PayStubExtraction,
+    RateClaimDraft,
+    RateClaimRequest,
+    RateClaimVerdict,
 )
 
 
@@ -199,4 +202,39 @@ def test_registry_names_every_schema() -> None:
         "BenefitsExtraction": BenefitsExtraction,
         "BenefitsSummaryExtraction": BenefitsSummaryExtraction,
         "ExplanationDraft": ExplanationDraft,
+        "RateClaimVerdict": RateClaimVerdict,
     } == SCHEMAS
+
+
+def test_rate_claim_request_holds_the_three_rates_and_the_draft() -> None:
+    """Spec 008 rule 24a: the judge reads the rates and the draft's words, nothing else."""
+    request = RateClaimRequest(
+        chosen_rate="5%",
+        pay_stub_rate=None,
+        full_match_rate="5%",
+        draft=RateClaimDraft(concept="c", text="t", what_ifs=["w"]),
+    )
+    assert request.model_dump(mode="json") == {
+        "chosen_rate": "5%",
+        "pay_stub_rate": None,
+        "full_match_rate": "5%",
+        "draft": {"concept": "c", "text": "t", "what_ifs": ["w"]},
+    }
+    with pytest.raises(ValidationError):
+        RateClaimDraft.model_validate({"concept": "c", "text": "t", "what_ifs": [], "numbers": []})
+
+
+def test_rate_claim_verdict_quotes_a_sentence_exactly_when_it_claims() -> None:
+    claim = RateClaimVerdict.model_validate_json(
+        '{"reason": "It calls the chosen 5% current.", "claims_chosen_rate_in_effect": true,'
+        ' "sentence": "You are already contributing 5%."}'
+    )
+    assert claim.sentence == "You are already contributing 5%."
+    none = RateClaimVerdict(reason="Only the stub is current.", claims_chosen_rate_in_effect=False)
+    assert none.sentence is None
+    with pytest.raises(ValidationError, match="sentence"):
+        RateClaimVerdict(reason="r", claims_chosen_rate_in_effect=True, sentence=None)
+    with pytest.raises(ValidationError, match="sentence"):
+        RateClaimVerdict(reason="r", claims_chosen_rate_in_effect=True, sentence="  ")
+    with pytest.raises(ValidationError, match="sentence"):
+        RateClaimVerdict(reason="r", claims_chosen_rate_in_effect=False, sentence="You are at 3%.")

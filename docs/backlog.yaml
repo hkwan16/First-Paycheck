@@ -1331,11 +1331,12 @@ issues:
     labels: ["area:evals"]
     milestone: M10
     priority: Medium
-    status: in_progress
-    # October 29, #144: extraction, benefits-extraction and categorization
-    # hold measured baselines, under a tolerance of one case's worth or 2
-    # points. Explain waits for #132, which changes its prompt and grows it to
-    # 29 decisions. Running the LLM suites nightly is its own item, deferred.
+    status: done
+    # Done October 30: #144 measured extraction, benefits-extraction and
+    # categorization under a tolerance of one case's worth or 2 points; the
+    # explain baseline followed #132, with rate_framing scored by an LLM judge
+    # (1.0 on all five metrics in three runs). Running the LLM suites nightly
+    # is its own item (#145), deferred.
   - title: "Web account deletion"
     body: >-
       DELETE /me exists, but nothing in the web app calls it. Add a delete

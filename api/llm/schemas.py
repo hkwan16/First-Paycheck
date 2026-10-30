@@ -13,7 +13,7 @@ from __future__ import annotations
 import datetime as dt
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from sync.categories import CATEGORIES, Category
 
@@ -44,6 +44,9 @@ __all__ = [
     "PlanExtraction",
     "PlanKindField",
     "PlanKindValue",
+    "RateClaimDraft",
+    "RateClaimRequest",
+    "RateClaimVerdict",
     "TextField",
     "YearsField",
 ]
@@ -253,10 +256,61 @@ class ExplainContext(_Strict):
     benefits_passages: list[str]
 
 
+class RateClaimDraft(_Strict):
+    """The words of an explanation the rate-claim judge reads (spec 008 rule 24a)."""
+
+    concept: str
+    text: str
+    what_ifs: list[str]
+
+
+class RateClaimRequest(_Strict):
+    """What ``judge_rate_claim`` sends: the explain eval's question about one final
+    row, with the rates formatted like the explain facts ("5%", "3.69%")."""
+
+    chosen_rate: str
+    # None: no confirmed pay stub, so what goes in now is not known.
+    pay_stub_rate: str | None
+    # None: the plan has no employer match.
+    full_match_rate: str | None
+    draft: RateClaimDraft
+
+
+class RateClaimVerdict(_Strict):
+    """``judge_rate_claim`` output (spec 008 rule 24a): whether the draft says the
+    rate chosen is the one in effect now, and the sentence that says so. It
+    measures a draft in the eval and never gates one."""
+
+    reason: str = Field(
+        description=(
+            "One or two sentences: which rate each present-tense sentence describes,"
+            " worked out before the answer"
+        )
+    )
+    claims_chosen_rate_in_effect: bool = Field(
+        description="True when a sentence describes the rate chosen as the one in effect now"
+    )
+    sentence: str | None = Field(
+        default=None,
+        description="The first sentence that makes the claim, copied exactly; null when none does",
+    )
+
+    @model_validator(mode="after")
+    def _sentence_exactly_when_claimed(self) -> RateClaimVerdict:
+        quoted = self.sentence is not None and self.sentence.strip() != ""
+        if quoted != self.claims_chosen_rate_in_effect:
+            raise ValueError(
+                "sentence must quote the claim when claims_chosen_rate_in_effect is true,"
+                " and be null when it is false"
+            )
+        return self
+
+
 SCHEMAS: dict[str, type[BaseModel]] = {
     "CategoryBatch": CategoryBatch,
     "PayStubExtraction": PayStubExtraction,
     "BenefitsExtraction": BenefitsExtraction,
     "BenefitsSummaryExtraction": BenefitsSummaryExtraction,
     "ExplanationDraft": ExplanationDraft,
+    "RateClaimVerdict": RateClaimVerdict,
 }
