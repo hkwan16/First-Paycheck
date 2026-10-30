@@ -12,9 +12,11 @@ app sessions join it through savepoints (``client_as`` and ``db_connection``).
 
 from __future__ import annotations
 
+from tests.support import hypothesis_profiles
 from tests.support.env import pin_test_environment
 
 pin_test_environment()
+hypothesis_profiles.load()
 
 # The imports below read settings, so they come after the environment is pinned.
 import os

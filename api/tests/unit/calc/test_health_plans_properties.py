@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from decimal import Decimal
 from typing import Any
 
@@ -11,9 +10,8 @@ from hypothesis import strategies as st
 
 from calc.health_plans import SCAN_STEP_CENTS, HealthPlansInput, health_plans
 
-settings.register_profile("ci", derandomize=True, max_examples=150)
-settings.register_profile("dev", max_examples=100)
-settings.load_profile("ci" if os.environ.get("CI") else "dev")
+# Examples per property; tests/support/hypothesis_profiles.py sets the rest.
+EXAMPLES = settings(max_examples=150)
 
 MONEY = (
     "annual_premium_cents",
@@ -60,6 +58,7 @@ def inputs(draw: st.DrawFn) -> HealthPlansInput:
     )
 
 
+@EXAMPLES
 @given(inputs())
 def test_money_is_int_and_costs_rise_with_usage(data: HealthPlansInput) -> None:
     result = health_plans(data)
@@ -74,6 +73,7 @@ def test_money_is_int_and_costs_rise_with_usage(data: HealthPlansInput) -> None:
         )
 
 
+@EXAMPLES
 @given(inputs())
 def test_hsa_amounts_stay_within_the_limit(data: HealthPlansInput) -> None:
     result = health_plans(data)
@@ -86,6 +86,7 @@ def test_hsa_amounts_stay_within_the_limit(data: HealthPlansInput) -> None:
             assert plan_cost.employee_hsa_cents == 0
 
 
+@EXAMPLES
 @given(inputs())
 def test_break_evens_are_scanned_points_in_order(data: HealthPlansInput) -> None:
     result = health_plans(data)

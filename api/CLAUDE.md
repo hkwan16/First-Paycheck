@@ -685,7 +685,13 @@ also bounds the Plaid webhook before its signature check.
   `client_as(user)` (a TestClient sending a signed ES256 JWT) plus `app_api_url`
   for tests that must connect exactly as production does.
 - Calculator tests come from the spec's hand-worked examples, plus Hypothesis
-  properties (`derandomize=True` in CI).
+  properties (`derandomize=True` in CI). The profiles (`ci`, `dev`, both with
+  no deadline) are registered and loaded once by
+  `tests/support/hypothesis_profiles.py`; a test module never registers or
+  loads one (profiles are global, so it would change every module imported
+  after it). A module that wants more examples puts
+  `@settings(max_examples=...)` on its tests;
+  `tests/unit/test_hypothesis_settings.py` checks what each test runs with.
 - Marks: `plaid_sandbox` and `llm_live` call real services and are excluded by
   default (`-m "not plaid_sandbox and not llm_live"`). They read keys through
   `tests.support.env.live_credential` (the pinned environment blanks them) and
