@@ -1,6 +1,6 @@
 import { act, waitFor } from '@testing-library/react';
 import { delay, http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { sampleTransactions } from '@/test/fixtures/sample';
 import { apiUrl } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
@@ -13,6 +13,18 @@ const byMerchant = (rows: readonly Transaction[] | undefined, merchant: string) 
 
 const SWEETGREEN = sampleTransactions.find((t) => t.merchant_clean === 'Sweetgreen')!;
 const TRADER_JOES = sampleTransactions.filter((t) => t.merchant_clean === "Trader Joe's");
+
+/** The query of every `GET /transactions`, as the server received it. */
+function transactionReads() {
+  const seen: Record<string, string>[] = [];
+  server.events.on('request:start', ({ request }) => {
+    const url = new URL(request.url);
+    if (url.pathname === '/transactions') seen.push(Object.fromEntries(url.searchParams));
+  });
+  return seen;
+}
+
+afterEach(() => server.events.removeAllListeners());
 
 describe('useTransactions', () => {
   it('reads newest first and follows the cursor page by page', async () => {
@@ -35,6 +47,67 @@ describe('useTransactions', () => {
     );
     await waitFor(() => expect(result.current.transactions).toHaveLength(2));
     expect(result.current.transactions.every((t) => t.category === 'groceries')).toBe(true);
+  });
+
+  it('keeps the period on every page it reads', async () => {
+    const reads = transactionReads();
+    const { result } = renderHookWithClient(() =>
+      useTransactions({ limit: 5, start: '2026-10-05', end: '2026-10-13' }),
+    );
+    await waitFor(() => expect(result.current.transactions).toHaveLength(5));
+    await act(() => result.current.fetchNextPage());
+    await waitFor(() => expect(result.current.hasNextPage).toBe(false));
+    // October 5, 6, 8, 9, 11, 12 and 13 have a row each.
+    expect(result.current.transactions.map((t) => t.posted_at)).toEqual([
+      '2026-10-13',
+      '2026-10-12',
+      '2026-10-11',
+      '2026-10-09',
+      '2026-10-08',
+      '2026-10-06',
+      '2026-10-05',
+    ]);
+    expect(reads).toEqual([
+      { limit: '5', start: '2026-10-05', end: '2026-10-13' },
+      { limit: '5', start: '2026-10-05', end: '2026-10-13', cursor: expect.any(String) },
+    ]);
+  });
+
+  it('asks for nothing while the filters are not known', async () => {
+    const reads = transactionReads();
+    const { result } = renderHookWithClient(() => useTransactions(null));
+    await act(() => delay(50));
+    expect(reads).toEqual([]);
+    expect(result.current.isPending).toBe(true);
+    expect(result.current.transactions).toEqual([]);
+  });
+
+  it('keeps the last rows on screen while other filters load', async () => {
+    const answer = Promise.withResolvers<void>();
+    server.use(
+      http.get(apiUrl('/transactions'), async ({ request }) => {
+        if (new URL(request.url).searchParams.get('start') === '2026-10-02') await answer.promise;
+      }),
+    );
+    const late = { limit: 50, start: '2026-10-02', end: '2026-10-05' };
+    const { result, rerender } = renderHookWithClient(useTransactions, {
+      initialProps: { limit: 50, start: '2026-10-13', end: '2026-10-17' } as typeof late | null,
+    });
+    await waitFor(() => expect(result.current.transactions).toHaveLength(5));
+
+    rerender(late);
+    expect(result.current.isPlaceholderData).toBe(true);
+    expect(result.current.transactions).toHaveLength(5);
+    expect(result.current.hasNextPage).toBe(false);
+
+    answer.resolve();
+    await waitFor(() => expect(result.current.isPlaceholderData).toBe(false));
+    expect(result.current.transactions.map((t) => t.posted_at)).toEqual([
+      '2026-10-05',
+      '2026-10-04',
+      '2026-10-03',
+      '2026-10-02',
+    ]);
   });
 });
 

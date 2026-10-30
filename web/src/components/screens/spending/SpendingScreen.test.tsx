@@ -6,6 +6,7 @@ import { db, emptyDb } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { spendingDb } from '@/test/msw/spending-handlers';
+import type { Transaction } from '@/lib/api/types';
 import { renderWithProviders, screen, waitFor, within } from '@/test/render';
 import { SpendingScreen } from './SpendingScreen';
 
@@ -71,11 +72,14 @@ describe('SpendingScreen summary', () => {
         return HttpResponse.json({});
       }),
     );
-    await renderSpending();
-    const summary = screen.getByRole('region', { name: /Your month so far/ });
+    renderWithProviders(<SpendingScreen />);
+    const summary = await screen.findByRole('region', { name: /Your month so far/ });
     expect(summary).toHaveAttribute('aria-busy', 'true');
     expect(summary).not.toHaveTextContent('$');
     expect(summary.querySelectorAll('[data-skeleton]').length).toBeGreaterThanOrEqual(8);
+    // The transactions wait for the period the API answers with (spec 003 rule 17a).
+    const transactions = screen.getByRole('region', { name: 'Transactions' });
+    expect(within(transactions).getByText('Loading your transactions')).toBeInTheDocument();
   });
 
   it('names the linked accounts the summary covers', async () => {
@@ -319,7 +323,8 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
       ],
     };
     spendingDb.cashflow = flow;
-    await renderSpending({ showSankey: true });
+    // The sample's rows are all in October, so September's table is empty.
+    renderWithProviders(<SpendingScreen showSankey />);
     expect(await within(card()).findByRole('button', { name: 'Essentials $6.33' })).toBeVisible();
     // Spec 010 rule 5a: no stub in this period, which says nothing of other months'.
     expect(node('No pay stub this period $0.00')).toBeInTheDocument();
@@ -482,6 +487,7 @@ describe('SpendingScreen transactions', () => {
     emptyDb();
     renderWithProviders(<SpendingScreen />);
     expect(await screen.findByText(/No transactions yet/)).toBeInTheDocument();
+    expect(screen.queryByText(/No transactions from/)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Link a bank' })).toHaveAttribute(
       'href',
       '/setup/link',
@@ -508,5 +514,155 @@ describe('SpendingScreen transactions', () => {
       'href',
       '/setup/decisions/emergency-fund',
     );
+  });
+});
+
+describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', () => {
+  beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) }));
+  afterEach(() => vi.useRealTimers());
+
+  const AMAZON = sampleTransactions.find((t) => t.merchant_clean === 'Amazon')!;
+  /** A shopping row on `postedAt`, named `merchant`. */
+  const rowOn = (postedAt: string, merchant: string, n: number): Transaction => ({
+    ...AMAZON,
+    id: `7d000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
+    posted_at: postedAt,
+    merchant_raw: merchant.toUpperCase(),
+    merchant_clean: merchant,
+    merchant_norm: merchant.toLowerCase(),
+  });
+  /** `count` August rows, "August shop 1" first. */
+  const august = (count: number) =>
+    Array.from({ length: count }, (_, i) => rowOn('2026-08-20', `August shop ${i + 1}`, i + 1));
+  const AUGUST = { limit: '50', start: '2026-08-01', end: '2026-08-31' };
+
+  /** The query of every `GET /transactions` page read (not the per-account counts). */
+  function transactionReads() {
+    const seen: Record<string, string>[] = [];
+    server.events.on('request:start', ({ request }) => {
+      const url = new URL(request.url);
+      if (url.pathname === '/transactions' && !url.searchParams.has('account_id')) {
+        seen.push(Object.fromEntries(url.searchParams));
+      }
+    });
+    return seen;
+  }
+
+  const card = () => screen.getByRole('region', { name: 'Transactions' });
+  const listed = () =>
+    within(within(card()).getByRole('table', { name: 'Transactions' }))
+      .getAllByRole('row')
+      .slice(1);
+
+  async function pick(user: Awaited<ReturnType<typeof renderSpending>>['user'], label: string) {
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Period' }), label);
+  }
+
+  it('lists only the period the summary shows, asking the API for its dates', async () => {
+    db.transactions = [...db.transactions, rowOn('2026-09-20', 'Corner Bookshop', 1)];
+    const reads = transactionReads();
+    await renderSpending();
+    // The API's default period is the one it answered for: October 1 to 17 here.
+    expect(reads).toEqual([{ limit: '50', start: '2026-10-01', end: '2026-10-17' }]);
+    expect(listed()).toHaveLength(16);
+    expect(screen.queryByRole('row', { name: /Corner Bookshop/ })).not.toBeInTheDocument();
+  });
+
+  it('follows the period picker, from the first page, and pages within the period', async () => {
+    db.transactions = [...db.transactions, ...august(55)];
+    const reads = transactionReads();
+    const { user } = await renderSpending();
+
+    await pick(user, 'August 2026');
+    expect(await screen.findByRole('row', { name: /August shop 1\b/ })).toBeInTheDocument();
+    expect(listed()).toHaveLength(50);
+    expect(screen.queryByRole('row', { name: /Sweetgreen/ })).not.toBeInTheDocument();
+    expect(reads.at(-1)).toEqual(AUGUST);
+
+    await user.click(screen.getByRole('button', { name: 'Load more transactions' }));
+    await waitFor(() => expect(listed()).toHaveLength(55));
+    expect(reads.at(-1)).toEqual({ ...AUGUST, cursor: expect.any(String) });
+    expect(screen.queryByRole('row', { name: /Sweetgreen/ })).not.toBeInTheDocument();
+
+    // Another period starts again from its own first page: October 1 to 17,
+    // which the default read already asked for (the stand-in API answers the
+    // default with those dates).
+    await pick(user, 'October 2026 so far');
+    await waitFor(() => expect(listed()).toHaveLength(16));
+    expect(reads.filter((r) => r.start === '2026-10-01')).toEqual([
+      { limit: '50', start: '2026-10-01', end: '2026-10-17' },
+    ]);
+    expect(screen.queryByRole('row', { name: /August shop/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps the last rows on screen while the next period loads', async () => {
+    db.transactions = [...db.transactions, ...august(2)];
+    const answer = Promise.withResolvers<void>();
+    server.use(
+      http.get(apiUrl('/transactions'), async ({ request }) => {
+        if (new URL(request.url).searchParams.get('start') === AUGUST.start) await answer.promise;
+      }),
+    );
+    const { user } = await renderSpending();
+    await pick(user, 'August 2026');
+
+    await waitFor(() => expect(card()).toHaveAttribute('aria-busy', 'true'));
+    expect(listed()).toHaveLength(16);
+    expect(within(card()).queryByText(/Loading your transactions/)).not.toBeInTheDocument();
+
+    answer.resolve();
+    await waitFor(() => expect(card()).not.toHaveAttribute('aria-busy'));
+    expect(listed()).toHaveLength(2);
+  });
+
+  it('names the period when it has no transactions', async () => {
+    const { user } = await renderSpending();
+    await pick(user, 'July 2026');
+    expect(
+      await within(card()).findByText(
+        'No transactions from July 1 to 31. Pick another period above.',
+      ),
+    ).toBeInTheDocument();
+    expect(within(card()).queryByRole('link', { name: 'Link a bank' })).not.toBeInTheDocument();
+  });
+
+  it("lists the period's rows in a category's popover, however many newer rows there are", async () => {
+    // Fifty newer rows fill the newest page, so the period's own rows are on none of it.
+    db.transactions = [
+      ...Array.from({ length: 50 }, (_, i) => ({
+        ...sampleTransactions[i % 16]!,
+        id: `7c000000-0000-4000-8000-${String(1000 - i).padStart(12, '0')}`,
+      })),
+      ...august(2),
+    ];
+    const { user } = await renderSpending({ showSankey: true });
+    await pick(user, 'August 2026');
+    const flow = () => screen.getByRole('region', { name: /Where each dollar/ });
+    await screen.findByRole('heading', { name: 'Where each dollar of August pay went' });
+    await waitFor(() => expect(flow()).not.toHaveAttribute('aria-busy'));
+    await user.hover(within(flow()).getByRole('button', { name: 'Shopping $204.90' }));
+    const popover = within(flow()).getByRole('group', { name: 'Shopping' });
+    await waitFor(() =>
+      expect(
+        within(popover)
+          .getAllByRole('listitem')
+          .map((l) => l.textContent),
+      ).toEqual([
+        'August shop 1AI · 78%-$62.30Aug 20 · ··4821',
+        'August shop 2AI · 78%-$62.30Aug 20 · ··4821',
+      ]),
+    );
+  });
+
+  it('lists the newest rows when the period cannot be read', async () => {
+    server.use(
+      http.get(apiUrl('/cashflow'), () =>
+        HttpResponse.json({ error: { code: 'x', message: 'Database is busy' } }, { status: 503 }),
+      ),
+    );
+    const reads = transactionReads();
+    await renderSpending();
+    expect(reads).toEqual([{ limit: '50' }]);
+    expect(listed()).toHaveLength(16);
   });
 });
