@@ -10,28 +10,32 @@ import { Tile } from '@/components/ui/Tile';
 import { apiErrorMessage } from '@/lib/api/errors';
 import { useUpdateGoal } from '@/lib/api/hooks';
 import type { Account, Goal, GoalPatch } from '@/lib/api/types';
-import { formatDate } from '@/lib/dates';
 import { formatRate } from '@/lib/money';
 import { AmountField } from './AmountField';
 import { amountText, readAmount } from './decision-format';
-import { accountName, CONTRIBUTION_EXAMPLE, goalStatusBadge } from './emergency-fund-format';
+import {
+  accountName,
+  CONTRIBUTION_EXAMPLE,
+  goalPace,
+  goalStatusBadge,
+  type GoalPaceContext,
+} from './emergency-fund-format';
 
-export interface EmergencyGoalProps {
+export interface EmergencyGoalProps extends GoalPaceContext {
   goal: Goal;
   /** To name the linked account. */
   accounts: readonly Account[];
-  /** The saved decision found the fund already at its target. */
-  funded: boolean;
 }
 
 /**
  * The emergency fund goal a saved decision made (`GET /goals`): what it
- * aims for, when the saved contribution reaches it, the linked account's
+ * aims for, when its contribution reaches it (the API projects that again
+ * when the contribution changes, spec 011 rule 17a), the linked account's
  * balance, and the changes `PATCH /goals/{id}` allows: pause or resume, mark
  * reached (or take that back), and a new monthly contribution. Every figure
  * is the API's.
  */
-export function EmergencyGoal({ goal, accounts, funded }: EmergencyGoalProps) {
+export function EmergencyGoal({ goal, accounts, funded, horizonMonths }: EmergencyGoalProps) {
   const id = useId();
   const update = useUpdateGoal();
   const [draft, setDraft] = useState<string | null>(null);
@@ -52,16 +56,7 @@ export function EmergencyGoal({ goal, accounts, funded }: EmergencyGoalProps) {
     change({ monthly_contribution_cents: read.cents }, () => setDraft(null));
   };
 
-  let pace: string;
-  if (goal.status === 'reached' && goal.reached_at) {
-    pace = `Reached on ${formatDate(goal.reached_at)}.`;
-  } else if (goal.target_date) {
-    pace = `On pace to reach it by ${formatDate(goal.target_date)}.`;
-  } else if (funded) {
-    pace = 'Your savings already cover it.';
-  } else {
-    pace = 'No projected date at this amount. Save the decision again to project one.';
-  }
+  const pace = goalPace(goal, { funded, horizonMonths });
 
   return (
     <Tile role="group" aria-label="Your emergency fund goal" className="flex flex-col gap-3">

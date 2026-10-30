@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sampleCashflow } from '@/test/fixtures/cashflow';
-import { sampleGoal, sampleEmergencyFund } from '@/test/fixtures/planning';
+import { asEmergencyFundInputs } from '@/lib/decisions';
+import { sampleEmergencyDecision, sampleEmergencyFund, sampleGoal } from '@/test/fixtures/planning';
 import { sampleAccounts } from '@/test/fixtures/sample';
 import {
   accountName,
@@ -8,6 +9,8 @@ import {
   essentialsPrefill,
   fundBarTone,
   fundHeadline,
+  goalContributionOf,
+  goalPace,
   goalStatusBadge,
   monthsText,
 } from './emergency-fund-format';
@@ -91,5 +94,47 @@ describe('emergencyAccount', () => {
     expect(emergencyAccount([checking!])).toBeNull();
     expect(emergencyAccount([{ ...savings!, is_active: false }])).toBeNull();
     expect(emergencyAccount(undefined)).toBeNull();
+  });
+});
+
+describe('goalContributionOf', () => {
+  const decision = sampleEmergencyDecision();
+  const saved = asEmergencyFundInputs(decision.inputs);
+
+  it("is the goal's contribution once it was changed after the save (spec 011 rule 17b)", () => {
+    const goal = sampleGoal({ monthly_contribution_cents: 50_000 });
+    expect(goalContributionOf(goal, decision, saved)).toBe(50_000);
+  });
+
+  it('is null while the goal holds the saved amount, or belongs to another version', () => {
+    expect(goalContributionOf(sampleGoal(), decision, saved)).toBeNull();
+    const other = sampleGoal({ monthly_contribution_cents: 50_000, decision_id: 'another' });
+    expect(goalContributionOf(other, decision, saved)).toBeNull();
+    expect(goalContributionOf(undefined, decision, saved)).toBeNull();
+    expect(goalContributionOf(sampleGoal(), undefined, null)).toBeNull();
+  });
+});
+
+describe('goalPace', () => {
+  const horizon = { funded: false, horizonMonths: 120 };
+
+  it('says when an active goal is reached at its contribution', () => {
+    expect(goalPace(sampleGoal(), horizon)).toBe('On pace to reach it by Sep 30, 2027.');
+  });
+
+  it('says when a reached goal was reached', () => {
+    const goal = sampleGoal({ status: 'reached', reached_at: '2026-10-17T15:00:00Z' });
+    expect(goalPace(goal, horizon)).toBe('Reached on Oct 17, 2026.');
+  });
+
+  it('says the savings cover a funded goal, and one out of reach is not within the horizon', () => {
+    const undated = sampleGoal({ target_date: null });
+    expect(goalPace(undated, { funded: true, horizonMonths: 120 })).toBe(
+      'Your savings already cover it.',
+    );
+    expect(goalPace(undated, horizon)).toBe('Not within 10 years at this amount.');
+    expect(goalPace(undated, { funded: false, horizonMonths: null })).toBe(
+      'Not reached at this amount.',
+    );
   });
 });

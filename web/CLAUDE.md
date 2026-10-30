@@ -589,7 +589,11 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
   (`CONTRIBUTION_EXAMPLE`, also the example in what to fix). The result (target,
   shortfall, funded bar, months to target or "not within 10 years", per paycheck) is the
   calculator's. After a save, `EmergencyGoal` shows the goal with Pause or Resume, Mark reached
-  and Change contribution (`useUpdateGoal`). There is no "Why" link: spec 011 has no explanation.
+  and Change contribution (`useUpdateGoal`). A new contribution makes the API project the goal's
+  date again (spec 011 rule 17a, issue 165), and the card's monthly transfer then starts from the
+  goal's amount (`goalContributionOf`), its hint naming the saved decision's, so the result is the
+  goal's projection and the badge offers the next version (rule 17b). `goalPace` words when the
+  goal gets there. There is no "Why" link: spec 011 has no explanation.
 - **`HealthPlanCard`** (spec 012): compares the newest confirmed summary's plans (up to
   `MAX_PLANS`, the API's limit), the saved decision's, or plans typed in `PlanOptionsForm`. Usage
   low, medium or high; the comparison table marks the cheapest at that usage and the chosen plan,

@@ -1,5 +1,14 @@
-import type { Account, EmergencyFundResult, GoalStatus, SpendingSummary } from '@/lib/api/types';
+import type {
+  Account,
+  Decision,
+  EmergencyFundInput,
+  EmergencyFundResult,
+  Goal,
+  GoalStatus,
+  SpendingSummary,
+} from '@/lib/api/types';
 import { maskLabel } from '@/lib/accounts';
+import { formatDate } from '@/lib/dates';
 import type { Tone } from '@/lib/design/tone';
 import { formatMoney } from '@/lib/money';
 
@@ -53,6 +62,44 @@ const GOAL_STATUS: Record<GoalStatus, { label: string; tone: Tone }> = {
 };
 
 export const goalStatusBadge = (status: GoalStatus) => GOAL_STATUS[status];
+
+/**
+ * The goal's monthly contribution when it was changed after the decision was
+ * saved (`PATCH /goals/{id}`), so the card starts from it (spec 011 rule
+ * 17b); null while the goal holds the saved amount or belongs to another
+ * version. Picks which API value to show; nothing is computed.
+ */
+export function goalContributionOf(
+  goal: Goal | undefined,
+  current: Decision | undefined,
+  saved: EmergencyFundInput | null,
+): number | null {
+  if (!goal || !current || !saved || goal.decision_id !== current.id) return null;
+  const amount = goal.monthly_contribution_cents;
+  return amount === saved.monthly_contribution_cents ? null : amount;
+}
+
+export interface GoalPaceContext {
+  /** The saved decision found the fund already at its target. */
+  funded: boolean;
+  /** The calculator's projection horizon, from the saved result (null if it has none). */
+  horizonMonths: number | null;
+}
+
+/**
+ * When the goal gets there, in the API's own date: the date it was reached,
+ * the projected date at its contribution (spec 011 rule 17a), or why there
+ * is none.
+ */
+export function goalPace(goal: Goal, { funded, horizonMonths }: GoalPaceContext): string {
+  if (goal.status === 'reached' && goal.reached_at) {
+    return `Reached on ${formatDate(goal.reached_at)}.`;
+  }
+  if (goal.target_date) return `On pace to reach it by ${formatDate(goal.target_date)}.`;
+  if (funded) return 'Your savings already cover it.';
+  if (horizonMonths === null) return 'Not reached at this amount.';
+  return `Not within ${monthsText(horizonMonths, { years: true })} at this amount.`;
+}
 
 /**
  * The monthly essentials to start from: the spending summary's, when it

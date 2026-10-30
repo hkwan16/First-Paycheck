@@ -364,22 +364,57 @@ describe('EmergencyFundCard goal', () => {
     await waitFor(() => expect(goal()).toHaveTextContent('Active'));
   });
 
-  it('changes the monthly contribution, which clears the projected date', async () => {
+  it('changes the monthly contribution, which projects the date again and shows on the card', async () => {
+    // Spec 011 rules 17a and 17b (issue 165).
     const seen = requests();
     const { user } = await renderWithGoal();
     await user.click(within(goal()).getByRole('button', { name: 'Change contribution' }));
     const input = within(goal()).getByLabelText('New monthly contribution');
     expect(input).toHaveValue('300.00');
     await user.clear(input);
-    await user.type(input, '450');
+    await user.type(input, '500');
     await user.click(within(goal()).getByRole('button', { name: 'Save contribution' }));
 
-    await waitFor(() => expect(goal()).toHaveTextContent('$450.00 a month toward $5,469.75'));
-    expect(seen.goal).toEqual([{ monthly_contribution_cents: 45_000 }]);
-    expect(goal()).toHaveTextContent(
-      'No projected date at this amount. Save the decision again to project one.',
-    );
+    await waitFor(() => expect(goal()).toHaveTextContent('$500.00 a month toward $5,469.75'));
+    expect(seen.goal).toEqual([{ monthly_contribution_cents: 50_000 }]);
+    expect(goal()).toHaveTextContent('On pace to reach it by Apr 30, 2027.');
     expect(within(goal()).queryByLabelText('New monthly contribution')).toBeNull();
+
+    // The card shows the goal's amount, and that the saved decision has another.
+    const transfer = field('Monthly transfer to savings');
+    expect(transfer).toHaveValue('500.00');
+    expect(transfer).toHaveAccessibleDescription(
+      'From your goal. Your saved decision, v1, has $300.00 a month.',
+    );
+    await settle();
+    await waitFor(() => expect(result()).toHaveTextContent('reached in 7 months'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v2'));
+
+    // Back at the saved amount, the goal has its date again and the card is saved.
+    await user.click(within(goal()).getByRole('button', { name: 'Change contribution' }));
+    const again = within(goal()).getByLabelText('New monthly contribution');
+    await user.clear(again);
+    await user.type(again, '300');
+    await user.click(within(goal()).getByRole('button', { name: 'Save contribution' }));
+    await waitFor(() => expect(goal()).toHaveTextContent('On pace to reach it by Sep 30, 2027.'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v1'));
+    expect(field('Monthly transfer to savings')).toHaveValue('300.00');
+  });
+
+  it("saves the goal's contribution as the next version", async () => {
+    const seen = requests();
+    decisionsReady();
+    savedEmergencyFund();
+    planningDb.goals[0] = { ...planningDb.goals[0]!, monthly_contribution_cents: 50_000 };
+    const { user } = await renderReady();
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v2'));
+    await user.click(saveButton());
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v2'));
+    expect(seen.save[0]).toMatchObject({
+      supersedes_id: EMERGENCY_DECISION_ID,
+      inputs: sampleEmergencyFund({ monthly_contribution_cents: 50_000 }).inputs,
+    });
+    expect(field('Monthly transfer to savings')).not.toHaveAccessibleDescription(/From your goal/);
   });
 
   it('says what to fix in a new contribution before sending it', async () => {
