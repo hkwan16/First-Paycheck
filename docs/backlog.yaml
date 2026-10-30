@@ -1513,6 +1513,11 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: High
+    status: done
+    # Fixed October 29 in #147: pay stubs report retirement_contribution_pct,
+    # the card starts from it, and explain/v2 tells the chosen rate from the
+    # stub's. The eval's rate_framing, scored by an LLM judge since #149, was
+    # 1.0 in every live run.
   - title: "Production refuses to start without ANTHROPIC_API_KEY"
     body: >-
       Found on October 29: the key was saved on Render as ABTHROPIC_API_KEY,
