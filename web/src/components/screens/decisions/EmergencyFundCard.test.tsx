@@ -349,6 +349,9 @@ describe('EmergencyFundCard goal', () => {
     await user.click(within(goal()).getByRole('button', { name: 'Pause' }));
     await waitFor(() => expect(goal()).toHaveTextContent('Paused'));
     expect(seen.goal).toEqual([{ status: 'paused' }]);
+    // A paused goal is on pace for nothing (issue 166).
+    expect(goal()).toHaveTextContent('No projected date while it is paused.');
+    expect(goal()).not.toHaveTextContent('On pace');
 
     await user.click(within(goal()).getByRole('button', { name: 'Resume' }));
     await waitFor(() => expect(goal()).toHaveTextContent('Active'));

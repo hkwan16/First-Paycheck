@@ -122,6 +122,15 @@ describe('goalPace', () => {
     expect(goalPace(sampleGoal(), horizon)).toBe('On pace to reach it by Sep 30, 2027.');
   });
 
+  it('gives a paused goal no pace, dated or not (issue 166)', () => {
+    expect(goalPace(sampleGoal({ status: 'paused' }), horizon)).toBe(
+      'No projected date while it is paused.',
+    );
+    expect(goalPace(sampleGoal({ status: 'paused', target_date: null }), horizon)).toBe(
+      'No projected date while it is paused.',
+    );
+  });
+
   it('says when a reached goal was reached', () => {
     const goal = sampleGoal({ status: 'reached', reached_at: '2026-10-17T15:00:00Z' });
     expect(goalPace(goal, horizon)).toBe('Reached on Oct 17, 2026.');

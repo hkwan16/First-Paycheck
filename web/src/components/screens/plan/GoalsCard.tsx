@@ -15,7 +15,10 @@ function GoalRow({ goal }: { goal: Goal }) {
   const badge = goalStatusBadge(goal.status);
   let when: string | null = null;
   if (goal.status === 'reached' && goal.reached_at) when = `Reached ${formatDate(goal.reached_at)}`;
-  else if (goal.target_date) when = `By ${formatDate(goal.target_date)}`;
+  // A paused goal gets no contributions, so its projected date does not hold (issue 166).
+  else if (goal.status !== 'paused' && goal.target_date) {
+    when = `By ${formatDate(goal.target_date)}`;
+  }
 
   return (
     <li aria-label={label} className="flex flex-col gap-2">

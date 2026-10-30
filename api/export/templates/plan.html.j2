@@ -109,7 +109,7 @@ td.gap { width: 6%; border-top: 0; }
   <table>
     <tr><td class="label"><strong>{{ goal_titles[goal.kind] }}</strong></td><td class="num">{{ goal_statuses[goal.status] }}</td><td class="gap"></td><td class="label">Target</td><td class="num">{{ goal.target_amount_cents | money }}</td></tr>
     <tr><td class="label">Monthly contribution</td><td class="num">{{ goal.monthly_contribution_cents | money }}</td><td class="gap"></td><td class="label">Saved so far</td><td class="num">{% if goal.current_balance_cents is not none %}{{ goal.current_balance_cents | money }} ({{ goal.progress_pct | pct }}){% else %}No linked account{% endif %}</td></tr>
-{% if goal.target_date %}
+{% if goal.target_date and goal.status != 'paused' %}
     <tr><td class="label">On pace for</td><td class="num">{{ goal.target_date | long_date }}</td><td class="gap"></td><td></td><td></td></tr>
 {% endif %}
   </table>

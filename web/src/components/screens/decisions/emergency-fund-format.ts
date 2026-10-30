@@ -95,6 +95,8 @@ export function goalPace(goal: Goal, { funded, horizonMonths }: GoalPaceContext)
   if (goal.status === 'reached' && goal.reached_at) {
     return `Reached on ${formatDate(goal.reached_at)}.`;
   }
+  // A paused goal gets no contributions, so no date is a pace it keeps (issue 166).
+  if (goal.status === 'paused') return 'No projected date while it is paused.';
   if (goal.target_date) return `On pace to reach it by ${formatDate(goal.target_date)}.`;
   if (funded) return 'Your savings already cover it.';
   if (horizonMonths === null) return 'Not reached at this amount.';
