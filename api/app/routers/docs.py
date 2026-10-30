@@ -44,6 +44,7 @@ from ingest.proposal import (
     benefits_text,
 )
 from jobs import queue
+from verify.format import dollars
 
 router = APIRouter(prefix="/docs", tags=["docs"])
 
@@ -234,6 +235,14 @@ def upload_document(
     return DocumentCreated(document_id=document.id)
 
 
+# A document's type in words, for messages (spec 008 rule 22a).
+_DOCUMENT_NAMES: dict[DocumentType, str] = {
+    DocumentType.PAY_STUB: "a pay stub",
+    DocumentType.OFFER_LETTER: "an offer letter",
+    DocumentType.BENEFITS: "a benefits summary",
+}
+
+
 def _replaceable(
     session: UserSession, document_id: uuid.UUID, document_type: DocumentType
 ) -> Document:
@@ -242,7 +251,8 @@ def _replaceable(
     document = _for_update(session, document_id)
     if document.type is not document_type:
         raise AppError(
-            f"A {document_type.value} upload cannot replace a {document.type.value} document",
+            f"This upload is {_DOCUMENT_NAMES[document_type]} and cannot replace"
+            f" {_DOCUMENT_NAMES[document.type]}",
             code="replace_type_mismatch",
             status_code=422,
         )
@@ -300,7 +310,7 @@ def extract_document(
     document = _locked(session, document_id)
     if document.type not in EXTRACTABLE:
         raise AppError(
-            f"{document.type.value} documents cannot be extracted yet",
+            f"This is {_DOCUMENT_NAMES[document.type]}, which cannot be read yet",
             code="extraction_unsupported",
             status_code=422,
         )
@@ -353,8 +363,7 @@ def confirm_document(
             profile_updated = True
     else:
         raise AppError(
-            f"This is a {document.type.value} document; send its values under"
-            f" {document.type.value!r}",
+            f"This is {_DOCUMENT_NAMES[document.type]}; send the values that kind of document has",
             code="wrong_document_type",
             status_code=422,
         )
@@ -378,8 +387,8 @@ def _pay_stub(document: Document, values: PayStubValues) -> PayStub:
     result = balance(values.amounts())
     if not result.balances:
         raise AppError(
-            f"Gross minus deductions is {result.expected_net_cents} cents, but net is"
-            f" {result.net_cents} cents",
+            f"Gross minus deductions is {dollars(result.expected_net_cents)}, but net is"
+            f" {dollars(result.net_cents)}",
             code="pay_stub_unbalanced",
             status_code=422,
             details=result.model_dump(),

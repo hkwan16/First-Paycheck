@@ -85,7 +85,7 @@ def put_profile(body: ProfileIn, session: UserSession, user: CurrentUser, now: N
     """Replace the profile."""
     if body.birth_year is not None and body.birth_year > now.year:
         raise AppError(
-            f"birth_year: must be at most {now.year}", code="validation_error", status_code=422
+            f"The birth year must be at most {now.year}", code="validation_error", status_code=422
         )
     values: dict[str, Any] = body.model_dump(exclude={"other_jobs", "match_tiers"})
     # The jsonb columns hold JSON: percentages as two-place strings.

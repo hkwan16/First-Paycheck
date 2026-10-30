@@ -337,6 +337,10 @@ explanation, `GET /calendar` shows the check it implies.
   without `force` returns the latest verified row only while it is current. A
   row written in a test that should read as current needs the current digest
   and versions (`tests/support/plan_user.py:current_digest`).
+- **Error messages are for people** (spec 008 rule 22a): no `snake_case` or
+  `SCREAMING_CASE` words, no enum `.value` or `!r` in an f-string;
+  `tests/unit/test_error_messages.py` walks every `AppError` call. Name a
+  calculator or document type in words; put a provider code in `details`.
 - **No transaction across a model call.** `POST /explain` takes `UserSessions`
   (a factory, `app/deps.py`): read in one session, call the gateway with none
   open, write in a second. `LlmGateway` is lazy, so a 404 or a stored current

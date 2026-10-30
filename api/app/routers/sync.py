@@ -163,8 +163,12 @@ def _plaid_errors() -> Iterator[None]:
                 code="plaid_unavailable",
                 status_code=503,
             ) from None
+        # Plaid's code is for support and logs, not for the person (spec 008 rule 22a).
         raise AppError(
-            f"Plaid rejected the request ({exc.code})", code="plaid_error", status_code=502
+            "Plaid refused the request",
+            code="plaid_error",
+            status_code=502,
+            details={"plaid_error_code": exc.code},
         ) from None
 
 
@@ -208,7 +212,7 @@ def link_item(
     sandbox_id = body.sandbox_institution_id
     if sandbox_id is not None and not sandbox_allowed:
         raise AppError(
-            "sandbox_institution_id is not accepted in production",
+            "A sandbox bank can be linked only while Plaid runs in its sandbox",
             code="validation_error",
             status_code=422,
         )
@@ -224,7 +228,11 @@ def link_item(
         elif body.public_token is not None:
             public_token = body.public_token
         else:  # LinkItemRequest's validator makes this unreachable.
-            raise AppError("public_token is required", code="validation_error", status_code=422)
+            raise AppError(
+                "Link the bank through Plaid first: no public token was sent",
+                code="validation_error",
+                status_code=422,
+            )
         access_token, provider_item_id = plaid.item_public_token_exchange(public_token)
         if institution_name is None and sandbox_id is not None:
             institution_name = plaid.institution_name(sandbox_id)

@@ -68,7 +68,7 @@ def check_saveable(inputs: BaseModel) -> None:
     """Refuse a decision that cannot be saved even though its inputs are valid."""
     if isinstance(inputs, HealthPlansInput) and inputs.selected_plan_index is None:
         raise AppError(
-            "Pick a plan before saving: selected_plan_index is required",
+            "Pick a plan before saving",
             code="plan_not_selected",
             status_code=422,
         )

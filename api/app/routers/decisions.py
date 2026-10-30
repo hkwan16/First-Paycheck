@@ -142,7 +142,7 @@ def _next_version(session: Session, body: DecisionIn) -> int:
         raise NotFound("Decision not found")
     if parent.calculator != body.calculator:
         raise AppError(
-            "supersedes_id belongs to another calculator",
+            "The version this replaces belongs to another decision",
             code="supersedes_mismatch",
             status_code=422,
         )
@@ -164,7 +164,7 @@ def save_decision(
         spec = calculator(body.calculator)
     except UnknownCalculator as exc:
         raise AppError(
-            f"Decisions for {body.calculator.value} are not available yet",
+            "Decisions for this calculator are not available yet",
             code="calculator_unavailable",
             status_code=422,
         ) from exc
