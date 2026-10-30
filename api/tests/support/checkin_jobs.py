@@ -38,7 +38,7 @@ def job_row(connection: Connection, job_id: uuid.UUID) -> Row:
 def check_ins(connection: Connection, user: FixtureUser) -> list[Row]:
     rows = connection.execute(
         text(
-            "SELECT id, period, triggered_by::text, status::text FROM check_ins"
+            "SELECT id, period, triggered_by::text, status::text, last_run_at FROM check_ins"
             " WHERE user_id = :u ORDER BY period"
         ),
         {"u": user.id},

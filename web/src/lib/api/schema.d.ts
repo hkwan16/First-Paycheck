@@ -1250,6 +1250,11 @@ export interface components {
        */
       id: string;
       /**
+       * Last Run At
+       * Format: date-time
+       */
+      last_run_at: string;
+      /**
        * Period
        * Format: date
        */
@@ -1290,6 +1295,11 @@ export interface components {
        * Format: uuid
        */
       id: string;
+      /**
+       * Last Run At
+       * Format: date-time
+       */
+      last_run_at: string;
       /**
        * Period
        * Format: date

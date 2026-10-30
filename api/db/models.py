@@ -950,6 +950,9 @@ class CheckIn(Base):
         pg_enum(CheckinStatus, "checkin_status"), server_default=text("'open'")
     )
     completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    # When the finders last ran on it (spec 015 rule 9a), set by every run that
+    # creates or refreshes it; updated_at moves only when this row changes.
+    last_run_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=_NOW)
     created_at: Mapped[dt.datetime] = _created_at()
     updated_at: Mapped[dt.datetime] = _updated_at()
 

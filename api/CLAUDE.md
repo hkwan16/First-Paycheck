@@ -192,8 +192,9 @@ Rules:
   `0004_decisions`. After that the chain runs `0008_goals_and_birth_year`,
   `0011_no_model_reason`, `0009_w4_calendar_kind`, `0012_checkin_findings`,
   `0013_plan_export_job`, `0014_delete_account_fn`, `0015_loan_account_kind`,
-  `0016_rule_match_contains`, `0017_document_replaced_by` (each revises the one
-  before it); the head is `0017_document_replaced_by`.
+  `0016_rule_match_contains`, `0017_document_replaced_by`,
+  `0018_check_in_last_run_at` (each revises the one before it); the head is
+  `0018_check_in_last_run_at`.
 - Adding an enum label is `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with
   `AFTER` when the order means something, as `by_kind` does for
   `account_kind`); the downgrade maps the rows that use it and rebuilds the
@@ -511,7 +512,10 @@ adds the `calendar_kind` label `w4_submit`; no new table or function.
 Spec 015. Migration `0012_checkin_findings` (revises `0009_w4_calendar_kind`)
 adds `check_in_findings.key` (`UNIQUE (check_in_id, key)`, index `(user_id,
 key)`) and rebuilds `finding_action` as `done`, `dismissed`. No new table or
-function.
+function. `0018_check_in_last_run_at` adds `check_ins.last_run_at` (rule 9a):
+every run that creates or refreshes a check-in sets it to the job's clock, also
+when nothing changed, and the screen's "Compared with your plan on" reads it,
+never `updated_at`, which moves only when the row itself changes (issue #171).
 
 - **Finders** (`checkin/findings.py`) are pure, one per `finding_kind`,
   `f(Facts) -> list[Finding]`; `all_findings` runs them in rule order. Facts

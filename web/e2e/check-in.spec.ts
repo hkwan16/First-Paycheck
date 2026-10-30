@@ -79,6 +79,12 @@ async function firstFinding(page: Page, findings: Locator): Promise<Locator> {
   return findings.getByRole('listitem', { name, exact: true });
 }
 
+/** Today as the screen dates a time ("Oct 30, 2026"), in the browser's zone, which is this one's. */
+const today = () =>
+  new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(
+    new Date(),
+  );
+
 async function reload(page: Page) {
   await page.reload();
   await waitForHydration(page);
@@ -101,10 +107,16 @@ test('runs this month’s check-in again, then marks a finding done, dismissed a
 
   // An open check-in for this month can be run again from its own page.
   if (await checkInNow(page).isVisible()) {
+    const before = today();
     await checkInNow(page).click();
     await expect(page.getByText('Checked again just now. This page is up to date.')).toBeVisible({
       timeout: RUN_BUDGET_MS,
     });
+    // Issue 171: the lead dates the run just made, not the check-in's last change.
+    const dates = [...new Set([before, today()])].join('|');
+    await expect(
+      page.getByText(new RegExp(`^Compared with your plan on (${dates})\\.`)),
+    ).toBeVisible();
   }
 
   const row = await firstFinding(page, findings);

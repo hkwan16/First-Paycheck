@@ -351,6 +351,7 @@ Indexes: `(decision_id, created_at DESC)`, `(finding_id, created_at DESC)`. The 
 | `triggered_by` | `checkin_trigger` | `NOT NULL`; partial `UNIQUE (user_id, period) WHERE triggered_by = 'schedule'` so the monthly enqueue is idempotent |
 | `status` | `checkin_status` | `NOT NULL DEFAULT 'open'` |
 | `completed_at` | `timestamptz` | `CHECK ((status = 'completed') = (completed_at IS NOT NULL))` |
+| `last_run_at` | `timestamptz` | `NOT NULL DEFAULT now()`; when the finders last ran on it, set by every run that creates or refreshes it (spec 015 rule 9a; added in `0018`) |
 
 ### `check_in_findings`
 
@@ -456,6 +457,7 @@ Reference data, no `user_id` (RLS exception).
 | `0015_loan_account_kind` | Nothing new. `account_kind` gains `loan` after `credit` (spec 002 rule 4). The downgrade maps `loan` accounts back to `credit` and rebuilds the type with its five 0002 labels |
 | `0016_rule_match_contains` | Nothing new. `rule_match` gains `contains` after `prefix`, and `category_rules` the check `ck_category_rules_contains_is_seed_money_in` (spec 003 rule 3c). It clears the `rule` and `llm` labels of money-in rows with a spending category (the old precedence's paycheck-as-dining) so the next categorize run's rules pass labels them again under spec 003 rule 4. The downgrade deletes the `contains` rows, drops the check and rebuilds the type with its two 0002 labels; the cleared labels stay cleared |
 | `0017_document_replaced_by` | Nothing new. `documents.replaced_by_id` with its unique key, same-user foreign key and two checks (spec 004 rule 24). The downgrade drops them; replaced documents then list again, with no file |
+| `0018_check_in_last_run_at` | Nothing new. `check_ins.last_run_at` (spec 015 rule 9a), filled from `updated_at` for existing rows with the `updated_at` trigger off. The downgrade drops it |
 
 CI runs upgrade, downgrade, upgrade and `alembic check` on every pull request.
 

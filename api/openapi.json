@@ -830,6 +830,11 @@
             "title": "Id",
             "type": "string"
           },
+          "last_run_at": {
+            "format": "date-time",
+            "title": "Last Run At",
+            "type": "string"
+          },
           "period": {
             "format": "date",
             "title": "Period",
@@ -857,6 +862,7 @@
           "handled_count",
           "created_at",
           "updated_at",
+          "last_run_at",
           "findings",
           "cash_flow"
         ],
@@ -922,6 +928,11 @@
             "title": "Id",
             "type": "string"
           },
+          "last_run_at": {
+            "format": "date-time",
+            "title": "Last Run At",
+            "type": "string"
+          },
           "period": {
             "format": "date",
             "title": "Period",
@@ -948,7 +959,8 @@
           "finding_count",
           "handled_count",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "last_run_at"
         ],
         "title": "CheckInSummary",
         "type": "object"
