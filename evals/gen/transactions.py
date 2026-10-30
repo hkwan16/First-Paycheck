@@ -1,7 +1,7 @@
 """Seeded generator for ``evals/fixtures/transactions.csv``: 500 synthetic,
 labeled bank transactions for the categorization suites, then 15 written by
-hand for direction (spec 003 rules 3a-3b and 5a) and 13 for merchant names
-(rule 3d).
+hand for direction (spec 003 rules 3a-3b and 5a), 13 for merchant names
+(rule 3d) and 6 for the prompt's definitions (rule 9b).
 
 Merchant descriptions mimic what banks send (store numbers, processor
 prefixes, cities, reference codes). Most merchants are ones the seed rules
@@ -17,6 +17,8 @@ directions, and two refunds, whose true label is their spending category.
 The ``NAME_CASES`` (ids 516-528) follow: businesses whose names begin with an
 ordinary word a seed rule names a merchant by (``spectrum health``,
 ``adobe grill``), and the bare descriptors the narrowed rules still label.
+The ``DEFINITION_CASES`` (ids 529-534) close the file: warehouse clubs and
+card payments no seed rule names, tax preparation, and the IRS refund deposit.
 
     uv run python -m evals.gen.transactions      # rewrite the committed CSV
 
@@ -200,6 +202,18 @@ NAME_CASES: list[tuple[str, int, dt.date, str]] = [
     ("SPECTRUM", 7_999, dt.date(2026, 10, 5), "phone_internet"),
 ]
 
+# Written by hand, appended after NAME_CASES (spec 003 rule 9b): merchants of
+# the same kind as a seed rule's, which no seed rule names, labeled as the seed
+# rules label that kind, and the IRS refund deposit (money in).
+DEFINITION_CASES: list[tuple[str, int, dt.date, str]] = [
+    ("BJS WHOLESALE CLUB #0123", 15_600, dt.date(2026, 9, 6), "shopping"),
+    ("PRICESMART #0456", 21_000, dt.date(2026, 10, 4), "shopping"),
+    ("DISCOVER E-PAYMENT 4521", 45_000, dt.date(2026, 9, 25), "transfer"),
+    ("CHASE CREDIT CRD AUTOPAY", 62_000, dt.date(2026, 10, 12), "transfer"),
+    ("H&R BLOCK", 8_900, dt.date(2026, 8, 14), "taxes"),
+    ("IRS TREAS 310 TAX REF", -118_000, dt.date(2026, 8, 28), "income"),
+]
+
 
 def _fill(template: str, rng: random.Random) -> str:
     ref = "".join(rng.choices(string.ascii_uppercase, k=2)) + str(rng.randint(10, 9999))
@@ -222,7 +236,7 @@ def generate(seed: int = SEED, rows: int = ROWS) -> list[Row]:
             )
         )
     for index, (merchant_raw, amount_cents, posted_at, category) in enumerate(
-        [*SIGN_CASES, *NAME_CASES], start=rows + 1
+        [*SIGN_CASES, *NAME_CASES, *DEFINITION_CASES], start=rows + 1
     ):
         generated.append(Row(index, merchant_raw, amount_cents, posted_at, category))
     return generated
@@ -261,4 +275,4 @@ def read_csv(path: Path = DEFAULT_CSV) -> list[Row]:
 
 if __name__ == "__main__":
     write_csv()
-    sys.stdout.write(f"wrote {ROWS + len(SIGN_CASES) + len(NAME_CASES)} rows to {DEFAULT_CSV}\n")
+    sys.stdout.write(f"wrote {len(generate())} rows to {DEFAULT_CSV}\n")

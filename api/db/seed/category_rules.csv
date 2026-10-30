@@ -16,6 +16,8 @@ direct dep,contains,income
 direct deposit,contains,income
 salary,contains,income
 interest,contains,income
+tax ref,contains,income
+tax refund,contains,income
 interest,exact,fees
 interest charged,exact,fees
 monthly payment,exact,transfer

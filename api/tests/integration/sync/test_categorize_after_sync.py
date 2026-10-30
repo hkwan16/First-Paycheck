@@ -171,3 +171,28 @@ def test_a_public_radio_membership_is_sent_with_the_donation_definition(
         "kqed membership": ("gifts_donations", "llm"),
         "safeway": ("groceries", "rule"),
     }
+
+
+def test_a_tax_refund_deposit_is_income_and_a_tax_payment_is_taxes(
+    empty_queue: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Spec 003 rule 9b: the seed prefix rule ``irs treas`` (taxes) applies in
+    both directions, so the IRS's refund deposit came back taxes while the
+    prompt calls a tax refund income. The seed contains rule ``tax ref`` ranks
+    above it for money in."""
+    labeler = ScriptedLabeler({})
+    sync_and_categorize(
+        empty_queue,
+        user_a,
+        [
+            txn("t1", -118_000, "IRS TREAS 310 TAX REF"),
+            txn("t2", 52_000, "IRS TREAS 310 TAX PYMT"),
+        ],
+        labeler,
+    )
+
+    assert categories(client_as(user_a)) == {
+        "irs treas tax ref": ("income", "rule"),
+        "irs treas tax pymt": ("taxes", "rule"),
+    }
+    assert labeler.merchants == []

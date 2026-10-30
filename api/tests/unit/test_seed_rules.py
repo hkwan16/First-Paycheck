@@ -77,6 +77,11 @@ def test_seed_covers_the_core_categories(category: str) -> None:
         ("Interest", -12, "income"),
         ("Interest payment", -12, "income"),
         ("CASH DEPOSIT", -49_600, "transfer"),
+        # Spec 003 rule 9b: a tax refund deposit is income, a tax payment taxes.
+        ("IRS TREAS 310 TAX REF", -118_000, "income"),
+        ("IRS TREAS 310 TAX PYMT", 52_000, "taxes"),
+        ("FRANCHISE TAX BD CASTTAXRFD TAX REFUND", -21_000, "income"),
+        ("FRANCHISE TAX BD PAYMENTS", 21_000, "taxes"),
     ],
 )
 def test_seed_rules_label_common_descriptors(raw: str, amount_cents: int, category: str) -> None:
@@ -188,6 +193,8 @@ def test_seed_contains_rows_are_the_income_markers() -> None:
         "direct deposit": "income",
         "salary": "income",
         "interest": "income",
+        "tax ref": "income",
+        "tax refund": "income",
     }
 
 
