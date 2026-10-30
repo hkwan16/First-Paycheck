@@ -39,8 +39,9 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   way `categorize.run` labels them (spec 003 rule 29): seed rules, then each
   unknown merchant and direction's newest row to Sonnet (`LLM_MODEL_CATEGORIZE`), 50 per call, the label
   applied to every row of that merchant and direction. `accuracy` (all rows) and `llm_accuracy` (rows
-  the model labeled); baseline at the targets (0.90, 0.80) until the first
-  live run. `SuiteUnavailable` without `ANTHROPIC_API_KEY`; scoring is
+  the model labeled); baseline measured on October 29 (0.9670, 0.9474 in
+  every run: Sonnet calls `kqed membership`'s 5 gift rows subscriptions;
+  spec 003 targets 0.90, 0.80). `SuiteUnavailable` without `ANTHROPIC_API_KEY`; scoring is
   unit-tested with a labeler that answers from the labels.
 - `fixtures/pay_stubs/`: 30 synthetic pay stubs (text PDFs, clean and noisy
   PNG/JPEG scans, scanned PDFs; three layouts, `ledger`, `summary` and
@@ -56,7 +57,8 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
 - `suites/extraction.py` (`extraction`, LLM): the real pipeline and Sonnet over
   the stubs; `field_accuracy`, `document_accuracy`, `redaction_recall`.
   Raises `SuiteUnavailable` (exit 2) without `ANTHROPIC_API_KEY`. Its baseline
-  holds the spec 005 targets until the first live run replaces them.
+  is measured: 1.0 on all three in every live run on October 29, about 55
+  cents a run (spec 005 targets 0.95, 0.70, 1.0).
 - `suites/extraction_smoke.py` (`extraction-smoke`, free): the same pipeline
   with `FakeGateway`; checks every stub yields a proposal, SSNs are redacted,
   and neither the SSN nor an unmasked account number reaches the model input
@@ -86,8 +88,8 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   pipeline, `extract_benefits/v2` and `benefits_proposal` over those
   summaries; `plan_field_accuracy`, `retirement_accuracy`,
   `document_accuracy`. `SuiteUnavailable` without `ANTHROPIC_API_KEY`; its
-  baseline holds the spec 013 targets (0.90, 0.80, 0.60) until the first live
-  run. Scoring is unit-tested with a reader that answers from the labels.
+  baseline is measured: 1.0 on all three in every live run on October 29,
+  about 6 cents a run (spec 013 targets 0.90, 0.80, 0.60). Scoring is unit-tested with a reader that answers from the labels.
 - `fixtures/explain/decisions.json`: 10 synthetic `k401_match` inputs (with
   optional benefits passages) covering under-match, capped, catch-up,
   compensation-capped, already-full and no-match cases. Results are computed
@@ -161,6 +163,10 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
 - A new suite needs a registry entry and a baseline entry (a test checks both).
 - Update the baseline only with `--update-baseline`, in a commit of its own, with
   the reason in the message.
+- An LLM suite's baseline is what it measures live, not its spec's target: run
+  it at least twice, check the runs agree within the tolerance, record one with
+  `--update-baseline` and give every run's numbers and cost in the message. The
+  target is what the measurement has to clear before it is recorded.
 - Calc cases go through the HTTP route as a fixed eval user, never by calling
   `calc/` directly, so routing and serialization are covered too.
 - LLM suites charge `Budget` before reading each result and use only synthetic
