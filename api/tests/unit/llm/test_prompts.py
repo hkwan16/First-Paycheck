@@ -82,6 +82,23 @@ def test_categorize_v3_calls_a_nonprofit_membership_a_donation() -> None:
     assert "kqed" not in v3.lower()
 
 
+def definition(system: str, category: str) -> str:
+    return next(line for line in system.splitlines() if line.startswith(f"- `{category}`"))
+
+
+def test_categorize_v3_definitions_agree_with_the_seed_rules() -> None:
+    """Spec 003 rule 9b: a merchant the model labels gets the category a seed
+    rule gives a merchant of the same kind (costco and sams club shopping, a
+    credit card payment transfer, turbotax taxes)."""
+    system = load_prompt("categorize", "v3").system
+    assert "warehouse clubs" in definition(system, "shopping")
+    assert "warehouse" not in definition(system, "groceries")
+    assert "credit card payments" in definition(system, "transfer")
+    assert "A credit card payment is `transfer`" in definition(system, "debt_payment")
+    assert "tax preparation" in definition(system, "taxes")
+    assert "tax refunds" in definition(system, "income")
+
+
 def test_the_gateway_uses_categorize_v3() -> None:
     assert CATEGORIZE_PROMPT == ("categorize", "v3")
 

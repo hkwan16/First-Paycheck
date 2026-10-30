@@ -179,7 +179,10 @@ Rules:
   `categorize/v3`) and may call money in a refund. What a category means
   (a membership to a public radio station or another nonprofit is
   `gifts_donations`, issue #146) is the prompt's; which merchant a
-  description names is the seed rules' (spec 003 rule 9a). `tests/support/
+  description names is the seed rules' (spec 003 rule 9a), and the two agree
+  on a merchant of the same kind (rule 9b: a warehouse club is `shopping`, a
+  credit card payment `transfer`, a tax refund `income` by the seed
+  `contains` rules `tax ref` and `tax refund`). `tests/support/
   sandbox_history.py:DYNAMIC` replays Plaid's `user_transactions_dynamic`
   user (a paycheck named like a restaurant, five loan ledgers).
 - Migration names follow spec 001: `0006_webhook_fn` revises `0002_core`, and
