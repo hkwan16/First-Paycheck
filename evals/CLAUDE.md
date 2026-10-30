@@ -138,9 +138,26 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
 ## Rules
 
 - Metrics are scores in [0, 1], higher is better.
-- Deterministic suites (`llm=False`) tolerate no drop; LLM suites tolerate 2 points
-  (`run.DETERMINISTIC_TOLERANCE`, `run.LLM_TOLERANCE`; `test_run.py` checks both
-  through the CLI). A metric above its baseline passes.
+- Deterministic suites (`llm=False`) tolerate no drop (`run.DETERMINISTIC_TOLERANCE`).
+  An LLM metric may drop below its baseline by 2 points (`run.LLM_TOLERANCE`) or by
+  one case's worth, whichever is larger (`run.tolerances`). A case is one thing the
+  model gets right or wrong on its own: a field, a document, a decision, a
+  merchant's label. Its worth is the largest share of the metric one case
+  decides; the suite reports it per metric in `SuiteResult.case_worth`, and a
+  metric it leaves out is a share of the suite's `cases`, worth `1 / cases`. So
+  one answer the model gets wrong on one run and right on the next never fails
+  the nightly by itself, while a second miss on a small metric, or a slide of
+  more than 2 points on a large one, does. Today: benefits `document_accuracy`
+  and `retirement_accuracy` (5 summaries) 20 points, extraction
+  `document_accuracy` (30 stubs) 3.3, `redaction_recall` (19 stubs with an SSN)
+  5.3, extraction `field_accuracy` (390 fields) and benefits
+  `plan_field_accuracy` (72) 2, categorization `llm_accuracy` 14.7 and
+  `accuracy` 2.7 (one label covers all 14 `sunrise bakery` rows, of the 95 the
+  model labels and the 515 in all). A metric above its baseline passes. The
+  report gives each metric's tolerance under `tolerances`. `test_run.py` checks
+  the rule through the CLI; each LLM suite's tests check its `case_worth`.
+  `redaction_recall` does not depend on the model; `extraction-smoke` gates it
+  at zero tolerance over the same stubs.
 - A new suite needs a registry entry and a baseline entry (a test checks both).
 - Update the baseline only with `--update-baseline`, in a commit of its own, with
   the reason in the message.
