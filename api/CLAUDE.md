@@ -283,6 +283,20 @@ explanation, `GET /calendar` shows the check it implies.
   `retrieval/context.py` (facts formatted with `verify/format.py`, which the
   verifier reads back), the seed IRS passages and the user's redacted benefits
   text.
+- **The rate chosen is not the rate in effect** (spec 008 rule 7a, issue
+  132). A decision's `contribution_pct` is what the person picked;
+  `POST /explain` reads the newest stub's rate in its first session
+  (`routers/pay_stubs.py:newest_pay_stub_rate`) and passes it as
+  `pay_stub_pct` to `retrieval/context.py:explain_setup`, which builds the
+  context (facts `Contribution rate you chose` and `401(k) contribution rate
+  your latest pay stub shows`), the allowed numbers (`pay_stub_numbers`) and
+  the fallback, for the route and the eval suites alike. Which of the three
+  cases holds is `calc/pay_stub.py:stub_rate` (`StubRate.CHOSEN`, `OTHER`,
+  `NONE`), decided once; the context's note and the fallback's sentences are
+  looked up by it. It never goes into the decision, which is immutable. The
+  verifier checks numbers and citations only; whether drafts call the chosen
+  rate the one in effect is the explain eval's `rate_framing` metric, not a
+  check. The gateway sends `explain/v2`; fallback rows are `fallback/v2`.
 - **No transaction across a model call.** `POST /explain` takes `UserSessions`
   (a factory, `app/deps.py`): read in one session, call the gateway with none
   open, write in a second. `LlmGateway` is lazy, so a 404 or a stored verified

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from db.enums import LlmPurpose
 from llm import schemas
-from llm.gateway import CATEGORIZE_PROMPT
+from llm.gateway import CATEGORIZE_PROMPT, EXPLAIN_PROMPT
 from llm.prompts import PROMPTS_DIR, Prompt, PromptError, all_prompts, load_prompt, parse_prompt
 
 VALID = """---
@@ -113,9 +113,10 @@ def test_pay_stub_prompt_names_every_line_kind_and_field() -> None:
         assert f"`{frequency}`" in prompt.system
 
 
-def test_explain_v1() -> None:
-    prompt = load_prompt("explain", "v1")
-    assert prompt.version == "explain/v1"
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_explain(version: str) -> None:
+    prompt = load_prompt("explain", version)
+    assert prompt.version == f"explain/{version}"
     assert prompt.purpose is LlmPurpose.EXPLAIN
     assert prompt.effort == "medium"
     assert prompt.schema is schemas.ExplanationDraft
@@ -127,6 +128,31 @@ def test_explain_v1() -> None:
     assert "`feedback`" in prompt.system
     # No em dash anywhere in what the model reads.
     assert chr(0x2014) not in prompt.system
+
+
+def test_explain_v2_keeps_the_chosen_rate_apart_from_the_stub() -> None:
+    """Spec 008 rule 8 (issue 132): v1 told the model to describe "their current
+    contribution" with only the chosen rate in the facts; v2 names both facts,
+    says the chosen rate "would" or "will" happen, and is the version the gateway
+    sends."""
+    v1 = load_prompt("explain", "v1").system
+    v2 = load_prompt("explain", "v2").system
+    assert "at their current contribution" in v1
+    assert "current contribution" not in v2
+    for label in (
+        "Contribution rate you chose",
+        "401(k) contribution rate your latest pay stub shows",
+    ):
+        assert f"`{label}`" in v2, label
+    # Plain guidance, not a description of a check: nothing rejects a draft
+    # for its wording (spec 008 rule 8).
+    assert '"would" or "will"' in v2
+    assert "rejects" not in v2
+    # The number habits behind most first-try failures: a tier's width and a
+    # passage's percentages.
+    assert '"the next 2%"' in v2
+    assert '"100% vested"' in v2
+    assert EXPLAIN_PROMPT == ("explain", "v2")
 
 
 def test_parse_valid_prompt() -> None:
