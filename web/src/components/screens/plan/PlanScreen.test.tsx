@@ -152,6 +152,16 @@ describe('PlanScreen with every decision saved', () => {
     ).toHaveAttribute('aria-valuetext', '39.12% of the target');
   });
 
+  it('gives a paused goal no date (issue 166)', async () => {
+    const [goal] = planDb.plan.goals;
+    planDb.plan.goals = [{ ...goal!, status: 'paused' }];
+    await open();
+    const row = within(region('Goals')).getByRole('listitem');
+    expect(within(row).getByText('Paused')).toBeInTheDocument();
+    expect(row).toHaveTextContent('$300.00 a month toward $5,469.75');
+    expect(row).not.toHaveTextContent('By Sep 30, 2027');
+  });
+
   it('lists the next 90 days of the calendar in the API’s order', async () => {
     await open();
     const calendar = region('Next 90 days');

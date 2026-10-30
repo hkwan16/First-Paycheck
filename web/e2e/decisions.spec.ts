@@ -213,7 +213,9 @@ test('compares health plans, chooses one and saves it with its deadline', async 
   await expect(save).toBeEnabled();
   await save.click();
   await savedVersion(save);
-  await expect(health.getByText(/ is on your calendar for /)).toBeVisible({
+  await expect(
+    health.getByText(/^On your calendar for .+: Health plan enrollment deadline\.$/),
+  ).toBeVisible({
     timeout: 15_000,
   });
 });
@@ -271,7 +273,7 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
   await save.click();
   await savedVersion(save);
   await expect(
-    w4.getByText(/^Give your employer your updated Form W-4 is on your calendar for /),
+    w4.getByText(/^On your calendar for .+: Give your employer your updated Form W-4\.$/),
   ).toBeVisible({ timeout: 15_000 });
   await expect(w4.getByRole('link', { name: 'Why this decision' })).toHaveAttribute(
     'href',
@@ -293,4 +295,40 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
   );
   await page.getByRole('link', { name: 'See your plan' }).click();
   await expect(page).toHaveURL('/plan');
+});
+
+test.describe('on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  /** The scroll offset, and whether the collapsed nav button clears the sticky header. */
+  const placement = (page: Page) =>
+    page.evaluate(() => {
+      const header = document.querySelector('header')!.getBoundingClientRect();
+      const nav = document.querySelector('nav[aria-label="Setup steps"] > button')!;
+      return { scrollY: window.scrollY, clear: nav.getBoundingClientRect().top >= header.bottom };
+    });
+
+  test('a step footer link lands at the top of the next step (issue 172)', async ({ page }) => {
+    test.setTimeout(120_000);
+    // From the bottom of a longer step to a shorter one, where the browser keeps
+    // part of the old scroll offset while the new step loads.
+    const steps = [
+      ['/setup/decisions/emergency-fund', /^Next: 401\(k\) match/],
+      ['/setup/decisions/health-plan', /^Back to 401\(k\) match/],
+    ] as const;
+    for (const [from, name] of steps) {
+      await page.goto(from);
+      await waitForHydration(page);
+      const link = page.getByRole('link', { name });
+      await expect(link).toBeVisible({ timeout: 30_000 });
+      await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 30_000 });
+      await link.scrollIntoViewIfNeeded();
+      expect((await placement(page)).scrollY).toBeGreaterThan(0);
+
+      await link.click();
+      await expect(page).toHaveURL('/setup/decisions/401k');
+      await settled(page);
+      expect(await placement(page)).toEqual({ scrollY: 0, clear: true });
+    }
+  });
 });

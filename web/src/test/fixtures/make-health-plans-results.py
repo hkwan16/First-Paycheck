@@ -9,7 +9,8 @@ employer HSA money is more than its premiums and low use's care, so it comes
 out ahead at low use, spec 012 rule 17) for J. Rivera ($65,000.00,
 semi-monthly, single, 2026) at every expected usage, with no plan chosen or
 any one, contributing $0 or $1,000.00 to the HSA, with the summary's
-enrollment deadline; the same plans at medium usage with no deadline; one
+enrollment deadline; the same plans at medium usage with no deadline; the Gold
+PPO and Saver HDHP alone (issue 168), with no plan chosen or the Gold PPO; one
 plan typed by hand; a plan labeled HDHP below the 2026 minimum deductible;
 an HSA contribution over the limit; and issue 153's user (the stub-01 salary,
 biweekly) choosing a $4.00 Value HMO, for the W-4 card.
@@ -128,6 +129,8 @@ cases += [
         }
     ),
     case({**SAMPLE, "employee_hsa_cents": 500_000}),
+    # Issue 168: the Bronze HSA removed, so the Gold PPO moves to the front.
+    *(case({**SAMPLE, "plans": [GOLD, SAVER], "selected_plan_index": s}) for s in (None, 0)),
     # Issue 153's user (stub-01, $3,653.85 biweekly) chose a $4.00 plan.
     case(
         {

@@ -9,35 +9,42 @@ import { Notice } from '@/components/ui/Notice';
 import { Tile } from '@/components/ui/Tile';
 import { apiErrorMessage } from '@/lib/api/errors';
 import { useUpdateGoal } from '@/lib/api/hooks';
+import { useFocusHandoff } from '@/lib/focus-handoff';
 import type { Account, Goal, GoalPatch } from '@/lib/api/types';
-import { formatDate } from '@/lib/dates';
 import { formatRate } from '@/lib/money';
 import { AmountField } from './AmountField';
 import { amountText, readAmount } from './decision-format';
-import { accountName, CONTRIBUTION_EXAMPLE, goalStatusBadge } from './emergency-fund-format';
+import {
+  accountName,
+  CONTRIBUTION_EXAMPLE,
+  goalPace,
+  goalStatusBadge,
+  type GoalPaceContext,
+} from './emergency-fund-format';
 
-export interface EmergencyGoalProps {
+export interface EmergencyGoalProps extends GoalPaceContext {
   goal: Goal;
   /** To name the linked account. */
   accounts: readonly Account[];
-  /** The saved decision found the fund already at its target. */
-  funded: boolean;
 }
 
 /**
  * The emergency fund goal a saved decision made (`GET /goals`): what it
- * aims for, when the saved contribution reaches it, the linked account's
+ * aims for, when its contribution reaches it (the API projects that again
+ * when the contribution changes, spec 011 rule 17a), the linked account's
  * balance, and the changes `PATCH /goals/{id}` allows: pause or resume, mark
  * reached (or take that back), and a new monthly contribution. Every figure
  * is the API's.
  */
-export function EmergencyGoal({ goal, accounts, funded }: EmergencyGoalProps) {
+export function EmergencyGoal({ goal, accounts, funded, horizonMonths }: EmergencyGoalProps) {
   const id = useId();
   const update = useUpdateGoal();
   const [draft, setDraft] = useState<string | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
   const badge = goalStatusBadge(goal.status);
   const account = accounts.find((a) => a.id === goal.account_id);
+  // Each action here swaps its own button for another control (issue 167).
+  const focus = useFocusHandoff<'form' | 'change' | 'reached' | 'not-reached'>();
 
   const change = (patch: GoalPatch, onSuccess?: () => void) =>
     update.mutate({ goalId: goal.id, patch }, { onSuccess });
@@ -49,19 +56,13 @@ export function EmergencyGoal({ goal, accounts, funded }: EmergencyGoalProps) {
       setDraftError(read.error ?? `Enter an amount, like ${CONTRIBUTION_EXAMPLE}.`);
       return;
     }
-    change({ monthly_contribution_cents: read.cents }, () => setDraft(null));
+    change({ monthly_contribution_cents: read.cents }, () => {
+      focus.moveTo('change');
+      setDraft(null);
+    });
   };
 
-  let pace: string;
-  if (goal.status === 'reached' && goal.reached_at) {
-    pace = `Reached on ${formatDate(goal.reached_at)}.`;
-  } else if (goal.target_date) {
-    pace = `On pace to reach it by ${formatDate(goal.target_date)}.`;
-  } else if (funded) {
-    pace = 'Your savings already cover it.';
-  } else {
-    pace = 'No projected date at this amount. Save the decision again to project one.';
-  }
+  const pace = goalPace(goal, { funded, horizonMonths });
 
   return (
     <Tile role="group" aria-label="Your emergency fund goal" className="flex flex-col gap-3">
@@ -93,6 +94,7 @@ export function EmergencyGoal({ goal, accounts, funded }: EmergencyGoalProps) {
 
       {draft !== null ? (
         <form
+          ref={focus.target('form')}
           aria-label="Change the monthly contribution"
           noValidate
           onSubmit={saveContribution}
@@ -113,7 +115,13 @@ export function EmergencyGoal({ goal, accounts, funded }: EmergencyGoalProps) {
             <Button type="submit" size="sm" variant="primary" loading={update.isPending}>
               Save contribution
             </Button>
-            <Button size="sm" onClick={() => setDraft(null)}>
+            <Button
+              size="sm"
+              onClick={() => {
+                focus.moveTo('change');
+                setDraft(null);
+              }}
+            >
               Cancel
             </Button>
           </div>
@@ -121,7 +129,11 @@ export function EmergencyGoal({ goal, accounts, funded }: EmergencyGoalProps) {
       ) : (
         <div className="flex flex-wrap gap-2">
           {goal.status === 'reached' ? (
-            <Button size="sm" onClick={() => change({ status: 'active' })}>
+            <Button
+              ref={focus.target('not-reached')}
+              size="sm"
+              onClick={() => change({ status: 'active' }, () => focus.moveTo('reached'))}
+            >
               Not reached yet
             </Button>
           ) : (
@@ -132,12 +144,18 @@ export function EmergencyGoal({ goal, accounts, funded }: EmergencyGoalProps) {
               >
                 {goal.status === 'paused' ? 'Resume' : 'Pause'}
               </Button>
-              <Button size="sm" onClick={() => change({ status: 'reached' })}>
+              <Button
+                ref={focus.target('reached')}
+                size="sm"
+                onClick={() => change({ status: 'reached' }, () => focus.moveTo('not-reached'))}
+              >
                 Mark reached
               </Button>
               <Button
+                ref={focus.target('change')}
                 size="sm"
                 onClick={() => {
+                  focus.moveTo('form');
                   setDraft(amountText(goal.monthly_contribution_cents));
                   setDraftError(null);
                 }}

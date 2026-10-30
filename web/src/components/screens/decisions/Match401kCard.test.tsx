@@ -474,6 +474,50 @@ describe('Match401kCard plan details', () => {
   });
 });
 
+describe('Match401kCard focus (issue 167)', () => {
+  const changePlan = () => within(card()).getByRole('button', { name: 'Change plan details' });
+  const form = () => within(card()).getByRole('form', { name: 'Your plan details' });
+
+  it('opens the plan details on their first field and returns to Change plan details', async () => {
+    savedDecision();
+    const { user } = await renderReady();
+    await user.click(changePlan());
+    expect(within(form()).getByLabelText('Yearly salary')).toHaveFocus();
+
+    await user.click(within(form()).getByRole('button', { name: 'Cancel' }));
+    expect(changePlan()).toHaveFocus();
+
+    await user.click(changePlan());
+    await user.click(within(form()).getByRole('button', { name: 'Save plan details' }));
+    await waitFor(() => expect(changePlan()).toHaveFocus());
+  });
+
+  it('hands focus to the contribution once the first plan details are saved', async () => {
+    decisionsReady();
+    db.profile = { ...db.profile, birth_year: null };
+    const { user } = renderCard();
+    const details = await within(
+      await screen.findByRole('region', { name: '401(k) match' }),
+    ).findByRole('form', { name: 'Your plan details' });
+    await user.type(within(details).getByLabelText('Year you were born'), '1996');
+    await user.click(within(details).getByRole('button', { name: 'Save plan details' }));
+    await waitFor(() => expect(slider()).toHaveFocus());
+  });
+
+  it('focuses the tier that a tier added or removed leaves in its place', async () => {
+    savedDecision();
+    const { user } = await renderReady();
+    await user.click(changePlan());
+    await user.click(within(form()).getByRole('button', { name: 'Add a tier' }));
+    expect(
+      within(form()).getByLabelText('Tier 2: Employer adds, % of what you put in'),
+    ).toHaveFocus();
+
+    await user.click(within(form()).getByRole('button', { name: 'Remove tier 2' }));
+    expect(within(form()).getByLabelText('Employer adds, % of what you put in')).toHaveFocus();
+  });
+});
+
 describe('Match401kCard before it can calculate', () => {
   it('sends a person without a confirmed pay stub to confirm one', async () => {
     renderCard();

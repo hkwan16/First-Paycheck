@@ -29,6 +29,7 @@ import type {
   HealthPlansResult,
 } from '@/lib/api/types';
 import { cn } from '@/lib/cn';
+import { useFocusHandoff } from '@/lib/focus-handoff';
 import { formatDate } from '@/lib/dates';
 import {
   asHealthPlansInputs,
@@ -41,8 +42,15 @@ import { formatRate } from '@/lib/money';
 import { whyRoute } from '@/lib/routes';
 import { AmountField } from './AmountField';
 import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
-import { amountText, readAmount, saveBadgeTone, saveErrorText } from './decision-format';
 import {
+  amountText,
+  calendarNote,
+  readAmount,
+  saveBadgeTone,
+  saveErrorText,
+} from './decision-format';
+import {
+  choiceAmong,
   costAt,
   costText,
   hdhpNotice,
@@ -92,6 +100,8 @@ export function HealthPlanCard() {
     null,
   );
   const [editing, setEditing] = useState(false);
+  // The plan table and the comparison take each other's place (issue 167).
+  const focus = useFocusHandoff<'plans-form' | 'edit-plans' | 'usage'>();
   const [usage, setUsage] = useState<HealthcareUsage | null>(null);
   const [hsa, setHsa] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null | undefined>(undefined);
@@ -163,8 +173,11 @@ export function HealthPlanCard() {
   };
   const applyPlans = (next: HealthPlanOption[], from: Source) =>
     edit(() => {
+      // Back to the button that opened the table, else on to the comparison's first control.
+      focus.moveTo(editing ? 'edit-plans' : 'usage');
       setOverride({ plans: next, source: from });
-      setSelected(null);
+      // The chosen plan stays chosen while the new plans still offer it (issue 168).
+      setSelected(choiceAmong(plans, selectedValue, next));
       setEditing(false);
     });
 
@@ -218,9 +231,17 @@ export function HealthPlanCard() {
           </p>
         )}
         <PlanOptionsForm
+          ref={focus.target('plans-form')}
           initial={plans}
           onCompare={(next) => applyPlans(next, 'typed')}
-          onCancel={plans !== null ? () => setEditing(false) : undefined}
+          onCancel={
+            plans !== null
+              ? () => {
+                  focus.moveTo('edit-plans');
+                  setEditing(false);
+                }
+              : undefined
+          }
           onUseBenefits={
             fromBenefits ? () => applyPlans(fromBenefits.plans, 'benefits') : undefined
           }
@@ -242,7 +263,7 @@ export function HealthPlanCard() {
     body = (
       <>
         <p className="m-0 text-small text-ink-3">{intro}</p>
-        <div>
+        <div ref={focus.target('usage')}>
           <div className="mb-1.5 text-small font-semibold text-ink-2">
             How much care do you expect next year?
           </div>
@@ -328,7 +349,14 @@ export function HealthPlanCard() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button size="sm" onClick={() => setEditing(true)}>
+            <Button
+              ref={focus.target('edit-plans')}
+              size="sm"
+              onClick={() => {
+                focus.moveTo('plans-form');
+                setEditing(true);
+              }}
+            >
               Edit plans
             </Button>
             {current && (
@@ -338,11 +366,7 @@ export function HealthPlanCard() {
             )}
           </div>
         </div>
-        {event && (
-          <p className="m-0 text-small text-ink-3">
-            {event.title} is on your calendar for {formatDate(event.due_at)}.
-          </p>
-        )}
+        {event && <p className="m-0 text-small text-ink-3">{calendarNote(event)}</p>}
       </>
     );
   }

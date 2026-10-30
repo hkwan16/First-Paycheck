@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { FieldError } from '@/components/ui/FieldError';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
@@ -15,6 +15,8 @@ export interface AmountFieldProps {
   hint?: ReactNode;
   placeholder?: string;
   className?: string;
+  /** The input, for an action that fills the field and moves focus to it. */
+  inputRef?: Ref<HTMLInputElement>;
 }
 
 /**
@@ -31,12 +33,14 @@ export function AmountField({
   hint,
   placeholder,
   className,
+  inputRef,
 }: AmountFieldProps) {
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
   return (
     <div className={className}>
       <Label htmlFor={id}>{label}</Label>
       <Input
+        ref={inputRef}
         id={id}
         inputMode="decimal"
         autoComplete="off"

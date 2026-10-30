@@ -306,7 +306,10 @@ describe('W4Card suggestion', () => {
 
     await user.click(within(suggestion()!).getByRole('button', { name: 'Apply suggestion' }));
     expect(field(STEP_4C)).toHaveValue('0.00');
+    // The suggestion leaves with its button: focus goes to the entry it filled (issue 167).
+    expect(field(STEP_4C)).toHaveFocus();
     await recalculated('A $0.08 refund at tax time');
+    expect(field(STEP_4C)).toHaveFocus();
     // Back to the first inputs, whose result is cached: nothing is asked twice.
     expect(seen.calc).toEqual([
       sampleW4().inputs,
@@ -352,6 +355,7 @@ describe('W4Card suggestion', () => {
 
     await user.click(within(suggestion()!).getByRole('button', { name: 'Apply suggestion' }));
     expect(field(STEP_4B)).toHaveValue('17,522.00');
+    expect(field(STEP_4B)).toHaveFocus();
     expect(field(EXPECTED)).toHaveValue('0.00');
     await recalculated('A $0.08 refund at tax time');
     expect(seen.calc.at(-1)).toEqual(
@@ -378,7 +382,7 @@ describe('W4Card saving', () => {
     ]);
     expect(
       await within(card()).findByText(
-        'Give your employer your updated Form W-4 is on your calendar for Oct 31, 2026.',
+        'On your calendar for Oct 31, 2026: Give your employer your updated Form W-4.',
       ),
     ).toBeInTheDocument();
     expect(within(card()).getByRole('link', { name: 'Why this decision' })).toHaveAttribute(
@@ -397,7 +401,7 @@ describe('W4Card saving', () => {
     expect(field(STEP_4C)).toHaveValue('0.00');
     expect(
       within(card()).getByText(
-        'Give your employer your updated Form W-4 is on your calendar for Oct 31, 2026.',
+        'On your calendar for Oct 31, 2026: Give your employer your updated Form W-4.',
       ),
     ).toBeInTheDocument();
 

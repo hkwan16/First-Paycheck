@@ -32,7 +32,7 @@ import {
   payPeriodsFor,
 } from '@/lib/decisions';
 import { toneText } from '@/lib/design/tone';
-import { formatRate } from '@/lib/money';
+import { formatMoney, formatRate } from '@/lib/money';
 import { AmountField } from './AmountField';
 import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
 import {
@@ -49,6 +49,7 @@ import {
   essentialsPrefill,
   fundBarTone,
   fundHeadline,
+  goalContributionOf,
   monthsText,
 } from './emergency-fund-format';
 import { EmergencyGoal } from './EmergencyGoal';
@@ -93,12 +94,16 @@ export function EmergencyFundCard() {
 
   const account = emergencyAccount(accounts.data);
   const prefill = essentialsPrefill(summary.data);
+  const goal = goals.data?.find((g) => g.kind === 'emergency_fund');
+  // The goal's contribution, when it was changed since the saved decision (spec 011 rule 17b).
+  const goalContribution = goalContributionOf(goal, current, saved);
   const essentialsValue =
     essentials ?? amountText(saved ? saved.monthly_essentials_cents : prefill);
   const monthsValue = months ?? saved?.target_months ?? MIN_MONTHS;
   const balanceValue =
     balance ?? amountText(saved ? saved.current_balance_cents : account?.balance_cents);
-  const contributionValue = contribution ?? amountText(saved?.monthly_contribution_cents);
+  const contributionValue =
+    contribution ?? amountText(goalContribution ?? saved?.monthly_contribution_cents);
 
   const essentialsRead = readAmount(essentialsValue, { example: '1,823.25', positive: true });
   const balanceRead = readAmount(balanceValue, { example: '2,140.00' });
@@ -110,7 +115,8 @@ export function EmergencyFundCard() {
     payStubs.data !== undefined &&
     decisions.data !== undefined &&
     !accounts.isPending &&
-    !summary.isPending;
+    !summary.isPending &&
+    !goals.isPending;
   const periods = loaded ? payPeriodsFor(payFrequencyOf(profile.data, payStubs.data[0])) : null;
 
   let missing: string | null = null;
@@ -138,8 +144,7 @@ export function EmergencyFundCard() {
     if (save.isError) save.reset();
   };
 
-  const goal = goals.data?.find((g) => g.kind === 'emergency_fund');
-  const savedResult = current?.result as { funded?: unknown } | undefined;
+  const savedResult = current?.result as { funded?: unknown; horizon_months?: unknown } | undefined;
 
   let body: ReactNode;
   const failed = profile.error ?? payStubs.error ?? decisions.error;
@@ -210,7 +215,11 @@ export function EmergencyFundCard() {
           label="Monthly transfer to savings"
           value={contributionValue}
           error={contributionRead.error}
-          hint="What you will move into savings each month."
+          hint={
+            contribution === null && goalContribution !== null && current && saved
+              ? `From your goal. Your saved decision, v${current.version}, has ${formatMoney(saved.monthly_contribution_cents)} a month.`
+              : 'What you will move into savings each month.'
+          }
           placeholder={examplePlaceholder(CONTRIBUTION_EXAMPLE)}
           onChange={(text) => edit(() => setContribution(text))}
         />
@@ -245,6 +254,9 @@ export function EmergencyFundCard() {
             goal={goal}
             accounts={accounts.data ?? []}
             funded={savedResult?.funded === true}
+            horizonMonths={
+              typeof savedResult?.horizon_months === 'number' ? savedResult.horizon_months : null
+            }
           />
         )}
       </>

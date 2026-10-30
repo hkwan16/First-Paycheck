@@ -8249,7 +8249,7 @@
     },
     "/goals/{goal_id}": {
       "patch": {
-        "description": "Pause, resume or mark a goal reached, change its contribution or its account.",
+        "description": "Pause, resume or mark a goal reached, change its contribution or its account.\n\nA new contribution projects the goal's date again, the way saving the\ndecision at that contribution would.",
         "operationId": "update_goal",
         "parameters": [
           {

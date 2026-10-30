@@ -223,7 +223,7 @@ describe('HealthPlanCard saving', () => {
     ]);
     expect(
       await within(card()).findByText(
-        'Health plan enrollment deadline is on your calendar for Nov 14, 2026.',
+        'On your calendar for Nov 14, 2026: Health plan enrollment deadline.',
       ),
     ).toBeInTheDocument();
     expect(within(card()).getByRole('link', { name: 'Why this decision' })).toHaveAttribute(
@@ -289,6 +289,66 @@ describe('HealthPlanCard saving', () => {
     await waitFor(() => expect(saveButton()).toBeEnabled());
     await user.click(saveButton());
     await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v1'));
+  });
+
+  it('keeps the chosen plan when the benefits summary has it again (issue 168)', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const { user } = await renderReady();
+    await user.click(within(card()).getByRole('button', { name: 'Edit plans' }));
+    await user.click(within(card()).getByRole('button', { name: 'Use your benefits summary' }));
+
+    expect(within(choice()).getByRole('button', { name: 'Gold PPO' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await settle();
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v1'));
+    expect(within(card()).queryByText('Choose the plan you will enroll in to save.')).toBeNull();
+  });
+
+  it('follows the chosen plan to its new place when another plan is removed', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const seen = requests();
+    const { user } = await renderReady();
+    await user.click(within(card()).getByRole('button', { name: 'Edit plans' }));
+    await user.click(within(card()).getByRole('button', { name: 'Remove plan 1' }));
+    await user.click(within(card()).getByRole('button', { name: 'Compare these plans' }));
+
+    expect(within(choice()).getByRole('button', { name: 'Gold PPO' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await settle();
+    await waitFor(() => expect(seen.calc.at(-1)).toMatchObject({ selected_plan_index: 0 }));
+    expect(seen.calc.at(-1)).toMatchObject({ plans: [GOLD_PPO, SAVER_HDHP] });
+  });
+
+  it('drops the choice when the chosen plan has other terms now, even under its name', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const seen = requests();
+    const { user } = await renderReady();
+    await user.click(within(card()).getByRole('button', { name: 'Edit plans' }));
+    const gold = within(card()).getByRole('group', { name: 'Plan 2' });
+    fireEvent.change(within(gold).getByLabelText('Premium per paycheck'), {
+      target: { value: '70.00' },
+    });
+    await user.click(within(card()).getByRole('button', { name: 'Compare these plans' }));
+
+    expect(within(choice()).getByRole('button', { name: 'Gold PPO' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    expect(
+      within(card()).getByText('Choose the plan you will enroll in to save.'),
+    ).toBeInTheDocument();
+    await settle();
+    await waitFor(() => expect(seen.calc.at(-1)).toMatchObject({ selected_plan_index: null }));
   });
 
   it('reloads and offers the next version when another save got there first', async () => {
@@ -379,6 +439,58 @@ describe('HealthPlanCard without a benefits summary', () => {
     ).toEqual([BRONZE_HSA.name, GOLD_PPO.name, SAVER_HDHP.name]);
     await user.click(within(form).getByRole('button', { name: 'Cancel' }));
     expect(within(card()).queryByRole('form', { name: 'Your health plan options' })).toBeNull();
+  });
+});
+
+describe('HealthPlanCard focus (issue 167)', () => {
+  const editPlans = () => within(card()).getByRole('button', { name: 'Edit plans' });
+  const form = () => within(card()).getByRole('form', { name: 'Your health plan options' });
+  const planName = (n: number) =>
+    within(within(form()).getByRole('group', { name: `Plan ${n}` })).getByLabelText('Plan name');
+
+  it('opens the plans on the first name and returns to Edit plans however the table closes', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const { user } = await renderReady();
+    for (const close of ['Cancel', 'Use your benefits summary', 'Compare these plans']) {
+      await user.click(editPlans());
+      expect(planName(1)).toHaveFocus();
+      await user.click(within(form()).getByRole('button', { name: close }));
+      expect(editPlans()).toHaveFocus();
+    }
+  });
+
+  it('hands focus to the usage once the first typed plans are compared', async () => {
+    decisionsReady();
+    const { user } = renderCard();
+    const typed = await within(
+      await screen.findByRole('region', { name: 'Health plan' }),
+    ).findByRole('form', { name: 'Your health plan options' });
+    const plan = within(typed).getByRole('group', { name: 'Plan 1' });
+    await user.type(within(plan).getByLabelText('Plan name'), 'Silver HMO');
+    await user.selectOptions(within(plan).getByLabelText('Plan type'), 'hmo');
+    await user.type(within(plan).getByLabelText('Premium per paycheck'), '40');
+    await user.type(within(plan).getByLabelText('Deductible'), '1,000');
+    await user.type(within(plan).getByLabelText('Coinsurance, %'), '0');
+    await user.type(within(plan).getByLabelText('Out-of-pocket maximum'), '2,500');
+    await user.click(within(typed).getByRole('button', { name: 'Compare these plans' }));
+    expect(within(usage()).getByRole('button', { pressed: true })).toHaveFocus();
+  });
+
+  it('focuses a new plan, and the plan that takes the place of one removed', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    const { user } = await renderReady();
+    await user.click(editPlans());
+    await user.click(within(form()).getByRole('button', { name: 'Add a plan' }));
+    expect(planName(4)).toHaveFocus();
+
+    await user.click(within(form()).getByRole('button', { name: 'Remove plan 2' }));
+    expect(planName(2)).toHaveFocus();
+    expect(planName(2)).toHaveValue(SAVER_HDHP.name);
+    await user.click(within(form()).getByRole('button', { name: 'Remove plan 3' }));
+    expect(planName(2)).toHaveFocus();
   });
 });
 

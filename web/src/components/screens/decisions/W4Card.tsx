@@ -23,6 +23,7 @@ import {
 } from '@/lib/api/hooks';
 import type { FilingStatus, PayStub, W4Input } from '@/lib/api/types';
 import { cn } from '@/lib/cn';
+import { useFocusHandoff } from '@/lib/focus-handoff';
 import { formatDate } from '@/lib/dates';
 import {
   ageAtYearEnd,
@@ -37,7 +38,13 @@ import { formatMoney, formatRate } from '@/lib/money';
 import { decisionStepRoute, whyRoute } from '@/lib/routes';
 import { AmountField } from './AmountField';
 import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
-import { amountText, readAmount, saveBadgeTone, saveErrorText } from './decision-format';
+import {
+  amountText,
+  calendarNote,
+  readAmount,
+  saveBadgeTone,
+  saveErrorText,
+} from './decision-format';
 import { payFrequencyOf } from './plan-details';
 import {
   appliedEntries,
@@ -132,6 +139,8 @@ export function W4Card() {
   const [texts, setTexts] = useState<Partial<Record<TextKey, string>>>({});
   const [status, setStatus] = useState<FilingStatus | null>(null);
   const [multipleJobs, setMultipleJobs] = useState<boolean | null>(null);
+  // "Apply suggestion" leaves with its suggestion: focus the entry it filled (issue 167).
+  const focus = useFocusHandoff<AmountKey>();
 
   const textOf = (key: TextKey) =>
     texts[key] ??
@@ -191,6 +200,11 @@ export function W4Card() {
   const applySuggestion = () => {
     if (!calc.isCurrent || !calc.data || !calc.inputs) return;
     const entries = appliedEntries(calc.inputs, calc.data);
+    focus.moveTo(
+      calc.data.suggestion === 'increase_deductions'
+        ? 'deductions_cents'
+        : 'extra_withholding_cents',
+    );
     edit(() =>
       setTexts((previous) => ({
         ...previous,
@@ -206,6 +220,7 @@ export function W4Card() {
   );
   const amountField = (key: AmountKey) => (
     <AmountField
+      inputRef={focus.target(key)}
       id={`${id}-${key}`}
       label={FIELDS[key].label}
       value={textOf(key)}
@@ -348,11 +363,7 @@ export function W4Card() {
             </Link>
           )}
         </div>
-        {event && (
-          <p className="m-0 text-small text-ink-3">
-            {event.title} is on your calendar for {formatDate(event.due_at)}.
-          </p>
-        )}
+        {event && <p className="m-0 text-small text-ink-3">{calendarNote(event)}</p>}
       </>
     );
   }

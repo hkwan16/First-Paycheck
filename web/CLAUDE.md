@@ -80,6 +80,7 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     validation, errors, account), supabase/ (env, client, server, proxy),
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
                     documents.ts, decisions.ts, decision-steps.ts, deep-equal.ts, features.ts,
+                    focus-handoff.ts, land-at-top.ts,
                     findings.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts,
                     page-hydration.ts, page-title.ts, log-error.ts
@@ -157,7 +158,9 @@ width; under 780px it sits behind a disclosure button, see "Side nav on a phone"
 (current item and `pathname` from the URL), `Shell` (header, nav column `1 1 200px` up to 240px,
 full width above the page under 780px, main `999 1 560px`, skip link), `PageTitle` (`title`, `lead`, `aside`,
 `eyebrow`), `StepFooter` (`back`, `next` with `primary`, `disabled` and `loading`; a disabled
-next is a real disabled button, never a dead link).
+next is a real disabled button, never a dead link; its links land the next page at the top, with
+Next's scroll off and `onNavigate={requestLandAtTop}`, which the new page's `HydrationMarker`
+carries out: `lib/land-at-top.ts`, spec 018 rule 6a, issue 172).
 
 ### Side nav on a phone
 
@@ -467,7 +470,15 @@ What the audit found and fixed:
 - Keyboard: every control on every screen was reachable with a visible ring and no trap; the walk
   stays in the smoke spec so it stays true. Focus after an action that removes its control now
   moves somewhere useful: an unlink focuses its done notice, Keep my account returns to Delete
-  account.
+  account. The decision cards (issue 167) do it with one hook, `useFocusHandoff`
+  (`lib/focus-handoff.ts`): `moveTo(key)` in the handler or the mutation's `onSuccess`,
+  `ref={target(key)}` on what takes focus, focused once it is on the page and enabled (a container
+  focuses its first Tab stop). The rule: an editor that opens in place of its button focuses its
+  first field; closing it returns to the button that opens it again (or, when nothing opened it,
+  the first control of what replaced it: the 401(k) slider, the health plan usage); a swapped pair
+  (Mark reached, Not reached yet) focuses the counterpart; a removed plan or tier focuses the one
+  in its place, an added one its first field; Apply suggestion focuses the W-4 entry it filled.
+  Use it for any new control that removes itself.
 - Motion: every `animate-` and `transition` was checked (`Bar`, `Button`, `Seg`, `Skeleton`,
   `DropZone`, `FieldRow`, `UserMenu`, the Sankey's popover and bands; Recharts runs with no
   animation). Durations are tokens that reduced motion sets to zero; the indeterminate bar and the
@@ -589,7 +600,11 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
   (`CONTRIBUTION_EXAMPLE`, also the example in what to fix). The result (target,
   shortfall, funded bar, months to target or "not within 10 years", per paycheck) is the
   calculator's. After a save, `EmergencyGoal` shows the goal with Pause or Resume, Mark reached
-  and Change contribution (`useUpdateGoal`). There is no "Why" link: spec 011 has no explanation.
+  and Change contribution (`useUpdateGoal`). A new contribution makes the API project the goal's
+  date again (spec 011 rule 17a, issue 165), and the card's monthly transfer then starts from the
+  goal's amount (`goalContributionOf`), its hint naming the saved decision's, so the result is the
+  goal's projection and the badge offers the next version (rule 17b). `goalPace` words when the
+  goal gets there. There is no "Why" link: spec 011 has no explanation.
 - **`HealthPlanCard`** (spec 012): compares the newest confirmed summary's plans (up to
   `MAX_PLANS`, the API's limit), the saved decision's, or plans typed in `PlanOptionsForm`. Usage
   low, medium or high; the comparison table marks the cheapest at that usage and the chosen plan,
@@ -601,7 +616,9 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
   leaves you $260 ahead a year". No color: the word carries it. The Plan page's `net_cost`
   figures read the same way (`figureText`). The sample's third plan, Saver HDHP, comes out ahead
   at low use. Saving needs a
-  chosen plan (a 422 `plan_not_selected` says so); an enrollment deadline adds a calendar event,
+  chosen plan (a 422 `plan_not_selected` says so); a new table (Use your benefits summary, an
+  edited one) keeps the choice when it still has the chosen plan with every term the same, in
+  whatever place (`choiceAmong`, issue 168), and drops it otherwise; an enrollment deadline adds a calendar event,
   shown under the card.
 - **`W4Card`** (spec 014): salary and pay schedule from the profile and the confirmed pay stub,
   the age from the birth year (null without one: no catch-up), and, read-only under "From your
@@ -859,7 +876,9 @@ plan choice (typing two synthetic plans when no benefits summary is confirmed) w
 deadline (reaching that step through the 401(k)'s footer), and saves a W-4 version that reads
 those two decisions (checking "If you change nothing" states the `current_refund_cents` of the
 calculator's own answer), with its reminder, then checks every step is done in the nav and follows the
-footer to the plan. Decisions cannot be
+footer to the plan; at 390x844 it follows a Next and a Back footer link from the bottom of a step
+and checks the next page sits at the top with the nav button clear of the header (issue 172).
+Decisions cannot be
 deleted, so it reads the current version instead of assuming v1. `plan.spec.ts` (project
 `authenticated-plan`, after decisions) reads the four decisions back on `/plan` (and the nav's
 done mark, the calendar badges' and Back's step routes), downloads the `.ics` and checks its first line is `BEGIN:VCALENDAR`, and exports the

@@ -442,7 +442,11 @@ kinds `goal_contribution` and `goal_review`, `profiles.birth_year` and
   creates that event. A superseded decision's events are dismissed.
 - **Goals.** `GET /goals` (progress from the latest balance of the linked
   account) and `PATCH /goals/{id}` (status, contribution, linked account; an
-  account the user cannot see is 404).
+  account the user cannot see is 404). A new contribution re-projects
+  `target_date` through `decision_effects.reproject_goal`: the goal's
+  decision's inputs at that contribution, the calculator and the first
+  contribution date a save uses (spec 011 rule 17a, issue 165); the decision
+  and its events stay as they are.
 - **Benefits** (spec 013). `extract_benefits/v2` returns
   `BenefitsSummaryExtraction` (plans, match tiers as printed, vesting); v1 and
   `BenefitsExtraction` stay for the ledger. `ingest/proposal.py` turns the

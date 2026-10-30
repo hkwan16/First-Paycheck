@@ -2,6 +2,7 @@ import type { Route } from 'next';
 import type { ReactNode } from 'react';
 import { ArrowRightIcon } from '@/components/icons';
 import { Button } from '@/components/ui/Button';
+import { requestLandAtTop } from '@/lib/land-at-top';
 
 export interface StepFooterProps {
   back?: { href: Route; label?: string };
@@ -30,14 +31,23 @@ export function StepFooter({ back, next, status }: StepFooterProps) {
     </>
   );
 
+  // A step change lands at the top of the next page (lib/land-at-top.ts, issue 172).
+  const step = { scroll: false, onNavigate: requestLandAtTop } as const;
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      {back ? <Button href={back.href}>{back.label ?? 'Back'}</Button> : <span />}
+      {back ? (
+        <Button href={back.href} {...step}>
+          {back.label ?? 'Back'}
+        </Button>
+      ) : (
+        <span />
+      )}
       <div className="flex flex-wrap items-center gap-3">
         {status !== undefined && <span className="text-small text-ink-3">{status}</span>}
         {next &&
           (next.href && !next.disabled ? (
-            <Button href={next.href} variant={variant}>
+            <Button href={next.href} variant={variant} {...step}>
               {nextContent}
             </Button>
           ) : (

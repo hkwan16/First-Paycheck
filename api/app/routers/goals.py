@@ -1,9 +1,10 @@
 """Savings goals with their progress (spec 011 rules 15-17).
 
-Goals are created and re-projected only by saving an emergency-fund decision
+Goals are created by saving an emergency-fund decision
 (``app/decision_effects.py``); these routes read them and make the small
 changes a user makes between decisions: pause, mark reached, change the
-contribution, link another account.
+contribution (which re-projects the date the way a save does), link another
+account.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import decision_effects
 from app.deps import Now, UserSession
 from app.errors import NotFound, error_responses
 from app.types import UtcDateTime
@@ -37,8 +39,8 @@ class GoalOut(BaseModel):
     monthly_contribution_cents: int
     account_id: uuid.UUID | None
     decision_id: uuid.UUID | None
-    # The projected date of the last contribution; null when funded, not
-    # reachable, or the contribution changed since the decision.
+    # The projected date of the last contribution, at the goal's own
+    # contribution; null when funded or not reachable.
     target_date: dt.date | None
     reached_at: UtcDateTime | None
     # The linked account's latest balance, and that balance against the target.
@@ -108,7 +110,11 @@ def list_goals(session: UserSession) -> list[GoalOut]:
 
 @router.patch("/{goal_id}", responses=error_responses(401, 404, 422))
 def update_goal(goal_id: uuid.UUID, body: GoalPatch, session: UserSession, now: Now) -> GoalOut:
-    """Pause, resume or mark a goal reached, change its contribution or its account."""
+    """Pause, resume or mark a goal reached, change its contribution or its account.
+
+    A new contribution projects the goal's date again, the way saving the
+    decision at that contribution would.
+    """
     goal = session.scalars(select(Goal).where(Goal.id == goal_id).with_for_update()).one_or_none()
     if goal is None:
         raise NotFound("Goal not found")
@@ -117,11 +123,11 @@ def update_goal(goal_id: uuid.UUID, body: GoalPatch, session: UserSession, now: 
         if body.account_id is not None and session.get(Account, body.account_id) is None:
             raise NotFound("Account not found")
         goal.account_id = body.account_id
-    if body.monthly_contribution_cents is not None:
-        if body.monthly_contribution_cents != goal.monthly_contribution_cents:
-            # The projection belongs to the saved decision (spec 011 rule 17).
-            goal.target_date = None
-        goal.monthly_contribution_cents = body.monthly_contribution_cents
+    contribution = body.monthly_contribution_cents
+    if contribution is not None and contribution != goal.monthly_contribution_cents:
+        goal.monthly_contribution_cents = contribution
+        # As saving the decision at this contribution would project it (spec 011 rule 17a).
+        goal.target_date = decision_effects.reproject_goal(session, goal, now.date())
     if body.status is not None and body.status != goal.status:
         goal.status = body.status
         goal.reached_at = now if body.status is GoalStatus.REACHED else None

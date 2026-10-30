@@ -1,7 +1,14 @@
 import { apiErrorCode, apiErrorMessage } from '@/lib/api/errors';
 import { ResultMismatch } from '@/lib/api/hooks';
 import { percentInput, type DecisionSaveState } from '@/lib/decisions';
-import type { K401MatchInput, K401MatchResult, MatchTier, MatchTierIn } from '@/lib/api/types';
+import type {
+  CalendarEvent,
+  K401MatchInput,
+  K401MatchResult,
+  MatchTier,
+  MatchTierIn,
+} from '@/lib/api/types';
+import { formatDate } from '@/lib/dates';
 import type { Tone } from '@/lib/design/tone';
 import { formatMoney, formatRate, parseMoney } from '@/lib/money';
 
@@ -47,6 +54,15 @@ export function readAmount(
  * API can fill takes the API's value instead, never a placeholder.
  */
 export const examplePlaceholder = (example: string) => `for example ${example}`;
+
+/**
+ * The line under a card that names the calendar event its save made: the
+ * date first, then the event's title as it stands, because a title can be
+ * an instruction ("Give your employer your updated Form W-4") that cannot be
+ * the subject of a sentence (issue 169).
+ */
+export const calendarNote = (event: Pick<CalendarEvent, 'title' | 'due_at'>) =>
+  `On your calendar for ${formatDate(event.due_at)}: ${event.title}.`;
 
 /** Cents as a person types them in an amount field: `182325` is `"1,823.25"`; null is empty. */
 export const amountText = (cents: number | null | undefined) =>

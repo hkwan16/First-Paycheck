@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, text
 
 from app.db import user_session_for
 from app.plan import build_plan
@@ -33,6 +33,18 @@ def test_html_has_no_ids(
     html = plan_html(db_connection, user_a)
     for decision_id in (plan_user.k401_id, plan_user.w4_id, plan_user.account_id):
         assert str(decision_id) not in html
+
+
+def test_a_paused_goal_has_no_pace(
+    plan_user: PlanUser, db_connection: Connection, user_a: FixtureUser
+) -> None:
+    # Issue 166: a paused goal gets no contributions, so it is on pace for nothing.
+    assert "On pace for" in plan_html(db_connection, user_a)
+    with user_session_for(user_a.id, bind=db_connection) as session:
+        session.execute(text("UPDATE goals SET status = 'paused'"))
+    html = plan_html(db_connection, user_a)
+    assert '<td class="num">Paused</td>' in html
+    assert "On pace for" not in html
 
 
 def test_an_empty_plan_says_nothing_is_saved(

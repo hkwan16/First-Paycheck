@@ -142,18 +142,40 @@ export interface DecisionCalculator {
   effects: (decision: Decision) => DecisionEffects;
 }
 
+/** Spec 011 rule 11: the last contribution's date, from the sample's next pay date. */
+function targetDate(result: EmergencyFundResult): string | null {
+  const months = result.months_to_target;
+  return months !== null && months >= 1 ? addMonths(NEXT_PAY_DATE, months - 1) : null;
+}
+
+/**
+ * Spec 011 rule 17a: the goal's date at its own contribution, the decision's
+ * other inputs through the calculator's fixture; undefined for a case the
+ * fixture lacks, null without an emergency fund decision.
+ */
+function reprojectGoal(goal: Goal): string | null | undefined {
+  const decision = db.decisions.find(
+    (d) => d.id === goal.decision_id && d.calculator === 'emergency_fund',
+  );
+  if (!decision) return null;
+  const result = emergencyFundResult({
+    ...(decision.inputs as unknown as EmergencyFundInput),
+    monthly_contribution_cents: goal.monthly_contribution_cents,
+  });
+  return result && targetDate(result);
+}
+
 /** Spec 011 rules 9-14: one goal per user, updated by each version, and its two events. */
 function emergencyFundEffects(decision: Decision): DecisionEffects {
   const inputs = decision.inputs as unknown as EmergencyFundInput;
   const result = decision.result as unknown as EmergencyFundResult;
-  const months = result.months_to_target;
   const fields = {
     target_amount_cents: result.target_cents,
     monthly_contribution_cents: inputs.monthly_contribution_cents,
     decision_id: decision.id,
     status: 'active' as const,
     reached_at: null,
-    target_date: months !== null && months >= 1 ? addMonths(NEXT_PAY_DATE, months - 1) : null,
+    target_date: targetDate(result),
     updated_at: SAMPLE_NOW,
   };
   let goal = planningDb.goals.find((g) => g.kind === 'emergency_fund');
@@ -281,11 +303,16 @@ export const planningHandlers = [
     if (Object.keys(body).length === 0) {
       return invalid('give at least one of status, monthly_contribution_cents, account_id');
     }
-    if (body.monthly_contribution_cents != null) {
-      if (body.monthly_contribution_cents !== goal.monthly_contribution_cents) {
-        goal.target_date = null;
+    const contribution = body.monthly_contribution_cents;
+    if (contribution != null && contribution !== goal.monthly_contribution_cents) {
+      const date = reprojectGoal({ ...goal, monthly_contribution_cents: contribution });
+      if (date === undefined) {
+        return missingCase('emergency-fund-results.json', {
+          monthly_contribution_cents: contribution,
+        });
       }
-      goal.monthly_contribution_cents = body.monthly_contribution_cents;
+      goal.monthly_contribution_cents = contribution;
+      goal.target_date = date;
     }
     if (body.status != null && body.status !== goal.status) {
       goal.status = body.status;

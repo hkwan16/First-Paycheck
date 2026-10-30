@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode, type Ref } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { KVList } from '@/components/ui/KV';
@@ -21,6 +21,7 @@ import {
 } from '@/lib/api/hooks';
 import type { K401MatchInput, PayStub, Profile } from '@/lib/api/types';
 import { cn } from '@/lib/cn';
+import { useFocusHandoff } from '@/lib/focus-handoff';
 import { formatDate } from '@/lib/dates';
 import {
   ageAtYearEnd,
@@ -100,6 +101,8 @@ export function Match401kCard() {
   const saved = current ? asK401Inputs(current.inputs) : null;
 
   const [editing, setEditing] = useState(false);
+  // Focus when the plan details form and the calculator take each other's place (issue 167).
+  const focus = useFocusHandoff<'plan-form' | 'change-plan' | 'contribution'>();
   // What the person has set; until they touch the slider, where it starts.
   const [contribution, setContribution] = useState<number | null>(null);
   const pct = contribution ?? startingContribution(saved, payStub);
@@ -154,10 +157,22 @@ export function Match401kCard() {
     const complete = !needsPlanDetails(profile.data, payStub);
     body = (
       <PlanDetailsForm
+        ref={focus.target('plan-form')}
         profile={profile.data}
         payStub={payStub}
-        onSaved={() => setEditing(false)}
-        onCancel={complete ? () => setEditing(false) : undefined}
+        onSaved={() => {
+          // Back to the button that opened the form, else on to the contribution.
+          focus.moveTo(editing ? 'change-plan' : 'contribution');
+          setEditing(false);
+        }}
+        onCancel={
+          complete
+            ? () => {
+                focus.moveTo('change-plan');
+                setEditing(false);
+              }
+            : undefined
+        }
       />
     );
   } else {
@@ -176,7 +191,12 @@ export function Match401kCard() {
           if (state.status === 'saved' || !calc.isCurrent || !calc.data || !calc.inputs) return;
           save.mutate({ inputs: calc.inputs, result: calc.data, current });
         }}
-        onEditPlan={() => setEditing(true)}
+        onEditPlan={() => {
+          focus.moveTo('plan-form');
+          setEditing(true);
+        }}
+        changePlanRef={focus.target('change-plan')}
+        contributionRef={focus.target('contribution')}
       />
     );
   }
@@ -207,6 +227,9 @@ interface CalculatorProps extends Ready {
   onContribution: (value: number) => void;
   onSave: () => void;
   onEditPlan: () => void;
+  changePlanRef: Ref<HTMLButtonElement>;
+  /** Around the contribution slider, which takes focus after the first plan details. */
+  contributionRef: Ref<HTMLDivElement>;
 }
 
 /** The controls, the result panel and the save row. */
@@ -223,6 +246,8 @@ function Calculator({
   onContribution,
   onSave,
   onEditPlan,
+  changePlanRef,
+  contributionRef,
 }: CalculatorProps) {
   const employer = payStub.employer_name ?? 'Your employer';
   const result = calc.data;
@@ -239,16 +264,18 @@ function Calculator({
         {stubRate !== null && `, ${formatRate(stubRate)} of your gross pay,`} going to your 401(k).
       </p>
 
-      <Range
-        id="k401-contribution"
-        label="Your contribution"
-        valueLabel={`${formatRate(pct)} of salary`}
-        min={0}
-        max={Math.max(SLIDER_MAX, Math.ceil(pct))}
-        step={1}
-        value={pct}
-        onChange={onContribution}
-      />
+      <div ref={contributionRef}>
+        <Range
+          id="k401-contribution"
+          label="Your contribution"
+          valueLabel={`${formatRate(pct)} of salary`}
+          min={0}
+          max={Math.max(SLIDER_MAX, Math.ceil(pct))}
+          step={1}
+          value={pct}
+          onChange={onContribution}
+        />
+      </div>
 
       <Tile
         tone="plum"
@@ -299,7 +326,7 @@ function Calculator({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SaveButton state={state} canSave={calc.isCurrent} saving={saving} onSave={onSave} />
         <div className="flex flex-wrap items-center gap-3">
-          <Button size="sm" onClick={onEditPlan}>
+          <Button ref={changePlanRef} size="sm" onClick={onEditPlan}>
             Change plan details
           </Button>
           {whyHref && (
