@@ -110,8 +110,9 @@ const FILING_STATUSES: readonly { value: FilingStatus; label: string }[] = [
  * form's steps. Every withholding, tax, refund and suggested entry is the
  * calculator's (`POST /calc/w4` through `useCalc`), and so is what the newest
  * stub's withholding leaves at tax time if nothing changes (spec 014 rule
- * 10a); "Apply suggestion" copies the suggested entries into the form. Saving keeps a version and puts the
- * reminder to hand the form in on the calendar.
+ * 10a); "Apply suggestion" copies the suggested entries into the form.
+ * Saving keeps a version and puts the reminder to hand the form in on the
+ * calendar.
  */
 export function W4Card() {
   const id = useId();
