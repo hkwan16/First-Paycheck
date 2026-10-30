@@ -122,6 +122,12 @@ const SCREENS: readonly Screen[] = [
     heading: 'Why contribute 4% to your 401(k)',
     sample: true,
   },
+  {
+    path: '/dev/screens/why/stale',
+    name: 'why-stale',
+    heading: 'Why contribute 4% to your 401(k)',
+    sample: true,
+  },
   { path: '/dev/screens/why-index', name: 'why-index', heading: 'Why each decision', sample: true },
   {
     path: '/dev/screens/check-in',

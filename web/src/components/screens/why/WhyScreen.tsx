@@ -15,7 +15,13 @@ import { asK401Inputs, CALCULATOR_LABELS } from '@/lib/decisions';
 import { formatRate } from '@/lib/money';
 import { decisionKindRoute, firstDecisionRoute } from '@/lib/routes';
 import { CalculatorResultCard } from './CalculatorResultCard';
-import { FallbackStatus, NextSteps, VerifiedBody, VerifiedStatus } from './ExplanationViews';
+import {
+  FallbackStatus,
+  NextSteps,
+  StaleStatus,
+  VerifiedBody,
+  VerifiedStatus,
+} from './ExplanationViews';
 import { Sources } from './Sources';
 
 const LEAD =
@@ -87,9 +93,25 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
 
   let body: ReactNode;
   if (explanation.data) {
+    // Out of date (spec 008 rule 19b): asked for again without force, so the
+    // API answers with a current row another tab may already have written.
+    const status = explanation.data.stale ? (
+      <StaleStatus explanation={explanation.data}>
+        <div>
+          <Button variant="primary" loading={explain.isPending} onClick={() => write(false)}>
+            Write it again
+          </Button>
+        </div>
+        {progress}
+        {explainError}
+      </StaleStatus>
+    ) : (
+      <VerifiedStatus explanation={explanation.data} />
+    );
     body = explanation.data.verified ? (
       <Verified
         explanation={explanation.data}
+        status={status}
         version={current?.version ?? null}
         taxYear={taxYearOf(current)}
         next={<NextSteps event={event} rerun={rerun} />}
@@ -173,18 +195,20 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
 
 function Verified({
   explanation,
+  status,
   version,
   taxYear,
   next,
 }: {
   explanation: Explanation;
+  status: ReactNode;
   version: number | null;
   taxYear: number | null;
   next: ReactNode;
 }) {
   return (
     <>
-      <VerifiedStatus explanation={explanation} />
+      {status}
       <div className="flex flex-wrap items-start gap-6">
         <div className="flex min-w-0 flex-[1_1_460px] flex-col gap-6">
           <VerifiedBody explanation={explanation} version={version} />

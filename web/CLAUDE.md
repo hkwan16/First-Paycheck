@@ -86,7 +86,7 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     page-hydration.ts, page-title.ts, log-error.ts
 src/app/dev/screens/{link,account,spending,confirm,confirm/manual,confirm/unread,confirm/benefits,confirm/extracting,
                     confirm/failed,confirm/confirmed,decisions/{emergency-fund,401k,health-plan,w4,
-                    after-alpha},why,why/fallback,why-index,check-in,
+                    after-alpha},why,why/fallback,why/stale,why-index,check-in,
                     check-in/complete,check-in-index,plan,plan/empty}  a screen on the sample data, no
                     API (development only); `account` is Link with the header's account menu
 src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, queued animation frames settled
@@ -399,7 +399,8 @@ The arrow turns over `--duration-fast`, zero under reduced motion; nothing anima
   `make-k401-results.py`, run it from the repo root with
   `uv run --project api python web/src/test/fixtures/make-k401-results.py`, then `pnpm format`.
   `db.llmConfigured = false` makes `POST /explain` a 503; `db.explainOutcomes` scripts whether
-  each attempt comes back verified or fallback.
+  each attempt comes back verified or fallback. A stored row with `stale: true` is run again
+  without `force`, as the API does.
 - M6 routes live in `src/test/msw/planning-handlers.ts` over `planningDb` (goals, benefits plans),
   reset after every test: `POST /calc/emergency-fund` and `POST /calc/health-plans` answer from
   `emergency-fund-results.json` and `health-plans-results.json` (made by
@@ -665,6 +666,13 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
 - **None yet** (404): offers "Write the explanation". A 503 `llm_unavailable` is a calm blue
   notice, with the calculator result still shown. An unknown decision is "Decision not found"
   with a link back to `/why`.
+- **Out of date** (`explanation.stale`, spec 008 rules 19a and 19b, issue 161): the API compares
+  what the row was written from with what the decision would be explained from now. A stale
+  verified row keeps its text but its status is `StaleStatus`, a warning "Out of date" (never
+  "Verified") with "Write it again", which posts without `force`: the API runs again only when
+  its stored row is stale, so a second tab gets the row the first wrote. A stale fallback adds a
+  sentence to `FallbackStatus`. Confirming a stub or summary invalidates every explanation read
+  (`invalidateAfterConfirm`). Sample: `/dev/screens/why/stale`.
 
 ## Check-in screen
 
@@ -728,8 +736,9 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
   with "v{n} · Saved {date}", the API's `figures` by their labels (`figureText` formats by
   `kind`: money, a net cost (negative reads "$260.00 ahead"), a percentage as stored, a count,
   text; a null `months_to_target` reads "Not within 10 years"; a value of the wrong type throws rather than guessing), and the explanation:
-  a `confirmed` "Verified explanation" badge linking to Why, a warning notice for a fallback, or
-  "Explanation not written yet. Write it". An emergency fund is never explained (spec 011), so
+  a `confirmed` "Verified explanation" badge linking to Why, "Explanation out of date. Write it
+  again" (a warning) for a stale verified one (`explanationView` gives `stale`), a warning notice
+  for a fallback, or "Explanation not written yet. Write it". An emergency fund is never explained (spec 011), so
   it shows none (`explanationView`).
 - **Your paycheck** (`PaycheckCard`): the newest confirmed stub's gross and take-home tiles and
   its deductions, or a link to Confirm. **Goals** (`GoalsCard`): status badge, contribution,

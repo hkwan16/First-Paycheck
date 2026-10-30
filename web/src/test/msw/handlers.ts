@@ -407,8 +407,9 @@ async function explain(request: Request) {
   const { decision_id: decisionId, force = false } = (await request.json()) as ExplainIn;
   if (!db.decisions.some((d) => d.id === decisionId)) return notFound('Decision not found');
   const rows = db.explanations.get(decisionId) ?? [];
+  // Spec 008 rule 20: the stored verified row only while it is current.
   const verified = rows.filter((r) => r.verified).at(-1);
-  if (!force && verified) return HttpResponse.json(verified);
+  if (!force && verified && !verified.stale) return HttpResponse.json(verified);
   if (!db.llmConfigured) {
     return appError(503, 'llm_unavailable', 'Explanations are not available right now');
   }

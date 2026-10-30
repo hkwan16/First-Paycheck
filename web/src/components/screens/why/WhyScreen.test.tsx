@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DECISION_V1_ID,
   sampleCitations,
+  sampleExplanation,
   sampleFallbackExplanation,
 } from '@/test/fixtures/decisions';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
@@ -175,6 +176,44 @@ describe('WhyScreen, fallback', () => {
     expect(
       screen.getByRole('region', { name: '401(k) match calculator result' }),
     ).toBeInTheDocument();
+  });
+});
+
+describe('WhyScreen, out of date (spec 008 rule 19b)', () => {
+  beforeEach(() => {
+    // Issue 161: verified, but written from figures that have changed since.
+    db.explanations = new Map([[DECISION_V1_ID, [sampleExplanation({ stale: true })]]]);
+  });
+
+  it('never calls it verified, says why, and still shows what it said', async () => {
+    renderWhy();
+    expect(await screen.findByText('Out of date')).toBeInTheDocument();
+    expect(screen.queryByText('Verified against calculator')).not.toBeInTheDocument();
+    expect(status()).toHaveTextContent(
+      'It was checked against figures that have changed since, so it may no longer be right.',
+    );
+    expect(screen.getByRole('region', { name: 'The concept' })).toHaveTextContent(
+      'An employer match is pay you receive only when you contribute',
+    );
+  });
+
+  it('writes it again without force and shows the current one', async () => {
+    db.explainOutcomes = ['verified'];
+    const bodies = explainBodies();
+    const { user } = renderWhy();
+    const again = await screen.findByRole('button', { name: 'Write it again' });
+    await user.click(again);
+    expect(await screen.findByText('Verified against calculator')).toBeInTheDocument();
+    expect(bodies).toEqual([{ decision_id: DECISION_V1_ID, force: false }]);
+    expect(screen.queryByText('Out of date')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Write it again' })).not.toBeInTheDocument();
+  });
+
+  it('says the same on a stale fallback', async () => {
+    db.explanations = new Map([[DECISION_V1_ID, [sampleFallbackExplanation({ stale: true })]]]);
+    renderWhy();
+    await screen.findByText('Could not verify the explanation');
+    expect(status()).toHaveTextContent('It was also written from figures that have changed since.');
   });
 });
 

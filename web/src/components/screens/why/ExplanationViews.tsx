@@ -12,8 +12,14 @@ import { formatDate, formatDateTime } from '@/lib/dates';
  * The two layouts of docs/mockup/Why.dc.html. Verified: the AI's explanation,
  * which plain code checked against the calculator before it reached the API's
  * response. Fallback: the checks failed (or the model could not answer), so
- * the calculator's own result is shown instead.
+ * the calculator's own result is shown instead. Either can be stale: written
+ * from figures that have changed since (spec 008 rules 19a and 19b), which
+ * the status says instead of calling it verified.
  */
+
+/** Why a stale explanation may be wrong now (spec 008 rule 19b). */
+export const STALE_TEXT =
+  'It was checked against figures that have changed since, so it may no longer be right.';
 
 /** The explanation's paragraphs (the API separates them with a blank line). */
 const paragraphs = (text: string) =>
@@ -94,6 +100,41 @@ export function VerifiedStatus({ explanation }: { explanation: Explanation }) {
   );
 }
 
+/**
+ * A verified explanation written from figures that have changed since: the
+ * same checks, which held for those figures, under a warning instead of
+ * "Verified", and `children` (the way to write it again).
+ */
+export function StaleStatus({
+  explanation,
+  children,
+}: {
+  explanation: Explanation;
+  children: ReactNode;
+}) {
+  return (
+    <StatusCard
+      tint="warning"
+      badge={
+        <Badge tone="warning" solid icon={<AlertIcon size={12} strokeWidth={1.4} />}>
+          Out of date
+        </Badge>
+      }
+      meta={`Explanation prompt ${explanation.prompt_version} · checked ${formatDateTime(explanation.created_at)}`}
+    >
+      <p className="m-0 text-small text-ink-3">
+        {STALE_TEXT} A newer pay stub, a benefits summary or a newer way of writing explanations
+        came after it. Write it again to explain this decision from what you have confirmed now.
+      </p>
+      <div className={STATUS_GRID}>
+        <Checks explanation={explanation} />
+        <Check label="Retries" value={String(explanation.retries)} />
+      </div>
+      {children}
+    </StatusCard>
+  );
+}
+
 export function FallbackStatus({ explanation }: { explanation: Explanation }) {
   const retried = explanation.retries > 0;
   return (
@@ -116,6 +157,7 @@ export function FallbackStatus({ explanation }: { explanation: Explanation }) {
           ? "The AI's explanation did not match the calculator after one retry, so it is withheld and you see the calculator's own output below."
           : "The AI could not write an explanation this time, so you see the calculator's own output below."}{' '}
         Nothing in it came from a language model.
+        {explanation.stale && ' It was also written from figures that have changed since.'}
       </p>
     </StatusCard>
   );

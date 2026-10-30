@@ -103,6 +103,7 @@ export type SampleScreenName =
   | 'decisions-after-alpha'
   | 'why'
   | 'why-fallback'
+  | 'why-stale'
   | 'why-index'
   | 'check-in'
   | 'check-in-complete'
@@ -283,6 +284,15 @@ const SCREENS: Record<
     seed: (seed) => {
       seedDecided(seed);
       seed(queryKeys.explanation(DECISION_V1_ID), sampleFallbackExplanation());
+    },
+  },
+  // Issue 161: verified, but written from figures that have changed since.
+  'why-stale': {
+    nav: 'why',
+    render: () => <WhyScreen decisionId={DECISION_V1_ID} />,
+    seed: (seed) => {
+      seedDecided(seed);
+      seed(queryKeys.explanation(DECISION_V1_ID), sampleExplanation({ stale: true }));
     },
   },
   'why-index': { nav: 'why', render: () => <WhyIndexScreen />, seed: seedDecided },

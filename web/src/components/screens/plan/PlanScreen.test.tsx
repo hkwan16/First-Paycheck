@@ -127,6 +127,21 @@ describe('PlanScreen with every decision saved', () => {
     expect(within(region('Emergency fund')).queryByText(/explanation/i)).toBeNull();
   });
 
+  it('never calls an out-of-date explanation verified (spec 008 rule 19b)', async () => {
+    const plan = samplePlan();
+    const k401 = plan.decisions[1]!;
+    plan.decisions[1] = { ...k401, explanation: { ...k401.explanation, stale: true } };
+    planDb.plan = plan;
+    await open();
+    const card = region('401(k) match');
+    expect(within(card).queryByRole('link', { name: 'Verified explanation' })).toBeNull();
+    expect(within(card).getByText(/Explanation out of date\./)).toBeInTheDocument();
+    expect(within(card).getByRole('link', { name: 'Write it again' })).toHaveAttribute(
+      'href',
+      `/why/${DECISION_V1_ID}`,
+    );
+  });
+
   it('shows the pay stub the plan is built on', async () => {
     await open();
     const paycheck = region('Your paycheck');
