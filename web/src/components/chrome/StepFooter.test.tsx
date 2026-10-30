@@ -1,9 +1,47 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { requestLandAtTop } from '@/lib/land-at-top';
 import { StepFooter } from './StepFooter';
 
+// What each Next link was given, besides what it renders.
+const links = vi.hoisted(() => [] as { href: unknown; scroll: unknown; onNavigate: unknown }[]);
+vi.mock('next/link', () => ({
+  default: ({
+    href,
+    scroll,
+    onNavigate,
+    className,
+    children,
+  }: ComponentProps<'a'> & {
+    scroll?: boolean;
+    onNavigate?: () => void;
+  }) => {
+    links.push({ href, scroll, onNavigate });
+    return (
+      <a href={href} className={className}>
+        {children}
+      </a>
+    );
+  },
+}));
+
 describe('StepFooter', () => {
+  it('lands the next step at the top of the page, not where Next would scroll (issue 172)', () => {
+    links.length = 0;
+    render(
+      <StepFooter
+        back={{ href: '/setup/decisions/emergency-fund' }}
+        next={{ href: '/setup/decisions/health-plan', label: 'Next: health plan' }}
+      />,
+    );
+    expect(links).toEqual([
+      { href: '/setup/decisions/emergency-fund', scroll: false, onNavigate: requestLandAtTop },
+      { href: '/setup/decisions/health-plan', scroll: false, onNavigate: requestLandAtTop },
+    ]);
+  });
+
   it('puts Back on the left and a primary next link with an arrow on the right', () => {
     render(
       <StepFooter

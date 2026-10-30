@@ -80,7 +80,7 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     validation, errors, account), supabase/ (env, client, server, proxy),
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
                     documents.ts, decisions.ts, decision-steps.ts, deep-equal.ts, features.ts,
-                    focus-handoff.ts,
+                    focus-handoff.ts, land-at-top.ts,
                     findings.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts,
                     page-hydration.ts, page-title.ts, log-error.ts
@@ -158,7 +158,9 @@ width; under 780px it sits behind a disclosure button, see "Side nav on a phone"
 (current item and `pathname` from the URL), `Shell` (header, nav column `1 1 200px` up to 240px,
 full width above the page under 780px, main `999 1 560px`, skip link), `PageTitle` (`title`, `lead`, `aside`,
 `eyebrow`), `StepFooter` (`back`, `next` with `primary`, `disabled` and `loading`; a disabled
-next is a real disabled button, never a dead link).
+next is a real disabled button, never a dead link; its links land the next page at the top, with
+Next's scroll off and `onNavigate={requestLandAtTop}`, which the new page's `HydrationMarker`
+carries out: `lib/land-at-top.ts`, spec 018 rule 6a, issue 172).
 
 ### Side nav on a phone
 
@@ -874,7 +876,9 @@ plan choice (typing two synthetic plans when no benefits summary is confirmed) w
 deadline (reaching that step through the 401(k)'s footer), and saves a W-4 version that reads
 those two decisions (checking "If you change nothing" states the `current_refund_cents` of the
 calculator's own answer), with its reminder, then checks every step is done in the nav and follows the
-footer to the plan. Decisions cannot be
+footer to the plan; at 390x844 it follows a Next and a Back footer link from the bottom of a step
+and checks the next page sits at the top with the nav button clear of the header (issue 172).
+Decisions cannot be
 deleted, so it reads the current version instead of assuming v1. `plan.spec.ts` (project
 `authenticated-plan`, after decisions) reads the four decisions back on `/plan` (and the nav's
 done mark, the calendar badges' and Back's step routes), downloads the `.ics` and checks its first line is `BEGIN:VCALENDAR`, and exports the

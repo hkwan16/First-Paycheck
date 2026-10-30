@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { requestLandAtTop } from '@/lib/land-at-top';
 import { resetPageHydration, usePageHydrated } from '@/lib/page-hydration';
 import { HydrationMarker } from './hydration-marker';
 
@@ -27,6 +28,20 @@ describe('HydrationMarker', () => {
       </>,
     );
     expect(container).toHaveTextContent('page hydrated');
+  });
+
+  it('lands the page a step link opened at its top, and leaves any other where it is', () => {
+    // Issue 172: every page renders the marker, so the page a step link
+    // opened always takes the request, once its content is in place.
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    const first = render(<HydrationMarker />);
+    expect(scrollTo).not.toHaveBeenCalled();
+    first.unmount();
+
+    requestLandAtTop();
+    render(<HydrationMarker />);
+    expect(scrollTo).toHaveBeenCalledExactlyOnceWith(0, 0);
+    scrollTo.mockRestore();
   });
 });
 
