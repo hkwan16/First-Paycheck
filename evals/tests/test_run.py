@@ -11,9 +11,18 @@ from evals import run
 from evals.suites.base import Budget, CostCapExceeded, Suite, SuiteResult, SuiteUnavailable
 
 
-def fixed(name: str, *, llm: bool = False, **metrics: float) -> Suite:
+def fixed(
+    name: str,
+    *,
+    llm: bool = False,
+    cases: int = 100,
+    case_worth: dict[str, float] | None = None,
+    **metrics: float,
+) -> Suite:
     def execute(budget: Budget) -> SuiteResult:
-        return SuiteResult(metrics=dict(metrics), cases=1, failures=[], cost_cents=0)
+        return SuiteResult(
+            metrics=dict(metrics), cases=cases, case_worth=dict(case_worth or {}), cost_cents=0
+        )
 
     return Suite(name=name, llm=llm, run=execute)
 
@@ -59,22 +68,52 @@ def test_budget_refuses_spend_past_the_cap() -> None:
 
 
 def test_deterministic_suites_allow_no_drop() -> None:
-    result = SuiteResult(metrics={"pass_rate": 0.99}, cases=100, failures=[], cost_cents=0)
-    assert run.regressions(result, {"pass_rate": 1.0}, tolerance=0.0) == [
-        "pass_rate 0.9900 < baseline 1.0000"
+    result = SuiteResult(metrics={"pass_rate": 0.99}, cases=5, failures=[], cost_cents=0)
+    tolerances = run.tolerances(result, llm=False)
+    assert tolerances == {"pass_rate": 0.0}
+    assert run.regressions(result, {"pass_rate": 1.0}, tolerances) == [
+        "pass_rate 0.9900 < baseline 1.0000 (tolerance 0.0000)"
     ]
 
 
 def test_llm_suites_allow_two_points() -> None:
-    result = SuiteResult(metrics={"field_accuracy": 0.935}, cases=10, failures=[], cost_cents=1)
-    assert run.regressions(result, {"field_accuracy": 0.95}, tolerance=0.02) == []
-    worse = SuiteResult(metrics={"field_accuracy": 0.92}, cases=10, failures=[], cost_cents=1)
-    assert run.regressions(worse, {"field_accuracy": 0.95}, tolerance=0.02)
+    result = SuiteResult(metrics={"field_accuracy": 0.935}, cases=100, failures=[], cost_cents=1)
+    tolerances = run.tolerances(result, llm=True)
+    assert tolerances == {"field_accuracy": 0.02}
+    assert run.regressions(result, {"field_accuracy": 0.95}, tolerances) == []
+    worse = SuiteResult(metrics={"field_accuracy": 0.92}, cases=100, failures=[], cost_cents=1)
+    assert run.regressions(worse, {"field_accuracy": 0.95}, tolerances)
+
+
+def test_an_llm_metric_over_few_cases_allows_one_case() -> None:
+    result = SuiteResult(metrics={"document_accuracy": 0.8}, cases=5)
+    assert run.tolerances(result, llm=True) == {"document_accuracy": pytest.approx(0.2)}
+
+
+def test_a_reported_case_worth_replaces_one_over_cases() -> None:
+    result = SuiteResult(
+        metrics={"accuracy": 0.9, "llm_accuracy": 0.9, "rules": 1.0},
+        cases=515,
+        case_worth={"accuracy": 14 / 515, "llm_accuracy": 14 / 95},
+    )
+    assert run.tolerances(result, llm=True) == {
+        "accuracy": pytest.approx(14 / 515),
+        "llm_accuracy": pytest.approx(14 / 95),
+        "rules": 0.02,
+    }
+
+
+def test_a_metric_over_no_cases_gets_the_two_point_floor() -> None:
+    result = SuiteResult(metrics={"recall": 1.0}, cases=0, case_worth={"recall": 0.0})
+    assert run.tolerances(result, llm=True) == {"recall": 0.02}
+    assert run.tolerances(SuiteResult(metrics={"recall": 1.0}, cases=0), llm=True) == {
+        "recall": 0.02
+    }
 
 
 def test_missing_metric_is_a_regression() -> None:
     result = SuiteResult(metrics={}, cases=0, failures=[], cost_cents=0)
-    assert run.regressions(result, {"pass_rate": 1.0}, tolerance=0.0) == [
+    assert run.regressions(result, {"pass_rate": 1.0}, run.tolerances(result, llm=False)) == [
         "pass_rate missing (baseline 1.0000)"
     ]
 
@@ -163,6 +202,7 @@ def test_report_is_written_as_json(tmp_path: Path) -> None:
     assert run.main(argv, registry=REGISTRY) == 0
     data = json.loads(report.read_text())
     assert data["suites"]["calc"]["metrics"] == {"pass_rate": 1.0}
+    assert data["suites"]["calc"]["tolerances"] == {"pass_rate": 0.0}
     assert data["suites"]["calc"]["regressions"] == []
 
 
@@ -183,12 +223,32 @@ def test_cli_holds_deterministic_suites_at_tolerance_zero(tmp_path: Path) -> Non
 
 
 def test_cli_gives_llm_suites_two_points(tmp_path: Path) -> None:
-    """The plan: LLM suites are compared with a tolerance of 2 points."""
+    """The plan: LLM suites are compared with a tolerance of at least 2 points."""
     assert run.LLM_TOLERANCE == 0.02
     assert run_one(tmp_path, fixed("judge", llm=True, score=0.88), baseline=0.9) == 0
     assert run_one(tmp_path, fixed("judge", llm=True, score=0.8799), baseline=0.9) == 1
     # The same drop in a deterministic suite is a regression.
     assert run_one(tmp_path, fixed("rules", score=0.88), baseline=0.9) == 1
+
+
+def test_cli_gives_an_llm_metric_over_few_cases_one_case(tmp_path: Path) -> None:
+    """Over 5 cases one case is 20 points: one miss from a perfect baseline passes,
+    a second fails."""
+    assert run_one(tmp_path, fixed("judge", llm=True, cases=5, score=0.8), baseline=1.0) == 0
+    assert run_one(tmp_path, fixed("judge", llm=True, cases=5, score=0.6), baseline=1.0) == 1
+    # A deterministic suite over 5 cases still tolerates nothing.
+    assert run_one(tmp_path, fixed("rules", cases=5, score=0.8), baseline=1.0) == 1
+
+
+def test_cli_uses_the_case_worth_a_suite_reports(tmp_path: Path) -> None:
+    """One label covers 14 of the 95 rows the model labels: losing it passes,
+    losing one row more fails, though the suite has 515 cases."""
+
+    def labels(score: float) -> Suite:
+        return fixed("labels", llm=True, cases=515, case_worth={"score": 14 / 95}, score=score)
+
+    assert run_one(tmp_path, labels(1 - 14 / 95), baseline=1.0) == 0
+    assert run_one(tmp_path, labels(1 - 15 / 95), baseline=1.0) == 1
 
 
 def test_a_stopped_run_still_writes_its_report(tmp_path: Path) -> None:

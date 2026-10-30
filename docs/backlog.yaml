@@ -409,11 +409,10 @@ issues:
     labels: ["area:evals"]
     milestone: M2
     priority: High
-    status: in_progress
-    # The generator, the fixtures (30 since M10) and the extraction suite are on
-    # main, and the free extraction-smoke suite passes. The extraction suite
-    # needs ANTHROPIC_API_KEY and has never run live, so baseline.json holds
-    # spec 005's targets, not a measured accuracy.
+    status: done
+    # Done October 29 in #144: the extraction suite's first live runs scored
+    # field and document accuracy 1.0 over the 30 stubs (target 0.90 on the
+    # first 10), and baseline.json holds that measurement.
   - title: "Pin tesseract in the Dockerfile and run ingest tests in the image in CI"
     body: >-
       Pin the Debian tesseract package and add the ingest-in-docker CI job, so
@@ -1221,10 +1220,11 @@ issues:
     labels: ["area:evals"]
     milestone: M10
     priority: Medium
-    status: in_progress
-    # The 30 labeled stubs are on main; the 95% target is unmeasured until the
-    # extraction suite runs live. There are no offer or benefits stubs in this
-    # set; benefits summaries have their own suite.
+    status: done
+    # Done October 29 in #144: field accuracy 1.0 on the 30 stubs (target
+    # 0.95). Offer letters have no extraction (spec 005 leaves them out; the
+    # endpoint answers 422 extraction_unsupported), so there is nothing to
+    # label; benefits summaries have their own suite, 1.0 on all five.
   - title: "500-transaction categorization eval set at target"
     body: >-
       Label 500 transactions and add the categorization suite. Done when
@@ -1232,10 +1232,9 @@ issues:
     labels: ["area:evals"]
     milestone: M10
     priority: Medium
-    status: in_progress
-    # The 500 labeled transactions and both suites are on main. The free rules
-    # suite measures 97% precision at 81% coverage; overall accuracy is
-    # unmeasured until the categorization suite runs live.
+    status: done
+    # Done October 29 in #144: on Sonnet, accuracy 0.9670 over the 515 rows
+    # (target 0.90) and llm_accuracy 0.9474, the same in every run.
   - title: "Nightly evals workflow"
     body: >-
       Run every eval suite nightly and open an issue on regression. Done when a
@@ -1328,11 +1327,15 @@ issues:
       been available. Run make eval-llm under the cost cap, record what each
       suite measures, and commit the measured baselines on their own with the
       run's numbers in the message. Done when baseline.json holds measured
-      values for every LLM suite and the nightly workflow has the key.
+      values for every LLM suite.
     labels: ["area:evals"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: in_progress
+    # October 29, #144: extraction, benefits-extraction and categorization
+    # hold measured baselines, under a tolerance of one case's worth or 2
+    # points. Explain waits for #132, which changes its prompt and grows it to
+    # 29 decisions. Running the LLM suites nightly is its own item, deferred.
   - title: "Web account deletion"
     body: >-
       DELETE /me exists, but nothing in the web app calls it. Add a delete
@@ -1537,6 +1540,9 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: Medium
+    status: done
+    # Fixed October 29 in #143: spec 004 rules 24-31; the upload's replaces
+    # field retires the old document in the same request.
   - title: "The benefits summary review page has its own title"
     body: >-
       Found on October 29 on production: /setup/confirm/{id} for a benefits
@@ -1546,6 +1552,9 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed October 29 in #142: the screen renders a <title> from the
+    # document's type once it loads.
   - title: "Categorize with Sonnet 5.5 instead of Haiku 5.5"
     body: >-
       The October 29 production run labeled Rocket Money (a budgeting app
@@ -1575,3 +1584,44 @@ issues:
     milestone: M10
     priority: High
     status: done
+  # Found on October 29 in the first measured eval runs (#144).
+  - title: "Nightly evals run the LLM suites"
+    body: >-
+      The nightly workflow runs --suite all only when the ANTHROPIC_API_KEY
+      repository secret is set, and it is not, so the LLM suites run only by
+      hand. Adding the secret runs extraction, benefits-extraction,
+      categorization and explain every day under EVAL_MAX_COST_CENTS (300),
+      about $1.30 a day at today's measured costs and at most $90 a month.
+      Done when the secret is set and a scheduled run passes on the measured
+      baselines.
+    labels: ["area:evals", "area:infra"]
+    milestone: M10
+    priority: Low
+    status: todo
+    # Deferred by the project owner on October 29.
+  - title: "Categorize a membership donation as a gift, not a subscription"
+    body: >-
+      In every live categorization run on October 29, Sonnet labeled the 5
+      kqed membership rows subscriptions instead of gifts_donations: they are
+      the suite's only model misses. A public radio membership is a donation.
+      Fix it in the categorize prompt or with a seed rule, whichever spec 003
+      says owns it, failing eval case first. Done when the categorization
+      suite labels them gifts_donations and the baseline is measured again.
+    labels: ["area:api", "area:evals"]
+    milestone: M10
+    priority: Low
+    status: todo
+  - title: "Seed rules stop matching inside unrelated merchant names"
+    body: >-
+      The free categorization-rules suite shows three seed rules matching
+      words inside other merchants: rent the runway labeled housing (8 rows),
+      target optical labeled shopping, shell beach surf shop labeled
+      transport. A real user with those merchants gets the wrong category
+      from a rule, which the model never sees. Change spec 003's seed rules
+      first so a rule names the merchant, not a word it contains. Failing
+      eval case first. Done when categorization-rules has no false positive
+      on those merchants and its baseline is measured again.
+    labels: ["area:api", "area:evals", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: todo

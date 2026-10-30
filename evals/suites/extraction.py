@@ -6,20 +6,24 @@ Each stub goes through ``prepare_document`` (read, OCR, redact), the real
 runs it. The gateway records to an in-memory ledger that charges the run's
 ``Budget`` before the result is read, so ``--max-cost-cents`` is a hard cap.
 
-Metrics (higher is better, 2-point tolerance):
+Metrics (higher is better; each tolerates one case's worth or 2 points,
+whichever is larger, as evals/CLAUDE.md says):
 
 - ``field_accuracy``: of the 13 scored fields per stub (pay frequency, the
   three dates and the nine money fields including the computed other
   deductions), the share whose proposed value equals the label exactly.
 - ``document_accuracy``: the share of stubs with all 13 right.
-- ``redaction_recall``: of the stubs that print an SSN in full, the share
-  whose ``redaction_count`` is non-zero.
+
+Redaction runs before the model and does not depend on it, so this suite does
+not score it: ``extraction-smoke`` gates ``redaction_recall`` over the same
+stubs at zero tolerance, where an LLM suite would tolerate one missed SSN.
 """
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import replace
 from typing import Protocol
 
 from app.config import Settings
@@ -64,14 +68,11 @@ class PayStubReader(Protocol):
 
 
 def score(fixtures: Sequence[Fixture], reader: PayStubReader) -> SuiteResult:
-    right = documents_right = with_ssn = redacted = 0
+    right = documents_right = 0
     failures: list[str] = []
     for fixture in fixtures:
         labels = fixture.labels
         prepared = prepare_document(fixture.data, labels["content_type"])
-        if labels["ssn"] is not None:
-            with_ssn += 1
-            redacted += prepared.redaction_count > 0
         if not prepared.model_pages:
             failures.append(f"{labels['id']}: no readable page")
             continue
@@ -94,10 +95,14 @@ def score(fixtures: Sequence[Fixture], reader: PayStubReader) -> SuiteResult:
         metrics={
             "field_accuracy": right / (count * len(SCORED_FIELDS)) if count else 1.0,
             "document_accuracy": documents_right / count if count else 1.0,
-            "redaction_recall": redacted / with_ssn if with_ssn else 1.0,
         },
         cases=count,
         failures=failures,
+        # One case: a field, a stub.
+        case_worth={
+            "field_accuracy": 1 / (count * len(SCORED_FIELDS)) if count else 0.0,
+            "document_accuracy": 1 / count if count else 0.0,
+        },
     )
 
 
@@ -123,12 +128,7 @@ def run(budget: Budget) -> SuiteResult:
         ledger=MemoryLedger(on_record=charge),
     )
     result = score(load_fixtures(), gateway)
-    return SuiteResult(
-        metrics=result.metrics,
-        cases=result.cases,
-        failures=result.failures,
-        cost_cents=sum(spent),
-    )
+    return replace(result, cost_cents=sum(spent))
 
 
 SUITE = Suite(name="extraction", llm=True, run=run)

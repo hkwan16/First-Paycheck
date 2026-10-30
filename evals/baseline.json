@@ -1,15 +1,15 @@
 {
   "benefits-extraction": {
-    "document_accuracy": 0.6,
-    "plan_field_accuracy": 0.9,
-    "retirement_accuracy": 0.8
+    "document_accuracy": 1.0,
+    "plan_field_accuracy": 1.0,
+    "retirement_accuracy": 1.0
   },
   "calc": {
     "pass_rate": 1.0
   },
   "categorization": {
-    "accuracy": 0.9,
-    "llm_accuracy": 0.8
+    "accuracy": 0.9669902912621359,
+    "llm_accuracy": 0.9473684210526315
   },
   "categorization-rules": {
     "rules_coverage": 0.8155339805825242,
@@ -29,9 +29,8 @@
     "flow_correct": 1.0
   },
   "extraction": {
-    "document_accuracy": 0.7,
-    "field_accuracy": 0.95,
-    "redaction_recall": 1.0
+    "document_accuracy": 1.0,
+    "field_accuracy": 1.0
   },
   "extraction-smoke": {
     "pipeline_ok": 1.0,

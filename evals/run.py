@@ -10,9 +10,11 @@ Exit codes: 0 every metric meets its baseline; 1 a regression or a suite with
 no baseline; 2 the cost cap was hit, a suite cannot run here (no API key) or the
 arguments are wrong.
 
-Deterministic suites may not drop below their baseline at all (tolerance 0);
-LLM suites may drop up to 2 points, the model's run-to-run drift. A metric above
-its baseline passes. ``--update-baseline`` rewrites the baseline from this run;
+Deterministic suites may not drop below their baseline at all (tolerance 0).
+An LLM metric may drop by 2 points or by one case's worth, whichever is larger
+(``tolerances``), so one answer the model gets wrong on one run and right on the
+next does not fail a metric measured over few cases. A metric above its
+baseline passes. ``--update-baseline`` rewrites the baseline from this run;
 commit that change on its own. ``--report`` is written even when the cost cap
 or an unavailable suite stops the run, with the reason under ``stopped``.
 """
@@ -53,14 +55,33 @@ def select_suites(names: Sequence[str], registry: Mapping[str, Suite]) -> list[S
     return list(selected.values())
 
 
-def regressions(result: SuiteResult, baseline: Mapping[str, float], tolerance: float) -> list[str]:
+def tolerances(result: SuiteResult, *, llm: bool) -> dict[str, float]:
+    """How far each metric may fall below its baseline: nothing for a deterministic
+    suite; for an LLM suite the larger of 2 points and one case's worth (the
+    suite's ``case_worth``, else ``1 / cases``)."""
+    if not llm:
+        return dict.fromkeys(result.metrics, DETERMINISTIC_TOLERANCE)
+    default = 1 / result.cases if result.cases else 0.0
+    return {
+        metric: max(LLM_TOLERANCE, result.case_worth.get(metric, default))
+        for metric in result.metrics
+    }
+
+
+def regressions(
+    result: SuiteResult, baseline: Mapping[str, float], allowed: Mapping[str, float]
+) -> list[str]:
     found = []
     for metric, expected in baseline.items():
         actual = result.metrics.get(metric)
         if actual is None:
             found.append(f"{metric} missing (baseline {expected:.4f})")
-        elif actual < expected - tolerance - 1e-12:
-            found.append(f"{metric} {actual:.4f} < baseline {expected:.4f}")
+            continue
+        tolerance = allowed[metric]
+        if actual < expected - tolerance - 1e-12:
+            found.append(
+                f"{metric} {actual:.4f} < baseline {expected:.4f} (tolerance {tolerance:.4f})"
+            )
     return found
 
 
@@ -114,14 +135,14 @@ def main(argv: Sequence[str] | None = None, *, registry: Mapping[str, Suite] = S
             print(report["stopped"])
             _write_report(args.report, report, budget)
             return 2
-        tolerance = LLM_TOLERANCE if suite.llm else DETERMINISTIC_TOLERANCE
+        allowed = tolerances(result, llm=suite.llm)
         if args.update_baseline:
             baseline[suite.name] = dict(result.metrics)
             found: list[str] = []
         elif suite.name not in baseline:
             found = [f"no baseline for {suite.name}: run with --update-baseline and commit it"]
         else:
-            found = regressions(result, baseline[suite.name], tolerance)
+            found = regressions(result, baseline[suite.name], allowed)
         failed = failed or bool(found)
         metrics = ", ".join(f"{k}={v:.4f}" for k, v in sorted(result.metrics.items()))
         status = "REGRESSED" if found else "ok"
@@ -133,6 +154,7 @@ def main(argv: Sequence[str] | None = None, *, registry: Mapping[str, Suite] = S
             print(f"  {line}")
         report["suites"][suite.name] = {
             "metrics": result.metrics,
+            "tolerances": allowed,
             "cases": result.cases,
             "failures": result.failures,
             "cost_cents": result.cost_cents,

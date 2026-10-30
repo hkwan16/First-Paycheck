@@ -158,6 +158,18 @@ def test_a_perfect_reader_scores_full_marks() -> None:
     assert result.cases == 5
 
 
+def test_one_case_is_a_plan_field_or_a_summary() -> None:
+    """evals/CLAUDE.md: a metric tolerates one case's worth (spec 013 rule 17)."""
+    result = benefits_extraction.score(FIXTURES, LabelReader(labels()))
+    fields = sum(len(label["plans"]) for label in labels()) * 8
+    assert fields == 72
+    assert result.case_worth == {
+        "plan_field_accuracy": pytest.approx(1 / 72),
+        "retirement_accuracy": pytest.approx(1 / 5),
+        "document_accuracy": pytest.approx(1 / 5),
+    }
+
+
 def test_one_wrong_plan_field_per_summary() -> None:
     result = benefits_extraction.score(FIXTURES, LabelReader(labels(), wrong_deductible=True))
     fields = sum(len(label["plans"]) for label in labels()) * 8
