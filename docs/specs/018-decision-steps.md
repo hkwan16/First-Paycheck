@@ -1,6 +1,6 @@
 # 018: Decisions as four steps
 
-Status: Implemented, M10 (web only). Rules 11-17, the side nav on a phone (issue 155): Implemented, Hardening (web only).
+Status: Implemented, M10 (web only). Rules 11-17, the side nav on a phone (issue 155), and rule 6a, a footer link landing at the top (issue 172): Implemented, Hardening (web only).
 
 ## Goal
 
@@ -44,6 +44,7 @@ The side nav's "Decisions" item gets a nested list of four sub-items, labeled "E
 
 5. **Title**: an eyebrow row with "Decision n of 4" (the step's place in the order, counting every calculator, live or not) and, once `GET /decisions` has answered, the "n of 4 saved" badge (the number of calculators in `GET /decisions`, `items.length`, of the 4); the h1 from the table; and, for a live calculator only, the lead "Move the controls to try what-ifs. Every number comes from the calculator, not the AI. Saving keeps a versioned record and adds it to your plan." A placeholder has no controls, so its card says what it will decide instead. The tab title is the table's page title.
 6. **Footer**: Back goes to the previous live step, or to `/setup/spending` before the first live one; next goes to the next live step, or to `/plan` after the last live one. Steps that are not live are skipped, so the alpha (`calculators=401k_match`) walks Spending, 401(k), Plan as before. Labels: "Back to {name}" and "Next: {name}", where the names are "emergency fund", "401(k) match", "health plan" and "W-4"; Back to Spending is "Back"; next to the Plan is "See your plan" (today's label). A step that is not live has the same neighbors as if it were: the live steps around its place in the order.
+6a. **A footer link lands at the top of the next page** (issue 172), at every width, for every `StepFooter` link (the setup screens' too). Next's App Router scrolls only when the changed segment's top edge is out of view. Following a footer link at the bottom of a long step, the browser first clamps the scroll offset to the new page, which is still short while its cards load; the new page's top edge is then in view, so Next leaves it, 155px down on a 390x844 phone with the collapsed nav button (rule 11) under the sticky header. A step change is a new page and starts at the top: the link turns Next's scroll off and asks (`onNavigate`, `lib/land-at-top.ts`), and the new page's `HydrationMarker`, which every page renders, scrolls to the top as its content commits, before it is painted. Back and forward, reloads and every other link keep the browser's and Next's scrolling. A `scroll-padding-top` the size of the header was weighed and set aside: Next would then scroll this case, but a clamp that leaves the page's top edge below the header would still land part way down. `e2e/decisions.spec.ts` follows a Next and a Back link at 390x844 and checks the page is at 0 with the nav button clear of the header; the sample screens cannot show it, since their footers lead out of the sample layout and the whole page remounts.
 
 ### Side nav
 
