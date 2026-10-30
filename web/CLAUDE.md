@@ -384,7 +384,10 @@ next is a real disabled button, never a dead link).
   `benefitsConfirmed()` (the three sample plans), `benefitsWaiting()` (the sample summary proposed).
   `POST /calc/w4` answers from `w4-results.json` (`make-w4-results.py`, which also writes the
   case each suggestion leads to once applied); a saved W-4 adds the `w4_submit` reminder, and
-  `savedW4()` seeds v1 (the sample reading the saved 401(k) and Gold PPO decisions).
+  `savedW4()` seeds v1 (the sample reading the saved 401(k) and Gold PPO decisions). Every case
+  carries the stub's `current_withholding_per_paycheck_cents` (the sample's $297.76; null for a
+  stub on another schedule); `stub01W4Inputs()` is issue 153's e2e account (stub-01's $272.44,
+  the 401(k) at 5% and `stub01HealthDecision()`'s $4.00 Value HMO).
 - Debounces: measure them on the fake clock instead of asserting "nothing yet at 149 ms", which
   races `shouldAdvanceTime`. Record `Date.now()` when the input stops and when the request starts
   (`request:start`), and assert the difference is at least the debounce. Set inputs with
@@ -581,7 +584,16 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
   the profile until changed), Step 2(c), the other jobs' wages and withholding, Steps 3 and
   4(a)-(c) and the deductions they expect to claim (empty means the Step 4(b) entry). The result
   is the calculator's: a balance due takes the `off` tone, a refund stays neutral (never
-  `confirmed`). "Apply suggestion" copies `suggested_extra_withholding_cents` and
+  `confirmed`). The result panel opens with "If you change nothing" (spec 014 rule 10a): the
+  refund or balance due at the newest stub's withholding, `current_refund_cents`, with the
+  stub's per-paycheck figure and `current_annual_withholding_cents`, and says it assumes every
+  paycheck this year withholds the same; then "With the entries above", the projection. The
+  card sends the stub's `federal_withholding_cents` as `current_withholding_per_paycheck_cents`
+  only when the stub is on the card's pay schedule (or has none; `currentWithholdingOf`), else
+  null, and says why there is no comparison. The save badge ignores that input
+  (`decisionSaveState(..., { ignore: W4_CONTEXT_INPUTS })`, spec 014 rule 17a): it is payroll
+  today, so a newer stub alone never marks the saved W-4 changed, and a decision saved before it
+  existed stays saved. "Apply suggestion" copies `suggested_extra_withholding_cents` and
   `suggested_deductions_cents` into Steps 4(c) and 4(b) (`appliedEntries`); when Step 4(b) grows
   and no expected deductions are set, the old Step 4(b) entry becomes them (spec 014 rule 13).
   Always send every input, `k401_contribution_pct` as `"0.00"` when there is no 401(k)
@@ -818,7 +830,8 @@ emergency fund version (typing the essentials and savings over what the e2e user
 fills in, so the target is the same every run) and pauses and resumes its goal, and saves a health
 plan choice (typing two synthetic plans when no benefits summary is confirmed) with an enrollment
 deadline (reaching that step through the 401(k)'s footer), and saves a W-4 version that reads
-those two decisions, with its reminder, then checks every step is done in the nav and follows the
+those two decisions (checking "If you change nothing" states the `current_refund_cents` of the
+calculator's own answer), with its reminder, then checks every step is done in the nav and follows the
 footer to the plan. Decisions cannot be
 deleted, so it reads the current version instead of assuming v1. `plan.spec.ts` (project
 `authenticated-plan`, after decisions) reads the four decisions back on `/plan` (and the nav's
