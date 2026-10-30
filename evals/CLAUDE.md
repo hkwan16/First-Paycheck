@@ -91,20 +91,31 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   `document_accuracy`. `SuiteUnavailable` without `ANTHROPIC_API_KEY`; its
   baseline is measured: 1.0 on all three in every live run on October 29,
   about 6 cents a run (spec 013 targets 0.90, 0.80, 0.60). Scoring is unit-tested with a reader that answers from the labels.
-- `fixtures/explain/decisions.json`: 10 synthetic `k401_match` inputs (with
+- `fixtures/explain/decisions.json`: 29 synthetic `k401_match` inputs (with
   optional benefits passages) covering under-match, capped, catch-up,
-  compensation-capped, already-full and no-match cases. Results are computed
-  by the suite, never stored.
+  compensation-capped, already-full and no-match cases, each with the rate its
+  pay stub shows (`pay_stub_contribution_pct`, null for no stub; spec 008 rule
+  7a): 11 at the chosen rate, 14 at another (issue 132's stub-01 case among
+  them: 3% on the stub, 5% chosen), 4 with no stub. Results are computed by the
+  suite, never stored.
 - `suites/explain.py` (`explain`, LLM): the real draft-verify-retry-fallback
   flow (`verify.flow.run_explain`) with `LLMGateway` over those decisions, the
   seed citations read from `api/db/seed/irs_citations/`, no database.
   `first_try_verified`, `no_fallback`, `cited`; baseline at the spec 008
-  targets (0.8, 0.95, 1.0) until the first live run. `SuiteUnavailable`
-  without `ANTHROPIC_API_KEY`.
+  targets (0.8, 0.95, 1.0) until the first live run. `rate_framing` (issue
+  132): over the 18 decisions whose stub shows another rate or none, the share
+  whose final row does not claim the chosen rate is already in effect, scored
+  by `rate_claim`: "already" with the person as its subject ("You are already
+  contributing 5%") or the rate chosen called "already in effect", never a
+  rate as the subject ("The 5% you chose already earns the full match"). An
+  eval heuristic, never a gate; no baseline yet. `SuiteUnavailable` without
+  `ANTHROPIC_API_KEY`.
 - `suites/explain_smoke.py` (`explain-smoke`, free): the same flow with
-  `ScriptedGateway` over five scripted runs (pass, fail-then-pass,
+  `ScriptedGateway` over six scripted runs (pass, fail-then-pass,
   fail-twice on a 401(k) decision; pass and fail-twice on the W-4 decision in
-  `fixtures/explain/w4_decisions.json`, spec 014 example 9); `flow_correct`
+  `fixtures/explain/w4_decisions.json`, spec 014 example 9; a pass on issue
+  132's decision that states the stub's rate, spec 008 rule 7a);
+  `flow_correct`
   checks rows, the retry's feedback and that the fallback verifies and is
   cited. Fixture entries name their `calculator` (default `k401_match`) and
   `load_decisions` computes results through `calc/registry.py`.

@@ -14,6 +14,7 @@
       "filing_status": "single",
       "age": 24
     },
+    "pay_stub_contribution_pct": "3.00",
     "benefits_passages": [
       "Acme matches 100% of the first 3% of pay you contribute and 50% of the next 2%. Matching contributions vest 25% a year over four years."
     ]
@@ -30,6 +31,7 @@
       "filing_status": "single",
       "age": 23
     },
+    "pay_stub_contribution_pct": "2.00",
     "benefits_passages": []
   },
   {
@@ -44,6 +46,7 @@
       "filing_status": "single",
       "age": 27
     },
+    "pay_stub_contribution_pct": "4.00",
     "benefits_passages": [
       "The company contributes 50 cents for every dollar you save, up to 6% of your eligible pay. You are always 100% vested in your own contributions."
     ]
@@ -63,6 +66,7 @@
       "filing_status": "single",
       "age": 22
     },
+    "pay_stub_contribution_pct": "0.00",
     "benefits_passages": []
   },
   {
@@ -77,6 +81,7 @@
       "filing_status": "single",
       "age": 29
     },
+    "pay_stub_contribution_pct": "8.00",
     "benefits_passages": []
   },
   {
@@ -94,6 +99,7 @@
       "filing_status": "single",
       "age": 30
     },
+    "pay_stub_contribution_pct": "10.00",
     "benefits_passages": []
   },
   {
@@ -111,6 +117,7 @@
       "filing_status": "single",
       "age": 61
     },
+    "pay_stub_contribution_pct": null,
     "benefits_passages": []
   },
   {
@@ -128,6 +135,7 @@
       "filing_status": "single",
       "age": 35
     },
+    "pay_stub_contribution_pct": "6.00",
     "benefits_passages": []
   },
   {
@@ -145,6 +153,7 @@
       "filing_status": "married_filing_jointly",
       "age": 26
     },
+    "pay_stub_contribution_pct": "4.50",
     "benefits_passages": [
       "Employer matching contributions are made each pay period and are fully vested after two years of service."
     ]
@@ -161,6 +170,337 @@
       "filing_status": "head_of_household",
       "age": 31
     },
+    "pay_stub_contribution_pct": null,
+    "benefits_passages": []
+  },
+  {
+    "id": "issue-132-stub-01-chose-full-match",
+    "note": "Issue 132: stub-01 shows 3% ($109.62 of $3,653.85); the person chose 5%, the full match.",
+    "inputs": {
+      "salary_cents": 9500010,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "5",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 24
+    },
+    "pay_stub_contribution_pct": "3.00",
+    "benefits_passages": [
+      "Acme matches 100% of the first 3% of pay you contribute and 50% of the next 2%. Matching contributions are made each pay period.",
+      "You can change your contribution rate at any time in the benefits portal. A change takes effect with the next payroll after it is processed."
+    ]
+  },
+  {
+    "id": "issue-132-stub-01-at-stub-rate",
+    "note": "Issue 132's stub at the rate it shows: 3% chosen, 3% on the stub.",
+    "inputs": {
+      "salary_cents": 9500010,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "3",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 24
+    },
+    "pay_stub_contribution_pct": "3.00",
+    "benefits_passages": [
+      "Acme matches 100% of the first 3% of pay you contribute and 50% of the next 2%. Matching contributions are made each pay period."
+    ]
+  },
+  {
+    "id": "new-enrollee-chose-full-match",
+    "note": "The stub shows nothing going in yet; the person chose 5%.",
+    "inputs": {
+      "salary_cents": 6000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "5",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 22
+    },
+    "pay_stub_contribution_pct": "0.00",
+    "benefits_passages": [
+      "You can change your contribution rate at any time in the benefits portal. A change takes effect with the next payroll after it is processed."
+    ]
+  },
+  {
+    "id": "lowered-below-match",
+    "note": "The stub shows the full-match 4%; the person chose 2%, leaving match behind.",
+    "inputs": {
+      "salary_cents": 7000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [{"employee_pct_upto": "4", "employer_pct": "100"}],
+      "contribution_pct": "2",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 28
+    },
+    "pay_stub_contribution_pct": "4.00",
+    "benefits_passages": []
+  },
+  {
+    "id": "uneven-stub-rate",
+    "note": "A $100.00 flat election on the Acme stub is 3.69%; the person chose 4%.",
+    "inputs": {
+      "salary_cents": 6499992,
+      "pay_periods_per_year": 24,
+      "match_tiers": [{"employee_pct_upto": "4", "employer_pct": "100"}],
+      "contribution_pct": "4",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "pay_stub_contribution_pct": "3.69",
+    "benefits_passages": []
+  },
+  {
+    "id": "chose-zero-while-contributing",
+    "note": "The stub shows 3%; the person chose to stop contributing.",
+    "inputs": {
+      "salary_cents": 6000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "0",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 25
+    },
+    "pay_stub_contribution_pct": "3.00",
+    "benefits_passages": []
+  },
+  {
+    "id": "past-full-match-from-under",
+    "note": "The stub shows 4% of a 6% full match; the person chose 8%.",
+    "inputs": {
+      "salary_cents": 8500000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [{"employee_pct_upto": "6", "employer_pct": "50"}],
+      "contribution_pct": "8",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 33
+    },
+    "pay_stub_contribution_pct": "4.00",
+    "benefits_passages": []
+  },
+  {
+    "id": "capped-from-lower",
+    "note": "The stub shows 5%; the person chose 10% of $300,000, over the yearly limit.",
+    "inputs": {
+      "salary_cents": 30000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "10",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 40
+    },
+    "pay_stub_contribution_pct": "5.00",
+    "benefits_passages": []
+  },
+  {
+    "id": "no-match-stub-differs",
+    "note": "No employer match; the stub shows 3% and the person chose 6%, paid monthly.",
+    "inputs": {
+      "salary_cents": 5500000,
+      "pay_periods_per_year": 12,
+      "match_tiers": [],
+      "contribution_pct": "6",
+      "tax_year": 2026,
+      "filing_status": "head_of_household",
+      "age": 29
+    },
+    "pay_stub_contribution_pct": "3.00",
+    "benefits_passages": []
+  },
+  {
+    "id": "head-of-household-chose-full",
+    "note": "Head of household, semimonthly: the stub shows 2%, the person chose the full 5%.",
+    "inputs": {
+      "salary_cents": 5200000,
+      "pay_periods_per_year": 24,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "5",
+      "tax_year": 2026,
+      "filing_status": "head_of_household",
+      "age": 34
+    },
+    "pay_stub_contribution_pct": "2.00",
+    "benefits_passages": []
+  },
+  {
+    "id": "married-lowered",
+    "note": "Filing jointly: the stub shows the full-match 6%; the person chose 3%.",
+    "inputs": {
+      "salary_cents": 12000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [{"employee_pct_upto": "6", "employer_pct": "50"}],
+      "contribution_pct": "3",
+      "tax_year": 2026,
+      "filing_status": "married_filing_jointly",
+      "age": 38
+    },
+    "pay_stub_contribution_pct": "6.00",
+    "benefits_passages": []
+  },
+  {
+    "id": "weekly-raised",
+    "note": "Paid weekly: the stub shows 1%; the person chose the full-match 4%.",
+    "inputs": {
+      "salary_cents": 4160000,
+      "pay_periods_per_year": 52,
+      "match_tiers": [{"employee_pct_upto": "4", "employer_pct": "100"}],
+      "contribution_pct": "4",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 23
+    },
+    "pay_stub_contribution_pct": "1.00",
+    "benefits_passages": []
+  },
+  {
+    "id": "catch-up-52-at-stub-rate",
+    "note": "Age 52 at 10% of $300,000, which the stub already shows: the catch-up lifts the limit.",
+    "inputs": {
+      "salary_cents": 30000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "10",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 52
+    },
+    "pay_stub_contribution_pct": "10.00",
+    "benefits_passages": []
+  },
+  {
+    "id": "fractional-chose-from-whole",
+    "note": "The stub shows 3%; the person chose 4.5% of an odd salary.",
+    "inputs": {
+      "salary_cents": 4512345,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "4.5",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 26
+    },
+    "pay_stub_contribution_pct": "3.00",
+    "benefits_passages": []
+  },
+  {
+    "id": "no-stub-chose-full-match",
+    "note": "No pay stub confirmed: what goes in now is not known; the person chose 5%.",
+    "inputs": {
+      "salary_cents": 6000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "5",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 24
+    },
+    "pay_stub_contribution_pct": null,
+    "benefits_passages": [
+      "Acme matches 100% of the first 3% of pay you contribute and 50% of the next 2%. Matching contributions are made each pay period."
+    ]
+  },
+  {
+    "id": "dollar-for-dollar-at-stub-rate",
+    "note": "100% up to 6%, and the stub shows the 6% chosen.",
+    "inputs": {
+      "salary_cents": 7500000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [{"employee_pct_upto": "6", "employer_pct": "100"}],
+      "contribution_pct": "6",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 31
+    },
+    "pay_stub_contribution_pct": "6.00",
+    "benefits_passages": []
+  },
+  {
+    "id": "compensation-limit-from-lower",
+    "note": "Salary above the compensation limit; the stub shows 4% and the person chose 6%.",
+    "inputs": {
+      "salary_cents": 50000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "6",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 45
+    },
+    "pay_stub_contribution_pct": "4.00",
+    "benefits_passages": []
+  },
+  {
+    "id": "monthly-one-percent-no-stub",
+    "note": "Paid monthly at 1% with no pay stub confirmed.",
+    "inputs": {
+      "salary_cents": 3600000,
+      "pay_periods_per_year": 12,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "1",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 22
+    },
+    "pay_stub_contribution_pct": null,
+    "benefits_passages": []
+  },
+  {
+    "id": "two-tier-raised",
+    "note": "100% up to 4% then 50% up to 6%: the stub shows 5%, the person chose 6%.",
+    "inputs": {
+      "salary_cents": 9000000,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {"employee_pct_upto": "4", "employer_pct": "100"},
+        {"employee_pct_upto": "6", "employer_pct": "50"}
+      ],
+      "contribution_pct": "6",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 36
+    },
+    "pay_stub_contribution_pct": "5.00",
     "benefits_passages": []
   }
 ]
