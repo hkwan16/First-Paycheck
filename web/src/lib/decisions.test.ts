@@ -5,6 +5,7 @@ import { sampleW4, sampleW4Inputs } from '@/test/fixtures/w4';
 import {
   ageAtYearEnd,
   asEmergencyFundInputs,
+  asEmergencyFundResult,
   asHealthPlansInputs,
   asK401Inputs,
   asK401Result,
@@ -198,6 +199,17 @@ describe('asEmergencyFundInputs and asHealthPlansInputs', () => {
     expect(asHealthPlansInputs({ ...plans, plans: [{ name: 'Gold PPO' }] } as never)).toBeNull();
     expect(asHealthPlansInputs({ ...plans, expected_usage: 'some' } as never)).toBeNull();
     expect(asHealthPlansInputs(inputs)).toBeNull();
+  });
+});
+
+describe('asEmergencyFundResult', () => {
+  it("reads a saved decision's stored result, and refuses another shape", () => {
+    const { result } = sampleEmergencyFund();
+    expect(asEmergencyFundResult({ ...result })).toEqual(result);
+    expect(asEmergencyFundResult({ ...result, months_to_target: null })).not.toBeNull();
+    expect(asEmergencyFundResult({ ...result, funded_pct: 39.12 })).toBeNull();
+    expect(asEmergencyFundResult({ ...result, months_to_target: '12' })).toBeNull();
+    expect(asEmergencyFundResult(inputs)).toBeNull();
   });
 });
 

@@ -8,6 +8,7 @@ client has one thing to parse.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from http import HTTPStatus
 from typing import Any, cast
 
@@ -119,14 +120,26 @@ async def _http_error(_: Request, error: Exception) -> JSONResponse:
     )
 
 
+def validation_message(errors: Sequence[Any], prefix: Sequence[str] = ()) -> str:
+    """Pydantic errors as one message. A validator's own ``ValueError`` is a
+    sentence for people (spec 008 rule 22a) and goes as it is; any other error
+    names its field path, which only a client's developer reads."""
+    parts = []
+    for item in errors:
+        ctx = item.get("ctx") or {}
+        if item.get("type") == "value_error" and isinstance(ctx.get("error"), ValueError):
+            parts.append(str(ctx["error"]))
+            continue
+        location = ".".join(str(part) for part in (*prefix, *item.get("loc", ())))
+        parts.append(f"{location}: {item.get('msg', 'invalid')}")
+    return "; ".join(parts)
+
+
 async def _validation_error(_: Request, error: Exception) -> JSONResponse:
     exc = cast(RequestValidationError, error)
-    parts = []
-    for item in exc.errors():
-        location = ".".join(str(part) for part in item.get("loc", ()))
-        parts.append(f"{location}: {item.get('msg', 'invalid')}")
     return JSONResponse(
-        error_body("validation_error", "; ".join(parts) or "Invalid request"), status_code=422
+        error_body("validation_error", validation_message(exc.errors()) or "Invalid request"),
+        status_code=422,
     )
 
 

@@ -139,7 +139,10 @@ def test_health_plans_refuses_employer_hsa_on_a_ppo(client: TestClient) -> None:
     plan = {**B, "employer_hsa_cents": 100}
     response = client.post("/calc/health-plans", json=payload([plan], 6_500_000, 0))
     assert response.status_code == 422
-    assert "employer_hsa_cents" in response.json()["error"]["message"]
+    # The validator's sentence, as the health plan step shows it (spec 008 rule 22a).
+    assert response.json()["error"]["message"] == (
+        "Only a high-deductible plan can have an employer HSA contribution"
+    )
 
 
 W4_EXAMPLE_5: dict[str, Any] = {

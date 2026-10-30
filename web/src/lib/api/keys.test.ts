@@ -94,6 +94,9 @@ describe('document keys', () => {
       benefitsPlans: $api.queryOptions('get', '/benefits-plans').queryKey,
       accounts: $api.queryOptions('get', '/accounts').queryKey,
       plan: queryKeys.plan(),
+      explanation: $api.queryOptions('get', '/decisions/{decision_id}/explanation', {
+        params: { path: { decision_id: 'x1' } },
+      }).queryKey,
     };
     for (const key of Object.values(keys)) client.setQueryData(key, {});
     const invalidated = (key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
@@ -138,6 +141,8 @@ describe('document keys', () => {
     expect(invalidated(keys.profile)).toBe(true);
     // The plan shows the newest confirmed pay stub.
     expect(invalidated(keys.plan)).toBe(true);
+    // A new stub or summary can leave an explanation out of date (spec 008 rule 19b).
+    expect(invalidated(keys.explanation)).toBe(true);
     expect(invalidated(keys.accounts)).toBe(false);
   });
 });

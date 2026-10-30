@@ -210,7 +210,7 @@ describe('useExtractDocument', () => {
     act(() => result.current.mutate(document.id));
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(apiErrorMessage(result.current.error, 'x')).toBe(
-      'offer_letter documents cannot be extracted yet',
+      'This is an offer letter, which cannot be read yet',
     );
   });
 });
@@ -247,7 +247,9 @@ describe('useConfirmDocument', () => {
       expected_net_cents: 199_604,
       difference_cents: -2,
     });
-    expect(apiErrorMessage(error, 'x')).toMatch(/^Gross minus deductions is 199604 cents/);
+    expect(apiErrorMessage(error, 'x')).toBe(
+      'Gross minus deductions is $1,996.04, but net is $1,996.06',
+    );
     expect(db.payStubs).toHaveLength(0);
   });
 

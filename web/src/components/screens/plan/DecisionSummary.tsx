@@ -22,6 +22,12 @@ function ExplanationStatus({ decision }: { decision: PlanDecision }) {
           </Badge>
         </div>
       );
+    case 'stale':
+      return (
+        <Notice tone="warning" compact icon={<AlertIcon size={14} />}>
+          <strong>Explanation out of date.</strong> <Link href={why}>Write it again</Link>
+        </Notice>
+      );
     case 'fallback':
       return (
         <Notice tone="warning" compact icon={<AlertIcon size={14} />}>

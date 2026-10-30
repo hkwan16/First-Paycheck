@@ -4,9 +4,16 @@ import { Card } from '@/components/ui/Card';
 import { KV, KVList } from '@/components/ui/KV';
 import { Money } from '@/components/ui/Money';
 import type { Decision } from '@/lib/api/types';
-import { asK401Inputs, asK401Result, CALCULATOR_LABELS } from '@/lib/decisions';
+import {
+  asEmergencyFundInputs,
+  asEmergencyFundResult,
+  asK401Inputs,
+  asK401Result,
+  CALCULATOR_LABELS,
+} from '@/lib/decisions';
 import { formatRate } from '@/lib/money';
 import { tiersText } from '../decisions/decision-format';
+import { FundResultRows } from '../decisions/FundResultRows';
 import { K401Notices, K401ResultRows } from '../decisions/K401Result';
 
 export interface CalculatorResultCardProps {
@@ -16,6 +23,11 @@ export interface CalculatorResultCardProps {
   fallbackText?: string;
   /** Buttons under the result. */
   actions?: ReactNode;
+  /**
+   * Shown in place of a written explanation that failed (the default), or as
+   * the whole answer for a decision that is never explained (spec 011 rule 18).
+   */
+  fallback?: boolean;
 }
 
 /**
@@ -27,10 +39,15 @@ export function CalculatorResultCard({
   employer,
   fallbackText,
   actions,
+  fallback = true,
 }: CalculatorResultCardProps) {
   const title = `${CALCULATOR_LABELS[decision.calculator]} calculator result`;
   const inputs = decision.calculator === 'k401_match' ? asK401Inputs(decision.inputs) : null;
   const result = decision.calculator === 'k401_match' ? asK401Result(decision.result) : null;
+  const fundInputs =
+    decision.calculator === 'emergency_fund' ? asEmergencyFundInputs(decision.inputs) : null;
+  const fundResult =
+    decision.calculator === 'emergency_fund' ? asEmergencyFundResult(decision.result) : null;
 
   return (
     <Card inset aria-labelledby="calculator-result-title" gap={14}>
@@ -38,7 +55,7 @@ export function CalculatorResultCard({
         <h2 id="calculator-result-title" className="m-0">
           {title}
         </h2>
-        <Badge>Fallback</Badge>
+        {fallback && <Badge>Fallback</Badge>}
       </div>
       {inputs && result ? (
         <>
@@ -57,6 +74,13 @@ export function CalculatorResultCard({
           </KVList>
           <K401Notices result={result} taxYear={inputs.tax_year} />
         </>
+      ) : fundInputs && fundResult ? (
+        <FundResultRows
+          result={fundResult}
+          targetMonths={fundInputs.target_months}
+          periods={fundInputs.pay_periods_per_year}
+          spacing="comfortable"
+        />
       ) : (
         fallbackText && <p className="m-0">{fallbackText}</p>
       )}

@@ -350,7 +350,7 @@ def test_plan_values() -> None:
         PlanValues.model_validate({**PLAN, "deductible_cents": 400_000})
     with pytest.raises(ValidationError):
         PlanValues.model_validate({**PLAN, "coinsurance_pct": "100.5"})
-    with pytest.raises(ValidationError, match="employer_hsa_cents"):
+    with pytest.raises(ValidationError, match="Only a high-deductible plan"):
         PlanValues.model_validate({**PLAN, "employer_hsa_cents": 50_000})
     hdhp = PlanValues.model_validate({**PLAN, "kind": "hdhp", "employer_hsa_cents": 50_000})
     assert hdhp.employer_hsa_cents == 50_000

@@ -1,5 +1,4 @@
 import type {
-  CalculatorKind,
   CalendarEvent,
   Goal,
   PayFrequency,
@@ -9,6 +8,7 @@ import type {
 } from '@/lib/api/types';
 import { calculatorIdOf } from '@/lib/decisions';
 import type { Hue } from '@/lib/design/tone';
+import { isExplained } from '@/lib/explanations';
 import { formatMoney, formatNetCost, formatNumber, formatRate } from '@/lib/money';
 import { CALCULATOR_CARDS } from '../decisions/DecisionCard';
 
@@ -52,14 +52,19 @@ export function figureText(figure: PlanFigure): string {
   }
 }
 
-/** Calculators the API can explain; an emergency fund has no IRS source (spec 011). */
-const EXPLAINED: ReadonlySet<CalculatorKind> = new Set(['k401_match', 'health_plans', 'w4']);
+export type ExplanationView = PlanDecision['explanation']['status'] | 'stale' | 'unavailable';
 
-export type ExplanationView = PlanDecision['explanation']['status'] | 'unavailable';
-
-/** What to say about a decision's explanation: its status, or that none is written for it. */
-export const explanationView = (decision: PlanDecision): ExplanationView =>
-  EXPLAINED.has(decision.calculator) ? decision.explanation.status : 'unavailable';
+/**
+ * What to say about a decision's explanation: its status, `stale` for a
+ * verified one written from figures that have changed since (spec 008 rule
+ * 19b; a fallback already says it is not verified), or that none is written
+ * for it.
+ */
+export function explanationView(decision: PlanDecision): ExplanationView {
+  if (!isExplained(decision.calculator)) return 'unavailable';
+  const { status, stale } = decision.explanation;
+  return status === 'verified' && stale ? 'stale' : status;
+}
 
 /** "3 of 4 decisions saved": counting the API's two lists, not computing a figure. */
 export function completenessText({ saved, missing }: PlanCompleteness): string {

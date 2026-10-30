@@ -19,7 +19,7 @@ from app.plan import PlanFigure, PlanOut
 from db.enums import CalculatorKind, CalendarKind, GoalKind, GoalStatus
 from verify.format import dollars, net_cost, percent
 
-__all__ = ["render_html"]
+__all__ = ["STALE_LABEL", "render_html"]
 
 TEMPLATES = Path(__file__).parent / "templates"
 
@@ -34,6 +34,12 @@ EXPLANATION_LABELS = {
     "fallback": "Plain calculator summary (the written explanation did not pass the check)",
     "none": "Not explained yet",
 }
+# Spec 016 rule 11: an explanation written from figures that changed since
+# (spec 008 rule 19a) is labeled, and its text is not printed.
+STALE_LABEL = (
+    "Out of date: written from figures that have changed since. Open Why in First Paycheck"
+    " to write it again."
+)
 GOAL_TITLES = {GoalKind.EMERGENCY_FUND: "Emergency fund", GoalKind.CUSTOM: "Savings goal"}
 GOAL_STATUSES = {
     GoalStatus.ACTIVE: "Active",
@@ -95,6 +101,7 @@ def render_html(plan: PlanOut, prepared_at: dt.datetime) -> str:
         prepared_on=prepared_at.astimezone(dt.UTC).date(),
         calculator_titles=CALCULATOR_TITLES,
         explanation_labels=EXPLANATION_LABELS,
+        stale_label=STALE_LABEL,
         goal_titles=GOAL_TITLES,
         goal_statuses=GOAL_STATUSES,
         calendar_kinds=CalendarKind,

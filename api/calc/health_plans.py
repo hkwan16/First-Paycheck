@@ -31,9 +31,16 @@ from calc.data import FilingStatus, HsaLimits, UnknownTaxYear, tax_year
 from calc.money import CONTEXT, pct_of, round_half_up
 from calc.types import Cents, PayPeriods, Percent, PositiveCents, ResultPercent, SignedCents
 
+# A person reaches these by typing a plan, and the API shows them as they are
+# (spec 008 rule 22a), so they are sentences. The benefits confirm shares them.
+DEDUCTIBLE_OVER_OOP = "A plan's deductible must not be more than its out-of-pocket maximum"
+HSA_WITHOUT_HDHP = "Only a high-deductible plan can have an employer HSA contribution"
+
 __all__ = [
     "BASE_CITATION_KEYS",
+    "DEDUCTIBLE_OVER_OOP",
     "HDHP_CITATION_KEYS",
+    "HSA_WITHOUT_HDHP",
     "MAX_PLANS",
     "SCAN_LIMIT_CENTS",
     "SCAN_STEP_CENTS",
@@ -79,9 +86,9 @@ class HealthPlanOption(BaseModel):
     @model_validator(mode="after")
     def _consistent(self) -> Self:
         if self.deductible_cents > self.oop_max_cents:
-            raise ValueError("deductible_cents must not exceed oop_max_cents")
+            raise ValueError(DEDUCTIBLE_OVER_OOP)
         if self.employer_hsa_cents > 0 and self.kind != "hdhp":
-            raise ValueError("employer_hsa_cents must be 0 unless kind is hdhp")
+            raise ValueError(HSA_WITHOUT_HDHP)
         return self
 
 
@@ -123,9 +130,11 @@ class HealthPlansInput(BaseModel):
     @model_validator(mode="after")
     def _consistent(self) -> Self:
         if not self.usage_low_cents < self.usage_medium_cents < self.usage_high_cents:
-            raise ValueError("usage_low_cents, usage_medium_cents and usage_high_cents must ascend")
+            raise ValueError(
+                "Low, medium and high medical use must each be more than the one before"
+            )
         if self.selected_plan_index is not None and self.selected_plan_index >= len(self.plans):
-            raise ValueError("selected_plan_index must name one of the plans")
+            raise ValueError("The plan chosen must be one of the plans compared")
         return self
 
 

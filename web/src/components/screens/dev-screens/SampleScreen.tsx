@@ -61,6 +61,7 @@ import {
   samplePayStub,
 } from '@/test/fixtures/documents';
 import {
+  EMERGENCY_DECISION_ID,
   sampleBenefitsPlans,
   sampleBenefitsProposal,
   sampleEmergencyDecision,
@@ -103,6 +104,8 @@ export type SampleScreenName =
   | 'decisions-after-alpha'
   | 'why'
   | 'why-fallback'
+  | 'why-stale'
+  | 'why-emergency-fund'
   | 'why-index'
   | 'check-in'
   | 'check-in-complete'
@@ -285,7 +288,32 @@ const SCREENS: Record<
       seed(queryKeys.explanation(DECISION_V1_ID), sampleFallbackExplanation());
     },
   },
-  'why-index': { nav: 'why', render: () => <WhyIndexScreen />, seed: seedDecided },
+  // Issue 161: verified, but written from figures that have changed since.
+  'why-stale': {
+    nav: 'why',
+    render: () => <WhyScreen decisionId={DECISION_V1_ID} />,
+    seed: (seed) => {
+      seedDecided(seed);
+      seed(queryKeys.explanation(DECISION_V1_ID), sampleExplanation({ stale: true }));
+    },
+  },
+  // Spec 011 rule 18: never explained, so its page is the saved result.
+  'why-emergency-fund': {
+    nav: 'why',
+    render: () => <WhyScreen decisionId={EMERGENCY_DECISION_ID} />,
+    seed: (seed) => {
+      seedAllDecided(seed);
+      seed(queryKeys.decision(EMERGENCY_DECISION_ID), sampleEmergencyDecision());
+    },
+    done: ALL_DECIDED,
+  },
+  // Every decision saved, so the index shows the emergency fund's row too.
+  'why-index': {
+    nav: 'why',
+    render: () => <WhyIndexScreen />,
+    seed: seedAllDecided,
+    done: ALL_DECIDED,
+  },
   'check-in': {
     nav: 'checkIn',
     render: () => <CheckInScreen checkInId={NOVEMBER_ID} />,

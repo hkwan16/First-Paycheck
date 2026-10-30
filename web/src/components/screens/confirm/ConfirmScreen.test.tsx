@@ -262,7 +262,7 @@ describe('ConfirmScreen review', () => {
           {
             error: {
               code: 'pay_stub_unbalanced',
-              message: 'Gross minus deductions is 199604 cents, but net is 199606 cents',
+              message: 'Gross minus deductions is $1,996.04, but net is $1,996.06',
               details: {
                 gross_cents: 270_833,
                 deductions_cents: 71_229,
@@ -665,7 +665,7 @@ describe('ConfirmScreen benefits summary', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm all remaining' }));
     await user.click(continueButton());
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Could not save these fields. deductible_cents must not exceed oop_max_cents',
+      "Could not save these fields. A plan's deductible must not be more than its out-of-pocket maximum",
     );
     expect(benefitsCard()).toHaveTextContent('29 of 29 confirmed');
     expect(planningDb.benefitsPlans).toHaveLength(0);

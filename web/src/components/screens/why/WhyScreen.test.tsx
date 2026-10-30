@@ -3,10 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DECISION_V1_ID,
   sampleCitations,
+  sampleExplanation,
   sampleFallbackExplanation,
 } from '@/test/fixtures/decisions';
+import { EMERGENCY_DECISION_ID } from '@/test/fixtures/planning';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
 import { db, savedDecision } from '@/test/msw/db';
+import { savedEmergencyFund } from '@/test/msw/planning-handlers';
 import { apiUrl } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderWithProviders, screen, waitFor, within } from '@/test/render';
@@ -178,6 +181,44 @@ describe('WhyScreen, fallback', () => {
   });
 });
 
+describe('WhyScreen, out of date (spec 008 rule 19b)', () => {
+  beforeEach(() => {
+    // Issue 161: verified, but written from figures that have changed since.
+    db.explanations = new Map([[DECISION_V1_ID, [sampleExplanation({ stale: true })]]]);
+  });
+
+  it('never calls it verified, says why, and still shows what it said', async () => {
+    renderWhy();
+    expect(await screen.findByText('Out of date')).toBeInTheDocument();
+    expect(screen.queryByText('Verified against calculator')).not.toBeInTheDocument();
+    expect(status()).toHaveTextContent(
+      'It was checked against figures that have changed since, so it may no longer be right.',
+    );
+    expect(screen.getByRole('region', { name: 'The concept' })).toHaveTextContent(
+      'An employer match is pay you receive only when you contribute',
+    );
+  });
+
+  it('writes it again without force and shows the current one', async () => {
+    db.explainOutcomes = ['verified'];
+    const bodies = explainBodies();
+    const { user } = renderWhy();
+    const again = await screen.findByRole('button', { name: 'Write it again' });
+    await user.click(again);
+    expect(await screen.findByText('Verified against calculator')).toBeInTheDocument();
+    expect(bodies).toEqual([{ decision_id: DECISION_V1_ID, force: false }]);
+    expect(screen.queryByText('Out of date')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Write it again' })).not.toBeInTheDocument();
+  });
+
+  it('says the same on a stale fallback', async () => {
+    db.explanations = new Map([[DECISION_V1_ID, [sampleFallbackExplanation({ stale: true })]]]);
+    renderWhy();
+    await screen.findByText('Could not verify the explanation');
+    expect(status()).toHaveTextContent('It was also written from figures that have changed since.');
+  });
+});
+
 describe('WhyScreen with no explanation yet', () => {
   beforeEach(() => {
     db.explanations = new Map();
@@ -203,6 +244,40 @@ describe('WhyScreen with no explanation yet', () => {
     expect(
       screen.getByRole('region', { name: '401(k) match calculator result' }),
     ).toHaveTextContent('Contribution for the full match4% of salary');
+  });
+});
+
+describe('WhyScreen for an emergency fund (spec 011 rule 18, issue 162)', () => {
+  beforeEach(() => savedEmergencyFund());
+
+  it('says it has no written explanation, offers none, and shows the calculator result', async () => {
+    const bodies = explainBodies();
+    renderWhy(EMERGENCY_DECISION_ID);
+    const none = await screen.findByRole('region', { name: 'No written explanation' });
+    expect(none).toHaveTextContent('no tax rule applies, so there is nothing to explain or cite');
+    expect(screen.queryByRole('button', { name: /explanation/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/emergency_fund/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Nothing on this page came from a language model/)).toBeInTheDocument();
+
+    const result = screen.getByRole('region', { name: 'Emergency fund calculator result' });
+    // A saved result, not a written explanation that failed.
+    expect(within(result).queryByText('Fallback')).not.toBeInTheDocument();
+    const rows = within(result)
+      .getAllByRole('term')
+      .map((term) => [term.textContent, term.nextElementSibling?.textContent]);
+    expect(rows).toEqual([
+      ['Target, 3 months of essentials', '$5,469.75'],
+      ['Suggested range, 3 to 6 months', '$5,469.75 to $10,939.50'],
+      ['Already saved', '39.12% of the target'],
+      ['Still to save', '$3,329.75'],
+      ['Months to reach it', '12 months'],
+      ['Per paycheck, 24 a year', '$150.00'],
+    ]);
+    expect(screen.getByRole('link', { name: 'Change it on its step' })).toHaveAttribute(
+      'href',
+      '/setup/decisions/emergency-fund',
+    );
+    expect(bodies).toEqual([]);
   });
 });
 

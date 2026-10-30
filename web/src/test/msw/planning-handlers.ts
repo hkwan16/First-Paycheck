@@ -235,11 +235,7 @@ export const planningCalculators = {
     result: healthPlansResult,
     refuse: (inputs) =>
       inputs.selected_plan_index == null
-        ? appError(
-            422,
-            'plan_not_selected',
-            'Pick a plan before saving: selected_plan_index is required',
-          )
+        ? appError(422, 'plan_not_selected', 'Pick a plan before saving')
         : undefined,
     effects: healthPlansEffects,
   },
@@ -256,10 +252,10 @@ function benefitsProblem(values: BenefitsValues): string | null {
   }
   for (const plan of values.plans) {
     if (plan.employer_hsa_cents > 0 && plan.kind !== 'hdhp') {
-      return 'employer_hsa_cents must be 0 unless kind is hdhp';
+      return 'Only a high-deductible plan can have an employer HSA contribution';
     }
     if (plan.deductible_cents > plan.oop_max_cents) {
-      return 'deductible_cents must not exceed oop_max_cents';
+      return "A plan's deductible must not be more than its out-of-pocket maximum";
     }
   }
   const tiers = values.retirement?.match_tiers ?? [];
@@ -268,7 +264,7 @@ function benefitsProblem(values: BenefitsValues): string | null {
       (t, i) => i > 0 && Number(t.employee_pct_upto) <= Number(tiers[i - 1]!.employee_pct_upto),
     )
   ) {
-    return 'employee_pct_upto must ascend';
+    return 'Each match tier must reach a higher contribution rate than the one before it';
   }
   return null;
 }

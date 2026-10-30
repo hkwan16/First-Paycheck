@@ -60,6 +60,14 @@ describe('explanationView', () => {
     expect(explanationView(health!)).toBe('fallback');
     expect(explanationView(w4!)).toBe('none');
   });
+
+  it('reads a verified explanation written from figures that changed since as stale', () => {
+    const [, k401, health] = samplePlan().decisions;
+    const stale = (d: typeof k401) => ({ ...d!, explanation: { ...d!.explanation, stale: true } });
+    expect(explanationView(stale(k401))).toBe('stale');
+    // A fallback already says it was not verified, and offers Try again on Why.
+    expect(explanationView(stale(health))).toBe('fallback');
+  });
 });
 
 describe('completenessText', () => {

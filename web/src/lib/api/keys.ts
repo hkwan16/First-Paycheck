@@ -57,12 +57,15 @@ export const queryKeys = {
           '/decisions/{decision_id}',
           { params: { path: { decision_id: decisionId } } },
         ] as const),
-  explanation: (decisionId: string) =>
-    [
-      'get',
-      '/decisions/{decision_id}/explanation',
-      { params: { path: { decision_id: decisionId } } },
-    ] as const,
+  /** One decision's explanation; without an id, the prefix of every one read. */
+  explanation: (decisionId?: string) =>
+    decisionId === undefined
+      ? (['get', '/decisions/{decision_id}/explanation'] as const)
+      : ([
+          'get',
+          '/decisions/{decision_id}/explanation',
+          { params: { path: { decision_id: decisionId } } },
+        ] as const),
   calendar: () => ['get', '/calendar'] as const,
 
   /** Prefixes of every period's read (hooks/spending.ts). */
@@ -181,6 +184,8 @@ export const invalidateAfterConfirm = (client: QueryClient) =>
     queryKeys.profile(),
     // The plan shows the newest confirmed pay stub.
     queryKeys.plan(),
+    // A new stub or summary can leave an explanation out of date (spec 008 rule 19b).
+    queryKeys.explanation(),
   ]);
 
 /** The list and every version read (`is_current` changes when a version lands). */

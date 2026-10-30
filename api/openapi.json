@@ -2037,6 +2037,10 @@
             "title": "Retries",
             "type": "integer"
           },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
           "text": {
             "title": "Text",
             "type": "string"
@@ -2070,6 +2074,7 @@
           "retries",
           "prompt_version",
           "verification",
+          "stale",
           "created_at"
         ],
         "title": "ExplanationOut",
@@ -4286,6 +4291,10 @@
             ],
             "title": "Id"
           },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
           "status": {
             "enum": [
               "verified",
@@ -4313,7 +4322,8 @@
           "concept",
           "text",
           "created_at",
-          "citations"
+          "citations",
+          "stale"
         ],
         "title": "PlanExplanation",
         "type": "object"
@@ -7681,7 +7691,7 @@
     },
     "/decisions/{decision_id}/explanation": {
       "get": {
-        "description": "The decision's latest explanation; 404 when it has none.",
+        "description": "The decision's latest explanation, ``stale`` when written from other facts\nthan it would be now (rule 19a); 404 when it has none.",
         "operationId": "get_explanation",
         "parameters": [
           {
@@ -8143,7 +8153,7 @@
     },
     "/explain": {
       "post": {
-        "description": "Explain a decision; returns the existing verified explanation unless ``force``.",
+        "description": "Explain a decision; returns the stored verified explanation while it is\ncurrent, unless ``force`` (rule 20).",
         "operationId": "explain",
         "requestBody": {
           "content": {

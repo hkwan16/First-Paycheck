@@ -16,10 +16,15 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 from sqlalchemy import Connection
+from sqlalchemy.orm import Session
 
 from app.db import user_session_for
+from app.routers.explain import current_setup
 from db.enums import AccountKind, AccountRole
-from db.models import Explanation
+from db.models import Decision, Explanation
+from llm.gateway import EXPLAIN_PROMPT
+from llm.prompts import load_prompt
+from retrieval.citations import for_calculator
 from tests.support.factories import (
     make_account,
     make_document,
@@ -27,6 +32,7 @@ from tests.support.factories import (
     make_pay_stub,
     make_snapshot,
 )
+from verify.fallback import FALLBACK_VERSION
 
 NOW = dt.datetime(2026, 10, 21, 15, 0, tzinfo=dt.UTC)
 
@@ -128,7 +134,17 @@ def save_decision(
     return uuid.UUID(saved.json()["decision_id"])
 
 
+def current_digest(session: Session, decision_id: uuid.UUID) -> str:
+    """The digest a run would store now (spec 008 rule 19a), so the fixed rows read
+    as current."""
+    decision = session.get(Decision, decision_id)
+    assert decision is not None
+    citations = for_calculator(session, decision.calculator, int(decision.inputs["tax_year"]))
+    return current_setup(session, decision, citations).digest
+
+
 def explanation(
+    session: Session,
     user_id: uuid.UUID,
     decision_id: uuid.UUID,
     *,
@@ -149,10 +165,11 @@ def explanation(
         numbers=[],
         what_ifs=[],
         citations=citations,
-        prompt_version="fallback/v1" if fallback else "explain/v1",
+        prompt_version=FALLBACK_VERSION if fallback else load_prompt(*EXPLAIN_PROMPT).version,
         verified=verified,
         fallback=fallback,
         verification={},
+        context_digest=current_digest(session, decision_id),
     )
 
 
@@ -162,6 +179,7 @@ def explain(connection: Connection, user_id: uuid.UUID, plan: PlanUser) -> None:
         session.add_all(
             [
                 explanation(
+                    session,
                     user_id,
                     plan.k401_id,
                     attempt=1,
@@ -177,6 +195,7 @@ def explain(connection: Connection, user_id: uuid.UUID, plan: PlanUser) -> None:
         session.add_all(
             [
                 explanation(
+                    session,
                     user_id,
                     plan.k401_id,
                     attempt=2,
@@ -190,6 +209,7 @@ def explain(connection: Connection, user_id: uuid.UUID, plan: PlanUser) -> None:
                     citations=["k401.employer_match", "k401.deferral_limit"],
                 ),
                 explanation(
+                    session,
                     user_id,
                     plan.health_plans_id,
                     attempt=3,
@@ -200,6 +220,7 @@ def explain(connection: Connection, user_id: uuid.UUID, plan: PlanUser) -> None:
                     citations=["health.hsa_limit"],
                 ),
                 explanation(
+                    session,
                     user_id,
                     plan.w4_id,
                     attempt=1,

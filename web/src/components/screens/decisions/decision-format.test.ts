@@ -67,8 +67,12 @@ describe('saveErrorText', () => {
     expect(saveErrorText(apiError('plan_not_selected'))).toBe(
       'Choose the plan you will enroll in, then save.',
     );
-    expect(saveErrorText(apiError('validation_error', 'tax_year: no constants'))).toBe(
-      'tax_year: no constants',
+    expect(
+      saveErrorText(apiError('validation_error', 'no federal constants for tax year 2027')),
+    ).toBe('no federal constants for tax year 2027');
+    // A field path is for developers (spec 008 rule 22a): the card's own sentence instead.
+    expect(saveErrorText(apiError('validation_error', 'inputs.tax_year: Field required'))).toBe(
+      'Could not save this decision. Try again.',
     );
     expect(saveErrorText(new Error('offline'))).toBe('Could not save this decision. Try again.');
   });

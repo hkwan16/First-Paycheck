@@ -6,6 +6,7 @@ medium expected usage unless stated.
 
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 from typing import Any
 
@@ -238,6 +239,30 @@ def test_employer_hsa_above_the_limit_leaves_no_room() -> None:
 )
 def test_invalid_inputs_are_refused(change: dict[str, Any]) -> None:
     with pytest.raises(ValidationError):
+        HealthPlansInput.model_validate({**payload([A, B], 6_500_000, 0), **change})
+
+
+@pytest.mark.parametrize(
+    ("change", "sentence"),
+    [
+        (
+            {"plans": [{**B, "deductible_cents": 400_000}]},
+            "A plan's deductible must not be more than its out-of-pocket maximum",
+        ),
+        (
+            {"plans": [{**B, "employer_hsa_cents": 100}]},
+            "Only a high-deductible plan can have an employer HSA contribution",
+        ),
+        (
+            {"usage_low_cents": 300_000},
+            "Low, medium and high medical use must each be more than the one before",
+        ),
+        ({"selected_plan_index": 2}, "The plan chosen must be one of the plans compared"),
+    ],
+)
+def test_refusals_a_person_can_reach_are_sentences(change: dict[str, Any], sentence: str) -> None:
+    """Spec 008 rule 22a: a typed plan reaches these, and the API shows the sentence."""
+    with pytest.raises(ValidationError, match=re.escape(sentence)):
         HealthPlansInput.model_validate({**payload([A, B], 6_500_000, 0), **change})
 
 

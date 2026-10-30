@@ -237,6 +237,26 @@ describe('SampleScreen after Confirm', () => {
     expect(requests).toEqual([]);
   });
 
+  it("renders an emergency fund's result with no explanation, with no requests", async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="why-emergency-fund" />);
+    expect(
+      await screen.findByRole('region', { name: 'No written explanation' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: 'Emergency fund calculator result' }),
+    ).toHaveTextContent('Still to save');
+    expect(requests).toEqual([]);
+  });
+
+  it('renders an out-of-date explanation, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="why-stale" />);
+    expect(await screen.findByText('Out of date')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Write it again' })).toBeInTheDocument();
+    expect(requests).toEqual([]);
+  });
+
   it.each([
     ['confirm-extracting', /Reading pay stub/],
     ['confirm-failed', /This file could not be opened\./],
@@ -280,6 +300,8 @@ describe('seededClient', () => {
     'decisions-after-alpha',
     'why',
     'why-fallback',
+    'why-stale',
+    'why-emergency-fund',
     'why-index',
   ] as const)('seeds every %s query at the sample time without reading the clock', (name) => {
     // It runs while the page renders: next dev prerenders the route to

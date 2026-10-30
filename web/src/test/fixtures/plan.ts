@@ -129,6 +129,7 @@ export const noExplanation: PlanExplanation = {
   text: null,
   created_at: null,
   citations: [],
+  stale: false,
 };
 
 /** A stored explanation row as the plan reports it. */
@@ -139,6 +140,7 @@ export const planExplanation = (row: Explanation): PlanExplanation => ({
   text: row.text,
   created_at: row.created_at,
   citations: [...row.citations],
+  stale: row.stale,
 });
 
 /** One saved decision as `GET /plan` lists it. */

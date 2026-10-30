@@ -12,14 +12,24 @@ import { useCalendar, useDecision, useExplain, useExplanation, usePayStubs } fro
 import type { Decision, Explanation } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import { asK401Inputs, CALCULATOR_LABELS } from '@/lib/decisions';
+import { isExplained } from '@/lib/explanations';
 import { formatRate } from '@/lib/money';
 import { decisionKindRoute, firstDecisionRoute } from '@/lib/routes';
 import { CalculatorResultCard } from './CalculatorResultCard';
-import { FallbackStatus, NextSteps, VerifiedBody, VerifiedStatus } from './ExplanationViews';
+import {
+  FallbackStatus,
+  NextSteps,
+  StaleStatus,
+  VerifiedBody,
+  VerifiedStatus,
+} from './ExplanationViews';
 import { Sources } from './Sources';
 
 const LEAD =
   "Written by the AI from the calculator's numbers and your benefits text, then checked by plain code before you see it.";
+// Spec 011 rule 18: a decision that is never explained.
+const UNEXPLAINED_LEAD =
+  'Worked out by the calculator from your own numbers. Nothing on this page came from a language model.';
 
 function title(decision: Decision | undefined): string {
   const inputs = decision?.calculator === 'k401_match' ? asK401Inputs(decision.inputs) : null;
@@ -38,7 +48,9 @@ const taxYearOf = (decision: Decision | undefined): number | null => {
  * The explanation comes from `GET /decisions/{id}/explanation`: verified (the
  * AI's text, every number checked against the calculator) or a fallback (the
  * calculator's own result). With none yet, the person can ask for one;
- * `POST /explain` answers when the run is over, verified or fallen back.
+ * `POST /explain` answers when the run is over, verified or fallen back. An
+ * emergency fund is never explained (spec 011 rule 18): its page shows the
+ * saved result and offers no explanation.
  */
 export function WhyScreen({ decisionId }: { decisionId: string }) {
   const decision = useDecision(decisionId);
@@ -85,11 +97,53 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
       />
     );
 
+  const explained = current === undefined || isExplained(current.calculator);
   let body: ReactNode;
-  if (explanation.data) {
+  if (current && !explained) {
+    body = (
+      <>
+        <Card aria-labelledby="unexplained-title" gap={14}>
+          <h2 id="unexplained-title" className="m-0">
+            No written explanation
+          </h2>
+          <p className="m-0 text-small text-ink-3">
+            An emergency fund is arithmetic on your own spending and savings, and no tax rule
+            applies, so there is nothing to explain or cite. Here is what the calculator worked out
+            when you saved it.
+          </p>
+        </Card>
+        <CalculatorResultCard
+          decision={current}
+          employer={employer}
+          fallback={false}
+          actions={
+            <Button size="sm" href={rerun}>
+              Change it on its step
+            </Button>
+          }
+        />
+      </>
+    );
+  } else if (explanation.data) {
+    // Out of date (spec 008 rule 19b): asked for again without force, so the
+    // API answers with a current row another tab may already have written.
+    const status = explanation.data.stale ? (
+      <StaleStatus explanation={explanation.data}>
+        <div>
+          <Button variant="primary" loading={explain.isPending} onClick={() => write(false)}>
+            Write it again
+          </Button>
+        </div>
+        {progress}
+        {explainError}
+      </StaleStatus>
+    ) : (
+      <VerifiedStatus explanation={explanation.data} />
+    );
     body = explanation.data.verified ? (
       <Verified
         explanation={explanation.data}
+        status={status}
         version={current?.version ?? null}
         taxYear={taxYearOf(current)}
         next={<NextSteps event={event} rerun={rerun} />}
@@ -164,7 +218,7 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
           )
         }
         title={current ? title(current) : <Skeleton className="w-80 max-w-full" />}
-        lead={LEAD}
+        lead={explained ? LEAD : UNEXPLAINED_LEAD}
       />
       {body}
     </>
@@ -173,18 +227,20 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
 
 function Verified({
   explanation,
+  status,
   version,
   taxYear,
   next,
 }: {
   explanation: Explanation;
+  status: ReactNode;
   version: number | null;
   taxYear: number | null;
   next: ReactNode;
 }) {
   return (
     <>
-      <VerifiedStatus explanation={explanation} />
+      {status}
       <div className="flex flex-wrap items-start gap-6">
         <div className="flex min-w-0 flex-[1_1_460px] flex-col gap-6">
           <VerifiedBody explanation={explanation} version={version} />

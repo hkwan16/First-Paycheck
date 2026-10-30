@@ -326,9 +326,11 @@ def test_plaid_rejections_are_502(
     fake_plaid.fail["item_public_token_exchange"] = plaid_error("INVALID_PUBLIC_TOKEN")
     response = client_as(user_a).post("/sync/items", json={"public_token": "public-sandbox-x"})
     assert response.status_code == 502
+    # Plaid's code stays out of the sentence a person reads (spec 008 rule 22a).
     assert response.json()["error"] == {
         "code": "plaid_error",
-        "message": "Plaid rejected the request (INVALID_PUBLIC_TOKEN)",
+        "message": "Plaid refused the request",
+        "details": {"plaid_error_code": "INVALID_PUBLIC_TOKEN"},
     }
 
 
