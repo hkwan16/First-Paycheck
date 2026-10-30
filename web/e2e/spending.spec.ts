@@ -1,6 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import { e2eApiUrl, linkSandboxBank, NO_E2E_API, openLink } from './support/api';
 import { e2eUser, NO_E2E_USER, waitForHydration } from './support/auth';
+import {
+  loadedSummary,
+  monthOf,
+  showPeriodWithTransactions,
+  summaryMonth,
+  transactionsIn,
+} from './support/spending';
 
 /*
  * The Spending screen against the real API, after link.spec.ts (this file's
@@ -11,12 +18,11 @@ test.describe.configure({ mode: 'serial' });
 test.skip(!e2eUser(), NO_E2E_USER);
 test.skip(!e2eApiUrl(), NO_E2E_API);
 
+/** Spending on the period it opens on, or the newest one with transactions. */
 async function openSpending(page: Page) {
   await page.goto('/setup/spending');
   await waitForHydration(page);
-  const table = page.getByRole('table', { name: 'Transactions' });
-  await expect(table).toBeVisible({ timeout: 30_000 });
-  return table;
+  return showPeriodWithTransactions(page);
 }
 
 test('starts from a linked sandbox bank', async ({ page }) => {
@@ -34,16 +40,6 @@ test('lists the synced transactions with who labeled each one', async ({ page })
   expect(await rows.count()).toBeGreaterThan(2);
   await expect(table.getByText(/^(Rule|You|AI( · \d+%)?|Not labeled)$/).first()).toBeVisible();
 });
-
-/** The summary card, once GET /cashflow has answered (its heading names the period). */
-async function loadedSummary(page: Page) {
-  const summary = page.getByRole('region', {
-    name: /^\w+ \d+.* to .+ · (\d+ pay stubs?|no pay stub)$/,
-  });
-  await expect(summary).toBeVisible({ timeout: 30_000 });
-  await expect(summary).not.toHaveAttribute('aria-busy', 'true');
-  return summary;
-}
 
 const flowCard = (page: Page) =>
   page.getByRole('region', { name: /^Where each dollar of (\w+ )?pay went$/ });
@@ -102,13 +98,31 @@ test('a node opens its details from the keyboard and Escape returns focus', asyn
   await expect(card.locator(':focus')).toHaveAttribute('aria-expanded', 'false');
 });
 
+test('the transactions follow the period the summary shows', async ({ page }) => {
+  await page.goto('/setup/spending');
+  await waitForHydration(page);
+  const listed = [await transactionsIn(page, await summaryMonth(await loadedSummary(page)))];
+  const picker = page.getByRole('combobox', { name: 'Period' });
+  for (const label of await picker.locator('option').allTextContents()) {
+    await picker.selectOption({ label });
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+      `Where ${monthOf(label)}'s money went`,
+    );
+    listed.push(await transactionsIn(page, monthOf(label)));
+  }
+  // The sandbox's rows are in some month the picker offers, so some period lists rows.
+  expect(listed).toContain(true);
+});
+
 test('choosing another period reloads the totals and the diagram together', async ({ page }) => {
   await openSpending(page);
   const before = await loadedSummary(page);
   const heading = await before.getByRole('heading', { level: 2 }).textContent();
   const picker = page.getByRole('combobox', { name: 'Period' });
-  // The first option is the current month so far; the default is the last complete one.
-  const label = (await picker.locator('option').first().textContent()) ?? '';
+  // Any month but the one on screen.
+  const month = await summaryMonth(before);
+  const labels = await picker.locator('option').allTextContents();
+  const label = labels.find((l) => monthOf(l) !== month) ?? '';
   await picker.selectOption({ label });
   const after = await loadedSummary(page);
   await expect(after.getByRole('heading', { level: 2 })).not.toHaveText(heading ?? '');

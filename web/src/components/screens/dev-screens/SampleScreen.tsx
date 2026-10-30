@@ -19,7 +19,7 @@ import { SpendingScreen } from '@/components/screens/spending/SpendingScreen';
 import { WhyIndexScreen } from '@/components/screens/why/WhyIndexScreen';
 import { WhyScreen } from '@/components/screens/why/WhyScreen';
 import { $api } from '@/lib/api/client';
-import { ACCOUNT_COUNT_LIMIT, TRANSACTIONS_PAGE_SIZE } from '@/lib/api/hooks';
+import { ACCOUNT_COUNT_LIMIT, periodFilters } from '@/lib/api/hooks';
 import { queryKeys } from '@/lib/api/keys';
 import type { CheckInDetail, Decision } from '@/lib/api/types';
 import { CALCULATORS, type CalculatorId } from '@/lib/features';
@@ -411,7 +411,8 @@ export function seededClient(screen: SampleScreenName = 'link') {
       null,
     ),
   );
-  seed(queryKeys.transactionPages({ limit: TRANSACTIONS_PAGE_SIZE }), {
+  // The Spending screen's list for the sample period (spec 003 rule 17a).
+  seed(queryKeys.transactionPages(periodFilters(SAMPLE_PERIOD)), {
     pages: [{ items: [...sampleTransactions], next_cursor: null }],
     pageParams: [null],
   });

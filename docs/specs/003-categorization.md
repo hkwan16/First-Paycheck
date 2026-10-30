@@ -73,6 +73,7 @@ Give every synced transaction a spending category the user can trust and correct
 ### `GET /transactions`
 
 17. Filters, all optional and combined with AND: `account_id`; `start` and `end` (inclusive `posted_at` dates; `start > end` is 422); `category`; `min_confidence` (0-1), which keeps transactions whose effective confidence is at least the value, where a `rule` or `user` label counts as 1 and an uncategorized transaction is excluded.
+17a. **The Spending screen lists the period it totals.** The Spending screen's Transactions card and the cash-flow diagram's category popovers read `GET /transactions` with the `start` and `end` of the period the summary shows (spec 010, `GET /cashflow`): the period chosen in the picker, or, for the default (sent to `GET /cashflow` with no dates, the last complete UTC month), the `start` and `end` the cash flow answered with. Until that answer arrives the list waits; if the cash flow cannot be read, it lists the newest rows with no dates. Both reads use the same filters (`limit` 50 and the period), so they share one cached list. "Load more transactions" follows `next_cursor` with the same `start` and `end`, so every page stays in the period, and a new period starts again from its own first page. While another period loads, the last rows stay on screen and the card is `aria-busy`, as the summary does; "Load more" waits for the new rows. A period with no rows says so by name ("No transactions from July 1 to 31. Pick another period above."); with no linked account the card still points to linking a bank. Setup progress (whether any transaction has synced) reads the list without dates. Fixed on October 30: the card listed the newest rows whatever the period, so an earlier month's summary sat above October's transactions.
 18. Order is `posted_at DESC, id DESC`. `limit` is 1-200 (default 50). `next_cursor` is an opaque token encoding the last row's `(posted_at, id)`; passing it returns the rows strictly after that position. A malformed cursor is 422. `next_cursor` is null on the last page.
 
 ### LLM gateway (`llm/gateway.py`)
@@ -188,6 +189,17 @@ Working: row 1 `(1000 * 0.10 + 500 * 0.50) * 100 = (100 + 250) * 100 = 35000`. R
 ### Corrections (`test_fix_relabels_siblings`)
 
 User A has three `netflix.com` transactions: t1 `llm`/`entertainment` 0.62, t2 `rule`/`entertainment`, t3 `user`/`entertainment`. A patches t1 to `subscriptions`. Result: t1 `user`/`subscriptions`; t2 `rule`/`subscriptions`; t3 unchanged; a user exact rule `netflix.com -> subscriptions`; `relabeled = 1`. A new `netflix.com` transaction synced later is labeled `subscriptions` by that rule and never reaches the gateway.
+
+### The Spending screen's list for a period (rule 17a, `web/src/components/screens/spending/SpendingScreen.test.tsx`, "transactions follow the period"; `web/e2e/spending.spec.ts`)
+
+On 2026-10-17 the user has rows across September and October, and 55 rows on 2026-08-20.
+
+| Picker | `GET /cashflow` asks | `GET /transactions` asks | The card lists |
+|---|---|---|---|
+| September 2026 (the default) | no dates; answers `2026-09-01` to `2026-09-30` | `limit=50&start=2026-09-01&end=2026-09-30`, once the cash flow answered | September's rows only |
+| August 2026 | `start=2026-08-01&end=2026-08-31` | `limit=50&start=2026-08-01&end=2026-08-31` | 50 August rows; "Load more" asks the same with `cursor` and lists all 55 |
+| October 2026 so far | `start=2026-10-01&end=2026-10-17` | `limit=50&start=2026-10-01&end=2026-10-17` (no cursor) | October's rows, from the first page |
+| July 2026 | `start=2026-07-01&end=2026-07-31` | the same dates | "No transactions from July 1 to 31. Pick another period above." |
 
 ## Edge cases
 

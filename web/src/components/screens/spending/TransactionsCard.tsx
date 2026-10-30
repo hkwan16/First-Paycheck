@@ -8,16 +8,12 @@ import { Card } from '@/components/ui/Card';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { apiErrorMessage } from '@/lib/api/errors';
-import {
-  TRANSACTIONS_PAGE_SIZE,
-  useAccounts,
-  useFixCategory,
-  useTransactions,
-} from '@/lib/api/hooks';
+import { useAccounts, useFixCategory, useTransactions } from '@/lib/api/hooks';
+import type { TransactionFilters } from '@/lib/api/keys';
 import type { Category, Transaction } from '@/lib/api/types';
 import { categoryInfo } from '@/lib/categories';
 import { formatNumber } from '@/lib/money';
-import { countSources } from './spending-format';
+import { countSources, periodText } from './spending-format';
 import { TransactionTable } from './TransactionTable';
 
 type FixResult =
@@ -57,13 +53,23 @@ function LoadingRows() {
   );
 }
 
+export interface TransactionsCardProps {
+  /**
+   * The list to read (spec 003 rule 17a): the summary's period
+   * (`periodFilters`), or the newest rows when the period cannot be known;
+   * null while it is not known yet.
+   */
+  filters: TransactionFilters | null;
+}
+
 /**
- * The mockup's transactions card: who labeled what, the table, and the
- * category fix. A fix shows at once (useFixCategory is optimistic); the
- * notice says the server saved it as a rule, or that it went back.
+ * The mockup's transactions card: who labeled what, the period's table, and
+ * the category fix. A fix shows at once (useFixCategory is optimistic); the
+ * notice says the server saved it as a rule, or that it went back. While
+ * another period loads, the last rows stay on screen and the card is busy.
  */
-export function TransactionsCard() {
-  const list = useTransactions({ limit: TRANSACTIONS_PAGE_SIZE });
+export function TransactionsCard({ filters }: TransactionsCardProps) {
+  const list = useTransactions(filters);
   const accounts = useAccounts().data;
   const fix = useFixCategory();
   const [result, setResult] = useState<FixResult | null>(null);
@@ -112,12 +118,17 @@ export function TransactionsCard() {
       </Notice>
     );
   } else if (list.transactions.length === 0) {
-    body = (
-      <p className="m-0 text-small text-ink-3">
-        No transactions yet. <Link href="/setup/link">Link a bank</Link> on the first step and they
-        appear here once the sync finishes.
-      </p>
-    );
+    body =
+      filters?.start && filters.end && accounts?.length !== 0 ? (
+        <p className="m-0 text-small text-ink-3">
+          No transactions from {periodText(filters.start, filters.end)}. Pick another period above.
+        </p>
+      ) : (
+        <p className="m-0 text-small text-ink-3">
+          No transactions yet. <Link href="/setup/link">Link a bank</Link> on the first step and
+          they appear here once the sync finishes.
+        </p>
+      );
   } else {
     body = (
       <>
@@ -141,7 +152,7 @@ export function TransactionsCard() {
   }
 
   return (
-    <Card aria-labelledby="txn-title" gap={12}>
+    <Card aria-labelledby="txn-title" gap={12} aria-busy={list.isPlaceholderData || undefined}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="txn-title" className="m-0">
           Transactions

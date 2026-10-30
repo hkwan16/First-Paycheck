@@ -247,6 +247,12 @@ describe('spending and recurring keys', () => {
       summary: $api.queryOptions('get', '/spending/summary').queryKey,
       recurring: $api.queryOptions('get', '/recurring').queryKey,
       accounts: $api.queryOptions('get', '/accounts').queryKey,
+      // The Spending screen's list for a period (spec 003 rule 17a).
+      pagesAugust: queryKeys.transactionPages({
+        limit: 50,
+        start: '2026-08-01',
+        end: '2026-08-31',
+      }),
     };
     for (const key of Object.values(keys)) client.setQueryData(key, {});
     const invalidated = (key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
@@ -258,15 +264,30 @@ describe('spending and recurring keys', () => {
     expect(keys.cashflowAugust.slice(0, 2)).toEqual(queryKeys.cashflow());
     expect(keys.summary.slice(0, 2)).toEqual(queryKeys.spendingSummary());
     expect(keys.recurring.slice(0, 2)).toEqual(queryKeys.recurring());
+    expect(keys.pagesAugust.slice(0, 2)).toEqual(queryKeys.transactions());
   });
 
-  it('a category fix refreshes the cash flow and summary of every period', async () => {
+  it('a category fix refreshes the cash flow, summary and transactions of every period', async () => {
     const { client, keys, invalidated } = seededSpending();
     await invalidateSpending(client);
     expect(invalidated(keys.cashflow)).toBe(true);
     expect(invalidated(keys.cashflowAugust)).toBe(true);
     expect(invalidated(keys.summary)).toBe(true);
+    expect(invalidated(keys.pagesAugust)).toBe(true);
     expect(invalidated(keys.recurring)).toBe(false);
+  });
+
+  it("a sync, a categorize run, an import and an unlink refresh every period's transactions", async () => {
+    for (const refresh of [
+      (client: QueryClient) => invalidateForJob(client, 'sync.incremental'),
+      (client: QueryClient) => invalidateForJob(client, 'categorize.run'),
+      invalidateLinkedData,
+      invalidateAfterUnlink,
+    ]) {
+      const { client, keys, invalidated } = seededSpending();
+      await refresh(client);
+      expect(invalidated(keys.pagesAugust)).toBe(true);
+    }
   });
 
   it('invalidateRecurring refreshes the recurring list only', async () => {

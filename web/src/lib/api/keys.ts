@@ -21,10 +21,11 @@ export const queryKeys = {
   transactions: () => ['get', '/transactions'] as const,
   /**
    * The paginated list. The trailing 'pages' keeps its InfiniteData apart
-   * from a plain `$api.useQuery` read with the same filters.
+   * from a plain `$api.useQuery` read with the same filters. `null` filters
+   * (not known yet) are a key no read fills.
    */
-  transactionPages: (filters: TransactionFilters) =>
-    ['get', '/transactions', { params: { query: filters } }, 'pages'] as const,
+  transactionPages: (filters: TransactionFilters | null) =>
+    ['get', '/transactions', filters && { params: { query: filters } }, 'pages'] as const,
   job: (jobId: string) =>
     ['get', '/jobs/{job_id}', { params: { path: { job_id: jobId } } }] as const,
 

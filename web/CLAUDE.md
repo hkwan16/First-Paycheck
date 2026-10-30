@@ -114,7 +114,8 @@ src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, queued animatio
                     fixtures/plan.ts (`GET /plan` built from the decision, goal, calendar and pay
                     stub fixtures; export jobs), msw/plan-handlers.ts (`planDb`)
 e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions,
-                    plan, import, check-in, alpha), support/auth.ts, support/api.ts, fixtures/ (synthetic
+                    plan, import, check-in, alpha), support/auth.ts, support/api.ts,
+                    support/spending.ts (a period with transactions), fixtures/ (synthetic
                     acme-paystub.pdf and the script that makes it, bank-export.csv), baselines
 ../docs/user-test/  the 5-to-8-person user test kit (script, quiz, consent, observation sheet)
 ```
@@ -202,7 +203,10 @@ The arrow turns over `--duration-fast`, zero under reduced motion; nothing anima
   `invalidateSpending`, `invalidateLinkedData`, `invalidateRecurring`, `invalidateForJob`), not
   with keys spelled at call sites. `useTransactions` is an infinite query under
   `queryKeys.transactionPages(filters)`; the trailing `'pages'` keeps its `InfiniteData` apart
-  from plain reads under the same prefix. After an unlink, `invalidateAfterUnlink` reads again
+  from plain reads under the same prefix, so every invalidation of `queryKeys.transactions()`
+  reaches every period's list too. `null` filters read nothing (the Spending screen before it
+  knows its period); when the filters change the last rows stay on screen (`isPlaceholderData`)
+  and `hasNextPage` is false until the new rows arrive, since the kept cursor is the old filters'. After an unlink, `invalidateAfterUnlink` reads again
   everything the institution's rows fed (spec 017 rules 12-14): accounts, transactions, summary,
   cash flow, check-ins (their cash flow), net worth, holdings, goals and the plan.
   `DELETE /sync/items/{id}` answers `{ recurring_job_id }`, the `recurring.detect` job it queued
@@ -277,6 +281,12 @@ The arrow turns over `--duration-fast`, zero under reduced motion; nothing anima
   (setup progress reads it). A `Period` is `{ start, end }`; `null` sends no dates and the API
   reads the last complete UTC month. `lib/periods.ts` builds the picker's options from
   `useToday()` (null on the server, so nothing reads the clock while rendering).
+  The Transactions card and the diagram's category popovers list the period the summary shows
+  (spec 003 rule 17a): `useTransactions(periodFilters(period))`, the chosen period or the dates
+  `GET /cashflow` answered its default with (nothing until then; `NEWEST_TRANSACTIONS`, no dates,
+  if the cash flow fails). `SpendingScreen` picks the filters and hands them to the card, whose
+  `null` means not known yet, as the hook's does. Both build the same filters, so they share one
+  cached list; setup progress reads `NEWEST_TRANSACTIONS`.
   `useRecurring()` lists recurring charges; `useUpdateRecurring()` PATCHes `user_status` or
   `name` optimistically, with rollback.
   The summary reads only the account kinds in `account_kinds_counted` (checking, savings,
@@ -884,7 +894,10 @@ tests share.
 
 `link.spec.ts` (project `authenticated-link`) unlinks everything, links Plaid's sandbox bank with
 the e2e-only button, follows the sync and sets roles; `spending.spec.ts` (project
-`authenticated-spending`, which depends on it) reads those transactions, checks that the
+`authenticated-spending`, which depends on it) reads those transactions (on the newest month
+in the picker that has some, `support/spending.ts`: `user_good`'s rows may all be in the month so
+far, and the list keeps to the summary's period), checks that every period lists only its own
+rows or says it has none, checks that the
 diagram's buckets match the summary tiles (and that the scale badge shows only when there is
 gross pay or income to scale by: the sandbox bank's last month may deposit nothing), drives a node
 from the keyboard, changes the period and saves a category fix; `import.spec.ts` (project `authenticated-import`, after Spending)

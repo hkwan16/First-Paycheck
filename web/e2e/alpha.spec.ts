@@ -9,6 +9,7 @@ import {
   plaidSandboxAvailable,
 } from './support/api';
 import { alphaUser, NO_ALPHA_USER, submitSignIn, waitForHydration } from './support/auth';
+import { showPeriodWithTransactions } from './support/spending';
 
 /*
  * The alpha, end to end, as a new user against the real API (docs/plan.md,
@@ -67,8 +68,9 @@ test('a new user goes from sign-in to a verified 401(k) explanation', async ({ p
       await page.getByRole('link', { name: /Continue to spending/ }).click();
       await expect(page).toHaveURL('/setup/spending');
       await waitForHydration(page);
-      const table = page.getByRole('table', { name: 'Transactions' });
-      await expect(table).toBeVisible({ timeout: 30_000 });
+      // The list is the summary's period (spec 003 rule 17a); the sandbox's
+      // rows may all be in the month so far.
+      const table = await showPeriodWithTransactions(page);
       expect(await table.getByRole('row').count()).toBeGreaterThan(2);
       await expect(table.getByText(/^(Rule|You|AI( · \d+%)?|Not labeled)$/).first()).toBeVisible();
 
