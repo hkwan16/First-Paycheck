@@ -56,6 +56,8 @@ from llm.schemas import (
     ExplanationDraft,
     NumberClaim,
     PayStubExtraction,
+    RateClaimRequest,
+    RateClaimVerdict,
 )
 from sync.categories import is_money_in
 
@@ -65,6 +67,7 @@ CATEGORIZE_PROMPT = ("categorize", "v2")
 EXTRACT_PAY_STUB_PROMPT = ("extract_pay_stub", "v1")
 EXTRACT_BENEFITS_PROMPT = ("extract_benefits", "v2")
 EXPLAIN_PROMPT = ("explain", "v2")
+JUDGE_RATE_CLAIM_PROMPT = ("judge_rate_claim", "v1")
 REQUEST_TIMEOUT_SECONDS = 120.0
 MICROCENTS_PER_CENT = 1_000_000
 FAKE_MODEL = "fake"
@@ -72,6 +75,10 @@ FAKE_FIXTURES = REPO_ROOT / "api" / "tests" / "fixtures" / "llm"
 FAKE_DEFAULT = ("other", 0.5)
 # How many facts FakeGateway's explanation states.
 FAKE_EXPLAIN_FACTS = 4
+# FakeGateway's rate-claim verdict: no claim, so free runs score every draft framed.
+FAKE_RATE_CLAIM_VERDICT = RateClaimVerdict(
+    reason="FakeGateway reads no claim.", claims_chosen_rate_in_effect=False
+)
 # HTTP statuses that mean the key, its permissions or the model id is wrong.
 MISCONFIGURED_STATUSES = frozenset({401, 403, 404})
 
@@ -427,6 +434,22 @@ class Gateway(ABC):
             prompt, ExplanationDraft, user_id=user_id, job_id=None, content=json.dumps(payload)
         )
 
+    def judge_rate_claim(
+        self,
+        user_id: uuid.UUID,
+        request: RateClaimRequest,
+    ) -> RateClaimVerdict:
+        """Whether an explanation says the rate chosen is already in effect (spec 008
+        rule 24a). The explain eval's judge: it measures drafts, never gates one."""
+        prompt = load_prompt(*JUDGE_RATE_CLAIM_PROMPT)
+        return self._call(
+            prompt,
+            RateClaimVerdict,
+            user_id=user_id,
+            job_id=None,
+            content=request.model_dump_json(),
+        )
+
     @staticmethod
     def _pages(pages: Sequence[ModelPage]) -> list[ContentBlockParam]:
         if not pages:
@@ -636,6 +659,8 @@ class FakeGateway(Gateway):
             text = self._fixture_text("extract_benefits.json")
         elif prompt.schema is ExplanationDraft and isinstance(content, str):
             text = self._explain(content)
+        elif prompt.schema is RateClaimVerdict:
+            text = FAKE_RATE_CLAIM_VERDICT.model_dump_json()
         else:
             raise LLMError(f"FakeGateway has no answers for {prompt.version}")
         return Reply(stop_reason="end_turn", text=text, usage=Usage())

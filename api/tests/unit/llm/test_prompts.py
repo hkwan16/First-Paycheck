@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from db.enums import LlmPurpose
 from llm import schemas
-from llm.gateway import CATEGORIZE_PROMPT, EXPLAIN_PROMPT
+from llm.gateway import CATEGORIZE_PROMPT, EXPLAIN_PROMPT, JUDGE_RATE_CLAIM_PROMPT
 from llm.prompts import PROMPTS_DIR, Prompt, PromptError, all_prompts, load_prompt, parse_prompt
 
 VALID = """---
@@ -153,6 +153,28 @@ def test_explain_v2_keeps_the_chosen_rate_apart_from_the_stub() -> None:
     assert '"the next 2%"' in v2
     assert '"100% vested"' in v2
     assert EXPLAIN_PROMPT == ("explain", "v2")
+
+
+def test_judge_rate_claim() -> None:
+    """Spec 008 rule 24a: the explain eval's judge runs on the explain model, explains
+    every field it reads and writes, and is the version the gateway sends."""
+    prompt = load_prompt("judge_rate_claim", "v1")
+    assert JUDGE_RATE_CLAIM_PROMPT == ("judge_rate_claim", "v1")
+    assert prompt.version == "judge_rate_claim/v1"
+    assert prompt.purpose is LlmPurpose.EXPLAIN
+    assert prompt.schema is schemas.RateClaimVerdict
+    for field in schemas.RateClaimVerdict.model_fields:
+        assert f"`{field}`" in prompt.system, field
+    for field in schemas.RateClaimRequest.model_fields:
+        assert f"`{field}`" in prompt.system, field
+    for field in schemas.RateClaimDraft.model_fields:
+        assert f"`draft.{field}`" in prompt.system, field
+    # The cases the regular expressions could not tell apart (spec 008 rule 24): a
+    # condition, a rate as the subject, and the full-match rate read against both rates.
+    assert '"if you stay at ..."' in prompt.system
+    assert '"The 6% you picked already gets the whole match"' in prompt.system
+    assert "`pay_stub_rate` equals `full_match_rate`" in prompt.system
+    assert chr(0x2014) not in prompt.system
 
 
 def test_parse_valid_prompt() -> None:

@@ -110,9 +110,18 @@ Rules:
   `model` = settings purpose, `effort`, `max_tokens`, `schema`), loaded and
   validated by `llm/prompts/__init__.py`. A released prompt file is never
   edited; a change is a new version.
+- One public method per prompt: `categorize` (`categorize/v2`),
+  `extract_pay_stub` (`extract_pay_stub/v1`), `extract_benefits`
+  (`extract_benefits/v2`), `explain` (`explain/v2`) and `judge_rate_claim`
+  (`judge_rate_claim/v1`, schema `RateClaimVerdict`; spec 008 rule 24a), the
+  explain eval's judge of whether a final explanation calls the chosen 401(k)
+  rate the one in effect. Nothing in `app/` or `jobs/` calls the judge; its
+  front matter names the `explain` purpose, so it runs on
+  `LLM_MODEL_EXPLAIN` with no setting or `llm_purpose` label of its own.
 - `LLM_FAKE=true` swaps in `FakeGateway`, which shares the budget, validation
-  and ledger code and answers from `tests/fixtures/llm/categorize.json`; every
-  API and worker test runs with it. Live calls are marked `llm_live` and never
+  and ledger code and answers from `tests/fixtures/llm/` (categorize, extract);
+  it writes an explanation from the facts and judges every draft "no claim".
+  Every API and worker test runs with it. Live calls are marked `llm_live` and never
   run by default.
 - The SDK is built on `httpx2`, which `respx` cannot patch: gateway tests pass
   `http_client=httpx2.Client(transport=httpx2.MockTransport(...))`.
@@ -295,8 +304,8 @@ explanation, `GET /calendar` shows the check it implies.
   `NONE`), decided once; the context's note and the fallback's sentences are
   looked up by it. It never goes into the decision, which is immutable. The
   verifier checks numbers and citations only; whether drafts call the chosen
-  rate the one in effect is the explain eval's `rate_framing` metric, not a
-  check. The gateway sends `explain/v2`; fallback rows are `fallback/v2`.
+  rate the one in effect is the explain eval's `rate_framing` metric, read by
+  `Gateway.judge_rate_claim`, not a check. The gateway sends `explain/v2`; fallback rows are `fallback/v2`.
 - **No transaction across a model call.** `POST /explain` takes `UserSessions`
   (a factory, `app/deps.py`): read in one session, call the gateway with none
   open, write in a second. `LlmGateway` is lazy, so a 404 or a stored verified
