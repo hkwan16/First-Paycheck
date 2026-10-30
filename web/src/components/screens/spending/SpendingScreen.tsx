@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { PageTitle } from '@/components/chrome/PageTitle';
 import { StepFooter } from '@/components/chrome/StepFooter';
 import { CardErrorBoundary } from '@/components/ui/CardErrorBoundary';
-import { useCashflow, type Period } from '@/lib/api/hooks';
+import { NEWEST_TRANSACTIONS, periodFilters, useCashflow, type Period } from '@/lib/api/hooks';
 import { features } from '@/lib/features';
 import { CashFlowCard } from './CashFlowCard';
 import { PeriodPicker } from './PeriodPicker';
@@ -35,13 +35,16 @@ export function SpendingScreen({
   const cashflow = useCashflow(period);
   const flow = cashflow.data;
   const title = flow ? `Where ${monthName(flow.start)}'s money went` : 'Where your money went';
-  // The period the transactions cover (spec 003 rule 17a): the one chosen,
-  // else the dates the API answered its default with. Not known while that
-  // answer is on its way (the last period's flow may still be on screen); null
-  // when the cash flow cannot be read, and the newest rows are listed instead.
-  const answered =
-    flow && !cashflow.isPlaceholderData ? { start: flow.start, end: flow.end } : undefined;
-  const listed = period ?? answered ?? (cashflow.isError ? null : undefined);
+  // The transactions listed (spec 003 rule 17a): the period chosen, else the
+  // dates the API answered its default with. Nothing while that answer is on
+  // its way (the last period's flow may still be on screen), and the newest
+  // rows when the cash flow cannot be read.
+  const listed = period ?? (flow && !cashflow.isPlaceholderData ? flow : null);
+  const transactions = listed
+    ? periodFilters(listed)
+    : cashflow.isError
+      ? NEWEST_TRANSACTIONS
+      : null;
 
   return (
     <>
@@ -67,7 +70,7 @@ export function SpendingScreen({
         <RecurringCard />
       </CardErrorBoundary>
       <CardErrorBoundary title="Transactions">
-        <TransactionsCard period={listed} />
+        <TransactionsCard filters={transactions} />
       </CardErrorBoundary>
       <StepFooter
         back={{ href: '/setup/link' }}

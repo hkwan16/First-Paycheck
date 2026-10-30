@@ -283,9 +283,10 @@ The arrow turns over `--duration-fast`, zero under reduced motion; nothing anima
   `useToday()` (null on the server, so nothing reads the clock while rendering).
   The Transactions card and the diagram's category popovers list the period the summary shows
   (spec 003 rule 17a): `useTransactions(periodFilters(period))`, the chosen period or the dates
-  `GET /cashflow` answered its default with (nothing until then; the newest rows, no dates, if
-  the cash flow fails). Both build the same filters, so they share one cached list; setup
-  progress reads the list with no dates.
+  `GET /cashflow` answered its default with (nothing until then; `NEWEST_TRANSACTIONS`, no dates,
+  if the cash flow fails). `SpendingScreen` picks the filters and hands them to the card, whose
+  `null` means not known yet, as the hook's does. Both build the same filters, so they share one
+  cached list; setup progress reads `NEWEST_TRANSACTIONS`.
   `useRecurring()` lists recurring charges; `useUpdateRecurring()` PATCHes `user_status` or
   `name` optimistically, with rollback.
   The summary reads only the account kinds in `account_kinds_counted` (checking, savings,

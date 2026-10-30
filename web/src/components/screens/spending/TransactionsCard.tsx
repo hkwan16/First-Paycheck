@@ -8,14 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { apiErrorMessage } from '@/lib/api/errors';
-import {
-  periodFilters,
-  TRANSACTIONS_PAGE_SIZE,
-  useAccounts,
-  useFixCategory,
-  useTransactions,
-  type Period,
-} from '@/lib/api/hooks';
+import { useAccounts, useFixCategory, useTransactions } from '@/lib/api/hooks';
 import type { TransactionFilters } from '@/lib/api/keys';
 import type { Category, Transaction } from '@/lib/api/types';
 import { categoryInfo } from '@/lib/categories';
@@ -60,19 +53,13 @@ function LoadingRows() {
   );
 }
 
-/** The period's rows; the newest rows without a period; nothing until it is known. */
-function filtersFor(period: Period | null | undefined): TransactionFilters | null {
-  if (period === undefined) return null;
-  return period ? periodFilters(period) : { limit: TRANSACTIONS_PAGE_SIZE };
-}
-
 export interface TransactionsCardProps {
   /**
-   * The period the summary shows (spec 003 rule 17a). Undefined while it is
-   * not known yet (the API's default period has not answered); null when it
-   * cannot be known (the cash flow failed), and the newest rows are listed.
+   * The list to read (spec 003 rule 17a): the summary's period
+   * (`periodFilters`), or the newest rows when the period cannot be known;
+   * null while it is not known yet.
    */
-  period: Period | null | undefined;
+  filters: TransactionFilters | null;
 }
 
 /**
@@ -81,8 +68,8 @@ export interface TransactionsCardProps {
  * notice says the server saved it as a rule, or that it went back. While
  * another period loads, the last rows stay on screen and the card is busy.
  */
-export function TransactionsCard({ period }: TransactionsCardProps) {
-  const list = useTransactions(filtersFor(period));
+export function TransactionsCard({ filters }: TransactionsCardProps) {
+  const list = useTransactions(filters);
   const accounts = useAccounts().data;
   const fix = useFixCategory();
   const [result, setResult] = useState<FixResult | null>(null);
@@ -132,9 +119,9 @@ export function TransactionsCard({ period }: TransactionsCardProps) {
     );
   } else if (list.transactions.length === 0) {
     body =
-      period && accounts?.length !== 0 ? (
+      filters?.start && filters.end && accounts?.length !== 0 ? (
         <p className="m-0 text-small text-ink-3">
-          No transactions from {periodText(period.start, period.end)}. Pick another period above.
+          No transactions from {periodText(filters.start, filters.end)}. Pick another period above.
         </p>
       ) : (
         <p className="m-0 text-small text-ink-3">

@@ -8,7 +8,7 @@ import { useDocuments } from './documents';
 import { usePlan } from './plan';
 import { usePayStubs } from './profile';
 import { useSpendingSummary } from './spending';
-import { TRANSACTIONS_PAGE_SIZE, useTransactions } from './transactions';
+import { NEWEST_TRANSACTIONS, useTransactions } from './transactions';
 
 /**
  * The counts and states `setupProgress` compares, from the API.
@@ -16,7 +16,7 @@ import { TRANSACTIONS_PAGE_SIZE, useTransactions } from './transactions';
 export function useSetupFacts(): SetupFacts {
   const accounts = useAccounts().data;
   // Whether any transaction has synced, whatever its date: no period.
-  const { transactions } = useTransactions({ limit: TRANSACTIONS_PAGE_SIZE });
+  const { transactions } = useTransactions(NEWEST_TRANSACTIONS);
   const documents = useDocuments().data;
   const payStubs = usePayStubs().data;
   // The default period, as the Spending screen opens on it.

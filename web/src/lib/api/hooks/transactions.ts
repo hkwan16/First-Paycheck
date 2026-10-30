@@ -28,6 +28,9 @@ export const periodFilters = ({ start, end }: Period): TransactionFilters => ({
   end,
 });
 
+/** The newest rows, whatever their dates. */
+export const NEWEST_TRANSACTIONS: TransactionFilters = { limit: TRANSACTIONS_PAGE_SIZE };
+
 /**
  * `GET /transactions` page by page (newest first), following `next_cursor`
  * with the same filters, so every page keeps to them. Returns the loaded rows
