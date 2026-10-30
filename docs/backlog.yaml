@@ -1637,3 +1637,46 @@ issues:
     # Fixed October 30: spec 003 rule 3d, a seed prefix rule names one
     # merchant; 15 over-broad rules narrowed. categorization-rules precision
     # 0.9714 to 1.0 with no correct rule label lost.
+  # Found on October 30 testing the four Decisions steps on production
+  # (e2e@firstpaycheck.test, PR #151).
+  - title: "The W-4 card says what current withholding leaves owed at tax time"
+    body: >-
+      The W-4 card says the latest pay stub withholds $272.44 of federal
+      income tax a paycheck, then projects $423.16 a paycheck under the W-4
+      entries on screen, and never says what the gap means. At $272.44 for
+      26 paychecks the person withholds about $7,100 a year against about
+      $11,000 of projected tax, so they would owe roughly $3,900 in April if
+      they change nothing. That is the most useful thing the card could tell
+      them. Change spec 014 first: the calculator also projects the refund or
+      balance due at the withholding the newest confirmed stub shows, worked
+      out in api/calc with hand-worked examples, and the card states it beside
+      the projection for the new entries. Failing test first. Done when the
+      e2e account's W-4 card states the balance due at its stub's withholding.
+    labels: ["area:api", "area:web"]
+    milestone: M10
+    priority: High
+  - title: "The health plan comparison says when a plan comes out ahead"
+    body: >-
+      The health plan comparison shows Saver HDHP at low use as -$596 a year.
+      The number is right (the employer's $1,200 HSA money is more than the
+      premium and the expected care), but a negative cost reads as an error.
+      Change spec 012 first so a negative yearly cost reads as coming out
+      ahead (for example "$596 ahead"), the same wherever the comparison
+      shows a cost, with the sign still coming from the API. Failing test
+      first. Done when no cost in the comparison renders with a minus sign.
+    labels: ["area:web"]
+    milestone: M10
+    priority: Low
+  - title: "The side nav does not push a decision below the fold on a phone"
+    body: >-
+      On a 390px phone the side nav renders above the page, and with the four
+      Decisions sub-items (#151) it fills about 500px before the decision
+      starts, so a person sees navigation and not the decision. Change spec
+      018 first: on narrow screens the nav collapses to a compact control that
+      names where the person is and opens the full list, keeping 44px
+      targets, the keyboard path, the done marks and the smoke spec's Tab
+      walk and axe checks. Desktop stays as it is. Failing test first. Done
+      when every app screen at 390px shows its heading in the first screenful.
+    labels: ["area:web"]
+    milestone: M10
+    priority: Medium
