@@ -215,6 +215,14 @@ def test_rate_framing_scores_only_a_stub_that_does_not_show_the_chosen_rate() ->
     assert explain.score(same, Claims()).metrics["rate_framing"] == 1.0
 
 
+def test_one_case_is_a_decision_and_rate_framing_counts_only_its_own() -> None:
+    """evals/CLAUDE.md: a metric tolerates one case's worth. rate_framing is a
+    share of the 18 decisions it scores, not of all 29, so one is worth 1/18."""
+    result = explain.score(explain.load_decisions(), fake())
+    assert result.cases == 29
+    assert result.case_worth == {"rate_framing": pytest.approx(1 / 18)}
+
+
 def test_the_live_suite_needs_a_key(monkeypatch: pytest.MonkeyPatch) -> None:
     # Explicitly no key: a key in the shell's environment must not make this a live call.
     no_key = Settings(_env_file=None, anthropic_api_key=None)

@@ -221,6 +221,8 @@ def score(decisions: Sequence[EvalDecision], drafter: Drafter) -> SuiteResult:
         },
         cases=count,
         failures=failures,
+        # One case is one decision; rate_framing is a share of only the ones it scores.
+        case_worth={"rate_framing": 1 / scored if scored else 0.0},
     )
 
 

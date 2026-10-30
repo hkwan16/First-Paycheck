@@ -166,7 +166,8 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   `document_accuracy` (30 stubs) 3.3, extraction `field_accuracy` (390 fields) and benefits
   `plan_field_accuracy` (72) 2, categorization `llm_accuracy` 14.7 and
   `accuracy` 2.7 (one label covers all 14 `sunrise bakery` rows, of the 95 the
-  model labels and the 515 in all). A metric above its baseline passes. The
+  model labels and the 515 in all), explain 3.4 (29 decisions) and its
+  `rate_framing` 5.6 (a share of only the 18 it scores). A metric above its baseline passes. The
   report gives each metric's tolerance under `tolerances`. `test_run.py` checks
   the rule through the CLI; each LLM suite's tests check its `case_worth`.
   A metric that does not depend on the model belongs in a free suite, which
