@@ -1,0 +1,332 @@
+[
+  {
+    "id": "person-contributing-chosen",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "You are already contributing 5%.",
+    "claims": true,
+    "note": "Issue 132's claim: the stub shows 3%."
+  },
+  {
+    "id": "person-at-chosen",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "You're already at 5%.",
+    "claims": true
+  },
+  {
+    "id": "full-match-stub-below",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "You already earn the full match.",
+    "claims": true,
+    "note": "Only the chosen 5% earns the full match; the stub's 3% does not."
+  },
+  {
+    "id": "full-match-no-stub",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": null,
+    "full_match_pct": "5.00",
+    "text": "You already earn the full match.",
+    "claims": true,
+    "note": "No stub: only the chosen rate could give the full match."
+  },
+  {
+    "id": "put-in-chosen",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "Each paycheck, you already put 5% in.",
+    "claims": true
+  },
+  {
+    "id": "chosen-already-in-effect",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "The 5% you chose is already in effect.",
+    "claims": true
+  },
+  {
+    "id": "chosen-is-full-match-rate",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "Because you are already at the full-match rate, moving to it costs you an extra $0.00 per paycheck before tax and $0.00 after federal income tax.",
+    "claims": true,
+    "note": "The chosen 5% is the full-match rate and the stub shows 3%: the mirror of capped-from-lower's true sentence."
+  },
+  {
+    "id": "missing-match-lowered",
+    "chosen_pct": "2.00",
+    "pay_stub_pct": "4.00",
+    "full_match_pct": "4.00",
+    "text": "You are already missing out on part of your employer's match.",
+    "claims": true,
+    "note": "The stub's 4% earns the whole match; only the chosen 2% misses part of it."
+  },
+  {
+    "id": "stub-equals-chosen",
+    "chosen_pct": "3.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "You are already contributing 3%.",
+    "claims": true,
+    "note": "The stub shows the chosen rate, so the claim is true; rate_framing does not score such a decision."
+  },
+  {
+    "id": "stub-equals-chosen-in-effect",
+    "chosen_pct": "4.00",
+    "pay_stub_pct": "4.00",
+    "full_match_pct": "6.00",
+    "text": "Your latest pay stub already shows the 4% you chose, so that rate is in effect now.",
+    "claims": true,
+    "note": "A true claim: the stub shows the chosen rate."
+  },
+  {
+    "id": "currently-no-stub",
+    "chosen_pct": "12.00",
+    "pay_stub_pct": null,
+    "full_match_pct": "5.00",
+    "text": "You are currently putting 12% of each paycheck into your 401(k).",
+    "claims": true
+  },
+  {
+    "id": "buried-in-paragraph",
+    "chosen_pct": "4.50",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "Your pay stub shows 3%. Your employer is already matching the 4.5% you contribute, and the full match starts at 5%.",
+    "claims": true,
+    "note": "The second sentence makes the claim after a first that states the stub."
+  },
+  {
+    "id": "chose-zero-nothing-now",
+    "chosen_pct": "0.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "You are not putting anything into your 401(k) right now, so your employer adds nothing.",
+    "claims": true,
+    "note": "The stub shows 3% going in; only the chosen 0% puts nothing in."
+  },
+  {
+    "id": "full-match-outcome",
+    "chosen_pct": "6.00",
+    "pay_stub_pct": "4.00",
+    "full_match_pct": "5.00",
+    "text": "Your employer already adds the full match to what you put in.",
+    "claims": true,
+    "note": "The stub's 4% is below the full-match 5%; only the chosen 6% earns it."
+  },
+  {
+    "id": "past-full-match",
+    "chosen_pct": "10.00",
+    "pay_stub_pct": "5.00",
+    "full_match_pct": "5.00",
+    "text": "You are already contributing 10%, more than the full-match rate.",
+    "claims": true
+  },
+  {
+    "id": "rate-subject-goes-in-now",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "The 5% you chose is what goes into your 401(k) from each paycheck now.",
+    "claims": true,
+    "note": "A rate as the subject can still be called the rate in effect."
+  },
+  {
+    "id": "claim-in-what-ifs",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "0.00",
+    "full_match_pct": "5.00",
+    "text": "At the 5% you chose, your employer would add $3,800.00 a year once you change your election.",
+    "what_ifs": [
+      "Since you already put in 5%, raising your rate would only add your own money."
+    ],
+    "claims": true
+  },
+  {
+    "id": "claim-in-concept",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": null,
+    "full_match_pct": "5.00",
+    "concept": "You already contribute the rate that earns your employer's full match.",
+    "text": "At the 5% you chose, you would earn the full match.",
+    "claims": true
+  },
+  {
+    "id": "live-chosen-rate-earns-full-match",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "The 5% you chose already earns the full match, so the match you miss is $0.00.",
+    "claims": false,
+    "decision": "issue-132-stub-01-chose-full-match",
+    "note": "A rate as the subject: 5% is enough for the full match."
+  },
+  {
+    "id": "live-rate-you-chose-earns",
+    "chosen_pct": "12.00",
+    "pay_stub_pct": null,
+    "full_match_pct": "5.00",
+    "text": "Moving to the full-match rate would not cost you more per paycheck, because the rate you chose already earns the full match.",
+    "claims": false,
+    "decision": "catch-up-61"
+  },
+  {
+    "id": "live-because-rate-you-chose",
+    "chosen_pct": "4.00",
+    "pay_stub_pct": "3.69",
+    "full_match_pct": "4.00",
+    "text": "Because the rate you chose already earns the full match, moving to the full-match rate would cost you an extra $0.00 per paycheck before tax and $0.00 after federal income tax.",
+    "claims": false,
+    "decision": "uneven-stub-rate"
+  },
+  {
+    "id": "live-stub-rate-earns",
+    "chosen_pct": "2.00",
+    "pay_stub_pct": "4.00",
+    "full_match_pct": "4.00",
+    "text": "The 4% your pay stub shows already earns the full match.",
+    "claims": false,
+    "decision": "lowered-below-match",
+    "note": "About the stub's rate, which is in effect and earns the full match."
+  },
+  {
+    "id": "live-rate-on-pay-stub",
+    "chosen_pct": "10.00",
+    "pay_stub_pct": "5.00",
+    "full_match_pct": "5.00",
+    "text": "Going from 5% to the full-match rate costs you an extra $0.00 per paycheck before tax and $0.00 after federal income tax, because the rate already earning the full match is the one on your pay stub.",
+    "claims": false,
+    "decision": "capped-from-lower"
+  },
+  {
+    "id": "live-stay-at-stub",
+    "chosen_pct": "2.00",
+    "pay_stub_pct": "4.00",
+    "full_match_pct": "4.00",
+    "text": "If you stay at the 4% on your pay stub, you already get the full match.",
+    "claims": false,
+    "decision": "lowered-below-match",
+    "note": "A condition about the stub's rate."
+  },
+  {
+    "id": "live-at-full-match-rate-stub",
+    "chosen_pct": "10.00",
+    "pay_stub_pct": "5.00",
+    "full_match_pct": "5.00",
+    "text": "Because you are already at the full-match rate, moving to it costs you an extra $0.00 per paycheck before tax and $0.00 after federal income tax.",
+    "claims": false,
+    "decision": "capped-from-lower",
+    "note": "The stub shows 5%, the full-match rate, so this is about the stub."
+  },
+  {
+    "id": "full-match-stub-earns",
+    "chosen_pct": "8.00",
+    "pay_stub_pct": "6.00",
+    "full_match_pct": "6.00",
+    "text": "You already earn the full match.",
+    "claims": false,
+    "note": "The stub's 6% is the full-match rate."
+  },
+  {
+    "id": "both-rates",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "Your pay stub shows 3% going to your 401(k) now. At the 5% you chose, your employer would add $3,800.00 a year.",
+    "claims": false
+  },
+  {
+    "id": "already-chosen",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "You have already chosen the full-match rate.",
+    "claims": false,
+    "note": "Choosing is not the rate going in."
+  },
+  {
+    "id": "future-once-election",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "Once you change your election with your employer, the 5% you chose will earn the full match.",
+    "claims": false
+  },
+  {
+    "id": "no-stub-would",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": null,
+    "full_match_pct": "5.00",
+    "text": "No confirmed pay stub shows what goes to your 401(k) now. At the 5% you chose, you would earn the full match.",
+    "claims": false
+  },
+  {
+    "id": "stub-full-chosen-more",
+    "chosen_pct": "8.00",
+    "pay_stub_pct": "6.00",
+    "full_match_pct": "6.00",
+    "text": "You already get the full match at the 6% your pay stub shows; the 8% you chose would add more of your own money but no more match.",
+    "claims": false
+  },
+  {
+    "id": "chose-zero-stub-now",
+    "chosen_pct": "0.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "Right now 3% of each paycheck goes to your 401(k); at the 0% you chose, nothing would, and your employer would stop matching.",
+    "claims": false
+  },
+  {
+    "id": "new-enrollee-yet",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "0.00",
+    "full_match_pct": "5.00",
+    "text": "Nothing goes to your 401(k) from your paychecks yet; the 5% you chose starts once you change your election.",
+    "claims": false
+  },
+  {
+    "id": "full-match-rate-is-chosen",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "The full-match rate is 5%, which is the rate you chose.",
+    "claims": false,
+    "note": "A statement about the rates, not about the paycheck."
+  },
+  {
+    "id": "no-match",
+    "chosen_pct": "6.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": null,
+    "text": "Your plan has no employer match, so the 6% you chose would be all your own money.",
+    "claims": false
+  },
+  {
+    "id": "saved-takes-effect",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "text": "You have already saved the 5% rate; it takes effect once payroll updates your election.",
+    "claims": false,
+    "note": "Saving the decision, not saving 5% of pay."
+  },
+  {
+    "id": "full-draft",
+    "chosen_pct": "5.00",
+    "pay_stub_pct": "3.00",
+    "full_match_pct": "5.00",
+    "concept": "Your employer adds money to your 401(k) when you contribute, up to a limit.",
+    "text": "Your latest pay stub shows 3% of your pay going to your 401(k) now. At the 5% you chose, your employer would add $3,800.00 a year, which is the full match.\n\nThe 5% you chose takes effect once you change your election with your employer. Until then, payroll keeps taking 3%.",
+    "what_ifs": [
+      "If you stay at 3%, your employer would add $2,850.00 a year."
+    ],
+    "claims": false
+  }
+]
