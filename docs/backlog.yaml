@@ -1688,3 +1688,7 @@ issues:
     labels: ["area:web"]
     milestone: M10
     priority: Medium
+    status: done
+    # Fixed October 30: spec 018 rules 11-17. Under 780px the nav is one
+    # disclosure button (about 56px, was 425px at 390x844); the smoke spec
+    # checks every screen's h1 ends in the first screenful.
