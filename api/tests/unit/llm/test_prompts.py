@@ -40,7 +40,7 @@ def test_version_matches_the_file_path() -> None:
         assert prompt.version == f"{path.parent.name}/{path.stem}"
 
 
-@pytest.mark.parametrize("version", ["v1", "v2"])
+@pytest.mark.parametrize("version", ["v1", "v2", "v3"])
 def test_categorize_prompts(version: str) -> None:
     prompt = load_prompt("categorize", version)
     assert prompt.version == f"categorize/{version}"
@@ -52,10 +52,11 @@ def test_categorize_prompts(version: str) -> None:
         assert f"`{category}`" in prompt.system
 
 
-def test_categorize_v2_explains_the_direction() -> None:
+@pytest.mark.parametrize("version", ["v2", "v3"])
+def test_categorize_explains_the_direction(version: str) -> None:
     """Spec 003 rule 9: the model is told what the direction means and that
     money in at a merchant is usually a refund unless it reads as pay."""
-    system = load_prompt("categorize", "v2").system
+    system = load_prompt("categorize", version).system
     assert "`direction`" in system
     assert '`"in"`' in system
     assert '`"out"`' in system
@@ -63,8 +64,26 @@ def test_categorize_v2_explains_the_direction() -> None:
     assert "pay, payroll, deposit or transfer" in system
 
 
-def test_the_gateway_uses_categorize_v2() -> None:
-    assert CATEGORIZE_PROMPT == ("categorize", "v2")
+def test_categorize_v3_calls_a_nonprofit_membership_a_donation() -> None:
+    """Spec 003 rule 9a (issue #146): v2 listed memberships under subscriptions,
+    so the model labeled a public radio station's member dues a subscription.
+    v3 defines such a membership as a donation, for every nonprofit, and names
+    no merchant."""
+    v2 = load_prompt("categorize", "v2").system
+    v3 = load_prompt("categorize", "v3").system
+    assert "news, memberships." in v2
+    subscriptions = next(line for line in v3.splitlines() if line.startswith("- `subscriptions`"))
+    assert "membership" not in subscriptions
+    donations = next(line for line in v3.splitlines() if line.startswith("- `gifts_donations`"))
+    assert "memberships or pledges to public radio and TV stations and other nonprofits" in (
+        donations
+    )
+    assert "even when it recurs every month" in v3
+    assert "kqed" not in v3.lower()
+
+
+def test_the_gateway_uses_categorize_v3() -> None:
+    assert CATEGORIZE_PROMPT == ("categorize", "v3")
 
 
 @pytest.mark.parametrize(

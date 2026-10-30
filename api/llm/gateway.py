@@ -63,7 +63,7 @@ from sync.categories import is_money_in
 
 log = logging.getLogger(__name__)
 
-CATEGORIZE_PROMPT = ("categorize", "v2")
+CATEGORIZE_PROMPT = ("categorize", "v3")
 EXTRACT_PAY_STUB_PROMPT = ("extract_pay_stub", "v1")
 EXTRACT_BENEFITS_PROMPT = ("extract_benefits", "v2")
 EXPLAIN_PROMPT = ("explain", "v2")

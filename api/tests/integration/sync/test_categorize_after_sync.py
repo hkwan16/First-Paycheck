@@ -1,5 +1,5 @@
 """A user's synced transactions, labeled the way the worker labels them
-(spec 003 rule 3d; issue #148).
+(spec 003 rules 3d and 9a; issues #148 and #146).
 
 Each test links a bank item, runs the worker as production does (the sync job
 writes the transactions and queues ``categorize.run``, which runs the seed
@@ -29,6 +29,7 @@ from sync.categorize import CategoryLabeler
 from sync.pipeline import SyncItemSecrets
 from sync.provider import ProviderTransaction, SyncProvider
 from tests.conftest import FixtureUser
+from tests.support.anthropic_api import AnsweringApi, api_gateway
 from tests.support.factories import make_item
 from tests.support.fake_provider import CHECKING, FakeProvider, page, txn
 
@@ -142,3 +143,31 @@ def test_a_seed_word_inside_another_merchants_name_is_not_its_category(
     }
     # Only the merchants no seed rule names reach the model.
     assert sorted(labeler.merchants) == ["rent the runway", "shell beach surf shop"]
+
+
+def test_a_public_radio_membership_is_sent_with_the_donation_definition(
+    empty_queue: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Issue #146: categorize/v2 listed memberships under subscriptions, so the
+    model called a public radio station's member dues a subscription. The job
+    now sends categorize/v3, which defines such a membership as a donation
+    (spec 003 rule 9a), and applies the model's answer to the user's rows."""
+    api = AnsweringApi({"items": [{"id": 1, "category": "gifts_donations", "confidence": 0.92}]})
+    sync_and_categorize(
+        empty_queue,
+        user_a,
+        [txn("t1", 2_500, "KQED MEMBERSHIP"), txn("t2", 1_200, "SAFEWAY #1234")],
+        api_gateway(empty_queue, api),
+    )
+
+    [request] = api.requests
+    system = request["system"][0]["text"]
+    assert "public radio" in system
+    versions = empty_queue.execute(
+        text("SELECT prompt_version FROM llm_calls WHERE user_id = :u"), {"u": user_a.id}
+    ).scalars()
+    assert list(versions) == ["categorize/v3"]
+    assert categories(client_as(user_a)) == {
+        "kqed membership": ("gifts_donations", "llm"),
+        "safeway": ("groceries", "rule"),
+    }

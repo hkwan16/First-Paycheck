@@ -200,7 +200,7 @@ def test_categorize_sends_minimal_data_and_records_the_call(
     assert row == {
         "purpose": "categorize",
         "model": "claude-sonnet-5-5",
-        "prompt_version": "categorize/v2",
+        "prompt_version": "categorize/v3",
         "input_tokens": 300,
         "output_tokens": 120,
         "cache_read_tokens": 2_000,

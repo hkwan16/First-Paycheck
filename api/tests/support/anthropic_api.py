@@ -1,12 +1,17 @@
-"""The real ``LLMGateway`` in front of a Messages API that answers every request
-with one HTTP error, for job tests that must see exactly what production sees.
+"""The real ``LLMGateway`` in front of a scripted Messages API (one HTTP error,
+or one answer, for every request), for job tests that must see exactly what
+production sees.
 
 The SDK is built on httpx2, which respx cannot patch, so the API is an
 ``httpx2.MockTransport`` handed to the SDK as its HTTP client. Everything above
-the transport (the SDK's error mapping, the gateway's ledger) is the real code.
+the transport (the prompt, the SDK's error mapping, the gateway's ledger) is
+the real code.
 """
 
 from __future__ import annotations
+
+import json
+from typing import Any
 
 import httpx2
 from pydantic import SecretStr
@@ -43,7 +48,30 @@ class ErroringApi:
         return httpx2.Response(self.status, json=body)
 
 
-def api_gateway(connection: Connection, api: ErroringApi) -> LLMGateway:
+class AnsweringApi:
+    """Answers every request with one successful message whose text is
+    ``answer`` (the model's JSON); records each request body it was sent."""
+
+    def __init__(self, answer: dict[str, Any]) -> None:
+        self.answer = answer
+        self.requests: list[dict[str, Any]] = []
+
+    def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        self.requests.append(json.loads(request.content))
+        message = {
+            "id": "msg_test",
+            "type": "message",
+            "role": "assistant",
+            "model": "claude-sonnet-5-5",
+            "content": [{"type": "text", "text": json.dumps(self.answer)}],
+            "stop_reason": "end_turn",
+            "stop_sequence": None,
+            "usage": {"input_tokens": 200, "output_tokens": 40},
+        }
+        return httpx2.Response(200, json=message)
+
+
+def api_gateway(connection: Connection, api: ErroringApi | AnsweringApi) -> LLMGateway:
     """A real gateway with a test key whose HTTP calls go to ``api``."""
     settings = Settings(
         _env_file=None,
