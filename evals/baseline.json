@@ -30,8 +30,7 @@
   },
   "extraction": {
     "document_accuracy": 1.0,
-    "field_accuracy": 1.0,
-    "redaction_recall": 1.0
+    "field_accuracy": 1.0
   },
   "extraction-smoke": {
     "pipeline_ok": 1.0,
