@@ -323,7 +323,10 @@ The arrow turns over `--duration-fast`, zero under reduced motion; nothing anima
   tests, `replaceDocument(id)` (msw/handlers.ts) does to `db` what the API does. A CSV import refused with 422
   `csv_invalid` carries its row errors: `csvProblems(error)` reads `{ errors, total }` (the first
   50 and how many in all); the Link screen's `CsvImport` lists them, offers Try again on 409
-  `import_conflict`, and follows the two job ids the import returns. `lib/documents.ts` maps a
+  `import_conflict`, and follows the two job ids the import returns. It reports an import, and
+  keeps an account as the one to import into, only while the account list has that account
+  (`useImportCsv` adds the imported account to the list at once), so removing the account clears
+  both (issue 173). `lib/documents.ts` maps a
   document's status to its badge and reason text; `isReviewable`/`newestReviewable` pick what
   Confirm opens: a pay stub first, else a benefits summary that was read.
 - **Money** is formatted only. Transactions keep Plaid's sign (positive is money out):
@@ -860,7 +863,8 @@ diagram's buckets match the summary tiles (and that the scale badge shows only w
 gross pay or income to scale by: the sandbox bank's last month may deposit nothing), drives a node
 from the keyboard, changes the period and saves a category fix; `import.spec.ts` (project `authenticated-import`, after Spending)
 imports `e2e/fixtures/bank-export.csv` (five synthetic rows) into a new CSV account, imports it
-again without making a second account, and checks a broken file's row errors.
+again without making a second account, imports into another new account and removes it (the panel
+then reports nothing about it), and checks a broken file's row errors.
 Both change the e2e user's data, so they are ordered projects with serial files rather than
 parallel tests. `confirm.spec.ts` (project `authenticated-confirm`) uploads
 `e2e/fixtures/acme-paystub.pdf`, a synthetic stub with an example SSN the API must redact and a
