@@ -1,10 +1,10 @@
 # 018: Decisions as four steps
 
-Status: Implemented, M10 (web only).
+Status: Implemented, M10 (web only). Rules 11-17, the side nav on a phone (issue 155): Implemented, Hardening (web only).
 
 ## Goal
 
-The Decisions screen put four calculators on one page, two by two, with every control of every card in view at once; people found it cluttered. This spec splits it into four steps, one page per calculator, in the mockup's order (emergency fund, 401(k), health plan, W-4), and gives the side nav four sub-items under "Decisions", so a person works through one decision at a time and can still see, from anywhere, which ones are saved. Nothing about a calculator changes: each card moves to its own page as it is. No API route or schema changes; every number still comes from the API. Code: `web/src/lib/decision-steps.ts` (order, slugs, neighbors), the route builders in `web/src/lib/routes.ts`, `web/src/components/screens/decisions/DecisionStepScreen.tsx`, `web/src/app/(app)/setup/decisions/<slug>/page.tsx`, `web/src/components/chrome/SideNav.tsx`, `web/src/lib/setup-progress.ts` and the redirect in `web/src/proxy.ts`.
+The Decisions screen put four calculators on one page, two by two, with every control of every card in view at once; people found it cluttered. This spec splits it into four steps, one page per calculator, in the mockup's order (emergency fund, 401(k), health plan, W-4), and gives the side nav four sub-items under "Decisions", so a person works through one decision at a time and can still see, from anywhere, which ones are saved. On a phone the nav with its sub-items filled about 500px of a 390x844 screen above the page's heading, so a person saw navigation and not the decision; under 780px the nav now collapses to one control that names where the person is and opens the full list (rules 11-17). Nothing about a calculator changes: each card moves to its own page as it is. No API route or schema changes; every number still comes from the API. Code: `web/src/lib/decision-steps.ts` (order, slugs, neighbors), the route builders in `web/src/lib/routes.ts`, `web/src/components/screens/decisions/DecisionStepScreen.tsx`, `web/src/app/(app)/setup/decisions/<slug>/page.tsx`, `web/src/components/chrome/SideNav.tsx` (with `AppSideNav.tsx`), `web/src/lib/setup-progress.ts` and the redirect in `web/src/proxy.ts`.
 
 ## Inputs
 
@@ -51,7 +51,15 @@ The side nav's "Decisions" item gets a nested list of four sub-items, labeled "E
 8. **Done marks**: a sub-item is done when its calculator is live and has a saved decision (`setupProgress`, from the `savedDecisionCalculators` and `liveCalculators` it already reads; no new API call). "Decisions" itself is done when every live calculator is saved (unchanged). A done item says ", done" to screen readers, like the steps.
 9. **Not live**: a calculator off in `features.calculators` is still a sub-item, still a link to its step (whose page shows the placeholder), drawn muted with a visible "After alpha" after its label; its accessible name ends ", After alpha". It is never marked done.
 10. **"Decisions" links to the entry step** (rule 3's target), not to `/setup/decisions`, so following it costs no redirect.
-11. **Under 780px** the nav is a wrapping chip row (unchanged for every other item). The "Decisions" item takes the full row width there: its chip, then its four sub-items as a wrapping row of their own, indented behind a hairline so they read as Decisions' children. At 390px that is two rows of two sub-items. Every sub-item keeps its 44px height, and Tab reaches them in order right after "Decisions", before "Why this decision".
+### The side nav on a phone (issue 155)
+
+11. **Under 780px the nav collapses to one control** at the top of the page, above the page's title, that names where the person is and opens the full nav list. The breakpoint stays 780px (the `nav` breakpoint token). At 780px and wider nothing changes: the control is not displayed (so it is neither seen nor reached by Tab) and the list is always shown, as before. On a 390x844 phone the h1 of every app screen is within the first screenful.
+12. **A disclosure, not a sheet.** The control is a `<button>` with `aria-expanded` and `aria-controls` naming the list, and the open list sits in the page flow right under it, pushing the page down. That is the accessible choice with the least to get wrong: focus stays on the button when the list opens, Tab goes from the button straight into the list in reading order, the page around it stays usable, and nothing is covered. A modal sheet would need a focus trap, a backdrop, a scroll lock, `inert` on the rest of the page and a close button of its own, and it would hide the page the person is on to show them navigation, for no gain on a list of eleven links. The control and the list are in the one `<nav aria-label="Setup steps">`, so on a phone the landmark is still there, with the button first in it.
+13. **Closed**, the control shows the current item's marker (its `NavStep`: the step number or glyph, the small dot for a decision step, a check once done), its label, with its section first for a decision step ("Decisions: 401(k) match"), and under it how far through setup the person is: "n of 4 setup steps done", counting the four setup steps (Accounts and documents, Confirm pay stub, Spending map, Decisions) that the list marks done, from the same `setupProgress` (`setupStepsDone`). With no current item (a page the nav does not list, or the layout's fallback before the URL is read) the label is "Setup steps" with a neutral glyph. A chevron at the end points down while closed and up while open. The accessible name is the visible text with ", done" after a done item's label and a comma before the progress: "Decisions: 401(k) match, done, 3 of 4 setup steps done". The control spans the content width and is at least 44px tall.
+14. **Open**, the list is the desktop list: one list in two presentations, never a second copy for phones. The two groups, the four decision steps indented under Decisions behind their hairline, every done mark, `aria-current="page"` on the current item, the muted "After alpha" steps and every 44px target are as rules 7-9 say. It stacks one item per row, as on desktop: the wrapping chip row it replaces is gone, so every label reads in full.
+15. **It closes** when the person presses the control again, presses Escape while focus is in the nav (focus returns to the control), or chooses a link in the list, and whenever the page changes some other way (a link in the page, the footer, Back): an open list belongs to the page it was opened on. Every page load starts closed. A click elsewhere does not close it, since it covers nothing.
+16. **Motion and transparency**: the only movement is the chevron turning, over `--duration-fast`, which reduced motion sets to zero; the list appears and disappears at once, with no animation. Nothing in the control is translucent, so reduced transparency changes nothing.
+17. **The keyboard path on a phone**: Tab reaches the control right after the header's controls; Enter or Space opens it; Tab then goes through the list in order (the four decision steps right after "Decisions", before "Why this decision") and on into the page. The smoke spec's Tab walk presses Enter on the control when it reaches it and walks the list too, so every nav link stays reachable at 390px and is checked for its focus ring.
 
 ## Hand-worked examples
 
@@ -80,6 +88,24 @@ The side nav's "Decisions" item gets a nested list of four sub-items, labeled "E
 | `never marks a step that is not live` | `401k_match` | `w4` | none | no |
 | `all live saved` | `401k_match` | `401k_match` | 401(k) | yes |
 
+### The phone control (`web/src/components/chrome/SideNav.test.tsx`, `web/src/lib/setup-progress.test.ts`)
+
+| Test | Current | Done | The closed control's accessible name |
+|---|---|---|---|
+| `names a setup step and the setup progress` | `spending` | `link`, `confirm` | "Spending map, 2 of 4 setup steps done" |
+| `names a decision step after its section, with its done mark` | `401k_match` | `link`, `confirm`, `spending`, `401k_match` | "Decisions: 401(k) match, done, 3 of 4 setup steps done" |
+| `names a plan screen` | `checkIn` | `link`, `confirm`, `spending`, `decisions`, `plan` | "Monthly check-in, 4 of 4 setup steps done" |
+| `names the nav itself with no current item` | none | none | "Setup steps, 0 of 4 setup steps done" |
+
+`setupStepsDone` counts only the four setup steps: `{ link, confirm, spending, decisions, plan, '401k_match', w4 }` all true is 4, and `{ confirm, plan, w4 }` is 1.
+
+| Test | Steps | Result |
+|---|---|---|
+| `opens the list in place and closes it again` | press the control, then press it again | `aria-expanded` true, the list (its `aria-controls`) shown; then false, the list hidden under 780px |
+| `closes on Escape and gives focus back to the control` | open, Tab into the list, Escape | closed, focus on the control |
+| `closes when a link in the list is chosen` | open, click "Spending map" | closed |
+| `closes when the page changes` | open, rerender with a new `pathname` | closed |
+
 ### Redirect (`web/src/proxy.test.ts`)
 
 | Test | Request | Response |
@@ -96,6 +122,9 @@ The side nav's "Decisions" item gets a nested list of four sub-items, labeled "E
 - A saved decision for a calculator that is not live: its sub-item is muted and not done, and its page shows the placeholder; the "n of 4 saved" badge still counts it, as `GET /decisions` lists it (unchanged from the one-page screen).
 - A card that throws while rendering: its boundary shows the card's frame and notice, and the page's title, badge and footer still work, so the person can move on to the next step.
 - `GET /decisions` fails or is loading: no badge and no done marks, as before.
+- The done marks are loading: the closed control counts the marks the list shows, so it says "0 of 4 setup steps done" until they arrive, as the list shows no checks until then; the line is always there, so nothing below it moves when the count changes.
+- A window resized across 780px while the list is open: at 780px and wider the list shows as always and the control is not displayed; back under 780px the list is still open.
+- An item whose label wraps (a narrow phone): the control grows to fit and stays at least 44px; nothing is cut off.
 
 ## Out of scope
 
