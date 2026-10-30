@@ -4,7 +4,9 @@
 ``POST /decisions`` calls ``check_saveable`` before it inserts anything and
 ``apply`` right after the insert, in the same transaction, so a failure here
 saves nothing. Every read and write runs in the request's RLS session; dates
-come from ``calc/pay_dates.py``.
+come from ``calc/pay_dates.py``. ``reproject_goal`` is the save's projection
+of the emergency fund goal, which ``PATCH /goals/{id}`` reuses when the goal's
+contribution changes (spec 011 rule 17a).
 """
 
 from __future__ import annotations
@@ -19,12 +21,19 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.errors import AppError
-from calc.emergency_fund import EmergencyFundInput, EmergencyFundResult
+from calc.emergency_fund import EmergencyFundInput, EmergencyFundResult, emergency_fund
 from calc.health_plans import HealthPlansInput
 from calc.k401 import K401MatchInput
 from calc.pay_dates import PERIODS, PayFrequency, add_months, frequency_for_periods, next_pay_date
 from calc.w4 import W4Input
-from db.enums import AccountRole, CalendarKind, CalendarStatus, GoalKind, GoalStatus
+from db.enums import (
+    AccountRole,
+    CalculatorKind,
+    CalendarKind,
+    CalendarStatus,
+    GoalKind,
+    GoalStatus,
+)
 from db.models import Account, CalendarEvent, Decision, Goal, PayStub, Profile
 
 __all__ = [
@@ -37,6 +46,7 @@ __all__ = [
     "Effects",
     "apply",
     "check_saveable",
+    "reproject_goal",
 ]
 
 ELECTION_CHECK_TITLE = "Check that your next pay stub shows your new 401(k) contribution"
@@ -92,6 +102,29 @@ def _next_pay_date(session: Session, user_id: uuid.UUID, periods: int, today: dt
     """Spec 007 rule 16, anchored on the latest confirmed pay stub."""
     anchor = session.scalar(select(func.max(PayStub.pay_date)))
     return next_pay_date(_pay_frequency(session, user_id, periods), anchor, today)
+
+
+def _target_date(first: dt.date, result: EmergencyFundResult) -> dt.date | None:
+    """Spec 011 rule 11: the last contribution's date; None when funded or out of reach."""
+    months = result.months_to_target
+    return add_months(first, months - 1) if months else None
+
+
+def reproject_goal(session: Session, goal: Goal, today: dt.date) -> dt.date | None:
+    """Spec 011 rule 17a: the goal's date at its own contribution, as a save projects it.
+
+    The goal's decision supplies every other input; the calculator and the
+    first contribution date are the ones a save uses (rule 11). A goal without
+    an emergency-fund decision has no projection.
+    """
+    decision = session.get(Decision, goal.decision_id) if goal.decision_id else None
+    if decision is None or decision.calculator != CalculatorKind.EMERGENCY_FUND:
+        return None
+    inputs = EmergencyFundInput.model_validate(
+        {**decision.inputs, "monthly_contribution_cents": goal.monthly_contribution_cents}
+    )
+    first = _next_pay_date(session, decision.user_id, inputs.pay_periods_per_year, today)
+    return _target_date(first, emergency_fund(inputs))
 
 
 def _dismiss_superseded(
@@ -154,8 +187,6 @@ def _emergency_fund(
 ) -> Effects:
     """Spec 011 rules 9-14: create or update the goal, then the two checkpoints."""
     first = _next_pay_date(session, decision.user_id, inputs.pay_periods_per_year, today)
-    months = result.months_to_target
-    target_date = add_months(first, months - 1) if months else None
 
     goal = session.scalars(
         select(Goal).where(Goal.kind == GoalKind.EMERGENCY_FUND).with_for_update()
@@ -170,7 +201,7 @@ def _emergency_fund(
     goal.target_amount_cents = result.target_cents
     goal.monthly_contribution_cents = inputs.monthly_contribution_cents
     goal.decision_id = decision.id
-    goal.target_date = target_date
+    goal.target_date = _target_date(first, result)
     goal.status = GoalStatus.ACTIVE
     goal.reached_at = None
     session.flush()

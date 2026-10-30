@@ -241,15 +241,64 @@ def test_patch_pause_and_reach(frozen: FastAPI, client_as: Client, user_a: Fixtu
     assert (active.json()["status"], active.json()["reached_at"]) == ("active", None)
 
 
-def test_patch_contribution_clears_target_date(
-    frozen: FastAPI, client_as: Client, user_a: FixtureUser
-) -> None:
-    client = client_as(user_a)
-    goal_id = save_fund(client, EXAMPLE_1)["goal_id"]
-    patched = client.patch(f"/goals/{goal_id}", json={"monthly_contribution_cents": 60_000})
+def patch_contribution(client: TestClient, goal_id: str, cents: int) -> dict[str, Any]:
+    patched = client.patch(f"/goals/{goal_id}", json={"monthly_contribution_cents": cents})
     assert patched.status_code == 200, patched.text
-    assert patched.json()["monthly_contribution_cents"] == 60_000
-    assert patched.json()["target_date"] is None
+    body: dict[str, Any] = patched.json()
+    assert body["monthly_contribution_cents"] == cents
+    return body
+
+
+def test_patch_contribution_reprojects_target_date(
+    frozen: FastAPI, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    # Spec 011 rule 17a, goals example 5: the projection follows the goal's
+    # contribution, as saving would project it, and comes back with the amount.
+    client = client_as(user_a)
+    biweekly_with_stub(client, db_connection, user_a)
+    saved = save_fund(client, EXAMPLE_1)
+    goal_id = saved["goal_id"]
+
+    assert patch_contribution(client, goal_id, 75_000)["target_date"] == "2027-07-30"
+    back = patch_contribution(client, goal_id, 50_000)
+    assert back["target_date"] == "2027-12-30"
+    assert back["target_amount_cents"] == 750_000
+    assert back["decision_id"] == saved["decision_id"]
+
+    # The decision is immutable and its events belong to it.
+    [fund] = client.get("/decisions").json()["items"]
+    assert [version["id"] for version in fund["versions"]] == [saved["decision_id"]]
+    assert events(db_connection, saved["decision_id"]) == [
+        ("goal_contribution", "2026-10-30", "upcoming"),
+        ("goal_review", "2027-01-30", "upcoming"),
+    ]
+
+
+def test_patch_contribution_projects_from_the_request_day(
+    frozen: FastAPI, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    # Goals example 7: the first contribution is the next pay date after the request.
+    client = client_as(user_a)
+    biweekly_with_stub(client, db_connection, user_a)
+    goal_id = save_fund(client, EXAMPLE_1)["goal_id"]
+
+    frozen.dependency_overrides[get_now] = lambda: dt.datetime(2026, 11, 5, 15, tzinfo=dt.UTC)
+    assert patch_contribution(client, goal_id, 75_000)["target_date"] == "2027-08-13"
+    # The same contribution again changes nothing, a week on.
+    frozen.dependency_overrides[get_now] = lambda: dt.datetime(2026, 11, 12, 15, tzinfo=dt.UTC)
+    assert patch_contribution(client, goal_id, 75_000)["target_date"] == "2027-08-13"
+
+
+def test_patch_contribution_out_of_reach_has_no_date(
+    frozen: FastAPI, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    # Goals example 8: 750,000 at 5,000 a month is 150 months, past the horizon.
+    client = client_as(user_a)
+    biweekly_with_stub(client, db_connection, user_a)
+    goal_id = save_fund(client, EXAMPLE_1)["goal_id"]
+    assert patch_contribution(client, goal_id, 5_000)["target_date"] is None
+    assert patch_contribution(client, goal_id, 0)["target_date"] is None
+    assert patch_contribution(client, goal_id, 50_000)["target_date"] == "2027-12-30"
 
 
 def test_patch_links_and_unlinks_an_account(

@@ -486,6 +486,9 @@ export interface paths {
     /**
      * Update Goal
      * @description Pause, resume or mark a goal reached, change its contribution or its account.
+     *
+     *     A new contribution projects the goal's date again, the way saving the
+     *     decision at that contribution would.
      */
     patch: operations['update_goal'];
     trace?: never;
