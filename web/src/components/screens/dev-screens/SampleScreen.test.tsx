@@ -77,7 +77,7 @@ describe('SampleScreen', () => {
     const requests = countRequests();
     render(<SampleScreen screen="confirm-benefits" />);
     const fields = await screen.findByRole('region', { name: 'Plans and 401(k) match' });
-    expect(fields).toHaveTextContent('0 of 21 confirmed');
+    expect(fields).toHaveTextContent('0 of 29 confirmed');
     expect(within(fields).getByRole('heading', { name: 'Plan 2: Gold PPO' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Redacted benefits summary' })).toBeInTheDocument();
     expect(requests).toEqual([]);

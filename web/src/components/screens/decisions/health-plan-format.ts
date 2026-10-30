@@ -7,7 +7,7 @@ import type {
   PlanKind,
   PlanPair,
 } from '@/lib/api/types';
-import { formatMoney, formatRate } from '@/lib/money';
+import { formatMoney, formatNetCost, formatRate, netCost } from '@/lib/money';
 import { amountText, readAmount } from './decision-format';
 
 /*
@@ -98,11 +98,24 @@ export function costAt(plan: PlanCost, usage: HealthcareUsage): number {
   }
 }
 
-/** The result panel's headline: the API's recommendation at the expected usage. */
+/**
+ * A plan's yearly net cost in whole dollars, as the comparison prints it: a
+ * negative cost (the API's sign) reads as coming out ahead, "$260 ahead"
+ * (spec 012 rule 17).
+ */
+export const costText = (cents: number) => formatNetCost(cents, { decimals: 0 });
+
+/**
+ * The result panel's headline: the API's recommendation at the expected usage.
+ * A plan that comes out ahead "leaves you $260 ahead a year" rather than
+ * costing "$260 ahead a year" (spec 012 rule 17).
+ */
 export function headline(result: HealthPlansResult, usage: HealthcareUsage): string {
   const plan = result.plans[result.recommended_index];
   if (!plan) return 'No plan to compare';
-  return `${plan.name} costs the least at ${usage} use: ${dollars(costAt(plan, usage))} a year`;
+  const { amount, ahead } = netCost(costAt(plan, usage), { decimals: 0 });
+  const least = `${plan.name} costs the least at ${usage} use`;
+  return ahead ? `${least} and leaves you ${amount} ahead a year` : `${least}: ${amount} a year`;
 }
 
 /** "$100", "$100 and $200", "$100, $200 and $300". */

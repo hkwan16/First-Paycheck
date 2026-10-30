@@ -44,6 +44,7 @@ import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
 import { amountText, readAmount, saveBadgeTone, saveErrorText } from './decision-format';
 import {
   costAt,
+  costText,
   hdhpNotice,
   headline,
   hsaEffect,
@@ -434,6 +435,8 @@ function Comparison({ result, plans, usage, scenarios, selected, taxYear }: Comp
   const cell = 'border-t border-line px-2 py-1.5 text-right tabular-nums';
   const rowHead = 'border-t border-line py-1.5 pr-2 text-left font-normal text-ink-3';
   const money = (cents: number) => <Money cents={cents} decimals={0} />;
+  // A net cost: the API's sign, a negative one written as an amount ahead (spec 012 rule 17).
+  const cost = (cents: number) => <span className="tabular-nums">{costText(cents)}</span>;
   const row = (label: string, values: ReactNode[], strong = false) => (
     <tr key={label} className={cn(strong && 'font-semibold')}>
       <th scope="row" className={cn(rowHead, strong && 'font-semibold text-ink')}>
@@ -517,13 +520,13 @@ function Comparison({ result, plans, usage, scenarios, selected, taxYear }: Comp
             {USAGES.map((u) =>
               row(
                 usageLabel(u, scenarios[u], { row: true }),
-                result.plans.map((plan) => money(costAt(plan, u))),
+                result.plans.map((plan) => cost(costAt(plan, u))),
                 u === usage,
               ),
             )}
             {row(
               'Worst case',
-              result.plans.map((plan) => money(plan.worst_case_cents)),
+              result.plans.map((plan) => cost(plan.worst_case_cents)),
             )}
           </tbody>
         </table>

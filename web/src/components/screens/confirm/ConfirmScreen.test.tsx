@@ -501,7 +501,7 @@ describe('ConfirmScreen benefits summary', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Check what we read from your benefits summary',
     );
-    expect(benefitsCard()).toHaveTextContent('0 of 21 confirmed');
+    expect(benefitsCard()).toHaveTextContent('0 of 29 confirmed');
     for (const heading of ['Plan 1: Bronze HSA', 'Plan 2: Gold PPO', '401(k) match']) {
       expect(
         within(benefitsCard()).getByRole('heading', { level: 3, name: heading }),
@@ -557,7 +557,7 @@ describe('ConfirmScreen benefits summary', () => {
       }),
     );
     await user.click(screen.getByRole('button', { name: 'Confirm all remaining' }));
-    expect(benefitsCard()).toHaveTextContent('21 of 21 confirmed');
+    expect(benefitsCard()).toHaveTextContent('29 of 29 confirmed');
     await user.click(continueButton());
 
     expect(await screen.findByText('Your benefits summary is confirmed.')).toBeInTheDocument();
@@ -568,16 +568,16 @@ describe('ConfirmScreen benefits summary', () => {
       'href',
       '/setup/decisions/health-plan',
     );
-    const [bronze, gold] = sampleBenefitsValues.plans;
+    const [bronze, gold, saver] = sampleBenefitsValues.plans;
     expect(bodies).toEqual([
       {
         benefits: {
           ...sampleBenefitsValues,
-          plans: [{ ...bronze, deductible_cents: 200_000 }, gold],
+          plans: [{ ...bronze, deductible_cents: 200_000 }, gold, saver],
         },
       },
     ]);
-    expect(planningDb.benefitsPlans).toHaveLength(2);
+    expect(planningDb.benefitsPlans).toHaveLength(3);
     expect(router.push).not.toHaveBeenCalled();
   });
 
@@ -587,7 +587,7 @@ describe('ConfirmScreen benefits summary', () => {
     db.proposals.set(BENEFITS_DOC_ID, proposal);
     const { user } = await renderBenefits();
     await user.click(screen.getByRole('button', { name: 'Confirm all remaining' }));
-    expect(benefitsCard()).toHaveTextContent('20 of 21 confirmed');
+    expect(benefitsCard()).toHaveTextContent('28 of 29 confirmed');
     expect(continueButton()).toBeDisabled();
     expect(screen.getByText('1 left to confirm')).toBeInTheDocument();
 
@@ -619,7 +619,7 @@ describe('ConfirmScreen benefits summary', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not save these fields. deductible_cents must not exceed oop_max_cents',
     );
-    expect(benefitsCard()).toHaveTextContent('21 of 21 confirmed');
+    expect(benefitsCard()).toHaveTextContent('29 of 29 confirmed');
     expect(planningDb.benefitsPlans).toHaveLength(0);
   });
 
@@ -630,7 +630,7 @@ describe('ConfirmScreen benefits summary', () => {
     db.proposals.set(BENEFITS_DOC_ID, proposal);
     const bodies = confirmBodies();
     const { user } = await renderBenefits();
-    expect(benefitsCard()).toHaveTextContent('0 of 16 confirmed');
+    expect(benefitsCard()).toHaveTextContent('0 of 24 confirmed');
     expect(benefitsCard()).toHaveTextContent(
       'No 401(k) match was found in this summary, so your plan details keep the match you entered.',
     );

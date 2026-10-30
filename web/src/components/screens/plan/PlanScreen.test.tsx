@@ -10,9 +10,15 @@ import {
   exportJobId,
   exportJobStates,
   partialPlan,
+  planDecision,
   PLAN_PDF_FILENAME,
+  samplePlan,
 } from '@/test/fixtures/plan';
-import { HEALTH_DECISION_ID } from '@/test/fixtures/planning';
+import {
+  HEALTH_DECISION_ID,
+  sampleHealthDecision,
+  sampleHealthPlans,
+} from '@/test/fixtures/planning';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
 import { W4_DECISION_ID } from '@/test/fixtures/w4';
 import { apiUrl, scriptJob } from '@/test/msw/handlers';
@@ -86,6 +92,22 @@ describe('PlanScreen with every decision saved', () => {
     const w4 = region('W-4, federal only');
     expect(figure(w4, 'Federal withholding per paycheck')).toHaveTextContent('$213.67');
     expect(figure(w4, 'Projected refund (negative is owed)')).toHaveTextContent('$0.08');
+  });
+
+  it('says a health plan that comes out ahead is that much ahead, with no minus sign', async () => {
+    // Saver HDHP at low use: the API's low cost is negative (spec 012 rule 17).
+    const { inputs, result } = sampleHealthPlans({ expected_usage: 'low', selected_plan_index: 2 });
+    const plan = samplePlan();
+    plan.decisions[2] = planDecision(
+      sampleHealthDecision({ inputs: structuredClone(inputs), result: structuredClone(result) }),
+    );
+    planDb.plan = plan;
+    await open();
+    const health = region('Health plan');
+    expect(figure(health, 'Plan')).toHaveTextContent('Saver HDHP');
+    expect(figure(health, 'Expected cost a year at low use')).toHaveTextContent('$260.00 ahead');
+    expect(figure(health, 'Worst case a year')).toHaveTextContent('$5,740.00');
+    expect(health).not.toHaveTextContent('-$');
   });
 
   it("gives each explanation's status: verified, fallback, not written, or none for this calculator", async () => {
