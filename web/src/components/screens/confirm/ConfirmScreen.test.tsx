@@ -362,15 +362,8 @@ describe('ConfirmScreen manual entry', () => {
       'Net pay': '1,996.04',
     };
     for (const [label, text] of Object.entries(typed)) {
-      const input = within(row(label)).getByLabelText(label);
-      if (input.getAttribute('type') === 'date') {
-        // A date input takes the ISO value directly.
-        await user.clear(input);
-        await user.type(input, text);
-      } else {
-        await user.type(input, text);
-      }
-      await user.type(input, '{Enter}');
+      // A date input takes the ISO value directly; Enter saves the row.
+      await user.type(within(row(label)).getByLabelText(label), `${text}{Enter}`);
     }
     await user.selectOptions(
       within(row('Pay frequency')).getByRole('combobox', { name: 'Pay frequency' }),

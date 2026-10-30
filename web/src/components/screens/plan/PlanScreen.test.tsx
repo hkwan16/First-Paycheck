@@ -248,7 +248,8 @@ describe('PlanScreen export', () => {
     await user.click(within(exportCard).getByRole('button', { name: 'Download PDF' }));
     const bar = await within(exportCard).findByRole('progressbar', { name: 'Preparing your PDF' });
     expect(bar).toBeInTheDocument();
-    expect(within(exportCard).getByText('Waiting to start')).toBeInTheDocument();
+    // "Starting" until the job's first read answers.
+    expect(await within(exportCard).findByText('Waiting to start')).toBeInTheDocument();
 
     await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));
     await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));

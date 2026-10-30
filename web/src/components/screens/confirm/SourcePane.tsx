@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useId } from 'react';
+import { Fragment, memo, useId } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import type { SourceLine } from '@/lib/api/types';
@@ -33,10 +33,11 @@ function Text({ text }: { text: string }) {
 
 export interface SourcePaneProps {
   id: string;
-  lines: readonly SourceLine[];
+  /** The redacted lines, as the proposal has them (none when it has none). */
+  lines?: readonly SourceLine[];
   redactionCount: number;
   /** Pages never sent to the model because OCR could not redact them safely. */
-  withheldPages: readonly number[];
+  withheldPages?: readonly number[];
   selectedKey: string | null;
   selectedLabel: string | null;
   /** Manual entry: no field was read from a line, so nothing is highlighted. */
@@ -54,13 +55,15 @@ export interface SourcePaneProps {
 /**
  * From the mockup's source card: the redacted lines the AI read, as a mono
  * paper panel, with the selected field's line highlighted. Redactions are
- * black bars; the original file is never shown.
+ * black bars; the original file is never shown. Memoized: a keystroke in a
+ * field changes none of its props, so the pane renders again only when the
+ * selection moves.
  */
-export function SourcePane({
+export const SourcePane = memo(function SourcePane({
   id,
-  lines,
+  lines = [],
   redactionCount,
-  withheldPages,
+  withheldPages = [],
   selectedKey,
   selectedLabel,
   manual = false,
@@ -148,4 +151,4 @@ export function SourcePane({
       </p>
     </Card>
   );
-}
+});

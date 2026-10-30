@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from decimal import Decimal
 
 from hypothesis import given, settings
@@ -10,9 +9,8 @@ from hypothesis import strategies as st
 
 from calc.emergency_fund import EmergencyFundInput, emergency_fund
 
-settings.register_profile("ci", derandomize=True, max_examples=300)
-settings.register_profile("dev", max_examples=200)
-settings.load_profile("ci" if os.environ.get("CI") else "dev")
+# Examples per property; tests/support/hypothesis_profiles.py sets the rest.
+EXAMPLES = settings(max_examples=300)
 
 MONEY = (
     "target_cents",
@@ -36,6 +34,7 @@ def inputs(draw: st.DrawFn) -> EmergencyFundInput:
     )
 
 
+@EXAMPLES
 @given(inputs())
 def test_money_outputs_are_ints_and_the_range_is_ordered(data: EmergencyFundInput) -> None:
     result = emergency_fund(data)
@@ -44,6 +43,7 @@ def test_money_outputs_are_ints_and_the_range_is_ordered(data: EmergencyFundInpu
     assert result.three_month_target_cents <= result.six_month_target_cents
 
 
+@EXAMPLES
 @given(inputs())
 def test_funded_exactly_when_nothing_is_short(data: EmergencyFundInput) -> None:
     result = emergency_fund(data)
@@ -54,6 +54,7 @@ def test_funded_exactly_when_nothing_is_short(data: EmergencyFundInput) -> None:
         assert result.reachable
 
 
+@EXAMPLES
 @given(inputs())
 def test_months_are_the_fewest_that_close_the_gap(data: EmergencyFundInput) -> None:
     result = emergency_fund(data)
@@ -66,6 +67,7 @@ def test_months_are_the_fewest_that_close_the_gap(data: EmergencyFundInput) -> N
     assert result.reachable == (months is not None)
 
 
+@EXAMPLES
 @given(inputs(), st.integers(0, 1_000_000))
 def test_more_contribution_never_takes_longer(data: EmergencyFundInput, other: int) -> None:
     low, high = sorted((data.monthly_contribution_cents, other))
@@ -76,6 +78,7 @@ def test_more_contribution_never_takes_longer(data: EmergencyFundInput, other: i
         assert faster.months_to_target <= slower.months_to_target
 
 
+@EXAMPLES
 @given(inputs())
 def test_funded_pct_is_a_percentage(data: EmergencyFundInput) -> None:
     assert Decimal(0) <= emergency_fund(data).funded_pct <= Decimal(100)

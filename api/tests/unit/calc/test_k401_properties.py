@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from decimal import Decimal
 from typing import Any
 
@@ -12,10 +11,8 @@ from hypothesis import strategies as st
 from calc.data import tax_year
 from calc.k401 import K401MatchInput, K401MatchResult, k401_match
 
-# Deterministic in CI, so a failure there is reproducible locally.
-settings.register_profile("ci", derandomize=True, max_examples=300)
-settings.register_profile("dev", max_examples=200)
-settings.load_profile("ci" if os.environ.get("CI") else "dev")
+# Examples per property; tests/support/hypothesis_profiles.py sets the rest.
+EXAMPLES = settings(max_examples=300)
 
 MONEY_FIELDS = (
     "employer_match_cents_current",
@@ -65,6 +62,7 @@ def with_contribution(data: K401MatchInput, pct: Decimal) -> K401MatchInput:
     return data.model_copy(update={"contribution_pct": pct})
 
 
+@EXAMPLES
 @given(inputs())
 def test_every_money_output_is_an_int(data: K401MatchInput) -> None:
     result = k401_match(data)
@@ -75,6 +73,7 @@ def test_every_money_output_is_an_int(data: K401MatchInput) -> None:
         assert type(dumped[name]) is int, name
 
 
+@EXAMPLES
 @given(inputs())
 def test_match_is_bounded(data: K401MatchInput) -> None:
     result = k401_match(data)
@@ -82,6 +81,7 @@ def test_match_is_bounded(data: K401MatchInput) -> None:
     assert result.missed_cents >= 0
 
 
+@EXAMPLES
 @given(inputs(), percents(0, 10_000))
 def test_match_is_non_decreasing_in_contribution(data: K401MatchInput, other: Decimal) -> None:
     low, high = sorted((data.contribution_pct, other))
@@ -90,6 +90,7 @@ def test_match_is_non_decreasing_in_contribution(data: K401MatchInput, other: De
     assert lower.employer_match_cents_current <= higher.employer_match_cents_current
 
 
+@EXAMPLES
 @given(inputs())
 def test_nothing_missed_at_or_above_full_match(data: K401MatchInput) -> None:
     result = k401_match(data)
@@ -97,6 +98,7 @@ def test_nothing_missed_at_or_above_full_match(data: K401MatchInput) -> None:
         assert result.missed_cents == 0
 
 
+@EXAMPLES
 @given(inputs())
 def test_something_missed_below_full_match_when_no_limit_binds(data: K401MatchInput) -> None:
     result = k401_match(data)
@@ -113,12 +115,14 @@ def test_something_missed_below_full_match_when_no_limit_binds(data: K401MatchIn
     assert result.missed_cents > 0
 
 
+@EXAMPLES
 @given(inputs())
 def test_after_tax_cost_is_between_zero_and_the_pre_tax_cost(data: K401MatchInput) -> None:
     result = k401_match(data)
     assert 0 <= result.per_paycheck_after_tax_cost_cents <= result.per_paycheck_cost_delta_cents
 
 
+@EXAMPLES
 @given(inputs())
 def test_deferral_never_exceeds_the_limit(data: K401MatchInput) -> None:
     result = k401_match(data)
@@ -126,6 +130,7 @@ def test_deferral_never_exceeds_the_limit(data: K401MatchInput) -> None:
     assert result.employee_annual_cents_full <= result.deferral_limit_cents
 
 
+@EXAMPLES
 @given(inputs())
 def test_capped_flags_agree_with_the_limits(data: K401MatchInput) -> None:
     result = k401_match(data)
@@ -134,6 +139,7 @@ def test_capped_flags_agree_with_the_limits(data: K401MatchInput) -> None:
     assert result.compensation_capped == (data.salary_cents > LIMITS.compensation_limit_cents)
 
 
+@EXAMPLES
 @given(inputs())
 def test_pure(data: K401MatchInput) -> None:
     first: K401MatchResult = k401_match(data)

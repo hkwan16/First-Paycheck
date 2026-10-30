@@ -89,7 +89,8 @@ src/app/dev/screens/{link,account,spending,confirm,confirm/manual,confirm/benefi
                     check-in/complete,check-in-index,plan,plan/empty}  a screen on the sample data, no
                     API (development only); `account` is Link with the header's account menu
 src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, queued animation frames settled
-                    before jsdom closes: animation-frames.ts), render.tsx, fake-xhr.ts,
+                    before jsdom closes: animation-frames.ts; Testing Library's async wrapper
+                    taught Vitest's fake timers: async-wrapper.ts), render.tsx, fake-xhr.ts,
                     fake-download.ts (object URLs and anchor clicks recorded, no navigation),
                     fixtures/sample.ts (the Acme / J. Rivera dataset), fixtures/documents.ts (the
                     Acme pay stub as the API proposes it), fixtures/decisions.ts (profile, 401(k)
@@ -364,6 +365,9 @@ The arrow turns over `--duration-fast`, zero under reduced motion; nothing anima
   `vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) })` and
   `await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS))`, and render with
   `renderWithProviders(ui, { advanceTimers: vi.advanceTimersByTime })` so userEvent keeps up.
+  A user-event call, `waitFor` or `findBy*` returns as soon as it is done, without waiting for
+  the fake clock (`src/test/async-wrapper.ts`), so wait with `findBy*` or `waitFor` for anything
+  a request still has to bring, never `getBy*` right after another query.
 - Uploads use XMLHttpRequest, which MSW does not see in jsdom: `installFakeXhr()`
   (`src/test/fake-xhr.ts`) records each request so a test can report progress and respond;
   restore with `vi.unstubAllGlobals()`. `extractJobStates(jobId, documentId)` scripts an extraction

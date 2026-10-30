@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useId, useReducer, type Dispatch } from 'react';
+import { useCallback, useId, useReducer, type Dispatch } from 'react';
 import { PageTitle } from '@/components/chrome/PageTitle';
 import { StepFooter } from '@/components/chrome/StepFooter';
 import { Bar } from '@/components/ui/Bar';
@@ -46,11 +46,16 @@ export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
   const summary = summarize(state);
   const confirm = useConfirmDocument({ onConfirmed: () => router.push('/setup/spending') });
 
-  const dispatch: Dispatch<ConfirmAction> = (action) => {
-    // An answer from the server describes the values it was sent; any change makes it stale.
-    if (action.type !== 'select' && confirm.isError) confirm.reset();
-    dispatchState(action);
-  };
+  // Stable, so a memoized FieldRow renders again only when its own field changes.
+  const { isError, reset } = confirm;
+  const dispatch = useCallback<Dispatch<ConfirmAction>>(
+    (action) => {
+      // An answer from the server describes the values it was sent; any change makes it stale.
+      if (action.type !== 'select' && isError) reset();
+      dispatchState(action);
+    },
+    [isError, reset],
+  );
 
   const submit = () =>
     // The fields are the API's own keys for this document type; the server validates them.
@@ -132,9 +137,9 @@ export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
         <SourcePane
           id={sourceId}
           className="min-w-0 flex-[1_1_320px]"
-          lines={proposal.source_lines ?? []}
+          lines={proposal.source_lines}
           redactionCount={document.redaction_count}
-          withheldPages={proposal.withheld_pages ?? []}
+          withheldPages={proposal.withheld_pages}
           selectedKey={state.selected}
           selectedLabel={selected?.label ?? null}
           manual={manual}

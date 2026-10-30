@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from decimal import Decimal
 from typing import Any
 
@@ -11,9 +10,8 @@ from hypothesis import strategies as st
 
 from calc.w4 import W4Input, w4
 
-settings.register_profile("ci", derandomize=True, max_examples=150)
-settings.register_profile("dev", max_examples=100)
-settings.load_profile("ci" if os.environ.get("CI") else "dev")
+# Examples per property; tests/support/hypothesis_profiles.py sets the rest.
+EXAMPLES = settings(max_examples=150)
 
 SIGNED = {"projected_refund_cents", "suggested_refund_cents", "current_refund_cents"}
 # Rule 10a: null exactly when there is no current withholding to compare with.
@@ -54,6 +52,7 @@ def build(salary: int, rest: dict[str, Any]) -> W4Input:
 SALARY = st.integers(1_000_000, 60_000_000)
 
 
+@EXAMPLES
 @given(SALARY, entries())
 def test_money_outputs_are_ints_and_non_negative(salary: int, rest: dict[str, Any]) -> None:
     result = w4(build(salary, rest)).model_dump()
@@ -67,6 +66,7 @@ def test_money_outputs_are_ints_and_non_negative(salary: int, rest: dict[str, An
                 assert value >= 0, key
 
 
+@EXAMPLES
 @given(SALARY, SALARY, entries())
 def test_withholding_is_monotone_in_salary(low: int, high: int, rest: dict[str, Any]) -> None:
     low, high = sorted((low, high))
@@ -75,6 +75,7 @@ def test_withholding_is_monotone_in_salary(low: int, high: int, rest: dict[str, 
     assert first.withholding_per_paycheck_cents <= second.withholding_per_paycheck_cents
 
 
+@EXAMPLES
 @given(SALARY, entries())
 def test_outputs_add_up(salary: int, rest: dict[str, Any]) -> None:
     data = build(salary, rest)
@@ -91,6 +92,7 @@ def test_outputs_add_up(salary: int, rest: dict[str, Any]) -> None:
     assert result.projected_tax_after_credits_cents <= result.projected_tax_cents
 
 
+@EXAMPLES
 @given(SALARY, entries())
 def test_the_comparison_adds_up(salary: int, rest: dict[str, Any]) -> None:
     """Rule 10a: the same tax, so the two refunds differ only by withholding."""
@@ -114,6 +116,7 @@ def test_the_comparison_adds_up(salary: int, rest: dict[str, Any]) -> None:
     )
 
 
+@EXAMPLES
 @given(SALARY, entries())
 def test_the_comparison_changes_nothing_else(salary: int, rest: dict[str, Any]) -> None:
     data = build(salary, rest)
@@ -121,6 +124,7 @@ def test_the_comparison_changes_nothing_else(salary: int, rest: dict[str, Any]) 
     assert w4(data).model_dump(exclude=COMPARISON) == without.model_dump(exclude=COMPARISON)
 
 
+@EXAMPLES
 @given(SALARY, entries())
 def test_suggestions_land_within_100_dollars(salary: int, rest: dict[str, Any]) -> None:
     result = w4(build(salary, rest))
@@ -137,6 +141,7 @@ def test_suggestions_land_within_100_dollars(salary: int, rest: dict[str, Any]) 
         assert result.suggestion == "none"
 
 
+@EXAMPLES
 @given(SALARY, entries())
 def test_suggested_entries_reproduce_the_suggested_refund(
     salary: int, rest: dict[str, Any]
@@ -161,6 +166,7 @@ def test_suggested_entries_reproduce_the_suggested_refund(
     assert again.projected_refund_cents == result.suggested_refund_cents
 
 
+@EXAMPLES
 @given(SALARY, entries())
 def test_pure(salary: int, rest: dict[str, Any]) -> None:
     data = build(salary, rest)

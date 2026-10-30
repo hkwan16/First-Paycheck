@@ -9,16 +9,18 @@ import { spendingDb } from '@/test/msw/spending-handlers';
 import { renderWithProviders, screen, waitFor, within } from '@/test/render';
 import { SpendingScreen } from './SpendingScreen';
 
+// A row's accessible name is all of its text, its category select's options included, which
+// jsdom works out node by node; find a row's select by its own label instead.
 const row = (merchant: string, index = 0) =>
   screen.getAllByRole('row', { name: new RegExp(merchant) })[index]!;
 const categoryOf = (merchant: string, index = 0) =>
-  within(row(merchant, index)).getByRole('combobox', { name: `Category for ${merchant}` });
+  screen.getAllByRole('combobox', { name: `Category for ${merchant}` })[index]!;
 
 async function renderSpending(props: Parameters<typeof SpendingScreen>[0] = {}) {
   const rendered = renderWithProviders(<SpendingScreen {...props} />, {
     advanceTimers: vi.isFakeTimers() ? vi.advanceTimersByTime : undefined,
   });
-  await screen.findAllByRole('row', { name: /Sweetgreen/ });
+  await screen.findAllByRole('combobox', { name: 'Category for Sweetgreen' });
   return rendered;
 }
 
@@ -382,9 +384,11 @@ describe('SpendingScreen transactions', () => {
   });
 
   it('applies a fix at once, then confirms it was saved as a rule', async () => {
+    // The server answers when the test says so, not after a timer a busy machine can outrun.
+    const answer = Promise.withResolvers<void>();
     server.use(
       http.patch(apiUrl('/transactions/:id'), async ({ params, request }) => {
-        await delay(150);
+        await answer.promise;
         const { category } = (await request.json()) as { category: 'groceries' };
         const txn = db.transactions.find((t) => t.id === params.id)!;
         Object.assign(txn, { category, category_source: 'user', confidence: null });
@@ -403,6 +407,7 @@ describe('SpendingScreen transactions', () => {
     expect(within(row('Sweetgreen')).getByText('You')).toBeInTheDocument();
     expect(screen.queryByText(/Saved as a rule/)).not.toBeInTheDocument();
 
+    answer.resolve();
     expect(await screen.findByText(/Saved as a rule/)).toHaveTextContent(
       'Saved as a rule. Sweetgreen will never go back to the AI for you.',
     );
