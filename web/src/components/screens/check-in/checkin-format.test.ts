@@ -65,11 +65,19 @@ describe('affectsView', () => {
     expect(affectsView('k401_match')).toEqual({
       label: '401(k) match',
       tone: 'plum',
-      href: '/setup/decisions',
+      href: '/setup/decisions/401k',
     });
-    expect(affectsView('health_plans')).toMatchObject({ label: 'Health plan', tone: 'coral' });
-    expect(affectsView('emergency_fund')).toMatchObject({ label: 'Emergency fund', tone: 'teal' });
-    expect(affectsView('w4')).toMatchObject({ label: 'W-4', tone: 'blue' });
+    expect(affectsView('health_plans')).toEqual({
+      label: 'Health plan',
+      tone: 'coral',
+      href: '/setup/decisions/health-plan',
+    });
+    expect(affectsView('emergency_fund')).toEqual({
+      label: 'Emergency fund',
+      tone: 'teal',
+      href: '/setup/decisions/emergency-fund',
+    });
+    expect(affectsView('w4')).toEqual({ label: 'W-4', tone: 'blue', href: '/setup/decisions/w4' });
     expect(affectsView('spending')).toEqual({
       label: 'Spending map',
       tone: 'blue',

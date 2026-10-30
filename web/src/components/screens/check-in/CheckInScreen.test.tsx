@@ -62,7 +62,7 @@ describe('CheckInScreen', () => {
     await open();
     expect(
       within(finding(ELECTION_TITLE)).getByRole('link', { name: 'Affects: 401(k) match' }),
-    ).toHaveAttribute('href', '/setup/decisions');
+    ).toHaveAttribute('href', '/setup/decisions/401k');
     expect(
       within(finding('Equinox, $185.00, looks monthly.')).getByRole('link', {
         name: 'Affects: Spending map',

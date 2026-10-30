@@ -99,27 +99,59 @@ describe('SampleScreen after Confirm', () => {
     server.events.removeAllListeners();
   });
 
-  it('renders the Decisions screen on the saved decisions, with no requests', async () => {
+  it('renders the 401(k) step on the saved decisions, with no requests', async () => {
     const requests = countRequests();
-    render(<SampleScreen screen="decisions" />);
+    render(<SampleScreen screen="decisions-401k" />);
     const card = await screen.findByRole('region', { name: '401(k) match' });
     expect(within(card).getByRole('group', { name: 'Calculator result' })).toHaveTextContent(
       'At 4% you would capture the full $2,600 match',
     );
     expect(within(card).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Emergency fund' })).toBeNull();
+    expect(screen.getByText(/of 4 saved/)).toHaveTextContent('4 of 4 saved');
+    expect(screen.getByRole('link', { name: '401(k) match, done' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Decisions, done' })).not.toHaveAttribute(
+      'aria-current',
+    );
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
+    expect(requests).toEqual([]);
+  });
 
-    const fund = screen.getByRole('region', { name: 'Emergency fund' });
+  it('renders the emergency fund step with its goal, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="decisions-emergency-fund" />);
+    const fund = await screen.findByRole('region', { name: 'Emergency fund' });
     expect(within(fund).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
     expect(
       within(fund).getByRole('group', { name: 'Your emergency fund goal' }),
     ).toBeInTheDocument();
-    const health = screen.getByRole('region', { name: 'Health plan' });
+    expect(screen.getByRole('link', { name: 'Emergency fund, done' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
+    expect(requests).toEqual([]);
+  });
+
+  it('renders the health plan step with its comparison, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="decisions-health-plan" />);
+    const health = await screen.findByRole('region', { name: 'Health plan' });
     expect(within(health).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
     expect(
       within(health).getByRole('table', { name: 'Expected yearly cost by plan' }),
     ).toBeInTheDocument();
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
+    expect(requests).toEqual([]);
+  });
 
-    const w4 = screen.getByRole('region', { name: 'W-4, federal only' });
+  it('renders the W-4 step reading the other decisions, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="decisions-w4" />);
+    const w4 = await screen.findByRole('region', { name: 'W-4, federal only' });
     expect(within(w4).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
     expect(within(w4).getByRole('group', { name: 'From your decisions' })).toHaveTextContent(
       '$62.50, Gold PPO',
@@ -130,9 +162,26 @@ describe('SampleScreen after Confirm', () => {
     expect(w4).toHaveTextContent(
       'Give your employer your updated Form W-4 is on your calendar for Oct 31, 2026.',
     );
+    expect(screen.getByRole('link', { name: 'See your plan' })).toHaveAttribute('href', '/plan');
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
+    expect(requests).toEqual([]);
+  });
 
-    expect(screen.getByText(/of 4 saved/)).toHaveTextContent('4 of 4 saved');
-    expect(screen.getByRole('link', { name: 'Decisions' })).toHaveAttribute('aria-current', 'page');
+  it('renders a step that is off in the alpha as its placeholder, muted in the nav', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="decisions-after-alpha" />);
+    const fund = screen.getByRole('region', { name: 'Emergency fund' });
+    expect(within(fund).getByText('After alpha')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Emergency fund, After alpha' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: '401(k) match, done' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/setup/spending');
+    expect(screen.getByRole('link', { name: 'Next: 401(k) match' })).toHaveAttribute(
+      'href',
+      '/setup/decisions/401k',
+    );
     await act(() => vi.advanceTimersByTimeAsync(1_000));
     expect(requests).toEqual([]);
   });
@@ -212,28 +261,33 @@ describe('SampleScreen after Confirm', () => {
 describe('seededClient', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it.each(['link', 'confirm-benefits', 'decisions', 'why', 'why-fallback', 'why-index'] as const)(
-    'seeds every %s query at the sample time without reading the clock',
-    (name) => {
-      // It runs while the page renders: next dev prerenders the route to
-      // validate it, and reports a Date.now() there as an unstable value.
-      const now = vi.spyOn(Date, 'now');
-      const client = seededClient(name);
-      expect(now).not.toHaveBeenCalled();
-      const queries = client.getQueryCache().getAll();
-      expect(queries.length).toBeGreaterThan(5);
-      for (const query of queries) {
-        expect(query.state.dataUpdatedAt, JSON.stringify(query.queryKey)).toBe(
-          Date.parse(SAMPLE_NOW),
-        );
-      }
-    },
-  );
+  it.each([
+    'link',
+    'confirm-benefits',
+    'decisions-w4',
+    'decisions-after-alpha',
+    'why',
+    'why-fallback',
+    'why-index',
+  ] as const)('seeds every %s query at the sample time without reading the clock', (name) => {
+    // It runs while the page renders: next dev prerenders the route to
+    // validate it, and reports a Date.now() there as an unstable value.
+    const now = vi.spyOn(Date, 'now');
+    const client = seededClient(name);
+    expect(now).not.toHaveBeenCalled();
+    const queries = client.getQueryCache().getAll();
+    expect(queries.length).toBeGreaterThan(5);
+    for (const query of queries) {
+      expect(query.state.dataUpdatedAt, JSON.stringify(query.queryKey)).toBe(
+        Date.parse(SAMPLE_NOW),
+      );
+    }
+  });
 
   it("serves the calculator's result without asking the clock whether it is stale", () => {
     // useCalc keeps results fresh with staleTime Infinity, which compares the
     // data's age with Date.now(); on the 'static' sample client it is static too.
-    const client = seededClient('decisions');
+    const client = seededClient('decisions-401k');
     const now = vi.spyOn(Date, 'now');
     const { result } = renderHook(() => useCalc('/calc/401k-match', sampleK401Inputs(4)), {
       wrapper: ({ children }) => (

@@ -4,7 +4,7 @@ import { SAMPLE_NOW } from '@/test/fixtures/sample';
 import { decisionsReady } from '@/test/msw/db';
 import { renderWithProviders, screen, userEvent, within } from '@/test/render';
 import { CheckInScreen } from './check-in/CheckInScreen';
-import { DecisionsScreen } from './decisions/DecisionsScreen';
+import { DecisionStepScreen } from './decisions/DecisionStepScreen';
 import { PlanScreen } from './plan/PlanScreen';
 import { SpendingScreen } from './spending/SpendingScreen';
 
@@ -47,22 +47,24 @@ function expectFallback(name: string) {
 }
 
 describe('a card that fails to render', () => {
-  it('leaves the other decision cards working', async () => {
+  it('leaves the decision step around it working: its title, count and way on', async () => {
     decisionsReady();
-    const { user } = render(
-      <DecisionsScreen calculators={['401k_match', 'emergency_fund', 'health_plan', 'w4']} />,
+    render(
+      <DecisionStepScreen
+        calculator="w4"
+        calculators={['401k_match', 'emergency_fund', 'health_plan', 'w4']}
+      />,
     );
     expectFallback('W-4, federal only');
-    const k401 = screen.getByRole('region', { name: '401(k) match' });
-    const slider = await within(k401).findByRole('slider', { name: /contribution/i });
-    slider.focus();
-    await user.keyboard('{ArrowRight}');
-    expect(slider).toHaveFocus();
     expect(
-      within(screen.getByRole('region', { name: 'Emergency fund' })).getByRole('slider', {
-        name: /Months of essentials/,
-      }),
+      screen.getByRole('heading', { level: 1, name: 'What to put on your W-4' }),
     ).toBeInTheDocument();
+    expect(await screen.findByText(/of 4 saved/)).toHaveTextContent('0 of 4 saved');
+    expect(screen.getByRole('link', { name: 'Back to health plan' })).toHaveAttribute(
+      'href',
+      '/setup/decisions/health-plan',
+    );
+    expect(screen.getByRole('link', { name: 'See your plan' })).toHaveAttribute('href', '/plan');
   });
 
   it('leaves the Sankey and the transactions on Spending', async () => {

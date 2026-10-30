@@ -1,4 +1,3 @@
-import type { Route } from 'next';
 import type {
   CalculatorKind,
   CalendarEvent,
@@ -63,14 +62,6 @@ export function completenessText({ saved, missing }: PlanCompleteness): string {
   const total = saved.length + missing.length;
   return `${formatNumber(saved.length)} of ${formatNumber(total)} decisions saved`;
 }
-
-/** Each calculator's card on the Decisions screen (the heading its card is labeled by). */
-export const DECISION_ANCHORS: Record<CalculatorKind, Route> = {
-  emergency_fund: '/setup/decisions#emergency-fund-title',
-  k401_match: '/setup/decisions#k401-title',
-  health_plans: '/setup/decisions#health-plan-title',
-  w4: '/setup/decisions#w4-title',
-};
 
 const GOAL_LABELS: Record<Goal['kind'], string> = {
   emergency_fund: 'Emergency fund',

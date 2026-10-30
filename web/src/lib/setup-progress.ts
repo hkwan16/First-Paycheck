@@ -1,9 +1,9 @@
-import type { CalculatorId } from './features';
+import { CALCULATORS, type CalculatorId } from './features';
 
 export const SETUP_STEPS = ['link', 'confirm', 'spending', 'decisions'] as const;
 export type SetupStep = (typeof SETUP_STEPS)[number];
-/** The side nav items that get a done mark: the setup steps and the plan. */
-export type ProgressKey = SetupStep | 'plan';
+/** The side nav items that get a done mark: the setup steps, each decision step and the plan. */
+export type ProgressKey = SetupStep | CalculatorId | 'plan';
 export type SetupProgress = Record<ProgressKey, boolean>;
 
 /** Counts and states read from the API; this module only compares them. */
@@ -19,10 +19,19 @@ export interface SetupFacts {
   planMissingCount: number | null;
 }
 
-/** Which setup steps are done, and whether the plan is whole, for the side nav's check marks. */
+/**
+ * Which setup steps are done, and whether the plan is whole, for the side
+ * nav's check marks. A decision step is done when its calculator is live and
+ * saved (spec 018 rule 8); Decisions, when every live one is.
+ */
 export function setupProgress(facts: SetupFacts): SetupProgress {
   const saved = new Set(facts.savedDecisionCalculators);
+  const live = new Set(facts.liveCalculators);
+  const steps = Object.fromEntries(
+    CALCULATORS.map((id) => [id, live.has(id) && saved.has(id)]),
+  ) as Record<CalculatorId, boolean>;
   return {
+    ...steps,
     link: facts.accounts > 0 && facts.documents > 0,
     confirm: facts.confirmedPayStubs > 0,
     spending: facts.transactions > 0 && facts.categorizationFinished,

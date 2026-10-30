@@ -566,7 +566,7 @@ describe('ConfirmScreen benefits summary', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Continue to decisions/ })).toHaveAttribute(
       'href',
-      '/setup/decisions',
+      '/setup/decisions/health-plan',
     );
     const [bronze, gold] = sampleBenefitsValues.plans;
     expect(bodies).toEqual([
@@ -649,7 +649,7 @@ describe('ConfirmScreen benefits summary', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Go to decisions/ })).toHaveAttribute(
       'href',
-      '/setup/decisions',
+      '/setup/decisions/health-plan',
     );
   });
 
@@ -659,7 +659,7 @@ describe('ConfirmScreen benefits summary', () => {
     expect(await screen.findByText('This benefits summary is confirmed.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Continue to decisions/ })).toHaveAttribute(
       'href',
-      '/setup/decisions',
+      '/setup/decisions/health-plan',
     );
   });
 

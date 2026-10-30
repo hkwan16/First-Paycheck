@@ -15,6 +15,7 @@ import { formatDate } from '@/lib/dates';
 import { formatNumber, formatTransactionAmount } from '@/lib/money';
 import { shareText } from './spending-format';
 import { SourceBadge } from './TransactionTable';
+import { decisionStepRoute } from '@/lib/routes';
 
 /** How many of a category's transactions the popover lists. */
 export const POPOVER_LINES = 8;
@@ -86,7 +87,7 @@ export function FlowDetails({ node, flow, transactions, masks, kinds }: FlowDeta
         return (
           <div className="flex flex-col gap-1">
             <Muted>Nothing went to a 401(k) from {stubWords}.</Muted>
-            <Link href="/setup/decisions" className="text-small">
+            <Link href={decisionStepRoute('401k_match')} className="text-small">
               See what a 401(k) match is worth
             </Link>
           </div>

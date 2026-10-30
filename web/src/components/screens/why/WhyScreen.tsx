@@ -13,6 +13,7 @@ import type { Decision, Explanation } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import { asK401Inputs, CALCULATOR_LABELS } from '@/lib/decisions';
 import { formatRate } from '@/lib/money';
+import { decisionKindRoute, firstDecisionRoute } from '@/lib/routes';
 import { CalculatorResultCard } from './CalculatorResultCard';
 import { FallbackStatus, NextSteps, VerifiedBody, VerifiedStatus } from './ExplanationViews';
 import { Sources } from './Sources';
@@ -63,6 +64,8 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
   const write = (force: boolean) => explain.mutate({ decisionId, force });
   const event = calendar.data?.find((e) => e.decision_id === decisionId);
   const llmUnavailable = apiErrorCode(explain.error) === 'llm_unavailable';
+  // Back to this decision's own step (spec 018 rule 4).
+  const rerun = current ? decisionKindRoute(current.calculator) : firstDecisionRoute();
 
   const progress = explain.isPending && (
     <p role="status" className="m-0 text-small text-ink-3">
@@ -89,7 +92,7 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
         explanation={explanation.data}
         version={current?.version ?? null}
         taxYear={taxYearOf(current)}
-        next={<NextSteps event={event} />}
+        next={<NextSteps event={event} rerun={rerun} />}
       />
     ) : (
       <>
@@ -101,7 +104,7 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
             <Button size="sm" loading={explain.isPending} onClick={() => write(true)}>
               Try writing the explanation again
             </Button>
-            <Button size="sm" href="/setup/decisions">
+            <Button size="sm" href={rerun}>
               Re-run the calculator
             </Button>
           </>,

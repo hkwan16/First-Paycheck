@@ -19,7 +19,8 @@ import { ExportCard } from './ExportCard';
 import { GoalsCard } from './GoalsCard';
 import { PaycheckCard } from './PaycheckCard';
 import { PlanCalendarCard } from './PlanCalendarCard';
-import { completenessText, DECISION_ANCHORS } from './plan-format';
+import { completenessText } from './plan-format';
+import { decisionKindRoute, firstDecisionRoute, lastDecisionRoute } from '@/lib/routes';
 
 const TITLE = 'Your plan, on one page';
 
@@ -32,7 +33,7 @@ function StillToDecide({ completeness }: { completeness: PlanCompleteness }) {
         {completeness.missing.map((calculator, index) => (
           <li key={calculator} className="inline">
             {index > 0 && ', '}
-            <Link href={DECISION_ANCHORS[calculator]}>{CALCULATOR_LABELS[calculator]}</Link>
+            <Link href={decisionKindRoute(calculator)}>{CALCULATOR_LABELS[calculator]}</Link>
           </li>
         ))}
       </ul>
@@ -89,7 +90,7 @@ export function PlanScreen() {
             to add to your calendar.
           </p>
           <div>
-            <Button href="/setup/decisions" variant="primary">
+            <Button href={firstDecisionRoute()} variant="primary">
               Go to decisions
             </Button>
           </div>
@@ -139,7 +140,7 @@ export function PlanScreen() {
         </div>
       </div>
       <StepFooter
-        back={{ href: '/setup/decisions', label: 'Back to decisions' }}
+        back={{ href: lastDecisionRoute(), label: 'Back to decisions' }}
         next={{ label: 'Monthly check-in', href: '/check-in' }}
       />
     </>

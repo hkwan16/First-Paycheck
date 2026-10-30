@@ -11,6 +11,7 @@ import { parseISODate } from '@/lib/dates';
 import type { Hue, Tone } from '@/lib/design/tone';
 import { formatNumber } from '@/lib/money';
 import { monthName } from '../spending/spending-format';
+import { decisionKindRoute } from '@/lib/routes';
 
 const MONTH_YEAR = new Intl.DateTimeFormat('en-US', {
   month: 'long',
@@ -62,10 +63,14 @@ export interface AffectsView {
 }
 
 const AFFECTS: Record<FindingAffects, AffectsView> = {
-  k401_match: { label: '401(k) match', tone: 'plum', href: '/setup/decisions' },
-  health_plans: { label: 'Health plan', tone: 'coral', href: '/setup/decisions' },
-  emergency_fund: { label: 'Emergency fund', tone: 'teal', href: '/setup/decisions' },
-  w4: { label: 'W-4', tone: 'blue', href: '/setup/decisions' },
+  k401_match: { label: '401(k) match', tone: 'plum', href: decisionKindRoute('k401_match') },
+  health_plans: { label: 'Health plan', tone: 'coral', href: decisionKindRoute('health_plans') },
+  emergency_fund: {
+    label: 'Emergency fund',
+    tone: 'teal',
+    href: decisionKindRoute('emergency_fund'),
+  },
+  w4: { label: 'W-4', tone: 'blue', href: decisionKindRoute('w4') },
   spending: { label: 'Spending map', tone: 'blue', href: '/setup/spending' },
 };
 

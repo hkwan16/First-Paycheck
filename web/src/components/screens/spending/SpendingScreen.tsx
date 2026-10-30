@@ -12,6 +12,7 @@ import { RecurringCard } from './RecurringCard';
 import { monthName } from './spending-format';
 import { SummaryCard } from './SummaryCard';
 import { TransactionsCard } from './TransactionsCard';
+import { firstDecisionRoute } from '@/lib/routes';
 
 export interface SpendingScreenProps {
   /** The cash-flow Sankey; on under the `sankey` feature flag. */
@@ -63,7 +64,7 @@ export function SpendingScreen({
       </CardErrorBoundary>
       <StepFooter
         back={{ href: '/setup/link' }}
-        next={{ label: 'Use these numbers in decisions', href: '/setup/decisions' }}
+        next={{ label: 'Use these numbers in decisions', href: firstDecisionRoute() }}
       />
     </>
   );

@@ -34,7 +34,7 @@ import {
 } from '@/lib/decisions';
 import { toneText } from '@/lib/design/tone';
 import { formatMoney, formatRate } from '@/lib/money';
-import { whyRoute } from '@/lib/routes';
+import { decisionStepRoute, whyRoute } from '@/lib/routes';
 import { AmountField } from './AmountField';
 import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
 import { amountText, readAmount, saveBadgeTone, saveErrorText } from './decision-format';
@@ -394,9 +394,13 @@ function FromYourDecisions({ id, from }: { id: string; from: FromDecisions }) {
       {from.k401Pct === null || from.premium === null ? (
         <p className="m-0 text-tiny text-ink-3">
           The projection counts a decision that is not saved yet as zero.{' '}
-          {from.k401Pct === null && <a href="#k401-title">Save your 401(k) decision</a>}
+          {from.k401Pct === null && (
+            <Link href={decisionStepRoute('401k_match')}>Save your 401(k) decision</Link>
+          )}
           {from.k401Pct === null && from.premium === null && ' · '}
-          {from.premium === null && <a href="#health-plan-title">Choose your health plan</a>}
+          {from.premium === null && (
+            <Link href={decisionStepRoute('health_plan')}>Choose your health plan</Link>
+          )}
         </p>
       ) : (
         <p className="m-0 text-tiny text-ink-3">

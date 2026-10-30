@@ -55,7 +55,7 @@ describe('StepFooter', () => {
   });
 
   it('can relabel Back', () => {
-    render(<StepFooter back={{ href: '/setup/decisions', label: 'Back to decisions' }} />);
+    render(<StepFooter back={{ href: '/setup/decisions/w4', label: 'Back to decisions' }} />);
     expect(screen.getByRole('link', { name: 'Back to decisions' })).toBeInTheDocument();
   });
 });

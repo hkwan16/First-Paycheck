@@ -44,6 +44,10 @@ describe('useSetupProgress', () => {
         spending: false,
         decisions: false,
         plan: false,
+        emergency_fund: false,
+        '401k_match': false,
+        health_plan: false,
+        w4: false,
       }),
     );
   });

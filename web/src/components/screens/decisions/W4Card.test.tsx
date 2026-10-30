@@ -129,10 +129,10 @@ describe('W4Card', () => {
     );
     expect(
       within(decided()).getByRole('link', { name: 'Save your 401(k) decision' }),
-    ).toHaveAttribute('href', '#k401-title');
+    ).toHaveAttribute('href', '/setup/decisions/401k');
     expect(
       within(decided()).getByRole('link', { name: 'Choose your health plan' }),
-    ).toHaveAttribute('href', '#health-plan-title');
+    ).toHaveAttribute('href', '/setup/decisions/health-plan');
     expect(result()).toHaveTextContent('Withheld each paycheck$234.17');
   });
 
