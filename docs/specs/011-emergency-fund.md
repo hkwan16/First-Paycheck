@@ -1,6 +1,6 @@
 # 011: Emergency fund calculator, goals and their calendar
 
-Status: Implemented, M6. Every example is a test. Explaining an emergency-fund decision is out of scope until the explain verifier can run without an IRS citation (see Out of scope).
+Status: Implemented, M6; rule 17 revised (17a, 17b) for issues 165 and 166. Every example is a test. Explaining an emergency-fund decision is out of scope until the explain verifier can run without an IRS citation (see Out of scope).
 
 ## Goal
 
@@ -65,7 +65,17 @@ Notation: `E = monthly_essentials_cents`, `m = target_months`, `B = current_bala
 
 15. **`goals` columns added in `0008`.** `status goal_status NOT NULL DEFAULT 'active'` (`active`, `paused`, `reached`) and `reached_at timestamptz` with `CHECK ((status = 'reached') = (reached_at IS NOT NULL))`.
 16. **`GET /goals`** lists the user's goals, oldest first, as `GoalOut`: `id`, `kind`, `status`, `target_amount_cents`, `monthly_contribution_cents`, `account_id`, `decision_id`, `target_date`, `reached_at`, `current_balance_cents` (the linked account's latest balance snapshot, or null), `progress_pct` (rule 3's percentage of that balance against the target, from `calc/emergency_fund.py:funded_pct`, or null without a balance), `created_at`, `updated_at`.
-17. **`PATCH /goals/{id}`** accepts any of `status` (`active`, `paused`, `reached`), `monthly_contribution_cents` (`Cents`) and `account_id` (an account id or null). Fields left out are unchanged. Setting `reached` sets `reached_at` to the request time; leaving it clears `reached_at`. A changed contribution clears `target_date`, because the projection belongs to the saved decision; saving a new decision projects again. An `account_id` the user cannot see is 404, the same as another user's goal. An empty body is 422.
+17. **`PATCH /goals/{id}`** accepts any of `status` (`active`, `paused`, `reached`), `monthly_contribution_cents` (`Cents`) and `account_id` (an account id or null). Fields left out are unchanged. Setting `reached` sets `reached_at` to the request time; leaving it clears `reached_at`. A changed contribution re-projects `target_date` (rule 17a). An `account_id` the user cannot see is 404, the same as another user's goal. An empty body is 422.
+17a. **Re-projecting on a new contribution** (issue 165). When `monthly_contribution_cents` differs from the goal's, the route projects `target_date` exactly as saving would (rule 11): the goal's decision's inputs with the new contribution go through `calc/emergency_fund.py` (`calc/` stays pure; the route supplies the inputs), the first contribution date is the next expected pay date as of the request, and `target_date` is that date plus `months_to_target - 1` months, or null when the fund is funded or not reachable at the new amount. `target_amount_cents` does not depend on the contribution and stays. The decision is immutable and its calendar events belong to it (rule 12), so neither changes; the goal's contribution is what the check-in compares savings against (spec 015). The same contribution as the goal's changes nothing, so a repeated request never moves the date. A goal without an emergency-fund decision keeps a null `target_date`. Setting the contribution back to the decision's amount on the day it was saved gives the saved date again (example 5).
+
+**Why the goal re-projects**, of the ways to keep it from losing its date:
+
+- *Clear the date and ask for a new save* (the rule before issue 165): a dead end. The card shows the decision's own inputs, so its save button reads "Saved as v1" and saves nothing, and setting the contribution back to the saved amount loses the date for good.
+- *Make the goal's change a new decision version*: `POST /decisions` is the only writer of decisions (spec 007); a second writer in `PATCH /goals` would repeat its version check and side effects, and every adjustment between decisions would become a version on the Why screen.
+- *Drop Change contribution from the goal* and change it only on the card: the simplest code, but the goal is where a person adjusts between decisions (pause, mark reached) and the check-in reads its contribution as the plan, so it narrows the product instead of fixing the projection.
+- *Re-project from the goal's decision* (chosen): one calculator path and one first-contribution rule for a save and a change, no new writer of decisions, and the goal's date is always the one saving the card as it stands would give.
+
+17b. **The card and a goal that differs** (web, `EmergencyFundCard`). The card's monthly transfer starts from the goal's contribution when the goal belongs to the current decision and holds another amount, so its result is the goal's projection and its save badge says the decision has changed ("Save as v2"); the field's hint names the saved decision's amount. Saving records the goal's amount as the next version, which then agrees with the goal again. The goal says when the contribution reaches the target (`On pace to reach it by ...`) only while it is active: a paused goal has no projected date to show (issue 166), a reached one says when it was reached, and an active one with no date says the target is not reached within the calculator's horizon at this amount, or that the savings already cover it.
 
 ## Hand-worked examples
 
@@ -128,8 +138,10 @@ Each row is one test in `api/tests/unit/calc/test_emergency_fund_examples.py` an
 | 2 | `test_v2_updates_goal_and_dismisses_events` | Save example 1, then v2 with `C = 75,000` | Still one goal, contribution 75,000, `target_date` 2027-07-30 (10 months: 2026-10-30 plus 9), `decision_id` = v2; v1's two events dismissed, v2's two upcoming |
 | 3 | `test_funded_save_has_no_contribution_event` | Save example 3 | Goal with `target_date` null; only a `goal_review` event, due 2027-01-30 |
 | 4 | `test_patch_pause_and_reach` | PATCH `status = paused`, then `reached` | `paused` with `reached_at` null; then `reached` with `reached_at` the request time |
-| 5 | `test_patch_contribution_clears_target_date` | PATCH `monthly_contribution_cents = 60,000` | contribution 60,000, `target_date` null |
+| 5 | `test_patch_contribution_reprojects_target_date` | As 1; PATCH `monthly_contribution_cents = 75,000`, then back to 50,000 | contribution 75,000 and `target_date` 2027-07-30 (as example 2's v2), then 50,000 and 2027-12-30 again; still one decision version, its two events unchanged |
 | 6 | `test_goal_progress_from_latest_snapshot` | Linked account with snapshots 100,000 then 187,500 | `current_balance_cents = 187,500`, `progress_pct = "25.00"` against 750,000 |
+| 7 | `test_patch_contribution_projects_from_the_request_day` | As 1, today 2026-11-05 when the PATCH arrives; PATCH 75,000 | First contribution 2026-11-13 (the next pay date after the request), `target_date` 2027-08-13; the same 75,000 again a week later leaves it |
+| 8 | `test_patch_contribution_out_of_reach_has_no_date` | As 1; PATCH 5,000 (150 months, past the 120-month horizon), then 0 | `target_date` null both times |
 
 ## Edge cases
 
