@@ -213,7 +213,9 @@ test('compares health plans, chooses one and saves it with its deadline', async 
   await expect(save).toBeEnabled();
   await save.click();
   await savedVersion(save);
-  await expect(health.getByText(/ is on your calendar for /)).toBeVisible({
+  await expect(
+    health.getByText(/^On your calendar for .+: Health plan enrollment deadline\.$/),
+  ).toBeVisible({
     timeout: 15_000,
   });
 });
@@ -271,7 +273,7 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
   await save.click();
   await savedVersion(save);
   await expect(
-    w4.getByText(/^Give your employer your updated Form W-4 is on your calendar for /),
+    w4.getByText(/^On your calendar for .+: Give your employer your updated Form W-4\.$/),
   ).toBeVisible({ timeout: 15_000 });
   await expect(w4.getByRole('link', { name: 'Why this decision' })).toHaveAttribute(
     'href',

@@ -223,7 +223,7 @@ describe('HealthPlanCard saving', () => {
     ]);
     expect(
       await within(card()).findByText(
-        'Health plan enrollment deadline is on your calendar for Nov 14, 2026.',
+        'On your calendar for Nov 14, 2026: Health plan enrollment deadline.',
       ),
     ).toBeInTheDocument();
     expect(within(card()).getByRole('link', { name: 'Why this decision' })).toHaveAttribute(

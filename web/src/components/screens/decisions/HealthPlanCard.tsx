@@ -41,7 +41,13 @@ import { formatRate } from '@/lib/money';
 import { whyRoute } from '@/lib/routes';
 import { AmountField } from './AmountField';
 import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
-import { amountText, readAmount, saveBadgeTone, saveErrorText } from './decision-format';
+import {
+  amountText,
+  calendarNote,
+  readAmount,
+  saveBadgeTone,
+  saveErrorText,
+} from './decision-format';
 import {
   choiceAmong,
   costAt,
@@ -340,11 +346,7 @@ export function HealthPlanCard() {
             )}
           </div>
         </div>
-        {event && (
-          <p className="m-0 text-small text-ink-3">
-            {event.title} is on your calendar for {formatDate(event.due_at)}.
-          </p>
-        )}
+        {event && <p className="m-0 text-small text-ink-3">{calendarNote(event)}</p>}
       </>
     );
   }

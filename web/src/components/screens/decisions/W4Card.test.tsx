@@ -378,7 +378,7 @@ describe('W4Card saving', () => {
     ]);
     expect(
       await within(card()).findByText(
-        'Give your employer your updated Form W-4 is on your calendar for Oct 31, 2026.',
+        'On your calendar for Oct 31, 2026: Give your employer your updated Form W-4.',
       ),
     ).toBeInTheDocument();
     expect(within(card()).getByRole('link', { name: 'Why this decision' })).toHaveAttribute(
@@ -397,7 +397,7 @@ describe('W4Card saving', () => {
     expect(field(STEP_4C)).toHaveValue('0.00');
     expect(
       within(card()).getByText(
-        'Give your employer your updated Form W-4 is on your calendar for Oct 31, 2026.',
+        'On your calendar for Oct 31, 2026: Give your employer your updated Form W-4.',
       ),
     ).toBeInTheDocument();
 

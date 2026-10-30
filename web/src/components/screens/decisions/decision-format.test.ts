@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { ResultMismatch } from '@/lib/api/hooks';
 import { parseMoney } from '@/lib/money';
 import { cappedK401, sampleK401 } from '@/test/fixtures/decisions';
+import { sampleW4Event } from '@/test/fixtures/w4';
 import {
   amountText,
+  calendarNote,
   examplePlaceholder,
   matchHeadline,
   readAmount,
@@ -164,5 +166,24 @@ describe('tiersText', () => {
         { employee_pct_upto: '5.00', employer_pct: '50.00' },
       ]),
     ).toBe('100% of the first 3%, then 50% up to 5%');
+  });
+});
+
+describe('calendarNote (issue 169)', () => {
+  it('names the event after its date, so an instruction reads as one', () => {
+    expect(calendarNote(sampleW4Event())).toBe(
+      'On your calendar for Oct 31, 2026: Give your employer your updated Form W-4.',
+    );
+  });
+
+  it('reads the same for an event titled with a noun', () => {
+    const deadline = sampleW4Event({
+      kind: 'enrollment_deadline',
+      title: 'Health plan enrollment deadline',
+      due_at: '2026-11-14',
+    });
+    expect(calendarNote(deadline)).toBe(
+      'On your calendar for Nov 14, 2026: Health plan enrollment deadline.',
+    );
   });
 });

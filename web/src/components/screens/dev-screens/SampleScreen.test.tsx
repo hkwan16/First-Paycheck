@@ -160,7 +160,7 @@ describe('SampleScreen after Confirm', () => {
       'A $0.08 refund at tax time',
     );
     expect(w4).toHaveTextContent(
-      'Give your employer your updated Form W-4 is on your calendar for Oct 31, 2026.',
+      'On your calendar for Oct 31, 2026: Give your employer your updated Form W-4.',
     );
     expect(screen.getByRole('link', { name: 'See your plan' })).toHaveAttribute('href', '/plan');
     await act(() => vi.advanceTimersByTimeAsync(1_000));
