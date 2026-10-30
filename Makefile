@@ -21,7 +21,7 @@ help: ## List targets
 .PHONY: setup
 setup: ## Install Python and web dependencies and the git hooks
 	uv sync --all-packages --locked
-	uv run pre-commit install
+	git config core.hooksPath scripts/git-hooks
 	@$(call in_web,pnpm --dir web install --frozen-lockfile)
 
 .PHONY: dev
