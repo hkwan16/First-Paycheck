@@ -116,6 +116,7 @@ def test_the_comparison_adds_up(salary: int, rest: dict[str, Any]) -> None:
     )
 
 
+@EXAMPLES
 @given(SALARY, entries())
 def test_the_comparison_changes_nothing_else(salary: int, rest: dict[str, Any]) -> None:
     data = build(salary, rest)
@@ -123,6 +124,7 @@ def test_the_comparison_changes_nothing_else(salary: int, rest: dict[str, Any]) 
     assert w4(data).model_dump(exclude=COMPARISON) == without.model_dump(exclude=COMPARISON)
 
 
+@EXAMPLES
 @given(SALARY, entries())
 def test_suggestions_land_within_100_dollars(salary: int, rest: dict[str, Any]) -> None:
     result = w4(build(salary, rest))
