@@ -80,7 +80,7 @@ Screenshots are in [`screenshots/`](screenshots/), at 1280 px wide and, where ma
 | `13-check-in.png` | A check-in: findings, the cash flow against the plan with its statuses, net worth |
 | `14-check-in-now.png` | The list of check-ins after Check in now |
 | `15-confirm-phone.png` | The Confirm screen at 390 px |
-| `16-decisions-phone.png` | The Decisions screen at 390 px |
+| `16-decisions-phone.png` | The 401(k) decision step at 390 px |
 | `backlog.png` | The GitHub Project board (to capture from a signed-in session) |
 
 ## Documented backlog

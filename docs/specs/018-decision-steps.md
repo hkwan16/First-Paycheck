@@ -1,6 +1,6 @@
 # 018: Decisions as four steps
 
-Status: Ready, M10 (web only).
+Status: Implemented, M10 (web only).
 
 ## Goal
 
