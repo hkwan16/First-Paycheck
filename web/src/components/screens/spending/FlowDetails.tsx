@@ -39,7 +39,7 @@ const Muted = ({ children }: { children: React.ReactNode }) => (
 export interface FlowDetailsProps {
   node: FlowNode;
   flow: CashFlow;
-  /** The transactions loaded for the table, newest first. */
+  /** The period's transactions loaded for the table, newest first. */
   transactions: readonly Transaction[];
   /** account_id to its mask ("4821"). */
   masks: ReadonlyMap<string, string | null>;

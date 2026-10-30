@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Swatch, type SwatchColor } from '@/components/ui/Swatch';
-import { TRANSACTIONS_PAGE_SIZE, useAccounts, useTransactions } from '@/lib/api/hooks';
+import { periodFilters, useAccounts, useTransactions } from '@/lib/api/hooks';
 import type { CashFlow } from '@/lib/api/types';
 import { formatMoney } from '@/lib/money';
 import { FlowDetails } from './FlowDetails';
@@ -53,7 +53,8 @@ export interface CashFlowCardProps {
  */
 export function CashFlowCard({ flow, updating }: CashFlowCardProps) {
   const { ref, width } = useContainerWidth<HTMLDivElement>();
-  const { transactions } = useTransactions({ limit: TRANSACTIONS_PAGE_SIZE });
+  // The period's rows for the category popovers: the list the Transactions card reads.
+  const { transactions } = useTransactions(flow ? periodFilters(flow) : null);
   const accounts = useAccounts().data;
   const masks = useMemo(
     () => new Map((accounts ?? []).map((a) => [a.id, a.mask] as const)),

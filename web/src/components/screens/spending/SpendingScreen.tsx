@@ -24,8 +24,8 @@ export interface SpendingScreenProps {
 /**
  * Setup step 3, from docs/mockup/Spending.dc.html: the period's totals by
  * bucket and, behind the `sankey` flag, where each dollar of pay went (both
- * from one `GET /cashflow`), the recurring charges, then every transaction
- * with who labeled it and a category fix that becomes a rule.
+ * from one `GET /cashflow`), the recurring charges, then the period's
+ * transactions with who labeled each and a category fix that becomes a rule.
  */
 export function SpendingScreen({
   showSankey = features.sankey,
@@ -35,6 +35,13 @@ export function SpendingScreen({
   const cashflow = useCashflow(period);
   const flow = cashflow.data;
   const title = flow ? `Where ${monthName(flow.start)}'s money went` : 'Where your money went';
+  // The period the transactions cover (spec 003 rule 17a): the one chosen,
+  // else the dates the API answered its default with. Not known while that
+  // answer is on its way (the last period's flow may still be on screen); null
+  // when the cash flow cannot be read, and the newest rows are listed instead.
+  const answered =
+    flow && !cashflow.isPlaceholderData ? { start: flow.start, end: flow.end } : undefined;
+  const listed = period ?? answered ?? (cashflow.isError ? null : undefined);
 
   return (
     <>
@@ -60,7 +67,7 @@ export function SpendingScreen({
         <RecurringCard />
       </CardErrorBoundary>
       <CardErrorBoundary title="Transactions">
-        <TransactionsCard />
+        <TransactionsCard period={listed} />
       </CardErrorBoundary>
       <StepFooter
         back={{ href: '/setup/link' }}

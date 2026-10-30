@@ -1,4 +1,6 @@
 import {
+  keepPreviousData,
+  skipToken,
   useInfiniteQuery,
   useMutation,
   useQueryClient,
@@ -10,23 +12,45 @@ import { fetchClient } from '../client';
 import { invalidateSpending, queryKeys, type TransactionFilters } from '../keys';
 import type { Category, Transaction, TransactionPage } from '../types';
 import { unwrap } from './request';
+import type { Period } from './spending';
+
+/** Rows per page of a transactions list; the same size shares the same cached list. */
+export const TRANSACTIONS_PAGE_SIZE = 50;
 
 /**
- * `GET /transactions` page by page (newest first), following `next_cursor`.
- * Returns the loaded rows flattened, plus the paging controls.
+ * The Spending screen's list for a period (spec 003 rule 17a): its dates and
+ * one page size, so the Transactions card and the diagram's popovers share
+ * one read.
  */
-export function useTransactions(filters: TransactionFilters) {
+export const periodFilters = ({ start, end }: Period): TransactionFilters => ({
+  limit: TRANSACTIONS_PAGE_SIZE,
+  start,
+  end,
+});
+
+/**
+ * `GET /transactions` page by page (newest first), following `next_cursor`
+ * with the same filters, so every page keeps to them. Returns the loaded rows
+ * flattened, plus the paging controls. `null` filters (not known yet) read
+ * nothing. When the filters change, the last rows stay on screen until the
+ * new ones arrive (`isPlaceholderData`), and there is no next page to ask
+ * for until then: the kept rows' cursor belongs to the old filters.
+ */
+export function useTransactions(filters: TransactionFilters | null) {
   const query = useInfiniteQuery({
     queryKey: queryKeys.transactionPages(filters),
-    queryFn: ({ pageParam, signal }) =>
-      unwrap(
-        fetchClient.GET('/transactions', {
-          params: { query: pageParam ? { ...filters, cursor: pageParam } : filters },
-          signal,
-        }),
-      ),
+    queryFn: filters
+      ? ({ pageParam, signal }) =>
+          unwrap(
+            fetchClient.GET('/transactions', {
+              params: { query: pageParam ? { ...filters, cursor: pageParam } : filters },
+              signal,
+            }),
+          )
+      : skipToken,
     initialPageParam: null as string | null,
     getNextPageParam: (last: TransactionPage) => last.next_cursor,
+    placeholderData: keepPreviousData,
   });
   const transactions = useMemo(
     () => query.data?.pages.flatMap((page) => page.items) ?? [],
@@ -35,10 +59,11 @@ export function useTransactions(filters: TransactionFilters) {
   return {
     transactions,
     isPending: query.isPending,
+    isPlaceholderData: query.isPlaceholderData,
     isError: query.isError,
     error: query.error,
     refetch: query.refetch,
-    hasNextPage: query.hasNextPage,
+    hasNextPage: query.hasNextPage && !query.isPlaceholderData,
     fetchNextPage: query.fetchNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
   };

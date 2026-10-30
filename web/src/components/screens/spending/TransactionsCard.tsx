@@ -9,15 +9,18 @@ import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { apiErrorMessage } from '@/lib/api/errors';
 import {
+  periodFilters,
   TRANSACTIONS_PAGE_SIZE,
   useAccounts,
   useFixCategory,
   useTransactions,
+  type Period,
 } from '@/lib/api/hooks';
+import type { TransactionFilters } from '@/lib/api/keys';
 import type { Category, Transaction } from '@/lib/api/types';
 import { categoryInfo } from '@/lib/categories';
 import { formatNumber } from '@/lib/money';
-import { countSources } from './spending-format';
+import { countSources, periodText } from './spending-format';
 import { TransactionTable } from './TransactionTable';
 
 type FixResult =
@@ -57,13 +60,29 @@ function LoadingRows() {
   );
 }
 
+/** The period's rows; the newest rows without a period; nothing until it is known. */
+function filtersFor(period: Period | null | undefined): TransactionFilters | null {
+  if (period === undefined) return null;
+  return period ? periodFilters(period) : { limit: TRANSACTIONS_PAGE_SIZE };
+}
+
+export interface TransactionsCardProps {
+  /**
+   * The period the summary shows (spec 003 rule 17a). Undefined while it is
+   * not known yet (the API's default period has not answered); null when it
+   * cannot be known (the cash flow failed), and the newest rows are listed.
+   */
+  period: Period | null | undefined;
+}
+
 /**
- * The mockup's transactions card: who labeled what, the table, and the
- * category fix. A fix shows at once (useFixCategory is optimistic); the
- * notice says the server saved it as a rule, or that it went back.
+ * The mockup's transactions card: who labeled what, the period's table, and
+ * the category fix. A fix shows at once (useFixCategory is optimistic); the
+ * notice says the server saved it as a rule, or that it went back. While
+ * another period loads, the last rows stay on screen and the card is busy.
  */
-export function TransactionsCard() {
-  const list = useTransactions({ limit: TRANSACTIONS_PAGE_SIZE });
+export function TransactionsCard({ period }: TransactionsCardProps) {
+  const list = useTransactions(filtersFor(period));
   const accounts = useAccounts().data;
   const fix = useFixCategory();
   const [result, setResult] = useState<FixResult | null>(null);
@@ -112,12 +131,17 @@ export function TransactionsCard() {
       </Notice>
     );
   } else if (list.transactions.length === 0) {
-    body = (
-      <p className="m-0 text-small text-ink-3">
-        No transactions yet. <Link href="/setup/link">Link a bank</Link> on the first step and they
-        appear here once the sync finishes.
-      </p>
-    );
+    body =
+      period && accounts?.length !== 0 ? (
+        <p className="m-0 text-small text-ink-3">
+          No transactions from {periodText(period.start, period.end)}. Pick another period above.
+        </p>
+      ) : (
+        <p className="m-0 text-small text-ink-3">
+          No transactions yet. <Link href="/setup/link">Link a bank</Link> on the first step and
+          they appear here once the sync finishes.
+        </p>
+      );
   } else {
     body = (
       <>
@@ -141,7 +165,7 @@ export function TransactionsCard() {
   }
 
   return (
-    <Card aria-labelledby="txn-title" gap={12}>
+    <Card aria-labelledby="txn-title" gap={12} aria-busy={list.isPlaceholderData || undefined}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="txn-title" className="m-0">
           Transactions
