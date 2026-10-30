@@ -1,6 +1,6 @@
 # 008: Explain, verify, citations and retrieval
 
-Status: Implemented, M3. Rule 7a, `explain/v2`, `fallback/v2` and the `rate_framing` eval metric added for issue 132: the explanation tells the rate the person chose from the rate their pay stub shows. Rules 24a and 24b: `rate_framing` is scored by an LLM judge, calibrated by `judge_accuracy`. Rule 19a and migration `0018_explanation_context_digest` added for issue 161: an explanation written from facts that have changed since reads as out of date and can be written again.
+Status: Implemented, M3. Rule 7a, `explain/v2`, `fallback/v2` and the `rate_framing` eval metric added for issue 132: the explanation tells the rate the person chose from the rate their pay stub shows. Rules 24a and 24b: `rate_framing` is scored by an LLM judge, calibrated by `judge_accuracy`. Rule 19a and migration `0019_explanation_context_digest` added for issue 161: an explanation written from facts that have changed since reads as out of date and can be written again.
 
 ## Goal
 
