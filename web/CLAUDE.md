@@ -150,12 +150,28 @@ Chrome (`components/chrome`): `Wordmark`, `Header` (`chips`, `account` slot, `mi
 `HeaderAccount` (server: "Sample data" chip and `UserMenu` from the Supabase user), `UserMenu` (the
 user chip as a disclosure button with "Sign out" and "Delete account"; see "Deleting the account"),
 `DeleteAccountConfirm`, `NavStep` (`size` md 22px, sm 18px for a decision step), `SideNav`
-(`current`, `done` from `lib/setup-progress.ts`, `hrefs` for id-bound screens, `calculators`;
-"Decisions" nests its four steps, see "Decisions screen"; wraps into a chip row under 780px),
-`AppSideNav` (current item from the URL), `Shell` (header, nav column
-`1 1 200px` up to 240px, main `999 1 560px`, skip link), `PageTitle` (`title`, `lead`, `aside`,
+(`current`, `done` from `lib/setup-progress.ts`, `hrefs` for id-bound screens, `calculators`,
+`pathname`; "Decisions" nests its four steps, see "Decisions screen"; one list, stacked at every
+width; under 780px it sits behind a disclosure button, see "Side nav on a phone"), `AppSideNav`
+(current item and `pathname` from the URL), `Shell` (header, nav column `1 1 200px` up to 240px,
+full width above the page under 780px, main `999 1 560px`, skip link), `PageTitle` (`title`, `lead`, `aside`,
 `eyebrow`), `StepFooter` (`back`, `next` with `primary`, `disabled` and `loading`; a disabled
 next is a real disabled button, never a dead link).
+
+### Side nav on a phone
+
+Spec 018 rules 11-17 (issue 155). Under 780px (`max-nav:`; the `nav` breakpoint token) the nav's
+first child, a `<button>` with `aria-expanded` and `aria-controls`, is all that shows above the
+page: the current item's `NavStep` and label ("Decisions: 401(k) match" for a step), and "n of 4
+setup steps done" (`setupStepsDone`, the four setup marks the list shows). Pressing it shows the
+same list in the page flow under it (`max-nav:hidden` comes off), pushing the page down; it is a
+disclosure, not a sheet, so there is no focus trap, backdrop or scroll lock to get right. Escape
+inside the nav closes it and focuses the button; choosing a link closes it (`onChoose` on every
+`ItemLink`); a new `pathname` closes it (state adjusted during render, so returning to the page
+does not reopen it). At 780px and wider the button is `nav:hidden` and the list always shows, so
+desktop is unchanged pixel for pixel. Its name in Chromium has a space before each hidden comma
+("match , done , 1 of 4 setup steps done"), like the nav links: match it with `\s*,` in e2e.
+The arrow turns over `--duration-fast`, zero under reduced motion; nothing animates the list.
 
 ## Data layer
 
@@ -428,7 +444,12 @@ Every sample screen runs in the smoke spec at 1280 and 390: axe, the visual base
 walk (`tabWalk`): every control a person can Tab to (tabindex 0; a roving group's one stop) is
 reached, each shows a focus ring (an outline on it, or on the ancestor that draws one for a
 visually hidden input, as `DropZone` does), none lands under the sticky header, and Tab leaves the
-page (a date field takes one Tab per part and is not a trap). M10 added the sample screens that
+page (a date field takes one Tab per part and is not a trap). At 390 the side nav's links are
+hidden behind its disclosure button: when Tab reaches the button the walk presses Enter, as a
+person would, tags the links it shows and walks them too, and fails if any nav button is still
+collapsed at the end, so no control is skipped for being hidden. Each screen also checks that its
+h1 ends within the first screenful (1280x820 and 390x844) and, at 390, that the nav above the page
+is at most 80px. M10 added the sample screens that
 were missing: sign-in after a deletion (`/sign-in?deleted=1`), Confirm while reading, failed and
 confirmed, and `account` (the account menu); the unlink and account deletion confirmations are
 checked in place.
@@ -524,8 +545,10 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
   done when its calculator is live and saved (`setupProgress`, keyed by the calculator id);
   "Decisions" when every live one is. A step that is not live is muted with "After alpha" under
   its label (its name ends ", After alpha") and still links to its placeholder page. Under 780px
-  the "Decisions" item takes the full row and its steps wrap as a row of their own beneath it
-  (two by two at 390px). `navKeyForPath` returns the calculator id for a step's path.
+  the nav is one control above the page ("Decisions: 401(k) match", with the setup progress), so
+  a step's heading and card start in the first screenful; the open list shows the steps indented
+  under "Decisions" as on desktop (see "Side nav on a phone"). `navKeyForPath` returns the
+  calculator id for a step's path.
 
 - **`Match401kCard`** always renders the same `DecisionCard` frame (a region named by its title)
   and swaps its body: skeleton, error, a link to Confirm when there is no confirmed pay stub,

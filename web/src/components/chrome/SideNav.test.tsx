@@ -312,13 +312,13 @@ describe('SideNav on a phone (spec 018 rules 11-17)', () => {
     expect(control()).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('turns its chevron over the fast duration, which reduced motion zeroes', async () => {
+  it('turns its arrow over the fast duration, which reduced motion zeroes', async () => {
     const user = userEvent.setup();
     render(<SideNav current="spending" />);
-    const chevron = control().lastElementChild;
-    expect(chevron).toHaveClass('transition-[rotate]', 'duration-(--duration-fast)', 'rotate-90');
+    const arrow = control().lastElementChild;
+    expect(arrow).toHaveClass('transition-[rotate]', 'duration-(--duration-fast)', 'rotate-90');
     await user.click(control());
-    expect(chevron).toHaveClass('-rotate-90');
+    expect(arrow).toHaveClass('-rotate-90');
   });
 });
 
