@@ -2,10 +2,21 @@ import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CALC_DEBOUNCE_MS } from '@/lib/api/hooks';
 import { parseMoney } from '@/lib/money';
-import { cappedK401, DECISION_V1_ID, sampleDecision, sampleK401 } from '@/test/fixtures/decisions';
-import { emptyProfile, SAMPLE_ANNUAL_SALARY_CENTS, samplePayStub } from '@/test/fixtures/documents';
+import {
+  cappedK401,
+  DECISION_V1_ID,
+  sampleDecision,
+  sampleK401,
+  stub01K401,
+} from '@/test/fixtures/decisions';
+import {
+  emptyProfile,
+  SAMPLE_ANNUAL_SALARY_CENTS,
+  samplePayStub,
+  stub01PayStub,
+} from '@/test/fixtures/documents';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
-import { db, decisionsReady, savedDecision } from '@/test/msw/db';
+import { db, decisionsReady, savedDecision, stub01Ready } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { act, fireEvent, renderWithProviders, screen, waitFor, within } from '@/test/render';
@@ -73,7 +84,7 @@ describe('Match401kCard with a saved decision', () => {
     // The age comes from the profile's birth year; the card no longer asks for it.
     expect(within(card()).queryByLabelText(/age/i)).not.toBeInTheDocument();
 
-    expect(result()).toHaveTextContent('You capture the full $2,600 match');
+    expect(result()).toHaveTextContent('At 4% you would capture the full $2,600 match');
     const rows = within(result())
       .getAllByRole('term')
       .map((term) => [term.textContent, term.nextElementSibling?.textContent]);
@@ -112,7 +123,7 @@ describe('Match401kCard with a saved decision', () => {
     ];
     await renderReady();
     expect(card()).toHaveTextContent('100% of the first 3%, then 50% up to 5%');
-    expect(result()).toHaveTextContent('You capture the full $14,400 match');
+    expect(result()).toHaveTextContent('At 6% you would capture the full $14,400 match');
     expect(within(card()).getByText(/Over the 2026 limit/)).toBeInTheDocument();
     expect(card()).toHaveTextContent('more than the $24,500 the IRS allows for 2026');
     expect(card()).toHaveTextContent('above the 2026 compensation limit');
@@ -151,7 +162,7 @@ describe('Match401kCard calculating', () => {
     const stoppedAt = Date.now();
     expect(result()).toHaveAttribute('aria-busy', 'true');
     // The previous numbers stay while the next ones load.
-    expect(result()).toHaveTextContent('You capture the full $2,600 match');
+    expect(result()).toHaveTextContent('At 4% you would capture the full $2,600 match');
     expect(saveButton()).toBeDisabled();
     expect(seen.calc).toHaveLength(1);
 
@@ -160,10 +171,71 @@ describe('Match401kCard calculating', () => {
     expect(seen.calc.map((body) => body.contribution_pct)).toEqual(['4.00', '3.00']);
     // Measured on the test clock, so a slow machine cannot make it pass or fail.
     expect(seen.calcAt[1]! - stoppedAt).toBeGreaterThanOrEqual(CALC_DEBOUNCE_MS);
-    expect(result()).toHaveTextContent('You leave $650 of match behind');
+    expect(result()).toHaveTextContent('At 3% you would leave $650 of match behind');
     expect(within(result()).getByText('$27.08')).toBeInTheDocument();
     expect(within(card()).getByText('Changed since v1')).toBeInTheDocument();
     expect(saveButton()).toHaveTextContent('Save as v2');
+  });
+});
+
+describe('Match401kCard and the rate the pay stub shows (spec 006 rule 14, issue 132)', () => {
+  it('starts from the newest stub rate when nothing is saved, and says what it leaves', async () => {
+    // stub-01: $109.62 of $3,653.85 goes to the 401(k), which the API reports as 3.00.
+    stub01Ready();
+    const seen = requests();
+    await renderReady();
+    expect(card()).toHaveTextContent(
+      'Your Apr 10 pay stub shows $109.62 a paycheck, 3% of your gross pay, going to your 401(k).',
+    );
+    expect(slider()).toHaveValue('3');
+    expect(slider()).toHaveAttribute('aria-valuetext', '3% of salary');
+    expect(seen.calc).toEqual([stub01K401(3).inputs]);
+    expect(result()).toHaveTextContent('You leave $950 of match behind');
+    expect(card()).not.toHaveTextContent(/leave the whole/);
+    expect(within(card()).getByText('Not saved')).toBeInTheDocument();
+  });
+
+  it('speaks of 0% as a choice while the stub shows a contribution', async () => {
+    stub01Ready();
+    await renderReady();
+    drag(0);
+    await settle();
+    await waitFor(() =>
+      expect(result()).toHaveTextContent('At 0% you would leave the whole $3,800 match behind'),
+    );
+    expect(result()).not.toHaveTextContent(/^You leave the whole/);
+  });
+
+  it('opens a saved rate over the stub, as a choice until the stub shows it', async () => {
+    stub01Ready();
+    db.decisions = [
+      sampleDecision({ inputs: { ...stub01K401(5).inputs }, result: { ...stub01K401(5).result } }),
+    ];
+    await renderReady();
+    expect(slider()).toHaveValue('5');
+    expect(result()).toHaveTextContent('At 5% you would capture the full $3,800 match');
+    expect(saveButton()).toHaveTextContent('Saved as v1');
+  });
+
+  it('says the whole match is left behind only at the rate the stub shows', async () => {
+    stub01Ready();
+    db.payStubs = [
+      stub01PayStub({ retirement_contribution_cents: 0, retirement_contribution_pct: '0.00' }),
+    ];
+    await renderReady();
+    expect(slider()).toHaveValue('0');
+    expect(result()).toHaveTextContent('You leave the whole $3,800 match behind');
+  });
+
+  it('starts at 0% and speaks conditionally when the stub has no rate', async () => {
+    decisionsReady();
+    db.payStubs = [samplePayStub({ retirement_contribution_pct: null })];
+    await renderReady();
+    expect(card()).toHaveTextContent(
+      'Your Oct 15 pay stub shows $0.00 a paycheck going to your 401(k).',
+    );
+    expect(slider()).toHaveValue('0');
+    expect(result()).toHaveTextContent('At 0% you would leave the whole $2,600 match behind');
   });
 });
 

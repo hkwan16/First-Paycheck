@@ -26,7 +26,7 @@ const saveButton = (page: Page) => card(page).getByRole('button', { name: /^Save
 
 async function settled(page: Page) {
   await expect(result(page)).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
-  await expect(result(page)).toContainText(/You (capture|leave)/);
+  await expect(result(page)).toContainText(/(You|you would) (capture|leave)/);
 }
 
 async function setContribution(slider: Locator, percent: number) {

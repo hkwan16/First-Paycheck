@@ -1,6 +1,6 @@
 # 005: Pay stub and benefits extraction, review and confirm
 
-Status: Implemented, M2. The `extraction` eval suite first ran live on October 29 (issue #123): on `claude-sonnet-5-5` every run scored `field_accuracy` and `document_accuracy` 1.0 over the 30 stubs for 55 to 56 cents, and the baseline holds those measurements. Rule 24a (`annual_salary_cents` on the stub output) added in M10. Rules 9, 10 and 23 name replaced documents since spec 004 rules 24-31.
+Status: Implemented, M2. The `extraction` eval suite first ran live on October 29 (issue #123): on `claude-sonnet-5-5` every run scored `field_accuracy` and `document_accuracy` 1.0 over the 30 stubs for 55 to 56 cents, and the baseline holds those measurements. Rule 24a (`annual_salary_cents` on the stub output) added in M10. Rules 9, 10 and 23 name replaced documents since spec 004 rules 24-31. Rule 24b (`retirement_contribution_pct`, the 401(k) rate the stub shows) added for issue 132.
 
 ## Goal
 
@@ -21,7 +21,7 @@ Turn the redacted pages of spec 004 into a proposal the user reviews field by fi
 - `documents.proposal` (jsonb): `{fields, line_items, plans, source_lines, withheld_pages, notes}`, returned by `GET /docs/{id}` when the status is `proposed` or `manual_entry_required` (the redacted lines to type from), and null otherwise.
 - `jobs.result` for `ingest.extract`: `{document_id, status, page_count, redaction_count, withheld_pages}`. Ids and counts only, never extracted text (spec 001 rule 28).
 - On confirm (200): one `pay_stubs` row, or `benefits_plans` rows plus `benefits_chunks`; the blob deleted; `documents.status = confirmed`, `confirmed_at` and `deleted_at` set. The response is `{document, pay_stub, plans}`: the document as `GET /docs` lists it and what was stored.
-- `GET /pay-stubs`: confirmed stubs, newest pay date first, each with `annual_salary_cents` (integer cents or null, rule 24a). `GET /profile`, `PUT /profile`: the profile.
+- `GET /pay-stubs`: confirmed stubs, newest pay date first, each with `annual_salary_cents` (integer cents or null, rule 24a) and `retirement_contribution_pct` (a two-place percentage string or null, rule 24b). `GET /profile`, `PUT /profile`: the profile.
 
 ## Rules
 
@@ -67,6 +67,7 @@ Turn the redacted pages of spec 004 into a proposal the user reviews field by fi
 
 24. `GET /pay-stubs` returns the user's stubs ordered by `pay_date DESC, created_at DESC`, every column including the generated `tax_year`.
 24a. **Yearly salary the stub implies.** Every stub output (`PayStubOut`: `GET /pay-stubs` and the confirm response's `pay_stub`) carries `annual_salary_cents`: `gross_cents` times the pay periods a year for its `pay_frequency` (weekly 52, biweekly 26, semimonthly 24, monthly 12), from `calc/pay_stub.py:annual_salary_cents`. It is an integer product of integer cents, so no rounding is applied and it need not be a round figure. A stub with no `pay_frequency` gives null. It is computed on read, never stored, and it is not written to the profile: the client offers it as the starting salary in the plan details form, which the user saves with `PUT /profile` (the profile's own `salary_cents` wins when set). Gross on one stub can include overtime or a bonus, which is why it is a starting value the user can change, not a confirmed salary.
+24b. **401(k) rate the stub shows.** Every stub output also carries `retirement_contribution_pct`: `retirement_contribution_cents` as a percentage of this paycheck's `gross_cents`, `retirement_contribution_cents * 100 / gross_cents` computed exactly and rounded half up once to two places, from `calc/pay_stub.py:retirement_contribution_pct`. It is a `Decimal` with exactly two places, sent as a JSON string (`"3.00"`), like every percentage the API returns (`calc/types.py:ResultPercent`). It is the same arithmetic as spec 015's `actual_pct`. A stub with no retirement line (stored as 0) shows nothing going to the 401(k), so its rate is `"0.00"`, not null. It is null only when it cannot be computed: a gross of zero or less, which confirm refuses (rule 20), so a stored stub has one in practice. It is computed on read, never stored, and never written to a decision: it is what the person contributes now, which the 401(k) card starts from (spec 006 rule 14) and the explanation states beside the rate the person chose (spec 008 rule 7a). Payroll can round a per-paycheck deferral to the cent, and a flat-dollar election is no whole percentage at all, so the rate need not be a round figure.
 25. `GET /profile` returns the saved profile, or the defaults (nulls, empty lists, `dependents = 0`) when none is saved. `PUT /profile` replaces it: `salary_cents` strict int > 0 or null; `pay_frequency`, `filing_status`, `expected_healthcare_usage` enums or null; `other_jobs` a list of up to 5 `{annual_wages_cents > 0}`; `dependents` 0-20; `start_date` a date or null; `match_tiers` up to 5 tiers `{employee_pct_upto, employer_pct}` with both in (0, 100] and `employee_pct_upto` strictly ascending (spec 006); `vesting_years` 0-10 or null. Percentages are decimals with at most 2 places, sent and returned as JSON strings.
 
 ### Evals
@@ -95,6 +96,18 @@ Working for row 1 (the Confirm mockup's stub): deductions = 29,776 + 16,792 + 3,
 | 3 | `test_annual_salary_without_frequency` | 270,833 | null | none | null |
 
 Working for row 1 (the Acme stub, $2,708.33 twice a month): 270,833 x 24 = 6,499,992 cents, $64,999.92. Not $65,000.00: the product is exact and nothing rounds it to the salary the stub was made from. Row 2: 250,000 x 52 = 13,000,000; x 26 = 6,500,000; x 24 = 6,000,000; x 12 = 3,000,000. The route test `tests/integration/test_pay_stubs.py::test_every_column_is_returned` reads row 1 back from `GET /pay-stubs`.
+
+### 401(k) rate (`tests/unit/calc/test_pay_stub.py`, rule 24b)
+
+| # | Test | Gross | 401(k) | Exact rate | `retirement_contribution_pct` |
+|---|---|---|---|---|---|
+| 1 | `test_contribution_rate_stub_01` | 365,385 | 10,962 | 3.000123... | 3.00 |
+| 2 | `test_contribution_rate_rounds_half_up` | 320,000 | 10,000 | 3.125 | 3.13 |
+| 3 | `test_contribution_rate_uneven` | 270,833 | 10,000 | 3.692312... | 3.69 |
+| 4 | `test_contribution_rate_no_retirement_line` | 270,833 | 0 | 0 | 0.00 |
+| 5 | `test_contribution_rate_zero_gross` | 0 | 0 | none | null |
+
+Working for row 1 (the synthetic `evals/fixtures/pay_stubs/stub-01.pdf`, $109.62 of a $3,653.85 biweekly paycheck, the stub of issue 132): `10,962 * 100 / 365,385 = 1,096,200 / 365,385 = 3.000123...`, which rounds to 3.00. The stub's employer set 3%: `365,385 * 3% = 10,961.55`, which payroll rounded to 10,962 cents, so the rate read back is a hair over 3% and the two places hide it. Row 2: `1,000,000 / 320,000 = 3.125` exactly, a tie on the third place; half up gives 3.13 (banker's rounding would give 3.12). Row 3: `1,000,000 / 270,833 = 3.692312...`, which rounds down to 3.69: a $100.00 flat election on the Acme stub is no whole percentage. Row 4: nothing withheld for the 401(k) is a rate of 0.00. Row 5: a zero gross has no rate (null), and the function never divides by zero. The route test `tests/integration/test_pay_stubs.py::test_every_column_is_returned` reads a stub-01-shaped stub back from `GET /pay-stubs` with `"3.00"`.
 
 ### Other deductions (`tests/unit/ingest/test_proposal.py::test_other_deductions_sum_unassigned_lines`)
 

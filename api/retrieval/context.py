@@ -1,34 +1,44 @@
-"""What the explain prompt is given about a decision (spec 008 rule 7).
+"""What the explain prompt is given about a decision (spec 008 rules 7 and 7a).
 
 Facts are the decision's own numbers, formatted the way the verifier reads
 them back; every fact passes ``verify_explanation`` by construction (a test
 checks this on every spec 006 and spec 012 example). Labels carry no numbers
 of their own; a health plan's name may, and ``name_numbers`` lets the verifier
-accept them (spec 012 rule 16).
+accept them (spec 012 rule 16). A 401(k) decision also gets the rate the
+newest confirmed pay stub shows, which is not part of the decision: the
+decision holds the rate chosen, the stub what goes in now (issue 132).
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 from calc.health_plans import HealthPlansInput, HealthPlansResult
 from calc.k401 import K401MatchInput, K401MatchResult
+from calc.pay_stub import StubRate, stub_rate
 from calc.w4 import W4Input, W4Result
 from db.enums import CalculatorKind
-from llm.schemas import ExplainCitation, ExplainContext, ExplainFact
+from llm.schemas import ExplainCitation, ExplainContext, ExplainFact, ExplanationDraft
 from retrieval.benefits_search import BenefitsPassage
 from retrieval.citations import Citation
+from verify.allowed import AllowedNumbers
+from verify.fallback import fallback_draft
 from verify.format import dollars, percent
 from verify.numbers import extract_numbers
 
 __all__ = [
     "BENEFITS_PASSAGES",
     "BENEFITS_QUERIES",
+    "ExplainSetup",
     "explain_context",
+    "explain_setup",
     "health_notes",
     "k401_notes",
     "name_numbers",
+    "pay_stub_numbers",
     "w4_notes",
 ]
 
@@ -52,6 +62,28 @@ COMPENSATION_NOTE = (
     " on pay up to that limit."
 )
 NO_MATCH_NOTE = "The plan has no employer match."
+# Spec 008 rule 7a: what the newest confirmed pay stub says about the chosen
+# rate. No digits, so a draft that repeats a note adds no number.
+STUB_SAME_NOTE = (
+    "The latest pay stub shows the rate chosen, so it is already in effect: it is what goes"
+    " to the 401(k) from each paycheck now."
+)
+STUB_DIFFERS_NOTE = (
+    "The latest pay stub shows a different rate from the one chosen. The pay stub shows what"
+    " goes to the 401(k) now; the rate chosen takes effect only once the election is changed"
+    " with the employer, so it is not in effect yet."
+)
+NO_STUB_NOTE = (
+    "No confirmed pay stub shows what goes to the 401(k) now, so the rate chosen may not be"
+    " in effect yet."
+)
+
+
+STUB_NOTES: dict[StubRate, str] = {
+    StubRate.NONE: NO_STUB_NOTE,
+    StubRate.CHOSEN: STUB_SAME_NOTE,
+    StubRate.OTHER: STUB_DIFFERS_NOTE,
+}
 
 
 def k401_notes(result: K401MatchResult, *, has_match: bool) -> list[str]:
@@ -65,22 +97,37 @@ def k401_notes(result: K401MatchResult, *, has_match: bool) -> list[str]:
     return notes
 
 
-def _k401_facts(data: K401MatchInput, result: K401MatchResult) -> list[ExplainFact]:
+def pay_stub_numbers(calculator: str, pay_stub_pct: Decimal | None) -> dict[str, str]:
+    """The pay stub's rate keyed for ``AllowedNumbers.from_decision`` (spec 008
+    rule 12): a ``_pct`` key, so it reads as a percentage."""
+    if calculator != CalculatorKind.K401_MATCH or pay_stub_pct is None:
+        return {}
+    return {"pay_stub_contribution_pct": str(pay_stub_pct)}
+
+
+def _k401_facts(
+    data: K401MatchInput, result: K401MatchResult, pay_stub_pct: Decimal | None
+) -> list[ExplainFact]:
     def fact(label: str, value: str) -> ExplainFact:
         return ExplainFact(label=label, value=value)
 
-    facts = [fact("Your contribution rate", percent(data.contribution_pct))]
+    facts = [fact("Contribution rate you chose", percent(data.contribution_pct))]
+    if pay_stub_pct is not None:
+        facts.append(
+            fact("401(k) contribution rate your latest pay stub shows", percent(pay_stub_pct))
+        )
     if data.match_tiers:
         facts += [
             fact("Contribution rate that earns the full match", percent(result.full_match_pct)),
             fact(
-                "Employer match per year at your rate", dollars(result.employer_match_cents_current)
+                "Employer match per year at the rate you chose",
+                dollars(result.employer_match_cents_current),
             ),
             fact(
                 "Employer match per year at the full-match rate",
                 dollars(result.employer_match_cents_full),
             ),
-            fact("Match you miss per year", dollars(result.missed_cents)),
+            fact("Match you miss per year at the rate you chose", dollars(result.missed_cents)),
             fact(
                 "Extra per paycheck before tax at the full-match rate",
                 dollars(result.per_paycheck_cost_delta_cents),
@@ -92,7 +139,10 @@ def _k401_facts(data: K401MatchInput, result: K401MatchResult) -> list[ExplainFa
         ]
     facts += [
         fact("Federal marginal tax rate used", percent(result.marginal_rate_used)),
-        fact("Your yearly contribution", dollars(result.employee_annual_cents_current)),
+        fact(
+            "Your yearly contribution at the rate you chose",
+            dollars(result.employee_annual_cents_current),
+        ),
     ]
     if data.match_tiers:
         facts.append(
@@ -417,7 +467,11 @@ def explain_context(
     result: Mapping[str, Any],
     citations: Sequence[Citation],
     passages: Sequence[BenefitsPassage],
+    *,
+    pay_stub_pct: Decimal | None = None,
 ) -> ExplainContext:
+    """``pay_stub_pct`` is the newest confirmed stub's 401(k) rate (spec 008 rule
+    7a), None without a stub; only a ``k401_match`` decision uses it."""
     if calculator == CalculatorKind.HEALTH_PLANS:
         plans = HealthPlansInput.model_validate(inputs)
         compared = HealthPlansResult.model_validate(result)
@@ -453,11 +507,52 @@ def explain_context(
     return ExplainContext(
         calculator=calculator,
         tax_year=data.tax_year,
-        facts=_k401_facts(data, computed),
-        notes=k401_notes(computed, has_match=bool(data.match_tiers)),
+        facts=_k401_facts(data, computed, pay_stub_pct),
+        notes=[
+            STUB_NOTES[stub_rate(data.contribution_pct, pay_stub_pct)],
+            *k401_notes(computed, has_match=bool(data.match_tiers)),
+        ],
         citations=[
             ExplainCitation(key=c.key, title=c.title, passage=c.passage)
             for c in _ordered(citations, computed.citation_keys)
         ],
         benefits_passages=[passage.text for passage in passages],
+    )
+
+
+@dataclass(frozen=True)
+class ExplainSetup:
+    """Everything a run of ``verify.flow.run_explain`` takes besides the model,
+    built once from the same pay stub rate for ``POST /explain`` and the evals."""
+
+    context: ExplainContext
+    allowed_numbers: AllowedNumbers
+    citation_keys: frozenset[str]
+    fallback: ExplanationDraft
+
+
+def explain_setup(
+    calculator: str,
+    inputs: Mapping[str, Any],
+    result: Mapping[str, Any],
+    citations: Sequence[Citation],
+    passages: Sequence[BenefitsPassage],
+    *,
+    pay_stub_pct: Decimal | None,
+) -> ExplainSetup:
+    """The context, the numbers the verifier allows, the citation keys and the
+    fallback for one decision (spec 008 rules 7-17)."""
+    keys = frozenset(citation.key for citation in citations)
+    return ExplainSetup(
+        context=explain_context(
+            calculator, inputs, result, citations, passages, pay_stub_pct=pay_stub_pct
+        ),
+        allowed_numbers=AllowedNumbers.from_decision(
+            inputs,
+            result,
+            name_numbers(calculator, inputs),
+            pay_stub_numbers(calculator, pay_stub_pct),
+        ),
+        citation_keys=keys,
+        fallback=fallback_draft(calculator, inputs, result, keys, pay_stub_pct=pay_stub_pct),
     )

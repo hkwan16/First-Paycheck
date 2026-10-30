@@ -3855,6 +3855,19 @@
             "title": "Retirement Contribution Cents",
             "type": "integer"
           },
+          "retirement_contribution_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "retirement_contribution_cents as a percentage of gross_cents, two places half up (spec 005 rule 24b): the 401(k) rate this paycheck shows. Null without a positive gross. Computed on read, never stored.",
+            "readOnly": true,
+            "title": "Retirement Contribution Pct"
+          },
           "social_security_cents": {
             "title": "Social Security Cents",
             "type": "integer"
@@ -3887,7 +3900,8 @@
           "other_deductions_cents",
           "net_cents",
           "created_at",
-          "annual_salary_cents"
+          "annual_salary_cents",
+          "retirement_contribution_pct"
         ],
         "title": "PayStubOut",
         "type": "object"

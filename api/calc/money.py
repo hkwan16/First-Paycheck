@@ -11,12 +11,14 @@ from __future__ import annotations
 
 from decimal import ROUND_HALF_UP, Context, Decimal
 
-__all__ = ["CONTEXT", "pct_of", "per_period", "round_half_up"]
+__all__ = ["CONTEXT", "pct_of", "per_period", "rate_pct", "round_half_up"]
 
 # Every calculator divides in this context: 50 significant digits leaves no
 # room for a quotient to land on the wrong side of a half cent.
 CONTEXT = Context(prec=50, rounding=ROUND_HALF_UP)
 _ONE = Decimal(1)
+_HUNDRED = Decimal(100)
+_HUNDREDTH = Decimal("0.01")
 
 
 def round_half_up(value: Decimal) -> int:
@@ -29,6 +31,15 @@ def round_half_up(value: Decimal) -> int:
 def pct_of(amount: int | Decimal, pct: Decimal) -> Decimal:
     """``pct`` percent of ``amount``, exactly (a product of finite decimals)."""
     return CONTEXT.divide(CONTEXT.multiply(Decimal(amount), pct), Decimal(100))
+
+
+def rate_pct(part_cents: int, whole_cents: int) -> Decimal:
+    """``part`` as a percentage of ``whole``, exact, then two places half up
+    (``5417 / 270833 -> 2.00``): spec 015's ``actual_pct``, spec 005 rule 24b."""
+    if whole_cents <= 0:
+        raise ValueError(f"the whole must be positive, not {whole_cents}")
+    share = CONTEXT.divide(CONTEXT.multiply(Decimal(part_cents), _HUNDRED), Decimal(whole_cents))
+    return share.quantize(_HUNDREDTH, rounding=ROUND_HALF_UP)
 
 
 def per_period(amount: int | Decimal, periods: int) -> Decimal:

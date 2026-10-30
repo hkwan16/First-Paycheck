@@ -1,5 +1,6 @@
 """The explain context's facts and the fallback text, on spec 006's examples
-(spec 008 rules 7 and 17). Both must pass the verifier by construction."""
+(spec 008 rules 7, 7a and 17). Both must pass the verifier by construction,
+with or without the rate a pay stub shows."""
 
 from __future__ import annotations
 
@@ -14,7 +15,17 @@ from calc.k401 import K401MatchInput, k401_match
 from llm.schemas import ExplanationDraft
 from retrieval.benefits_search import BenefitsPassage
 from retrieval.citations import Citation
-from retrieval.context import explain_context, name_numbers
+from retrieval.context import (
+    CAPPED_NOTE,
+    COMPENSATION_NOTE,
+    NO_STUB_NOTE,
+    STUB_DIFFERS_NOTE,
+    STUB_SAME_NOTE,
+    explain_context,
+    explain_setup,
+    name_numbers,
+    pay_stub_numbers,
+)
 from tests.unit.calc import test_health_plans_examples as health_examples
 from verify.allowed import AllowedNumbers
 from verify.fallback import fallback_draft
@@ -26,8 +37,11 @@ TIERED = [
     {"employee_pct_upto": "3", "employer_pct": "100"},
     {"employee_pct_upto": "5", "employer_pct": "50"},
 ]
-# (salary, periods, tiers, contribution, age) for spec 006 examples 1-10.
+# (salary, periods, tiers, contribution, age) for spec 006 examples 1-11, and
+# issue 132's decision: example 11's salary with 5% chosen.
 EXAMPLES: dict[str, tuple[int, int, list[dict[str, str]], str, int]] = {
+    "11": (9_500_010, 26, TIERED, "3", 30),
+    "issue-132": (9_500_010, 26, TIERED, "5", 30),
     "1": (6_000_000, 26, TIERED, "3", 30),
     "2": (6_500_000, 24, [{"employee_pct_upto": "4", "employer_pct": "100"}], "2", 30),
     "3": (8_500_000, 26, [{"employee_pct_upto": "6", "employer_pct": "50"}], "4", 30),
@@ -100,16 +114,20 @@ def test_context_for_example_1() -> None:
     passage = BenefitsPassage(
         document_id=uuid.uuid4(), chunk_index=0, text="Matching vests over 3 years.", rank=0.5
     )
-    context = explain_context("k401_match", inputs, result, SEEDED, [passage])
+    context = explain_context(
+        "k401_match", inputs, result, SEEDED, [passage], pay_stub_pct=Decimal("3.00")
+    )
     facts = {fact.label: fact.value for fact in context.facts}
-    assert facts["Your contribution rate"] == "3%"
+    assert facts["Contribution rate you chose"] == "3%"
+    assert facts["401(k) contribution rate your latest pay stub shows"] == "3%"
     assert facts["Contribution rate that earns the full match"] == "5%"
-    assert facts["Employer match per year at your rate"] == "$1,800.00"
+    assert facts["Employer match per year at the rate you chose"] == "$1,800.00"
     assert facts["Employer match per year at the full-match rate"] == "$2,400.00"
-    assert facts["Match you miss per year"] == "$600.00"
+    assert facts["Match you miss per year at the rate you chose"] == "$600.00"
     assert facts["Extra per paycheck before tax at the full-match rate"] == "$46.15"
     assert facts["Extra per paycheck after federal income tax"] == "$40.62"
     assert facts["Federal marginal tax rate used"] == "12%"
+    assert facts["Your yearly contribution at the rate you chose"] == "$1,800.00"
     assert facts["Yearly 401(k) contribution limit"] == "$24,500.00"
     assert facts["Paychecks per year"] == "26"
     assert facts["Tax year"] == "2026"
@@ -118,7 +136,7 @@ def test_context_for_example_1() -> None:
         "50% of what you contribute from 3% to 5% of pay"
     )
     assert context.tax_year == 2026
-    assert context.notes == []
+    assert context.notes == [STUB_SAME_NOTE]
     # The result's own keys come first, then the rest of the seed for the year.
     assert [c.key for c in context.citations][:4] == result["citation_keys"]
     assert {c.key for c in context.citations} == {c.key for c in SEEDED}
@@ -127,40 +145,60 @@ def test_context_for_example_1() -> None:
 
 def test_context_notes_the_limits() -> None:
     inputs, result = decision("9")
-    context = explain_context("k401_match", inputs, result, SEEDED, [])
-    assert len(context.notes) == 2
-    assert "limit" in context.notes[0]
-    assert "compensation" in context.notes[1]
+    context = explain_context("k401_match", inputs, result, SEEDED, [], pay_stub_pct=Decimal(6))
+    assert context.notes == [STUB_SAME_NOTE, CAPPED_NOTE, COMPENSATION_NOTE]
+    assert "limit" in context.notes[1]
+    assert "compensation" in context.notes[2]
 
 
+# Each k401 example explained with no pay stub, a stub at the chosen rate, and a
+# stub at 3.69 (a $100.00 flat election, spec 005 rule 24b row 3), which no
+# example chooses.
+STUBS = {"no-stub": None, "same": "same", "uneven": Decimal("3.69")}
+
+
+def stub_rate(example: str, stub: str) -> Decimal | None:
+    rate = STUBS[stub]
+    if rate == "same":
+        return Decimal(EXAMPLES[example][3])
+    assert rate is None or isinstance(rate, Decimal)
+    return rate
+
+
+@pytest.mark.parametrize("stub", sorted(STUBS))
 @pytest.mark.parametrize("example", sorted(EXAMPLES))
-def test_every_fact_passes_the_verifier(example: str) -> None:
+def test_every_fact_passes_the_verifier(example: str, stub: str) -> None:
     inputs, result = decision(example)
-    context = explain_context("k401_match", inputs, result, SEEDED, [])
-    allowed = AllowedNumbers.from_decision(inputs, result)
-    for fact in context.facts:
+    setup = explain_setup(
+        "k401_match", inputs, result, SEEDED, [], pay_stub_pct=stub_rate(example, stub)
+    )
+    for fact in setup.context.facts:
         check = verify_explanation(
             ExplanationDraft(
                 concept="c",
                 text=f"{fact.label}: {fact.value}.",
                 numbers=[],
-                what_ifs=[*context.notes],
+                what_ifs=[*setup.context.notes],
                 citation_keys=["k401.employer_match"],
             ),
-            allowed,
+            setup.allowed_numbers,
             {"k401.employer_match"},
         )
         assert check.passed, (fact, check)
 
 
+@pytest.mark.parametrize("stub", sorted(STUBS))
 @pytest.mark.parametrize("example", sorted(EXAMPLES))
-def test_fallback_passes_the_verifier(example: str) -> None:
+def test_fallback_passes_the_verifier(example: str, stub: str) -> None:
     inputs, result = decision(example)
+    setup = explain_setup(
+        "k401_match", inputs, result, SEEDED, [], pay_stub_pct=stub_rate(example, stub)
+    )
+    check = verify_explanation(setup.fallback, setup.allowed_numbers, setup.citation_keys)
+    assert check.passed, (setup.fallback.text, check)
     keys = {c.key for c in SEEDED}
-    draft = fallback_draft("k401_match", inputs, result, keys)
-    check = verify_explanation(draft, AllowedNumbers.from_decision(inputs, result), keys)
-    assert check.passed, (draft.text, check)
-    assert draft.citation_keys == [key for key in result["citation_keys"] if key in keys]
+    assert setup.citation_keys == keys
+    assert setup.fallback.citation_keys == [k for k in result["citation_keys"] if k in keys]
 
 
 def test_fallback_for_example_1_reads_plainly() -> None:
@@ -178,10 +216,99 @@ def test_fallback_for_example_1_reads_plainly() -> None:
 
 def test_fallback_when_nothing_is_missed() -> None:
     inputs, result = decision("6")
-    draft = fallback_draft("k401_match", inputs, result, set())
-    assert "already" in draft.text
-    assert "missing" not in draft.text
-    assert draft.citation_keys == []
+    # The stub shows the 8% chosen: the full match is earned now.
+    same = fallback_draft("k401_match", inputs, result, set(), pay_stub_pct=Decimal("8.00"))
+    assert "You already earn the full match of $2,800.00 a year." in same.text
+    assert "missing" not in same.text
+    assert same.citation_keys == []
+    # The stub shows 4% or nothing is known: 8% is a choice, not what goes in now.
+    for rate in (Decimal("4.00"), None):
+        draft = fallback_draft("k401_match", inputs, result, set(), pay_stub_pct=rate)
+        assert "already" not in draft.text
+        assert "That rate earns the full match of $2,800.00 a year." in draft.text
+
+
+# ---------------------------------------------------------------- issue 132 (rules 7a, 14a)
+
+
+def test_context_for_issue_132() -> None:
+    """The stub shows 3%; the person chose 5%. The model sees both, apart."""
+    inputs, result = decision("issue-132")
+    context = explain_context(
+        "k401_match", inputs, result, SEEDED, [], pay_stub_pct=Decimal("3.00")
+    )
+    assert [(fact.label, fact.value) for fact in context.facts[:3]] == [
+        ("Contribution rate you chose", "5%"),
+        ("401(k) contribution rate your latest pay stub shows", "3%"),
+        ("Contribution rate that earns the full match", "5%"),
+    ]
+    assert context.notes == [STUB_DIFFERS_NOTE]
+    # Notes add no number a draft could repeat ("401(k)" is a name, not a figure).
+    for note in (STUB_DIFFERS_NOTE, STUB_SAME_NOTE, NO_STUB_NOTE):
+        assert extract_numbers(note) == [], note
+
+
+def test_context_without_a_pay_stub() -> None:
+    inputs, result = decision("issue-132")
+    context = explain_context("k401_match", inputs, result, SEEDED, [])
+    labels = [fact.label for fact in context.facts]
+    assert labels[0] == "Contribution rate you chose"
+    assert "401(k) contribution rate your latest pay stub shows" not in labels
+    assert context.notes == [NO_STUB_NOTE]
+
+
+@pytest.mark.parametrize(
+    ("stub", "text", "unmatched"),
+    [
+        (
+            Decimal("3.00"),
+            "Your pay stub shows 3% going to your 401(k) now. At the 5% you chose,"
+            " your employer adds $3,800.00 a year.",
+            (),
+        ),
+        (Decimal("3.69"), "Your latest pay stub shows 3.69%.", ()),
+        (None, "Your latest pay stub shows 3.69%.", ("3.69%",)),
+    ],
+)
+def test_issue_132_drafts(stub: Decimal | None, text: str, unmatched: tuple[str, ...]) -> None:
+    inputs, result = decision("issue-132")
+    setup = explain_setup("k401_match", inputs, result, SEEDED, [], pay_stub_pct=stub)
+    draft = ExplanationDraft(
+        concept="c", text=text, numbers=[], what_ifs=[], citation_keys=["k401.employer_match"]
+    )
+    check = verify_explanation(draft, setup.allowed_numbers, setup.citation_keys)
+    assert check.numbers_unmatched == unmatched
+    assert check.passed is (unmatched == ())
+
+
+def test_fallback_for_issue_132() -> None:
+    inputs, result = decision("issue-132")
+    draft = fallback_draft("k401_match", inputs, result, set(), pay_stub_pct=Decimal("3.00"))
+    assert draft.text.startswith(
+        "At the 5% you chose, you put in $4,750.01 a year and your employer adds $3,800.00."
+        " Your latest pay stub shows 3% going to your 401(k), so the rate you chose takes"
+        " effect once you change your election with your employer."
+        " That rate earns the full match of $3,800.00 a year."
+    )
+    assert "already" not in draft.text
+
+
+def test_pay_stub_numbers() -> None:
+    assert pay_stub_numbers("k401_match", Decimal("3.00")) == {"pay_stub_contribution_pct": "3.00"}
+    assert pay_stub_numbers("k401_match", None) == {}
+    assert pay_stub_numbers("health_plans", Decimal("3.00")) == {}
+    allowed = AllowedNumbers.from_decision({}, {}, pay_stub_numbers("k401_match", Decimal("3.69")))
+    assert allowed.percents == {Decimal("3.69")}
+
+
+def test_other_calculators_ignore_the_pay_stub_rate() -> None:
+    inputs, result = health_decision("1")
+    plain = explain_setup("health_plans", inputs, result, HEALTH_SEEDED, [], pay_stub_pct=None)
+    with_stub = explain_setup(
+        "health_plans", inputs, result, HEALTH_SEEDED, [], pay_stub_pct=Decimal("3.00")
+    )
+    assert plain == with_stub
+    assert with_stub.context == explain_context("health_plans", inputs, result, HEALTH_SEEDED, [])
 
 
 def test_fallback_and_context_need_an_explainable_calculator() -> None:

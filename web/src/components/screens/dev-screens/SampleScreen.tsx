@@ -139,7 +139,7 @@ function seedDecided(seed: Seed) {
   seed(queryKeys.decision(DECISION_V1_ID), decision);
   seed(queryKeys.calendar(), [sampleCalendarEvent()]);
   const { inputs, result } = sampleK401(4);
-  seed(queryKeys.calc('/calc/401k-match', inputs), result);
+  seed(queryKeys.calc('/calc/401k-match', inputs), { inputs, result });
 }
 
 /**
@@ -159,9 +159,15 @@ function seedAllDecided(seed: Seed) {
   seed(queryKeys.spendingSummary(), sampleSpendingSummary);
   seed(queryKeys.goals(), [sampleGoal()]);
   seed(queryKeys.benefitsPlans(), [...sampleBenefitsPlans]);
-  seed(queryKeys.calc('/calc/emergency-fund', fund.inputs), fund.result);
-  seed(queryKeys.calc('/calc/health-plans', health.inputs), health.result);
-  seed(queryKeys.calc('/calc/w4', w4.inputs), w4.result);
+  seed(queryKeys.calc('/calc/emergency-fund', fund.inputs), {
+    inputs: fund.inputs,
+    result: fund.result,
+  });
+  seed(queryKeys.calc('/calc/health-plans', health.inputs), {
+    inputs: health.inputs,
+    result: health.result,
+  });
+  seed(queryKeys.calc('/calc/w4', w4.inputs), { inputs: w4.inputs, result: w4.result });
 }
 
 /** Spec 015's November user, a month after the decisions: one check-in open (or done), October's done. */

@@ -73,6 +73,17 @@ function k401Inputs(ready: Ready | null, pct: number): K401MatchInput | null {
 }
 
 /**
+ * Where the contribution starts (spec 006 rule 14): the saved decision's rate,
+ * else the rate the newest pay stub shows going in now, else 0. Starting at 0
+ * for someone whose stub shows a contribution told them they left the whole
+ * match behind (issue 132). The strings are read as numbers, never computed.
+ */
+function startingContribution(saved: K401MatchInput | null, payStub: PayStub | undefined) {
+  const rate = saved?.contribution_pct ?? payStub?.retirement_contribution_pct ?? null;
+  return rate === null ? 0 : Number(rate);
+}
+
+/**
  * The 401(k) match card, from docs/mockup/Decisions.dc.html. Salary, pay
  * schedule, filing status, the match formula and the birth year come from the
  * profile (asked for here when missing), the tax year from the confirmed pay
@@ -89,9 +100,9 @@ export function Match401kCard() {
   const saved = current ? asK401Inputs(current.inputs) : null;
 
   const [editing, setEditing] = useState(false);
-  // What the person has set; until they touch the slider, the saved decision's value.
+  // What the person has set; until they touch the slider, where it starts.
   const [contribution, setContribution] = useState<number | null>(null);
-  const pct = contribution ?? (saved ? Number(saved.contribution_pct) : 0);
+  const pct = contribution ?? startingContribution(saved, payStub);
   const save = useSaveDecision('k401_match');
 
   const loaded = profile.data !== undefined && payStubs.data !== undefined && decisions.data;
@@ -215,6 +226,7 @@ function Calculator({
 }: CalculatorProps) {
   const employer = payStub.employer_name ?? 'Your employer';
   const result = calc.data;
+  const stubRate = payStub.retirement_contribution_pct;
 
   return (
     <>
@@ -223,7 +235,8 @@ function Calculator({
         <strong className="text-ink-2">{tiersText(profile.match_tiers ?? [])}</strong> of your{' '}
         <Money cents={profile.salary_cents ?? 0} decimals={0} /> salary. Your{' '}
         {formatDate(payStub.pay_date, 'short')} pay stub shows{' '}
-        <Money cents={payStub.retirement_contribution_cents} /> a paycheck going to your 401(k).
+        <Money cents={payStub.retirement_contribution_cents} /> a paycheck
+        {stubRate !== null && `, ${formatRate(stubRate)} of your gross pay,`} going to your 401(k).
       </p>
 
       <Range
@@ -252,7 +265,12 @@ function Calculator({
         ) : result ? (
           <>
             <div className={cn('text-headline font-bold', toneText.plum)} aria-live="polite">
-              {matchHeadline(result)}
+              {matchHeadline(result, {
+                // The rate the result on screen was calculated at, kept with it
+                // while the next one loads.
+                chosen: calc.inputs?.contribution_pct ?? inputs.contribution_pct,
+                payStub: stubRate,
+              })}
             </div>
             <KVList rules="all" spacing="panel">
               <K401ResultRows result={result} employer={employer} />

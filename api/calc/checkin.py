@@ -7,28 +7,18 @@ integer cents with ``Decimal`` rates and one ``round_half_up`` per output.
 
 from __future__ import annotations
 
-from decimal import ROUND_HALF_UP, Decimal, localcontext
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
 
-from calc.money import CONTEXT, pct_of, round_half_up
+from calc.money import pct_of, round_half_up
 
-__all__ = ["GoalPace", "change_cents", "expected_deferral_cents", "goal_pace", "rate_pct"]
-
-_HUNDREDTH = Decimal("0.01")
+__all__ = ["GoalPace", "change_cents", "expected_deferral_cents", "goal_pace"]
 
 
 def expected_deferral_cents(gross_cents: int, pct: Decimal) -> int:
     """``pct`` percent of one paycheck's gross, rounded half up to the cent (rule 1)."""
     return round_half_up(pct_of(gross_cents, pct))
-
-
-def rate_pct(part_cents: int, whole_cents: int) -> Decimal:
-    """``part`` as a percentage of ``whole``, two places half up (``5417 / 270833 -> 2.00``)."""
-    if whole_cents <= 0:
-        raise ValueError(f"the whole must be positive, not {whole_cents}")
-    with localcontext(CONTEXT):
-        return (Decimal(part_cents) * 100 / whole_cents).quantize(_HUNDREDTH, ROUND_HALF_UP)
 
 
 def change_cents(new_cents: int, old_cents: int) -> int:

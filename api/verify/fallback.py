@@ -9,10 +9,12 @@ own citation keys that the seed holds.
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping
+from decimal import Decimal
 from typing import Any
 
 from calc.health_plans import HealthPlansInput, HealthPlansResult
 from calc.k401 import K401MatchInput, K401MatchResult
+from calc.pay_stub import StubRate, stub_rate
 from calc.w4 import W4Input, W4Result
 from llm.schemas import ExplanationDraft, NumberClaim
 from verify.format import dollars, percent
@@ -20,8 +22,10 @@ from verify.format import dollars, percent
 __all__ = ["FALLBACK_VERSION", "fallback_draft"]
 
 # Stored as a fallback row's prompt_version: the text comes from this module,
-# not a prompt, so a change to it is a new version here.
-FALLBACK_VERSION = "fallback/v1"
+# not a prompt, so a change to it is a new version here. v2 (issue 132): the
+# 401(k) text speaks of the rate chosen, states the pay stub's rate, and says
+# "already" only when the stub shows the rate chosen.
+FALLBACK_VERSION = "fallback/v2"
 
 K401_CONCEPT = "Your employer's 401(k) match and what it costs you to earn all of it."
 HEALTH_CONCEPT = "Comparing health plans by what each costs you in a year, not just by the premium."
@@ -31,32 +35,66 @@ W4_CONCEPT = (
 )
 
 
-def _k401(data: K401MatchInput, result: K401MatchResult) -> tuple[str, list[NumberClaim]]:
+# What the newest pay stub shows against the rate chosen (spec 008 rule 7a),
+# and how the full match is put when nothing is missed: as earned only when the
+# stub shows the rate chosen. No stub, no stub sentence.
+STUB_SENTENCES: dict[StubRate, str | None] = {
+    StubRate.NONE: None,
+    StubRate.CHOSEN: (
+        "Your latest pay stub shows {stub} going to your 401(k), so the rate you chose is in"
+        " effect now."
+    ),
+    StubRate.OTHER: (
+        "Your latest pay stub shows {stub} going to your 401(k), so the rate you chose takes"
+        " effect once you change your election with your employer."
+    ),
+}
+FULL_MATCH_SENTENCES: dict[StubRate, str] = {
+    StubRate.NONE: "That rate earns the full match of {full} a year.",
+    StubRate.CHOSEN: "You already earn the full match of {full} a year.",
+    StubRate.OTHER: "That rate earns the full match of {full} a year.",
+}
+
+
+def _stub_sentence(case: StubRate, pay_stub_pct: Decimal | None) -> list[str]:
+    template = STUB_SENTENCES[case]
+    if template is None or pay_stub_pct is None:
+        return []
+    return [template.format(stub=percent(pay_stub_pct))]
+
+
+def _k401(
+    data: K401MatchInput, result: K401MatchResult, pay_stub_pct: Decimal | None
+) -> tuple[str, list[NumberClaim]]:
     rate = percent(data.contribution_pct)
     full = percent(result.full_match_pct)
     yours = dollars(result.employee_annual_cents_current)
+    case = stub_rate(data.contribution_pct, pay_stub_pct)
     sentences: list[str] = []
-    claims = [NumberClaim(value=yours, label="Your yearly contribution")]
+    claims = [NumberClaim(value=yours, label="Your yearly contribution at the rate you chose")]
     if not data.match_tiers:
         sentences.append(
-            f"Your plan has no employer match. At {rate} of pay you put in {yours} a year."
+            f"Your plan has no employer match. At the {rate} you chose, you put in {yours} a year."
         )
+        sentences += _stub_sentence(case, pay_stub_pct)
     else:
         match_now = dollars(result.employer_match_cents_current)
         match_full = dollars(result.employer_match_cents_full)
         sentences.append(
-            f"At {rate} of pay you put in {yours} a year and your employer adds {match_now}."
+            f"At the {rate} you chose, you put in {yours} a year and your employer adds"
+            f" {match_now}."
         )
+        sentences += _stub_sentence(case, pay_stub_pct)
         claims.append(NumberClaim(value=match_full, label="Full employer match per year"))
         if result.missed_cents > 0:
             missed = dollars(result.missed_cents)
             sentences.append(
                 f"Contributing {full} of pay earns the full match of {match_full} a year,"
-                f" so you are missing {missed} a year."
+                f" so the rate you chose leaves {missed} a year of match behind."
             )
             claims.append(NumberClaim(value=missed, label="Match you miss per year"))
         else:
-            sentences.append(f"You already earn the full match of {match_full} a year.")
+            sentences.append(FULL_MATCH_SENTENCES[case].format(full=match_full))
         if result.per_paycheck_cost_delta_cents > 0:
             before = dollars(result.per_paycheck_cost_delta_cents)
             after = dollars(result.per_paycheck_after_tax_cost_cents)
@@ -226,7 +264,11 @@ def fallback_draft(
     inputs: Mapping[str, Any],
     result: Mapping[str, Any],
     allowed_citation_keys: Collection[str],
+    *,
+    pay_stub_pct: Decimal | None = None,
 ) -> ExplanationDraft:
+    """The code-written explanation; ``pay_stub_pct`` (spec 008 rule 7a) is the
+    newest stub's 401(k) rate, None without a stub, read for ``k401_match`` only."""
     if calculator == "w4":
         entries = W4Input.model_validate(inputs)
         projected = W4Result.model_validate(result)
@@ -253,7 +295,7 @@ def fallback_draft(
         raise ValueError(f"no fallback text for calculator {calculator!r} yet")
     data = K401MatchInput.model_validate(inputs)
     computed = K401MatchResult.model_validate(result)
-    text, claims = _k401(data, computed)
+    text, claims = _k401(data, computed, pay_stub_pct)
     return ExplanationDraft(
         concept=K401_CONCEPT,
         text=text,

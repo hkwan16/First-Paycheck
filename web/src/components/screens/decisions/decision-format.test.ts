@@ -80,19 +80,30 @@ describe('saveBadgeTone', () => {
   });
 });
 
-describe('matchHeadline', () => {
+/** The headline at the sample's rate, with the pay stub showing `payStub`. */
+const headline = (pct: number, payStub: string | null) => {
+  const { inputs, result } = sampleK401(pct);
+  return matchHeadline(result, { chosen: inputs.contribution_pct, payStub });
+};
+
+describe('matchHeadline at the rate the pay stub shows (spec 006 rule 14)', () => {
   it('names the whole match when nothing is contributed', () => {
-    expect(matchHeadline(sampleK401(0).result)).toBe('You leave the whole $2,600 match behind');
+    expect(headline(0, '0.00')).toBe('You leave the whole $2,600 match behind');
   });
 
   it('names the part of the match left behind', () => {
-    expect(matchHeadline(sampleK401(2).result)).toBe('You leave $1,300 of match behind');
+    expect(headline(2, '2.00')).toBe('You leave $1,300 of match behind');
   });
 
   it('says so when the whole match is captured, at or above the full-match rate', () => {
-    expect(matchHeadline(sampleK401(4).result)).toBe('You capture the full $2,600 match');
-    expect(matchHeadline(sampleK401(9).result)).toBe('You capture the full $2,600 match');
-    expect(matchHeadline(cappedK401.result)).toBe('You capture the full $14,400 match');
+    expect(headline(4, '4.00')).toBe('You capture the full $2,600 match');
+    expect(headline(9, '9.00')).toBe('You capture the full $2,600 match');
+    expect(
+      matchHeadline(cappedK401.result, {
+        chosen: cappedK401.inputs.contribution_pct,
+        payStub: '6.00',
+      }),
+    ).toBe('You capture the full $14,400 match');
   });
 
   it('says when the plan has no match at all', () => {
@@ -102,7 +113,40 @@ describe('matchHeadline', () => {
       employer_match_cents_current: 0,
       missed_cents: 0,
     };
-    expect(matchHeadline(none)).toBe('Your plan has no employer match');
+    expect(matchHeadline(none, { chosen: '0.00', payStub: '0.00' })).toBe(
+      'Your plan has no employer match',
+    );
+    expect(matchHeadline(none, { chosen: '5.00', payStub: '3.00' })).toBe(
+      'Your plan has no employer match',
+    );
+  });
+});
+
+describe('matchHeadline at another rate (spec 006 rule 14)', () => {
+  it('never says the whole match is left behind by someone the stub shows contributing', () => {
+    // Issue 132: the stub shows 3%, and 0% on the slider is only a choice.
+    expect(headline(0, '3.00')).toBe('At 0% you would leave the whole $2,600 match behind');
+  });
+
+  it('speaks of a chosen rate as a choice until the stub shows it', () => {
+    expect(headline(2, '0.00')).toBe('At 2% you would leave $1,300 of match behind');
+    expect(headline(4, '0.00')).toBe('At 4% you would capture the full $2,600 match');
+    expect(headline(9, '4.00')).toBe('At 9% you would capture the full $2,600 match');
+  });
+
+  it('speaks conditionally when the stub has no rate', () => {
+    expect(headline(0, null)).toBe('At 0% you would leave the whole $2,600 match behind');
+    expect(headline(4, null)).toBe('At 4% you would capture the full $2,600 match');
+  });
+
+  it('compares the two-place strings the API sends, digit for digit', () => {
+    const { result } = sampleK401(4);
+    expect(matchHeadline(result, { chosen: '4.50', payStub: '4.50' })).toBe(
+      'You capture the full $2,600 match',
+    );
+    expect(matchHeadline(result, { chosen: '4.50', payStub: '4.49' })).toBe(
+      'At 4.5% you would capture the full $2,600 match',
+    );
   });
 });
 

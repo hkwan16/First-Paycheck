@@ -617,16 +617,21 @@ export const handlers = [
         result,
       );
     }
-    // The yearly salary is the API's figure (spec 005 rule 24a); the fake knows
-    // it only for the sample stub's gross and frequency, never works one out.
+    // The yearly salary and the 401(k) rate are the API's figures (spec 005
+    // rules 24a and 24b); the fake knows them only for the sample stub's gross,
+    // frequency and retirement line, and never works one out.
     const sampleSalary =
       values.gross_cents === sampleValues.gross_cents &&
       values.pay_frequency === sampleValues.pay_frequency;
+    const sampleRate =
+      values.gross_cents === sampleValues.gross_cents &&
+      values.retirement_contribution_cents === sampleValues.retirement_contribution_cents;
     const stub = samplePayStub({
       ...values,
       id: nextId('6e000000'),
       document_id: document.id,
       ...(sampleSalary ? {} : { annual_salary_cents: null }),
+      ...(sampleRate ? {} : { retirement_contribution_pct: null }),
     });
     db.payStubs.unshift(stub);
     db.proposals.delete(document.id);

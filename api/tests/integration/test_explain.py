@@ -18,9 +18,10 @@ from app.db import user_session_for
 from app.deps import get_llm_gateway, get_now
 from llm.gateway import REFUSAL_REPLY, Gateway, ScriptedGateway, ScriptStep, reply_with
 from llm.schemas import ExplanationDraft
+from retrieval.context import NO_STUB_NOTE, STUB_DIFFERS_NOTE, STUB_SAME_NOTE
 from tests.conftest import FixtureUser
 from tests.rls.test_cross_user import EMERGENCY_FUND_INPUTS
-from tests.support.factories import make_document
+from tests.support.factories import STUB_01, make_document, make_pay_stub
 from tests.unit.calc.test_health_plans_examples import B_TWIN, A, B
 from tests.unit.calc.test_health_plans_examples import payload as health_payload
 
@@ -126,18 +127,21 @@ def test_pass_first_try(
     out = explain(client_as(user_a), decision)
     assert (out["attempt"], out["retries"], out["verified"], out["fallback"]) == (1, 0, True, False)
     assert out["decision_id"] == decision
-    assert out["prompt_version"] == "explain/v1"
+    assert out["prompt_version"] == "explain/v2"
     assert out["verification"]["numbers_unmatched"] == []
     assert out["verification"]["has_citation"] is True
     [citation] = out["citations"]
     assert citation["key"] == script.sent[0]["context"]["citations"][0]["key"]
     assert citation["url"].startswith("https://www.irs.gov/")
     assert citation["passage"]
-    assert rows(db_connection, decision) == [(1, 0, True, False, "explain/v1")]
+    assert rows(db_connection, decision) == [(1, 0, True, False, "explain/v2")]
     # The model saw the decision's facts and no feedback.
     context = script.sent[0]["context"]
-    assert {"label": "Match you miss per year", "value": "$600.00"} in context["facts"]
+    missed = {"label": "Match you miss per year at the rate you chose", "value": "$600.00"}
+    assert missed in context["facts"]
     assert "feedback" not in script.sent[0]
+    # No pay stub is confirmed, so nothing says what goes in now (rule 7a).
+    assert context["notes"] == [NO_STUB_NOTE]
 
 
 def test_fail_then_pass(
@@ -147,8 +151,8 @@ def test_fail_then_pass(
     out = explain(client_as(user_a), decision)
     assert (out["attempt"], out["retries"], out["verified"], out["fallback"]) == (2, 1, True, False)
     assert rows(db_connection, decision) == [
-        (1, 0, False, False, "explain/v1"),
-        (2, 1, True, False, "explain/v1"),
+        (1, 0, False, False, "explain/v2"),
+        (2, 1, True, False, "explain/v2"),
     ]
     assert "$123,456.78" in script.sent[1]["feedback"]
 
@@ -159,7 +163,7 @@ def test_fail_twice_falls_back(
     script(BAD, BAD)
     out = explain(client_as(user_a), decision)
     assert (out["attempt"], out["retries"], out["verified"], out["fallback"]) == (3, 1, False, True)
-    assert out["prompt_version"] == "fallback/v1"
+    assert out["prompt_version"] == "fallback/v2"
     # The plain calculator result, cited.
     assert "$1,800.00" in out["text"]
     assert "$600.00" in out["text"]
@@ -171,10 +175,85 @@ def test_fail_twice_falls_back(
         "k401.federal_brackets",
     ]
     assert rows(db_connection, decision) == [
-        (1, 0, False, False, "explain/v1"),
-        (2, 1, False, False, "explain/v1"),
-        (3, 1, False, True, "fallback/v1"),
+        (1, 0, False, False, "explain/v2"),
+        (2, 1, False, False, "explain/v2"),
+        (3, 1, False, True, "fallback/v2"),
     ]
+
+
+# Issue 132 (spec 008 rule 7a): stub-01 shows 3%; the person chose 5%.
+ISSUE_132: dict[str, Any] = {**EXAMPLE_1, "salary_cents": 9_500_010, "contribution_pct": "5"}
+
+
+def confirm_stub(connection: Connection, user: FixtureUser, **fields: Any) -> None:
+    document = make_document(connection, user.id, with_blob=False)
+    make_pay_stub(connection, user.id, document, **{**STUB_01, **fields})
+
+
+def save(client: TestClient, inputs: dict[str, Any]) -> str:
+    result = client.post("/calc/401k-match", json=inputs)
+    saved = client.post(
+        "/decisions", json={"calculator": "k401_match", "inputs": inputs, "result": result.json()}
+    )
+    assert saved.status_code == 201, saved.text
+    decision_id: str = saved.json()["decision_id"]
+    return decision_id
+
+
+def test_context_has_the_pay_stub_rate(
+    script: Script, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    confirm_stub(db_connection, user_a)
+    decision_id = save(client_as(user_a), ISSUE_132)
+    script(GOOD)
+    out = explain(client_as(user_a), decision_id)
+    assert (out["attempt"], out["verified"], out["fallback"]) == (1, True, False)
+    context = script.sent[0]["context"]
+    assert context["facts"][:2] == [
+        {"label": "Contribution rate you chose", "value": "5%"},
+        {"label": "401(k) contribution rate your latest pay stub shows", "value": "3%"},
+    ]
+    assert context["notes"] == [STUB_DIFFERS_NOTE]
+    # The fake's draft states the stub's 3%, which the verifier allows.
+    assert "your latest pay stub shows: 3%." in out["text"]
+
+
+def test_the_newest_stub_gives_the_rate(
+    script: Script, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    # An older stub at 3%, then one at 5% once the election took effect:
+    # 18,269 of 365,385 is 5.00 (365,385 x 5% = 18,269.25).
+    confirm_stub(db_connection, user_a)
+    confirm_stub(
+        db_connection,
+        user_a,
+        pay_date=dt.date(2026, 4, 24),
+        period_start=dt.date(2026, 4, 6),
+        period_end=dt.date(2026, 4, 19),
+        retirement_contribution_cents=18_269,
+        net_cents=275_086 - (18_269 - 10_962),
+    )
+    decision_id = save(client_as(user_a), ISSUE_132)
+    script(GOOD)
+    explain(client_as(user_a), decision_id)
+    context = script.sent[0]["context"]
+    assert context["facts"][1] == {
+        "label": "401(k) contribution rate your latest pay stub shows",
+        "value": "5%",
+    }
+    assert context["notes"] == [STUB_SAME_NOTE]
+
+
+def test_fallback_states_the_pay_stub_rate(
+    script: Script, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    confirm_stub(db_connection, user_a)
+    decision_id = save(client_as(user_a), ISSUE_132)
+    script(REFUSAL_REPLY)
+    out = explain(client_as(user_a), decision_id)
+    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v2")
+    assert "Your latest pay stub shows 3% going to your 401(k)" in out["text"]
+    assert "already" not in out["text"]
 
 
 def test_gateway_error_falls_back(
@@ -183,7 +262,7 @@ def test_gateway_error_falls_back(
     script(REFUSAL_REPLY)
     out = explain(client_as(user_a), decision)
     assert (out["attempt"], out["retries"], out["fallback"]) == (1, 0, True)
-    assert rows(db_connection, decision) == [(1, 0, False, True, "fallback/v1")]
+    assert rows(db_connection, decision) == [(1, 0, False, True, "fallback/v2")]
     # The refusal is in the ledger.
     statuses = db_connection.execute(
         text("SELECT status::text FROM llm_calls WHERE user_id = :u AND purpose = 'explain'"),
@@ -423,7 +502,7 @@ def test_health_plan_fallback_is_cited(
     decision_id = save_other(client, "health_plans", "/calc/health-plans", inputs)
     script(BAD, BAD)
     out = explain(client, decision_id)
-    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v1")
+    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v2")
     assert [c["key"] for c in out["citations"]] == [
         "health.hdhp_definition",
         "health.hsa_limit",
@@ -482,7 +561,7 @@ def test_w4_decision_is_explained_with_its_citations(
     ]
     facts = {fact["label"]: fact["value"] for fact in context["facts"]}
     assert facts["Projected balance due"] == "$2,360.08"
-    assert rows(db_connection, decision_id) == [(1, 0, True, False, "explain/v1")]
+    assert rows(db_connection, decision_id) == [(1, 0, True, False, "explain/v2")]
 
 
 def test_w4_fallback_is_cited(script: Script, client_as: Client, user_a: FixtureUser) -> None:
@@ -490,7 +569,7 @@ def test_w4_fallback_is_cited(script: Script, client_as: Client, user_a: Fixture
     decision_id = save_other(client, "w4", "/calc/w4", W4_EXAMPLE_5)
     script(BAD, BAD)
     out = explain(client, decision_id)
-    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v1")
+    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v2")
     assert out["verification"]["numbers_unmatched"] == []
     assert [c["key"] for c in out["citations"]] == [
         "w4.percentage_method",

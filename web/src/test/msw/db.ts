@@ -15,8 +15,15 @@ import {
   sampleDecision,
   sampleExplanation,
   sampleProfile,
+  stub01Profile,
 } from '../fixtures/decisions';
-import { emptyProfile, sampleDocument, samplePayStub, sampleProposal } from '../fixtures/documents';
+import {
+  emptyProfile,
+  sampleDocument,
+  samplePayStub,
+  sampleProposal,
+  stub01PayStub,
+} from '../fixtures/documents';
 import { sampleAccounts, sampleTransactions } from '../fixtures/sample';
 
 /**
@@ -101,6 +108,15 @@ export function resetDb() {
 export function decisionsReady() {
   db.payStubs = [samplePayStub()];
   db.profile = clone(sampleProfile);
+}
+
+/**
+ * Ready for decisions as issue 132's user: stub-01 confirmed (3% going to the
+ * 401(k)) and the plan details it and the benefits summary give. Nothing saved.
+ */
+export function stub01Ready() {
+  db.payStubs = [stub01PayStub()];
+  db.profile = clone(stub01Profile);
 }
 
 /** `decisionsReady`, plus the 401(k) decision v1 at 4%, its explanation and its check. */

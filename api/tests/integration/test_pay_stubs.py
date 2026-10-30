@@ -8,8 +8,10 @@ from collections.abc import Callable
 from fastapi.testclient import TestClient
 from sqlalchemy import Connection
 
+from app.db import user_session_for
+from app.routers.pay_stubs import newest_pay_stub_rate
 from tests.conftest import FixtureUser
-from tests.support.factories import make_document, make_pay_stub
+from tests.support.factories import STUB_01, make_document, make_pay_stub
 
 Client = Callable[[FixtureUser], TestClient]
 
@@ -66,12 +68,51 @@ def test_every_column_is_returned(
         "net_cents",
         "created_at",
         "annual_salary_cents",
+        "retirement_contribution_pct",
     }
     assert only["gross_cents"] == 270_833
     assert only["pay_frequency"] == "semimonthly"
     assert only["pay_date"] == "2026-10-15"
     # Spec 005 rule 24a, row 1: 270,833 x 24, exact.
     assert only["annual_salary_cents"] == 6_499_992
+    # Spec 005 rule 24b, row 4: the Acme stub has no retirement line.
+    assert only["retirement_contribution_pct"] == "0.00"
+
+
+def test_contribution_rate_of_stub_01(
+    db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    # Spec 005 rule 24b, row 1 (issue 132): 10,962 of 365,385 is 3.00.
+    document = make_document(db_connection, user_a.id, with_blob=False)
+    make_pay_stub(db_connection, user_a.id, document, **STUB_01)
+    (only,) = client_as(user_a).get("/pay-stubs").json()
+    assert only["retirement_contribution_cents"] == 10_962
+    assert only["retirement_contribution_pct"] == "3.00"
+    assert only["annual_salary_cents"] == 9_500_010
+
+
+def test_newest_pay_stub_rate(db_connection: Connection, user_a: FixtureUser) -> None:
+    """What POST /explain states beside the chosen rate (spec 008 rule 7a)."""
+    with user_session_for(user_a.id, bind=db_connection) as session:
+        assert newest_pay_stub_rate(session) is None
+    document = make_document(db_connection, user_a.id, with_blob=False)
+    make_pay_stub(db_connection, user_a.id, document, **STUB_01)
+    newer = make_document(db_connection, user_a.id, with_blob=False)
+    make_pay_stub(
+        db_connection,
+        user_a.id,
+        newer,
+        **{
+            **STUB_01,
+            "pay_date": dt.date(2026, 4, 24),
+            "period_start": dt.date(2026, 4, 6),
+            "period_end": dt.date(2026, 4, 19),
+            "retirement_contribution_cents": 0,
+            "net_cents": STUB_01["net_cents"] + STUB_01["retirement_contribution_cents"],
+        },
+    )
+    with user_session_for(user_a.id, bind=db_connection) as session:
+        assert str(newest_pay_stub_rate(session)) == "0.00"
 
 
 def test_annual_salary_is_null_without_a_pay_frequency(

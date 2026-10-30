@@ -1,11 +1,13 @@
 """The explain-smoke suite (free, spec 008 rule 25): the explain flow with a
-scripted ``FakeGateway`` over five scenarios.
+scripted ``FakeGateway`` over six scenarios.
 
-Each scenario scripts the model's drafts for the first fixture decision of its
-calculator and states the rows the flow must produce: verified on the first
-try, a failing draft then a verified one, and two failing drafts then the
-fallback, for a 401(k) decision; and verified on the first try and the
-fallback after two failing drafts for a W-4 decision (spec 014 rule 19).
+Each scenario scripts the model's drafts for a fixture decision (the first one
+of its calculator, or the one it names) and states the rows the flow must
+produce: verified on the first try, a failing draft then a verified one, and
+two failing drafts then the fallback, for a 401(k) decision; verified on the
+first try and the fallback after two failing drafts for a W-4 decision (spec
+014 rule 19); and, on issue 132's decision (5% chosen, the pay stub at 3%), a
+first try that states the stub's rate and verifies (rule 7a).
 ``flow_correct`` is the share of scenarios whose rows (count, ``attempt``,
 ``retries``, ``verified``, ``fallback``) match, whose fallback (when there is
 one) verifies and is cited, and whose retry carried the first failure. No
@@ -44,6 +46,7 @@ BAD = reply_with(
 )
 # FakeGateway's own draft: the facts as given, citing the first key. It verifies.
 GOOD: ScriptStep = None
+ISSUE_132 = "issue-132-stub-01-chose-full-match"
 
 
 @dataclass(frozen=True)
@@ -52,8 +55,10 @@ class Scenario:
     script: tuple[ScriptStep, ...]
     # (attempt, retries, verified, fallback) per row.
     expected: tuple[Row, ...]
-    # Which fixture decision the scenario explains: the first one of this calculator.
+    # Which fixture decision the scenario explains: the first one of this calculator,
+    # or the one with this id.
     calculator: str = CALCULATOR
+    decision_id: str | None = None
 
 
 FAIL_TWICE: tuple[Row, ...] = ((1, 0, False, False), (2, 1, False, False), (3, 1, False, True))
@@ -65,6 +70,8 @@ SCENARIOS = (
     # Spec 014 rule 19: a W-4 decision's facts verify, and its fallback verifies and is cited.
     Scenario("w4-pass", (GOOD,), ((1, 0, True, False),), calculator="w4"),
     Scenario("w4-fail-twice", (BAD, BAD), FAIL_TWICE, calculator="w4"),
+    # Spec 008 rule 7a: the fake states the stub's 3%, which the verifier allows.
+    Scenario("stub-differs-pass", (GOOD,), ((1, 0, True, False),), decision_id=ISSUE_132),
 )
 
 
@@ -90,6 +97,8 @@ def check(scenario: Scenario, decision: EvalDecision) -> list[str]:
 
 def score(decisions: Sequence[EvalDecision], scenarios: Sequence[Scenario]) -> SuiteResult:
     def decision_for(scenario: Scenario) -> EvalDecision:
+        if scenario.decision_id is not None:
+            return next(d for d in decisions if d.id == scenario.decision_id)
         return next(d for d in decisions if d.calculator == scenario.calculator)
 
     failures = [

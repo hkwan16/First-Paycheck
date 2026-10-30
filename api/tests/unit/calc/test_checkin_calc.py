@@ -8,7 +8,8 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from calc.checkin import GoalPace, change_cents, expected_deferral_cents, goal_pace, rate_pct
+from calc.checkin import GoalPace, change_cents, expected_deferral_cents, goal_pace
+from calc.money import rate_pct
 
 
 def test_expected_deferral_rounds_half_up() -> None:

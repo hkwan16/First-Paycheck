@@ -236,6 +236,26 @@ MOCKUP_STUB: dict[str, Any] = {
     "net_cents": 199_604,
 }
 
+# The synthetic evals/fixtures/pay_stubs/stub-01.pdf as confirmed: $109.62 of a
+# $3,653.85 biweekly paycheck goes to the 401(k), a rate of 3.00 (spec 005
+# rule 24b, row 1; issue 132).
+STUB_01: dict[str, Any] = {
+    "employer_name": "Acme Corp",
+    "pay_frequency": PayFrequency.BIWEEKLY,
+    "pay_date": dt.date(2026, 4, 10),
+    "period_start": dt.date(2026, 3, 23),
+    "period_end": dt.date(2026, 4, 5),
+    "gross_cents": 365_385,
+    "federal_withholding_cents": 27_244,
+    "social_security_cents": 22_654,
+    "medicare_cents": 5_298,
+    "state_tax_cents": 16_442,
+    "retirement_contribution_cents": 10_962,
+    "medical_premium_cents": 2_500,
+    "other_deductions_cents": 5_199,
+    "net_cents": 275_086,
+}
+
 
 def make_pay_stub(
     connection: Connection, user_id: uuid.UUID, document_id: uuid.UUID, **fields: Any

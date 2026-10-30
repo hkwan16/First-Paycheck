@@ -20,6 +20,7 @@ from app import ratelimit
 from app.auth import CurrentUser
 from app.deps import LlmGateway, Now, UserSession, UserSessions
 from app.errors import AppError, NotFound, error_responses
+from app.routers.pay_stubs import newest_pay_stub_rate
 from app.types import UtcDateTime
 from db.enums import CalculatorKind
 from db.models import Decision, Explanation
@@ -28,9 +29,8 @@ from llm.prompts import load_prompt
 from llm.schemas import NumberClaim
 from retrieval import benefits_search
 from retrieval.citations import Citation, by_key, for_calculator
-from retrieval.context import BENEFITS_PASSAGES, BENEFITS_QUERIES, explain_context, name_numbers
-from verify.allowed import AllowedNumbers
-from verify.fallback import FALLBACK_VERSION, fallback_draft
+from retrieval.context import BENEFITS_PASSAGES, BENEFITS_QUERIES, explain_setup
+from verify.fallback import FALLBACK_VERSION
 from verify.flow import Attempt, run_explain
 
 router = APIRouter(tags=["explain"])
@@ -176,17 +176,21 @@ def explain(
         model = gateway()
         ratelimit.consume(session, user.id, ratelimit.EXPLAIN_RUNS, now=now)
         passages = benefits_search.search(session, user.id, query, BENEFITS_PASSAGES)
+        # What goes into the 401(k) now, beside the rate the decision chose (rule 7a).
+        pay_stub_pct = newest_pay_stub_rate(session)
     inputs: dict[str, Any] = decision.inputs
     result: dict[str, Any] = decision.result
-    keys = {citation.key for citation in citations}
+    setup = explain_setup(
+        decision.calculator, inputs, result, citations, passages, pay_stub_pct=pay_stub_pct
+    )
     # The model call runs with no session open (rule 21).
     attempts = run_explain(
         model,
         user.id,
-        explain_context(decision.calculator, inputs, result, citations, passages),
-        AllowedNumbers.from_decision(inputs, result, name_numbers(decision.calculator, inputs)),
-        keys,
-        fallback_draft(decision.calculator, inputs, result, keys),
+        setup.context,
+        setup.allowed_numbers,
+        setup.citation_keys,
+        setup.fallback,
     )
     with sessions() as session:
         rows = [_row(user.id, decision.id, attempt) for attempt in attempts]

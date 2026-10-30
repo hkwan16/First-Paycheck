@@ -495,6 +495,48 @@
     }
   },
   {
+    "id": "spec-006-stub-01-rate-with-a-half-cent-tie",
+    "route": "/calc/401k-match",
+    "request": {
+      "salary_cents": 9500010,
+      "pay_periods_per_year": 26,
+      "match_tiers": [
+        {
+          "employee_pct_upto": "3",
+          "employer_pct": "100"
+        },
+        {
+          "employee_pct_upto": "5",
+          "employer_pct": "50"
+        }
+      ],
+      "contribution_pct": "3",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 30
+    },
+    "expected": {
+      "full_match_pct": "5.00",
+      "employer_match_cents_current": 285000,
+      "employer_match_cents_full": 380000,
+      "missed_cents": 95000,
+      "employee_annual_cents_current": 285000,
+      "employee_annual_cents_full": 475001,
+      "per_paycheck_cost_delta_cents": 7308,
+      "per_paycheck_after_tax_cost_cents": 5700,
+      "marginal_rate_used": "22.00",
+      "deferral_limit_cents": 2450000,
+      "capped": false,
+      "compensation_capped": false,
+      "citation_keys": [
+        "k401.employer_match",
+        "k401.pretax_deferral",
+        "k401.deferral_limit",
+        "k401.federal_brackets"
+      ]
+    }
+  },
+  {
     "id": "spec-006-no-match",
     "route": "/calc/401k-match",
     "request": {

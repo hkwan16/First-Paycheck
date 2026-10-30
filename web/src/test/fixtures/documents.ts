@@ -193,6 +193,12 @@ export const sampleValues: PayStubValues = {
  */
 export const SAMPLE_ANNUAL_SALARY_CENTS = 6_499_992;
 
+/**
+ * What the API reports as the sample stub's 401(k) rate (spec 005 rule 24b,
+ * row 4: no retirement line is 0.00), copied, never computed here.
+ */
+export const SAMPLE_RETIREMENT_CONTRIBUTION_PCT = '0.00';
+
 export function samplePayStub(overrides: Partial<PayStub> = {}): PayStub {
   return {
     id: '6e000000-0000-4000-8000-000000000001',
@@ -201,6 +207,39 @@ export function samplePayStub(overrides: Partial<PayStub> = {}): PayStub {
     created_at: SAMPLE_SYNCED_AT,
     ...sampleValues,
     annual_salary_cents: SAMPLE_ANNUAL_SALARY_CENTS,
+    retirement_contribution_pct: SAMPLE_RETIREMENT_CONTRIBUTION_PCT,
+    ...overrides,
+  };
+}
+
+/**
+ * The synthetic stub of issue 132 (evals/fixtures/pay_stubs/stub-01.pdf) as the
+ * API returns it once confirmed: $109.62 of a $3,653.85 biweekly paycheck goes
+ * to the 401(k). Its yearly salary (365,385 x 26) and its rate, 3.00 (spec 005
+ * rule 24b, row 1), are the API's figures, copied.
+ */
+export function stub01PayStub(overrides: Partial<PayStub> = {}): PayStub {
+  return {
+    id: '6e000000-0000-4000-8000-000000000132',
+    document_id: PAY_STUB_DOC_ID,
+    employer_name: 'Acme Corp',
+    pay_date: '2026-04-10',
+    period_start: '2026-03-23',
+    period_end: '2026-04-05',
+    pay_frequency: 'biweekly',
+    tax_year: 2026,
+    gross_cents: 365_385,
+    federal_withholding_cents: 27_244,
+    social_security_cents: 22_654,
+    medicare_cents: 5_298,
+    state_tax_cents: 16_442,
+    retirement_contribution_cents: 10_962,
+    medical_premium_cents: 2_500,
+    other_deductions_cents: 5_199,
+    net_cents: 275_086,
+    created_at: SAMPLE_SYNCED_AT,
+    annual_salary_cents: 9_500_010,
+    retirement_contribution_pct: '3.00',
     ...overrides,
   };
 }

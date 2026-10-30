@@ -104,7 +104,7 @@ describe('SampleScreen after Confirm', () => {
     render(<SampleScreen screen="decisions" />);
     const card = await screen.findByRole('region', { name: '401(k) match' });
     expect(within(card).getByRole('group', { name: 'Calculator result' })).toHaveTextContent(
-      'You capture the full $2,600 match',
+      'At 4% you would capture the full $2,600 match',
     );
     expect(within(card).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
 

@@ -2,10 +2,21 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 from pydantic import ValidationError
 
-from calc.pay_stub import Balance, PayStubAmounts, annual_salary_cents, balance, total_cents
+from calc.pay_stub import (
+    Balance,
+    PayStubAmounts,
+    StubRate,
+    annual_salary_cents,
+    balance,
+    retirement_contribution_pct,
+    stub_rate,
+    total_cents,
+)
 
 MOCKUP = {
     "gross_cents": 270_833,
@@ -70,3 +81,49 @@ def test_annual_salary_every_frequency() -> None:
 
 def test_annual_salary_without_frequency() -> None:
     assert annual_salary_cents(270_833, None) is None
+
+
+# Spec 005 rule 24b: the 401(k) rate a stub shows, two places half up.
+
+
+def test_contribution_rate_stub_01() -> None:
+    # 10,962 x 100 / 365,385 = 3.000123..., issue 132's stub.
+    rate = retirement_contribution_pct(10_962, 365_385)
+    assert rate == Decimal("3.00")
+    assert str(rate) == "3.00"
+
+
+def test_contribution_rate_rounds_half_up() -> None:
+    # 1,000,000 / 320,000 = 3.125 exactly: half up, not to even.
+    assert str(retirement_contribution_pct(10_000, 320_000)) == "3.13"
+
+
+def test_contribution_rate_uneven() -> None:
+    # 1,000,000 / 270,833 = 3.692312...: a flat $100.00 election.
+    assert str(retirement_contribution_pct(10_000, 270_833)) == "3.69"
+
+
+def test_contribution_rate_no_retirement_line() -> None:
+    assert str(retirement_contribution_pct(0, 270_833)) == "0.00"
+
+
+def test_contribution_rate_zero_gross() -> None:
+    assert retirement_contribution_pct(0, 0) is None
+    assert retirement_contribution_pct(10_962, 0) is None
+    assert retirement_contribution_pct(10_962, -1) is None
+
+
+# Spec 008 rule 7a: the stub's case, compared by value.
+@pytest.mark.parametrize(
+    ("chosen", "pay_stub_pct", "expected"),
+    [
+        ("5", None, StubRate.NONE),
+        ("5", "5.00", StubRate.CHOSEN),
+        ("0", "0.00", StubRate.CHOSEN),
+        ("4", "3.99", StubRate.OTHER),
+        ("5", "3.00", StubRate.OTHER),
+    ],
+)
+def test_stub_rate(chosen: str, pay_stub_pct: str | None, expected: StubRate) -> None:
+    stub = None if pay_stub_pct is None else Decimal(pay_stub_pct)
+    assert stub_rate(Decimal(chosen), stub) is expected
