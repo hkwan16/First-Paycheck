@@ -1655,6 +1655,10 @@ issues:
     labels: ["area:api", "area:web"]
     milestone: M10
     priority: High
+    status: done
+    # Fixed October 30: spec 014 rules 10a and 17a. The calculator projects
+    # the refund or balance due at the newest stub's withholding; the e2e
+    # account's card says $3,918.70 due at tax time if nothing changes.
   - title: "The health plan comparison says when a plan comes out ahead"
     body: >-
       The health plan comparison shows Saver HDHP at low use as -$596 a year.
