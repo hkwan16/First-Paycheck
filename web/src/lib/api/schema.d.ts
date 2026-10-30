@@ -3332,6 +3332,11 @@ export interface components {
        */
       age?: number | null;
       /**
+       * Current Withholding Per Paycheck Cents
+       * @description Federal income tax withheld each paycheck now, from the newest confirmed pay stub, for the comparison only; null means none to compare with
+       */
+      current_withholding_per_paycheck_cents?: number | null;
+      /**
        * Deductions Cents
        * @description Step 4(b), for the year
        * @default 0
@@ -3423,6 +3428,16 @@ export interface components {
       annual_withholding_cents: number;
       /** Citation Keys */
       citation_keys: string[];
+      /**
+       * Current Annual Withholding Cents
+       * @description Withheld in the year if every paycheck withholds the current amount; null without one
+       */
+      current_annual_withholding_cents: number | null;
+      /**
+       * Current Refund Cents
+       * @description The refund (negative, balance due) at the current withholding, against the same tax; null without it
+       */
+      current_refund_cents: number | null;
       /** Health Premium Annual Cents */
       health_premium_annual_cents: number;
       /** K401 Annual Cents */

@@ -90,7 +90,8 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   states; a list in it (the plan costs, the break-even pairs) is compared item
   by item, each item by its stated fields.
 - `fixtures/calc/w4.json`: every spec 014 example (`spec-014-<name>`, rows 1,
-  2a, 2b and 3 to 10) posted to `POST /calc/w4`; `test_every_spec_014_example_is_a_case`
+  2a, 2b and 3 to 10, and rule 10a's 11 to 15, the refund or balance due at
+  the stub's withholding) posted to `POST /calc/w4`; `test_every_spec_014_example_is_a_case`
   fails on a table row with no case.
 - `fixtures/benefits/`: 5 synthetic benefits summaries (`summary-0N.pdf`, text
   PDFs written by hand in Helvetica with no embedded font) and labels beside

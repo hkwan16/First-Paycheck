@@ -478,6 +478,16 @@ adds the `calendar_kind` label `w4_submit`; no new table or function.
   saved decisions; `calc/` never reads them. `expected_deductions_cents` keeps
   the projection honest when a Step 4(b) entry is only a withholding
   adjustment; `other_jobs_*` feed the projection, never this job's withholding.
+  `current_withholding_per_paycheck_cents` (the newest confirmed stub's
+  `federal_withholding_cents`, copied by the client; null for none) gives rule
+  10a's `current_annual_withholding_cents` and `current_refund_cents`: the
+  refund or balance due if every paycheck withholds that, against the same
+  tax, so the two refunds differ only by `(withholding_per_paycheck_cents -
+  w0) * P`. It never touches the suggestion. Both result fields default to
+  null so results stored before them still validate
+  (`json_schema_serialization_defaults_required`, so the schema still lists
+  them as required). Stubs store no year-to-date figures, so the comparison
+  assumes every paycheck of the year withholds the same.
 - **Constants.** `calc/data/pub15t_<year>.json` behind `calc.data.pub15t(year)`
   (Worksheet 1A line 1g and the annual STANDARD and Step 2 checkbox tables,
   column B implied by the next row). `tests/unit/calc/test_pub15t_data.py`

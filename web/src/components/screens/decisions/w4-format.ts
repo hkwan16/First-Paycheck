@@ -1,4 +1,4 @@
-import type { Decision, W4Input, W4Result } from '@/lib/api/types';
+import type { Decision, PayFrequency, PayStub, W4Input, W4Result } from '@/lib/api/types';
 import { asHealthPlansInputs, asK401Inputs } from '@/lib/decisions';
 import type { Tone } from '@/lib/design/tone';
 import { formatMoney, formatRate } from '@/lib/money';
@@ -122,6 +122,30 @@ export function fromDecisions(
     premium: plan ? { cents: plan.premium_per_period_cents, plan: plan.name } : null,
   };
 }
+
+/**
+ * What the newest confirmed stub withholds each paycheck, for the comparison
+ * at current withholding (spec 014 rule 10a), or null when its paycheck is
+ * not the card's: a stub on another pay schedule. A stub with no schedule is
+ * taken to be on the card's. A copy of the stub's figure, never worked out.
+ */
+export function currentWithholdingOf(
+  payStub: PayStub,
+  frequency: PayFrequency | null,
+): number | null {
+  const onSchedule =
+    frequency !== null && (payStub.pay_frequency === null || payStub.pay_frequency === frequency);
+  return onSchedule ? payStub.federal_withholding_cents : null;
+}
+
+/**
+ * Inputs that describe payroll today, not an entry on the form: a saved
+ * decision stays saved when only these differ (spec 014 rule 17a), so a newer
+ * stub alone never makes the W-4 look changed.
+ */
+export const W4_CONTEXT_INPUTS = [
+  'current_withholding_per_paycheck_cents',
+] as const satisfies readonly (keyof W4Input)[];
 
 const SCHEDULES: Record<W4Result['withholding_schedule'], string> = {
   standard: 'Standard schedule',

@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { formatMoney } from '../src/lib/money';
 import { e2eApiUrl, NO_E2E_API } from './support/api';
 import { e2eUser, NO_E2E_USER, waitForHydration } from './support/auth';
 
@@ -10,8 +11,10 @@ import { e2eUser, NO_E2E_USER, waitForHydration } from './support/auth';
  * explanation. The emergency fund: save a version and pause and resume its
  * goal. The health plan: type two synthetic plans when no benefits summary is
  * confirmed, choose one and save it with an enrollment deadline. The W-4:
- * read the saved 401(k) rate and health premium, change Step 4(c) and save a
- * version with its reminder to hand the form in. Each calculator is its own
+ * read the saved 401(k) rate and health premium, change Step 4(c), check the
+ * card states what the stub's withholding leaves at tax time in the
+ * calculator's figure (issue 153), and save a version with its reminder to
+ * hand the form in. Each calculator is its own
  * step (spec 018): the old address redirects to the first, the side nav and
  * the footers move between them. The e2e user
  * keeps its decisions between runs (they cannot be deleted), so each test
@@ -234,12 +237,34 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
   if ((await status.getByRole('button', { pressed: true }).count()) === 0) await single.click();
   // Move away from whatever is saved, so there is a version to save.
   const extra = w4.getByLabel('Step 4(c): extra withholding each paycheck');
-  await extra.fill((await extra.inputValue()) === '25.00' ? '50.00' : '25.00');
+  const entry = (await extra.inputValue()) === '25.00' ? '50.00' : '25.00';
+  // The calculator's answer to the new entry. Its rule 10a figures do not
+  // depend on Step 4(c), so any answer after the change states them.
+  const answer = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/calc/w4' && response.request().method() === 'POST',
+    { timeout: 15_000 },
+  );
+  await extra.fill(entry);
 
   const result = w4.getByRole('group', { name: 'Calculator result' });
   await expect(result).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
   await expect(result).toContainText(/at tax time/);
   await expect(result).toContainText(/Withheld each paycheck\s*\$/);
+
+  // Beside the entries, what the confirmed stub's withholding leaves at tax time
+  // (spec 014 rule 10a, issue 153), in the calculator's own figure.
+  const body = (await (await answer).json()) as { current_refund_cents: number | null };
+  expect(body.current_refund_cents).not.toBeNull();
+  const current = body.current_refund_cents!;
+  const amount = formatMoney(Math.abs(current));
+  await expect(result.getByRole('group', { name: 'If you change nothing' })).toContainText(
+    current < 0
+      ? `${amount} due at tax time`
+      : current > 0
+        ? `A ${amount} refund at tax time`
+        : 'Even at tax time',
+  );
 
   const save = w4.getByRole('button', { name: /^Save|^Saved as v/ });
   await expect(save).toBeEnabled();

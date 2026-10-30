@@ -11,7 +11,8 @@ semi-monthly, single, 2026) at every expected usage, with no plan chosen or
 any one, contributing $0 or $1,000.00 to the HSA, with the summary's
 enrollment deadline; the same plans at medium usage with no deadline; one
 plan typed by hand; a plan labeled HDHP below the 2026 minimum deductible;
-and an HSA contribution over the limit.
+an HSA contribution over the limit; and issue 153's user (the stub-01 salary,
+biweekly) choosing a $4.00 Value HMO, for the W-4 card.
 
 Run from the repository root, then format:
     uv run --project api python web/src/test/fixtures/make-health-plans-results.py
@@ -57,6 +58,15 @@ SILVER = {
     "deductible_cents": 100_000,
     "coinsurance_pct": "0.00",
     "oop_max_cents": 250_000,
+    "employer_hsa_cents": 0,
+}
+VALUE_HMO = {
+    "name": "Value HMO",
+    "kind": "hmo",
+    "premium_per_period_cents": 400,
+    "deductible_cents": 200_000,
+    "coinsurance_pct": "20.00",
+    "oop_max_cents": 450_000,
     "employer_hsa_cents": 0,
 }
 DEADLINE = "2026-11-14"
@@ -118,6 +128,17 @@ cases += [
         }
     ),
     case({**SAMPLE, "employee_hsa_cents": 500_000}),
+    # Issue 153's user (stub-01, $3,653.85 biweekly) chose a $4.00 plan.
+    case(
+        {
+            **SAMPLE,
+            "plans": [VALUE_HMO],
+            "pay_periods_per_year": 26,
+            "salary_cents": 9_500_010,
+            "selected_plan_index": 0,
+            "enrollment_deadline": None,
+        }
+    ),
 ]
 Path(__file__).with_name("health-plans-results.json").write_text(
     json.dumps(cases, indent=2) + "\n"

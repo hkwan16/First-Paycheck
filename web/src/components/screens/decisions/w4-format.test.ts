@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { sampleDecision } from '@/test/fixtures/decisions';
+import { stub01PayStub } from '@/test/fixtures/documents';
 import { sampleHealthDecision } from '@/test/fixtures/planning';
-import { sampleW4 } from '@/test/fixtures/w4';
+import { sampleW4, stub01W4Inputs } from '@/test/fixtures/w4';
 import {
   appliedEntries,
+  currentWithholdingOf,
   fromDecisions,
   refundHeadline,
   refundText,
   refundTone,
   scheduleText,
   suggestionText,
+  W4_CONTEXT_INPUTS,
 } from './w4-format';
 
 // Cases from w4-results.json (the API's calculator), so every amount is one it returned.
@@ -112,6 +115,39 @@ describe('fromDecisions', () => {
         }),
       ),
     ).toEqual({ k401Pct: null, premium: null });
+  });
+});
+
+describe('the comparison at the stub withholding (spec 014 rule 10a)', () => {
+  it("sends the newest stub's federal withholding when the stub is on the card's schedule", () => {
+    expect(currentWithholdingOf(stub01PayStub(), 'biweekly')).toBe(27_244);
+    expect(currentWithholdingOf(stub01PayStub({ federal_withholding_cents: 0 }), 'biweekly')).toBe(
+      0,
+    );
+    // A stub with no schedule is taken to be on the card's.
+    expect(currentWithholdingOf(stub01PayStub({ pay_frequency: null }), 'semimonthly')).toBe(
+      27_244,
+    );
+  });
+
+  it('sends nothing for a stub on another schedule: its paycheck is a different length', () => {
+    expect(currentWithholdingOf(stub01PayStub(), 'semimonthly')).toBeNull();
+    expect(currentWithholdingOf(stub01PayStub(), null)).toBeNull();
+  });
+
+  it("words the e2e account's balance due at its stub's withholding in the off tone", () => {
+    const { result } = sampleW4(stub01W4Inputs());
+    expect(refundHeadline(result.current_refund_cents!)).toBe('$3,918.70 due at tax time');
+    expect(refundTone(result.current_refund_cents!)).toBe('off');
+    // The sample stub keeps more than the year needs: a refund, neutral.
+    expect(refundHeadline(even.result.current_refund_cents!)).toBe(
+      'A $2,018.24 refund at tax time',
+    );
+    expect(refundTone(even.result.current_refund_cents!)).toBe('neutral');
+  });
+
+  it('leaves the stub withholding out of the saved comparison: it is payroll today, not an entry', () => {
+    expect(W4_CONTEXT_INPUTS).toEqual(['current_withholding_per_paycheck_cents']);
   });
 });
 

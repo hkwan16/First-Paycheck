@@ -1,15 +1,19 @@
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CALC_DEBOUNCE_MS } from '@/lib/api/hooks';
+import { sampleDecision, stub01K401 } from '@/test/fixtures/decisions';
+import { stub01PayStub } from '@/test/fixtures/documents';
+import { stub01HealthDecision } from '@/test/fixtures/planning';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
 import {
   NO_DECISIONS,
   sampleW4,
   sampleW4Decision,
   sampleW4Inputs,
+  stub01W4Inputs,
   W4_DECISION_ID,
 } from '@/test/fixtures/w4';
-import { db, decisionsReady, savedDecision } from '@/test/msw/db';
+import { db, decisionsReady, savedDecision, stub01Ready } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
 import { savedHealthPlan, savedW4 } from '@/test/msw/planning-handlers';
 import { server } from '@/test/msw/server';
@@ -42,6 +46,7 @@ const result = () => within(card()).getByRole('group', { name: 'Calculator resul
 const decided = () => within(card()).getByRole('group', { name: 'From your decisions' });
 const filing = () => within(card()).getByRole('group', { name: 'Filing status' });
 const suggestion = () => within(card()).queryByRole('group', { name: 'Suggestion' });
+const unchanged = () => within(result()).getByRole('group', { name: 'If you change nothing' });
 const field = (label: string) => within(card()).getByLabelText(label);
 const saveButton = () => within(card()).getByRole('button', { name: /^Save|^Saved/ });
 const settle = () => act(() => vi.advanceTimersByTimeAsync(CALC_DEBOUNCE_MS));
@@ -114,6 +119,14 @@ describe('W4Card', () => {
     expect(suggestion()).toBeNull();
     expect(saveButton()).toHaveTextContent('Save this decision');
     expect(saveButton()).toBeEnabled();
+
+    // Beside it, what the stub's $297.76 a paycheck leaves at tax time (spec 014 rule 10a).
+    expect(unchanged()).toHaveTextContent('If you change nothing');
+    expect(unchanged()).toHaveTextContent('A $2,018.24 refund at tax time');
+    expect(unchanged()).toHaveTextContent(
+      'Your Oct 15 pay stub withholds $297.76 a paycheck: $7,146.24 over 24 paychecks, if every paycheck this year withholds the same.',
+    );
+    expect(result()).toHaveTextContent('With the entries above');
   });
 
   it('works without the other decisions, says they count as zero and links to their cards', async () => {
@@ -190,6 +203,93 @@ describe('W4Card', () => {
     type('Step 3: dependent credits for the year', '2,200');
     await recalculated('Even at tax time');
     expect(seen.calc.at(-1)).toEqual(sampleW4Inputs({ dependents_credit_cents: 220_000 }));
+  });
+});
+
+describe('W4Card at the stub withholding (spec 014 rule 10a, issue 153)', () => {
+  it("states the e2e account's balance due at its stub's $272.44 beside the entries' projection", async () => {
+    // Stub-01 ($3,653.85 biweekly, $272.44 federal), single, the 401(k) at 5% and a $4.00 premium.
+    stub01Ready();
+    db.decisions = [
+      sampleDecision({ inputs: { ...stub01K401(5).inputs }, result: { ...stub01K401(5).result } }),
+      stub01HealthDecision(),
+    ];
+    const seen = requests();
+    await renderReady();
+
+    expect(seen.calc).toEqual([stub01W4Inputs()]);
+    expect(card()).toHaveTextContent(
+      'Your Apr 10 pay stub withholds $272.44 of federal income tax a paycheck.',
+    );
+    expect(unchanged()).toHaveTextContent('$3,918.70 due at tax time');
+    expect(unchanged()).toHaveTextContent(
+      'Your Apr 10 pay stub withholds $272.44 a paycheck: $7,083.44 over 26 paychecks, if every paycheck this year withholds the same.',
+    );
+    expect(unchanged()).toHaveTextContent(
+      'It changes only when you give your employer a new Form W-4.',
+    );
+    expect(result()).toHaveTextContent('A $0.02 refund at tax time');
+    expect(result()).toHaveTextContent('Withheld each paycheck$423.16');
+    expect(result()).toHaveTextContent('Projected 2026 federal income tax$11,002.14');
+  });
+
+  it('compares a stub that withholds nothing: the whole tax is due', async () => {
+    stub01Ready();
+    db.payStubs = [stub01PayStub({ federal_withholding_cents: 0, net_cents: 302_330 })];
+    db.decisions = [
+      sampleDecision({ inputs: { ...stub01K401(5).inputs }, result: { ...stub01K401(5).result } }),
+      stub01HealthDecision(),
+    ];
+    const seen = requests();
+    await renderReady();
+    expect(seen.calc).toEqual([stub01W4Inputs({ current_withholding_per_paycheck_cents: 0 })]);
+    expect(unchanged()).toHaveTextContent('$11,002.14 due at tax time');
+  });
+
+  it('says why there is no comparison when the stub is on another pay schedule', async () => {
+    otherDecisionsSaved();
+    db.payStubs = db.payStubs.map((stub) => ({ ...stub, pay_frequency: 'biweekly' as const }));
+    const seen = requests();
+    await renderReady();
+    expect(seen.calc).toEqual([sampleW4Inputs({ current_withholding_per_paycheck_cents: null })]);
+    expect(within(result()).queryByRole('group', { name: 'If you change nothing' })).toBeNull();
+    expect(result()).toHaveTextContent(
+      'Your pay stub is on a different pay schedule from your plan details, so the card cannot say what it withholds over the year.',
+    );
+    expect(result()).toHaveTextContent('A $0.08 refund at tax time');
+  });
+
+  it('keeps a saved decision saved when a newer stub withholds what its entries do', async () => {
+    otherDecisionsSaved();
+    savedW4();
+    db.payStubs = db.payStubs.map((stub) => ({
+      ...stub,
+      federal_withholding_cents: 21_367,
+      net_cents: stub.net_cents + 8_409,
+    }));
+    const seen = requests();
+    await renderReady();
+    expect(seen.calc).toEqual([sampleW4Inputs({ current_withholding_per_paycheck_cents: 21_367 })]);
+    expect(unchanged()).toHaveTextContent('A $0.08 refund at tax time');
+    expect(saveButton()).toHaveTextContent('Saved as v1');
+    expect(within(card()).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
+  });
+
+  it('keeps a decision saved before the comparison saved, and saves the stub with the next one', async () => {
+    otherDecisionsSaved();
+    const { current_withholding_per_paycheck_cents: _current, ...older } = sampleW4().inputs;
+    db.decisions.push(sampleW4Decision({ inputs: { ...older } }));
+    const seen = requests();
+    await renderReady();
+    expect(saveButton()).toHaveTextContent('Saved as v1');
+
+    type(STEP_4C, '100');
+    await recalculated('A $2,400.08 refund');
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v2'));
+    expect(seen.save[0]).toMatchObject({
+      inputs: sampleW4Inputs({ extra_withholding_cents: 10_000 }),
+    });
   });
 });
 

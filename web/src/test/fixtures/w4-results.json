@@ -15,7 +15,8 @@
       "extra_withholding_cents": 0,
       "expected_deductions_cents": null,
       "other_jobs_wages_cents": 0,
-      "other_jobs_withholding_cents": 0
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": 29776
     },
     "result": {
       "k401_annual_cents": 260000,
@@ -31,6 +32,8 @@
       "projected_tax_cents": 512800,
       "projected_tax_after_credits_cents": 512800,
       "projected_refund_cents": 8,
+      "current_annual_withholding_cents": 714624,
+      "current_refund_cents": 201824,
       "suggestion": "none",
       "suggested_extra_withholding_cents": 0,
       "suggested_deductions_cents": 0,
@@ -60,7 +63,8 @@
       "extra_withholding_cents": 0,
       "expected_deductions_cents": null,
       "other_jobs_wages_cents": 0,
-      "other_jobs_withholding_cents": 0
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": 29776
     },
     "result": {
       "k401_annual_cents": 0,
@@ -76,6 +80,8 @@
       "projected_tax_cents": 562000,
       "projected_tax_after_credits_cents": 562000,
       "projected_refund_cents": 8,
+      "current_annual_withholding_cents": 714624,
+      "current_refund_cents": 152624,
       "suggestion": "none",
       "suggested_extra_withholding_cents": 0,
       "suggested_deductions_cents": 0,
@@ -104,7 +110,8 @@
       "extra_withholding_cents": 0,
       "expected_deductions_cents": null,
       "other_jobs_wages_cents": 0,
-      "other_jobs_withholding_cents": 0
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": 29776
     },
     "result": {
       "k401_annual_cents": 0,
@@ -120,6 +127,8 @@
       "projected_tax_cents": 544000,
       "projected_tax_after_credits_cents": 544000,
       "projected_refund_cents": 8,
+      "current_annual_withholding_cents": 714624,
+      "current_refund_cents": 170624,
       "suggestion": "none",
       "suggested_extra_withholding_cents": 0,
       "suggested_deductions_cents": 0,
@@ -148,7 +157,8 @@
       "extra_withholding_cents": 0,
       "expected_deductions_cents": null,
       "other_jobs_wages_cents": 0,
-      "other_jobs_withholding_cents": 0
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": 29776
     },
     "result": {
       "k401_annual_cents": 260000,
@@ -164,6 +174,8 @@
       "projected_tax_cents": 530800,
       "projected_tax_after_credits_cents": 530800,
       "projected_refund_cents": 8,
+      "current_annual_withholding_cents": 714624,
+      "current_refund_cents": 183824,
       "suggestion": "none",
       "suggested_extra_withholding_cents": 0,
       "suggested_deductions_cents": 0,
@@ -193,7 +205,8 @@
       "extra_withholding_cents": 0,
       "expected_deductions_cents": null,
       "other_jobs_wages_cents": 0,
-      "other_jobs_withholding_cents": 0
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": 29776
     },
     "result": {
       "k401_annual_cents": 260000,
@@ -209,6 +222,104 @@
       "projected_tax_cents": 512800,
       "projected_tax_after_credits_cents": 512800,
       "projected_refund_cents": 8,
+      "current_annual_withholding_cents": 714624,
+      "current_refund_cents": 201824,
+      "suggestion": "none",
+      "suggested_extra_withholding_cents": 0,
+      "suggested_deductions_cents": 0,
+      "suggested_refund_cents": 8,
+      "citation_keys": [
+        "w4.percentage_method",
+        "w4.form_adjustments",
+        "w4.standard_deduction",
+        "w4.federal_brackets",
+        "w4.pretax_deferral"
+      ]
+    }
+  },
+  {
+    "inputs": {
+      "salary_cents": 6500000,
+      "pay_periods_per_year": 24,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "k401_contribution_pct": "4.00",
+      "age": 30,
+      "health_premium_per_paycheck_cents": 6250,
+      "multiple_jobs": false,
+      "dependents_credit_cents": 0,
+      "other_income_cents": 0,
+      "deductions_cents": 0,
+      "extra_withholding_cents": 0,
+      "expected_deductions_cents": null,
+      "other_jobs_wages_cents": 0,
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": null
+    },
+    "result": {
+      "k401_annual_cents": 260000,
+      "k401_capped": false,
+      "health_premium_annual_cents": 150000,
+      "taxable_wages_per_paycheck_cents": 253750,
+      "adjusted_annual_wage_cents": 5230000,
+      "withholding_schedule": "standard",
+      "withholding_rate_pct": "12.00",
+      "withholding_per_paycheck_cents": 21367,
+      "annual_withholding_cents": 512808,
+      "projected_taxable_income_cents": 4480000,
+      "projected_tax_cents": 512800,
+      "projected_tax_after_credits_cents": 512800,
+      "projected_refund_cents": 8,
+      "current_annual_withholding_cents": null,
+      "current_refund_cents": null,
+      "suggestion": "none",
+      "suggested_extra_withholding_cents": 0,
+      "suggested_deductions_cents": 0,
+      "suggested_refund_cents": 8,
+      "citation_keys": [
+        "w4.percentage_method",
+        "w4.form_adjustments",
+        "w4.standard_deduction",
+        "w4.federal_brackets",
+        "w4.pretax_deferral"
+      ]
+    }
+  },
+  {
+    "inputs": {
+      "salary_cents": 6500000,
+      "pay_periods_per_year": 24,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "k401_contribution_pct": "4.00",
+      "age": 30,
+      "health_premium_per_paycheck_cents": 6250,
+      "multiple_jobs": false,
+      "dependents_credit_cents": 0,
+      "other_income_cents": 0,
+      "deductions_cents": 0,
+      "extra_withholding_cents": 0,
+      "expected_deductions_cents": null,
+      "other_jobs_wages_cents": 0,
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": 21367
+    },
+    "result": {
+      "k401_annual_cents": 260000,
+      "k401_capped": false,
+      "health_premium_annual_cents": 150000,
+      "taxable_wages_per_paycheck_cents": 253750,
+      "adjusted_annual_wage_cents": 5230000,
+      "withholding_schedule": "standard",
+      "withholding_rate_pct": "12.00",
+      "withholding_per_paycheck_cents": 21367,
+      "annual_withholding_cents": 512808,
+      "projected_taxable_income_cents": 4480000,
+      "projected_tax_cents": 512800,
+      "projected_tax_after_credits_cents": 512800,
+      "projected_refund_cents": 8,
+      "current_annual_withholding_cents": 512808,
+      "current_refund_cents": 8,
       "suggestion": "none",
       "suggested_extra_withholding_cents": 0,
       "suggested_deductions_cents": 0,
@@ -238,7 +349,8 @@
       "extra_withholding_cents": 0,
       "expected_deductions_cents": null,
       "other_jobs_wages_cents": 0,
-      "other_jobs_withholding_cents": 0
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": 29776
     },
     "result": {
       "k401_annual_cents": 260000,
@@ -254,6 +366,8 @@
       "projected_tax_cents": 294800,
       "projected_tax_after_credits_cents": 294800,
       "projected_refund_cents": -8,
+      "current_annual_withholding_cents": 714624,
+      "current_refund_cents": 419824,
       "suggestion": "none",
       "suggested_extra_withholding_cents": 0,
       "suggested_deductions_cents": 0,
@@ -283,7 +397,8 @@
       "extra_withholding_cents": 0,
       "expected_deductions_cents": null,
       "other_jobs_wages_cents": 0,
-      "other_jobs_withholding_cents": 0
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": 29776
     },
     "result": {
       "k401_annual_cents": 260000,
@@ -299,6 +414,8 @@
       "projected_tax_cents": 405600,
       "projected_tax_after_credits_cents": 405600,
       "projected_refund_cents": 0,
+      "current_annual_withholding_cents": 714624,
+      "current_refund_cents": 309024,
       "suggestion": "none",
       "suggested_extra_withholding_cents": 0,
       "suggested_deductions_cents": 0,
@@ -328,7 +445,8 @@
       "extra_withholding_cents": 0,
       "expected_deductions_cents": null,
       "other_jobs_wages_cents": 0,
-      "other_jobs_withholding_cents": 0
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": 29776
     },
     "result": {
       "k401_annual_cents": 260000,
@@ -344,6 +462,8 @@
       "projected_tax_cents": 512800,
       "projected_tax_after_credits_cents": 292800,
       "projected_refund_cents": 0,
+      "current_annual_withholding_cents": 714624,
+      "current_refund_cents": 421824,
       "suggestion": "none",
       "suggested_extra_withholding_cents": 0,
       "suggested_deductions_cents": 0,
@@ -374,7 +494,8 @@
       "extra_withholding_cents": 10000,
       "expected_deductions_cents": null,
       "other_jobs_wages_cents": 0,
-      "other_jobs_withholding_cents": 0
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": 29776
     },
     "result": {
       "k401_annual_cents": 260000,
@@ -390,6 +511,8 @@
       "projected_tax_cents": 512800,
       "projected_tax_after_credits_cents": 512800,
       "projected_refund_cents": 240008,
+      "current_annual_withholding_cents": 714624,
+      "current_refund_cents": 201824,
       "suggestion": "decrease_extra_withholding",
       "suggested_extra_withholding_cents": 0,
       "suggested_deductions_cents": 0,
@@ -419,7 +542,8 @@
       "extra_withholding_cents": 0,
       "expected_deductions_cents": null,
       "other_jobs_wages_cents": 2000000,
-      "other_jobs_withholding_cents": 39000
+      "other_jobs_withholding_cents": 39000,
+      "current_withholding_per_paycheck_cents": 29776
     },
     "result": {
       "k401_annual_cents": 260000,
@@ -435,6 +559,8 @@
       "projected_tax_cents": 896800,
       "projected_tax_after_credits_cents": 896800,
       "projected_refund_cents": -344992,
+      "current_annual_withholding_cents": 714624,
+      "current_refund_cents": -143176,
       "suggestion": "increase_extra_withholding",
       "suggested_extra_withholding_cents": 14400,
       "suggested_deductions_cents": 0,
@@ -465,7 +591,8 @@
       "extra_withholding_cents": 0,
       "expected_deductions_cents": null,
       "other_jobs_wages_cents": 0,
-      "other_jobs_withholding_cents": 0
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": 29776
     },
     "result": {
       "k401_annual_cents": 260000,
@@ -481,6 +608,8 @@
       "projected_tax_cents": 512800,
       "projected_tax_after_credits_cents": 512800,
       "projected_refund_cents": 385496,
+      "current_annual_withholding_cents": 714624,
+      "current_refund_cents": 201824,
       "suggestion": "increase_deductions",
       "suggested_extra_withholding_cents": 0,
       "suggested_deductions_cents": 1752200,
@@ -511,7 +640,8 @@
       "extra_withholding_cents": 14400,
       "expected_deductions_cents": null,
       "other_jobs_wages_cents": 2000000,
-      "other_jobs_withholding_cents": 39000
+      "other_jobs_withholding_cents": 39000,
+      "current_withholding_per_paycheck_cents": 29776
     },
     "result": {
       "k401_annual_cents": 260000,
@@ -527,6 +657,8 @@
       "projected_tax_cents": 896800,
       "projected_tax_after_credits_cents": 896800,
       "projected_refund_cents": 608,
+      "current_annual_withholding_cents": 714624,
+      "current_refund_cents": -143176,
       "suggestion": "none",
       "suggested_extra_withholding_cents": 14400,
       "suggested_deductions_cents": 0,
@@ -557,7 +689,8 @@
       "extra_withholding_cents": 0,
       "expected_deductions_cents": 0,
       "other_jobs_wages_cents": 0,
-      "other_jobs_withholding_cents": 0
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": 29776
     },
     "result": {
       "k401_annual_cents": 260000,
@@ -573,6 +706,8 @@
       "projected_tax_cents": 512800,
       "projected_tax_after_credits_cents": 512800,
       "projected_refund_cents": 8,
+      "current_annual_withholding_cents": 714624,
+      "current_refund_cents": 201824,
       "suggestion": "none",
       "suggested_extra_withholding_cents": 0,
       "suggested_deductions_cents": 1752200,
@@ -583,6 +718,102 @@
         "w4.standard_deduction",
         "w4.federal_brackets",
         "w4.multiple_jobs",
+        "w4.pretax_deferral"
+      ]
+    }
+  },
+  {
+    "inputs": {
+      "salary_cents": 9500010,
+      "pay_periods_per_year": 26,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "k401_contribution_pct": "5.00",
+      "age": 24,
+      "health_premium_per_paycheck_cents": 400,
+      "multiple_jobs": false,
+      "dependents_credit_cents": 0,
+      "other_income_cents": 0,
+      "deductions_cents": 0,
+      "extra_withholding_cents": 0,
+      "expected_deductions_cents": null,
+      "other_jobs_wages_cents": 0,
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": 27244
+    },
+    "result": {
+      "k401_annual_cents": 475001,
+      "k401_capped": false,
+      "health_premium_annual_cents": 10400,
+      "taxable_wages_per_paycheck_cents": 346716,
+      "adjusted_annual_wage_cents": 8154610,
+      "withholding_schedule": "standard",
+      "withholding_rate_pct": "22.00",
+      "withholding_per_paycheck_cents": 42316,
+      "annual_withholding_cents": 1100216,
+      "projected_taxable_income_cents": 7404610,
+      "projected_tax_cents": 1100214,
+      "projected_tax_after_credits_cents": 1100214,
+      "projected_refund_cents": 2,
+      "current_annual_withholding_cents": 708344,
+      "current_refund_cents": -391870,
+      "suggestion": "none",
+      "suggested_extra_withholding_cents": 0,
+      "suggested_deductions_cents": 0,
+      "suggested_refund_cents": 2,
+      "citation_keys": [
+        "w4.percentage_method",
+        "w4.form_adjustments",
+        "w4.standard_deduction",
+        "w4.federal_brackets",
+        "w4.pretax_deferral"
+      ]
+    }
+  },
+  {
+    "inputs": {
+      "salary_cents": 9500010,
+      "pay_periods_per_year": 26,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "k401_contribution_pct": "5.00",
+      "age": 24,
+      "health_premium_per_paycheck_cents": 400,
+      "multiple_jobs": false,
+      "dependents_credit_cents": 0,
+      "other_income_cents": 0,
+      "deductions_cents": 0,
+      "extra_withholding_cents": 0,
+      "expected_deductions_cents": null,
+      "other_jobs_wages_cents": 0,
+      "other_jobs_withholding_cents": 0,
+      "current_withholding_per_paycheck_cents": 0
+    },
+    "result": {
+      "k401_annual_cents": 475001,
+      "k401_capped": false,
+      "health_premium_annual_cents": 10400,
+      "taxable_wages_per_paycheck_cents": 346716,
+      "adjusted_annual_wage_cents": 8154610,
+      "withholding_schedule": "standard",
+      "withholding_rate_pct": "22.00",
+      "withholding_per_paycheck_cents": 42316,
+      "annual_withholding_cents": 1100216,
+      "projected_taxable_income_cents": 7404610,
+      "projected_tax_cents": 1100214,
+      "projected_tax_after_credits_cents": 1100214,
+      "projected_refund_cents": 2,
+      "current_annual_withholding_cents": 0,
+      "current_refund_cents": -1100214,
+      "suggestion": "none",
+      "suggested_extra_withholding_cents": 0,
+      "suggested_deductions_cents": 0,
+      "suggested_refund_cents": 2,
+      "citation_keys": [
+        "w4.percentage_method",
+        "w4.form_adjustments",
+        "w4.standard_deduction",
+        "w4.federal_brackets",
         "w4.pretax_deferral"
       ]
     }

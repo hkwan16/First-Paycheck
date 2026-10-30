@@ -18,6 +18,7 @@ from db.enums import CalendarKind
 from tests.conftest import FixtureUser
 from tests.integration.test_goals import biweekly_with_stub, events
 from tests.support.database import downgrade, upgrade
+from tests.support.factories import STUB_01, make_document, make_pay_stub
 
 NOW = dt.datetime(2026, 10, 21, 15, 0, tzinfo=dt.UTC)
 Client = Callable[[FixtureUser], TestClient]
@@ -86,6 +87,40 @@ def test_w4_decision_adds_the_submit_reminder(
     assert stored["version"] == 2
     assert stored["result"]["projected_refund_cents"] == -10
     assert stored["result"]["suggestion"] == "none"
+
+
+def test_w4_decision_keeps_the_comparison_with_the_stub(
+    frozen: FastAPI, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    """Spec 014 example 11 (issue 153's e2e account): the confirmed stub-01 withholds
+    $272.44 a paycheck; the client copies it in, and the saved result keeps rule 10a's
+    $3,918.70 balance due beside the entries' 2-cent refund (rule 17a)."""
+    client = client_as(user_a)
+    document = make_document(db_connection, user_a.id, with_blob=False)
+    make_pay_stub(db_connection, user_a.id, document, **STUB_01)
+    [stub] = client.get("/pay-stubs").json()
+    inputs = {
+        "salary_cents": stub["annual_salary_cents"],
+        "pay_periods_per_year": 26,
+        "filing_status": "single",
+        "tax_year": stub["tax_year"],
+        "k401_contribution_pct": "5.00",
+        "age": 24,
+        "health_premium_per_paycheck_cents": 400,
+        "current_withholding_per_paycheck_cents": stub["federal_withholding_cents"],
+    }
+    saved = save_w4(client, inputs)
+    stored = client.get(f"/decisions/{saved['decision_id']}").json()
+    assert stored["inputs"]["current_withholding_per_paycheck_cents"] == 27_244
+    result = stored["result"]
+    assert (result["withholding_per_paycheck_cents"], result["projected_refund_cents"]) == (
+        42_316,
+        2,
+    )
+    assert (result["current_annual_withholding_cents"], result["current_refund_cents"]) == (
+        708_344,
+        -391_870,
+    )
 
 
 def test_w4_decision_without_pay_history_uses_the_pay_periods(

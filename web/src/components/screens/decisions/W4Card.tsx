@@ -21,7 +21,7 @@ import {
   useSaveDecision,
   type CalcState,
 } from '@/lib/api/hooks';
-import type { FilingStatus, W4Input } from '@/lib/api/types';
+import type { FilingStatus, PayStub, W4Input } from '@/lib/api/types';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/dates';
 import {
@@ -41,12 +41,14 @@ import { amountText, readAmount, saveBadgeTone, saveErrorText } from './decision
 import { payFrequencyOf } from './plan-details';
 import {
   appliedEntries,
+  currentWithholdingOf,
   fromDecisions,
   refundHeadline,
   refundText,
   refundTone,
   scheduleText,
   suggestionText,
+  W4_CONTEXT_INPUTS,
   type FromDecisions,
 } from './w4-format';
 
@@ -106,9 +108,11 @@ const FILING_STATUSES: readonly { value: FilingStatus; label: string }[] = [
  * year, and the 401(k) rate and health premium from the saved 401(k) and
  * health plan decisions (zero until they are saved). The person fills in the
  * form's steps. Every withholding, tax, refund and suggested entry is the
- * calculator's (`POST /calc/w4` through `useCalc`); "Apply suggestion" copies
- * the suggested entries into the form. Saving keeps a version and puts the
- * reminder to hand the form in on the calendar.
+ * calculator's (`POST /calc/w4` through `useCalc`), and so is what the newest
+ * stub's withholding leaves at tax time if nothing changes (spec 014 rule
+ * 10a); "Apply suggestion" copies the suggested entries into the form.
+ * Saving keeps a version and puts the reminder to hand the form in on the
+ * calendar.
  */
 export function W4Card() {
   const id = useId();
@@ -142,7 +146,8 @@ export function W4Card() {
   const loaded =
     profile.data !== undefined && payStubs.data !== undefined && decisions.data !== undefined;
   const payStub = payStubs.data?.[0];
-  const periods = loaded ? payPeriodsFor(payFrequencyOf(profile.data, payStub)) : null;
+  const frequency = loaded ? payFrequencyOf(profile.data, payStub) : null;
+  const periods = payPeriodsFor(frequency);
   const salary = profile.data?.salary_cents ?? null;
   const ready = loaded && payStub !== undefined && periods !== null && salary !== null;
 
@@ -168,11 +173,15 @@ export function W4Card() {
             number
           >),
           expected_deductions_cents: expectedRead.cents,
+          current_withholding_per_paycheck_cents: currentWithholdingOf(payStub, frequency),
         }
       : null;
   const calc = useCalc(CALC_PATH, inputs);
   // On the form, the badge compares what is set; elsewhere, only whether a version exists.
-  const state = decisionSaveState(current, ready ? inputs : (current?.inputs ?? null));
+  // A newer stub alone does not change a saved decision (spec 014 rule 17a).
+  const state = decisionSaveState(current, ready ? inputs : (current?.inputs ?? null), {
+    ignore: W4_CONTEXT_INPUTS,
+  });
   const edit = (apply: () => void) => {
     apply();
     if (save.isError) save.reset();
@@ -226,7 +235,8 @@ export function W4Card() {
     body = (
       <>
         <Notice tone="blue" compact icon={null}>
-          The calculator reads your pay schedule and tax year from a confirmed pay stub.
+          The calculator reads your pay schedule, your tax year and what you withhold now from a
+          confirmed pay stub.
         </Notice>
         <div>
           <Button href="/setup/confirm" variant="primary">
@@ -299,7 +309,7 @@ export function W4Card() {
           {amountField('extra_withholding_cents')}
         </div>
 
-        <W4Result inputs={inputs} missing={missing} calc={calc} />
+        <W4Result inputs={inputs} missing={missing} calc={calc} payStub={payStub} />
 
         {text && (
           <Notice tone="blue" compact icon={null} role="group" aria-label="Suggestion">
@@ -416,10 +426,16 @@ interface W4ResultProps {
   /** What to enter first, while the inputs are incomplete. */
   missing: string | null;
   calc: CalcState<typeof CALC_PATH>;
+  /** The newest confirmed stub, which the comparison names. */
+  payStub: PayStub;
 }
 
-/** The result panel: every figure is a field of the calculator's result. */
-function W4Result({ inputs, missing, calc }: W4ResultProps) {
+/**
+ * The result panel: every figure is a field of the calculator's result or of
+ * its inputs. What the stub's withholding leaves at tax time comes first, then
+ * what the entries on the form would.
+ */
+function W4Result({ inputs, missing, calc, payStub }: W4ResultProps) {
   const result = calc.data;
   let content: ReactNode;
   if (inputs === null) {
@@ -438,10 +454,40 @@ function W4Result({ inputs, missing, calc }: W4ResultProps) {
     const tone = refundTone(result.projected_refund_cents);
     // The inputs of the result on screen (the previous one stays while the next loads).
     const shown = calc.inputs ?? inputs;
+    const current = result.current_refund_cents;
+    const currentWithholding = shown.current_withholding_per_paycheck_cents;
+    const atStub =
+      current !== null &&
+      currentWithholding != null &&
+      result.current_annual_withholding_cents !== null ? (
+        <div role="group" aria-label="If you change nothing" className="flex flex-col gap-1">
+          <div className="text-small font-semibold text-ink-2">If you change nothing</div>
+          <div className={cn('text-headline font-bold', toneText[refundTone(current)])}>
+            {refundHeadline(current)}
+          </div>
+          <p className="m-0 text-tiny text-ink-3">
+            Your {formatDate(payStub.pay_date, 'short')} pay stub withholds{' '}
+            <Money cents={currentWithholding} /> a paycheck:{' '}
+            <Money cents={result.current_annual_withholding_cents} /> over{' '}
+            {shown.pay_periods_per_year} paychecks, if every paycheck this year withholds the same.
+            It changes only when you give your employer a new Form W-4.
+          </p>
+        </div>
+      ) : null;
     content = (
       <>
-        <div className={cn('text-headline font-bold', toneText[tone])} aria-live="polite">
-          {refundHeadline(result.projected_refund_cents)}
+        {atStub}
+        <div className={cn('flex flex-col gap-1', atStub && 'border-t border-line pt-3')}>
+          <div className="text-small font-semibold text-ink-2">With the entries above</div>
+          <div className={cn('text-headline font-bold', toneText[tone])} aria-live="polite">
+            {refundHeadline(result.projected_refund_cents)}
+          </div>
+          {!atStub && (
+            <p className="m-0 text-tiny text-ink-3">
+              Your pay stub is on a different pay schedule from your plan details, so the card
+              cannot say what it withholds over the year.
+            </p>
+          )}
         </div>
         <KVList rules="all" spacing="panel">
           <KV

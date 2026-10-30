@@ -103,6 +103,19 @@ describe('decisionSaveState', () => {
     expect(decisionSaveState(decision(), null).status).toBe('dirty');
     expect(decisionSaveState(undefined, null).status).toBe('unsaved');
   });
+
+  it('leaves the ignored inputs out of the comparison, on either side and absent or not', () => {
+    const ignore = ['age'];
+    expect(decisionSaveState(decision(), { ...inputs, age: 31 }, { ignore }).status).toBe('saved');
+    const { age: _age, ...withoutAge } = inputs;
+    expect(decisionSaveState(decision({ inputs: withoutAge }), inputs, { ignore }).status).toBe(
+      'saved',
+    );
+    expect(
+      decisionSaveState(decision(), { ...inputs, age: 31, tax_year: 2027 }, { ignore }).status,
+    ).toBe('dirty');
+    expect(decisionSaveState(decision(), { ...inputs, age: 31 }).status).toBe('dirty');
+  });
 });
 
 describe('calculator ids', () => {
@@ -199,6 +212,14 @@ describe('asW4Inputs', () => {
       age: null,
     });
     expect(asW4Inputs({ ...set })).toEqual(set);
+    const noStub = sampleW4Inputs({ current_withholding_per_paycheck_cents: null });
+    expect(asW4Inputs({ ...noStub })).toEqual(noStub);
+  });
+
+  it('reads a decision saved before the stub comparison, which has no such input', () => {
+    const { current_withholding_per_paycheck_cents: _current, ...older } = sampleW4().inputs;
+    expect(asW4Inputs({ ...older })).toEqual(older);
+    expect(asW4Inputs({ ...older, current_withholding_per_paycheck_cents: '272.44' })).toBeNull();
   });
 
   it('refuses objects that are not that shape', () => {
