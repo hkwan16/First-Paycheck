@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { toneSoft } from '@/lib/design/tone';
 import { checkInRoute, confirmRoute, whyRoute } from '@/lib/routes';
@@ -12,7 +13,7 @@ describe('SideNav', () => {
     expect(within(nav).getByText('Your plan')).toBeInTheDocument();
     const [setup, plan] = within(nav)
       .getAllByRole('list')
-      .filter((list) => list.parentElement?.tagName === 'NAV');
+      .filter((list) => !list.parentElement?.closest('li'));
     expect(
       [...(setup as HTMLElement).children].map((li) => li.firstElementChild?.textContent),
     ).toEqual(['1Accounts and documents', '2Confirm pay stub', '3Spending map', '4Decisions']);
@@ -109,10 +110,11 @@ describe('SideNav', () => {
     );
   });
 
-  it('wraps into a chip row under the nav breakpoint', () => {
+  it('stacks one item per row at every width (spec 018 rule 14)', () => {
     render(<SideNav />);
     for (const list of screen.getAllByRole('list')) {
-      expect(list).toHaveClass('max-nav:flex-row', 'max-nav:flex-wrap');
+      expect(list).toHaveClass('flex-col');
+      expect(list.className).not.toMatch(/max-nav:flex-row|max-nav:flex-wrap/);
     }
   });
 });
@@ -189,11 +191,134 @@ describe('SideNav decision steps (spec 018)', () => {
     expect(within(steps()).getAllByText('After alpha')).toHaveLength(3);
   });
 
-  it('gives the steps a wrapping row of their own under the nav breakpoint', () => {
+  it('indents the steps under Decisions at every width', () => {
     render(<SideNav calculators={ALL} />);
-    const decisions = screen.getByRole('link', { name: 'Decisions' }).closest('li');
-    expect(decisions).toHaveClass('max-nav:basis-full');
-    expect(steps()).toHaveClass('max-nav:flex-row', 'max-nav:flex-wrap');
+    expect(steps()).toHaveClass('flex-col', 'border-l', 'ml-[22px]');
+    expect(steps().className).not.toMatch(/max-nav:/);
+  });
+});
+
+/** The phone control: the nav's one button (spec 018 rules 11-17). */
+const control = () =>
+  within(screen.getByRole('navigation', { name: 'Setup steps' })).getByRole('button');
+/** The list the control opens: its aria-controls. */
+const navList = () => document.getElementById(control().getAttribute('aria-controls') ?? '');
+
+describe('SideNav on a phone (spec 018 rules 11-17)', () => {
+  it('names a setup step and the setup progress', () => {
+    render(<SideNav current="spending" done={{ link: true, confirm: true }} />);
+    expect(control()).toHaveAccessibleName('Spending map, 2 of 4 setup steps done');
+    expect(control()).toHaveTextContent('Spending map, 2 of 4 setup steps done');
+  });
+
+  it('names a decision step after its section, with its done mark', () => {
+    render(
+      <SideNav
+        calculators={ALL}
+        current="401k_match"
+        done={{ link: true, confirm: true, spending: true, '401k_match': true }}
+      />,
+    );
+    expect(control()).toHaveAccessibleName(
+      'Decisions: 401(k) match, done, 3 of 4 setup steps done',
+    );
+    expect(control().querySelector('[aria-hidden="true"]')).toHaveClass(
+      ...toneSoft.confirmed.split(' '),
+    );
+  });
+
+  it('names a plan screen', () => {
+    render(
+      <SideNav
+        current="checkIn"
+        hrefs={{ checkIn: checkInRoute('ci_1') }}
+        done={{ link: true, confirm: true, spending: true, decisions: true, plan: true }}
+      />,
+    );
+    expect(control()).toHaveAccessibleName('Monthly check-in, 4 of 4 setup steps done');
+  });
+
+  it('names the nav itself with no current item', () => {
+    render(<SideNav />);
+    expect(control()).toHaveAccessibleName('Setup steps, 0 of 4 setup steps done');
+  });
+
+  it('comes first in the nav, is a 44px target, and shows only under the nav breakpoint', () => {
+    render(<SideNav current="spending" />);
+    const nav = screen.getByRole('navigation', { name: 'Setup steps' });
+    expect(nav.firstElementChild).toBe(control());
+    expect(control()).toHaveAttribute('type', 'button');
+    expect(control()).toHaveClass('nav:hidden', 'min-h-11', 'w-full');
+    expect(nav).toContainElement(navList());
+  });
+
+  it('opens the list in place and closes it again', async () => {
+    const user = userEvent.setup();
+    render(<SideNav current="spending" />);
+    expect(control()).toHaveAttribute('aria-expanded', 'false');
+    expect(navList()).toHaveClass('max-nav:hidden');
+    await user.click(control());
+    expect(control()).toHaveAttribute('aria-expanded', 'true');
+    expect(navList()).not.toHaveClass('max-nav:hidden');
+    expect(control()).toHaveFocus();
+    await user.click(control());
+    expect(control()).toHaveAttribute('aria-expanded', 'false');
+    expect(navList()).toHaveClass('max-nav:hidden');
+  });
+
+  it('keeps one list for both presentations', () => {
+    render(<SideNav calculators={ALL} current="health_plan" />);
+    expect(screen.getAllByRole('link', { name: 'Spending map' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'Health plan' })).toHaveLength(1);
+    expect(navList()).toContainElement(screen.getByRole('link', { name: 'Health plan' }));
+    expect(document.querySelectorAll('[aria-current]')).toHaveLength(1);
+  });
+
+  it('closes on Escape and gives focus back to the control', async () => {
+    const user = userEvent.setup();
+    render(<SideNav current="spending" />);
+    await user.click(control());
+    await user.tab();
+    expect(screen.getByRole('link', { name: 'Accounts and documents' })).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(control()).toHaveAttribute('aria-expanded', 'false');
+    expect(control()).toHaveFocus();
+  });
+
+  it('closes when a link in the list is chosen', async () => {
+    const user = userEvent.setup();
+    render(<SideNav current="link" />);
+    // Stand in for the router: the click is the person's choice; nothing navigates here.
+    const stay = (event: MouseEvent) => event.preventDefault();
+    window.addEventListener('click', stay, { capture: true });
+    try {
+      await user.click(control());
+      await user.click(screen.getByRole('link', { name: 'Spending map' }));
+    } finally {
+      window.removeEventListener('click', stay, { capture: true });
+    }
+    expect(control()).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('closes when the page changes', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<SideNav current="spending" pathname="/setup/spending" />);
+    await user.click(control());
+    expect(control()).toHaveAttribute('aria-expanded', 'true');
+    rerender(<SideNav current="401k_match" pathname="/setup/decisions/401k" />);
+    expect(control()).toHaveAttribute('aria-expanded', 'false');
+    // Back on the first page it stays closed: an open list belongs to one visit.
+    rerender(<SideNav current="spending" pathname="/setup/spending" />);
+    expect(control()).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('turns its arrow over the fast duration, which reduced motion zeroes', async () => {
+    const user = userEvent.setup();
+    render(<SideNav current="spending" />);
+    const arrow = control().lastElementChild;
+    expect(arrow).toHaveClass('transition-[rotate]', 'duration-(--duration-fast)', 'rotate-90');
+    await user.click(control());
+    expect(arrow).toHaveClass('-rotate-90');
   });
 });
 

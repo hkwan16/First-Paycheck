@@ -46,6 +46,20 @@ describe('AppSideNav', () => {
     expect(screen.getByRole('link', { name: 'Emergency fund' })).toBeInTheDocument();
   });
 
+  it('closes the phone nav when the path changes (spec 018 rule 15)', async () => {
+    pathname.current = '/setup/spending';
+    const { user, rerender } = render(<AppSideNav />);
+    const control = screen.getByRole('button', { name: /^Spending map, / });
+    await user.click(control);
+    expect(control).toHaveAttribute('aria-expanded', 'true');
+    pathname.current = '/setup/decisions/401k';
+    rerender(<AppSideNav />);
+    expect(screen.getByRole('button', { name: /^Decisions: 401\(k\) match/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
   it('passes done marks through', () => {
     pathname.current = '/plan';
     render(<AppSideNav done={{ link: true }} />);
