@@ -74,7 +74,9 @@ def tiers_ascending(tiers: Sequence[MatchTier]) -> None:
     """Tiers are cumulative: each bound must be above the one before it."""
     uptos = [tier.employee_pct_upto for tier in tiers]
     if any(later <= earlier for earlier, later in pairwise(uptos)):
-        raise ValueError("match_tiers must have strictly ascending employee_pct_upto")
+        raise ValueError(
+            "Each match tier must reach a higher contribution rate than the one before it"
+        )
 
 
 def cumulative_bounds(bands: Sequence[Decimal]) -> list[Decimal]:

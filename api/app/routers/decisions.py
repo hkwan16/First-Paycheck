@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app import decision_effects, ratelimit
 from app.auth import CurrentUser
 from app.deps import Now, UserSession
-from app.errors import AppError, NotFound, error_responses
+from app.errors import AppError, NotFound, error_responses, validation_message
 from app.types import UtcDateTime
 from calc.registry import Calculator, UnknownCalculator, calculator
 from db.enums import CalculatorKind
@@ -83,21 +83,15 @@ class DecisionList(BaseModel):
     items: list[CalculatorDecisions]
 
 
-def _validation_message(prefix: str, exc: ValidationError) -> str:
-    parts = []
-    for error in exc.errors():
-        location = ".".join(str(part) for part in (prefix, *error["loc"]))
-        parts.append(f"{location}: {error['msg']}")
-    return "; ".join(parts)
-
-
 def _recompute(spec: Calculator, body: DecisionIn) -> tuple[BaseModel, BaseModel]:
     """Validate the inputs, rerun the calculator and compare (rule 2)."""
     try:
         inputs = spec.input_model.model_validate(body.inputs)
     except ValidationError as exc:
         raise AppError(
-            _validation_message("inputs", exc), code="validation_error", status_code=422
+            validation_message(exc.errors(), prefix=("inputs",)),
+            code="validation_error",
+            status_code=422,
         ) from exc
     computed = spec.run(inputs)
     try:

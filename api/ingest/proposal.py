@@ -18,6 +18,7 @@ from typing import Annotated, Any, Literal, Protocol, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from calc.health_plans import DEDUCTIBLE_OVER_OOP, HSA_WITHOUT_HDHP
 from calc.k401 import MAX_TIERS, MatchTier, cumulative_bounds, tiers_ascending
 from calc.pay_stub import PayStubAmounts, total_cents
 from calc.types import Cents, Percent, PositiveCents
@@ -447,10 +448,10 @@ class PlanValues(BaseModel):
     @model_validator(mode="after")
     def _consistent(self) -> Self:
         if self.deductible_cents > self.oop_max_cents:
-            raise ValueError("deductible_cents must not exceed oop_max_cents")
+            raise ValueError(DEDUCTIBLE_OVER_OOP)
         if self.employer_hsa_cents > 0 and self.kind != "hdhp":
             # The health plan calculator's rule (spec 012 rule 12, spec 013 rule 11).
-            raise ValueError("employer_hsa_cents must be 0 unless kind is hdhp")
+            raise ValueError(HSA_WITHOUT_HDHP)
         return self
 
 

@@ -174,6 +174,20 @@ def test_bad_confirm_is_422(
     assert client.get(f"/docs/{document_id}").json()["status"] == "proposed"
 
 
+def test_a_typed_deductible_over_the_maximum_is_refused_in_words(
+    empty_queue: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Spec 008 rule 22a: the Confirm screen shows this message as it is."""
+    client = client_as(user_a)
+    document_id = proposed(client, empty_queue)
+    response = confirm(client, document_id, {"plans": [{**PLAN, "deductible_cents": 900_000}]})
+    assert response.status_code == 422, response.text
+    assert response.json()["error"] == {
+        "code": "validation_error",
+        "message": "A plan's deductible must not be more than its out-of-pocket maximum",
+    }
+
+
 def test_newest_document_first(
     empty_queue: Connection, client_as: Client, user_a: FixtureUser
 ) -> None:

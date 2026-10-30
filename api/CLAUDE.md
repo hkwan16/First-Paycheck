@@ -340,7 +340,9 @@ explanation, `GET /calendar` shows the check it implies.
 - **Error messages are for people** (spec 008 rule 22a): no `snake_case` or
   `SCREAMING_CASE` words, no enum `.value` or `!r` in an f-string;
   `tests/unit/test_error_messages.py` walks every `AppError` call. Name a
-  calculator or document type in words; put a provider code in `details`.
+  calculator or document type in words; put a provider code in `details`. A
+  validator's `ValueError` leaves as the whole message (`errors.validation_message`), so
+  write it as a sentence too.
 - **No transaction across a model call.** `POST /explain` takes `UserSessions`
   (a factory, `app/deps.py`): read in one session, call the gateway with none
   open, write in a second. `LlmGateway` is lazy, so a 404 or a stored current

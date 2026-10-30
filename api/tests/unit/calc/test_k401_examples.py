@@ -378,6 +378,23 @@ def test_tax_year_without_constants_is_invalid() -> None:
         run(6_000_000, 26, TIERED, "3", tax_year=2027)
 
 
+def test_tiers_out_of_order_are_refused_in_words() -> None:
+    """Spec 008 rule 22a: typed match tiers reach this, and the API shows it."""
+    tiers = [{"employee_pct_upto": "5", "employer_pct": "50"}] * 2
+    with pytest.raises(ValidationError, match="Each match tier must reach a higher"):
+        K401MatchInput.model_validate(
+            {
+                "salary_cents": 6_000_000,
+                "pay_periods_per_year": 26,
+                "match_tiers": tiers,
+                "contribution_pct": "3",
+                "tax_year": 2026,
+                "filing_status": "single",
+                "age": 30,
+            }
+        )
+
+
 @pytest.mark.parametrize(
     "change",
     [
