@@ -64,7 +64,7 @@ describe('useUpdateGoal', () => {
     expect(queryClient.getQueryData(queryKeys.goals())).toEqual(planningDb.goals);
   });
 
-  it('marks a goal reached, and a changed contribution clears the projected date', async () => {
+  it('marks a goal reached, and a changed contribution projects the date again', async () => {
     savedEmergencyFund();
     const { result } = renderHookWithClient(() => ({
       goals: useGoals(),
@@ -75,13 +75,13 @@ describe('useUpdateGoal', () => {
     act(() =>
       result.current.update.mutate({
         goalId: GOAL_ID,
-        patch: { monthly_contribution_cents: 45_000 },
+        patch: { monthly_contribution_cents: 50_000 },
       }),
     );
     await waitFor(() =>
       expect(result.current.goals.data?.[0]).toMatchObject({
-        monthly_contribution_cents: 45_000,
-        target_date: null,
+        monthly_contribution_cents: 50_000,
+        target_date: '2027-04-30',
       }),
     );
 
