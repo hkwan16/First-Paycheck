@@ -110,7 +110,7 @@ Rules:
   `model` = settings purpose, `effort`, `max_tokens`, `schema`), loaded and
   validated by `llm/prompts/__init__.py`. A released prompt file is never
   edited; a change is a new version.
-- One public method per prompt: `categorize` (`categorize/v2`),
+- One public method per prompt: `categorize` (`categorize/v3`),
   `extract_pay_stub` (`extract_pay_stub/v1`), `extract_benefits`
   (`extract_benefits/v2`), `explain` (`explain/v2`) and `judge_rate_claim`
   (`judge_rate_claim/v1`, schema `RateClaimVerdict`; spec 008 rule 24a), the
@@ -168,9 +168,21 @@ Rules:
   (rule 4): money out goes user exact, user prefix, seed exact, seed prefix;
   money in goes user exact, user prefix, seed `contains` (income and transfer
   only, seed only), seed exact, seed prefix. So a paycheck named like a
-  restaurant is income and a refund keeps its merchant's category. The model
+  restaurant is income and a refund keeps its merchant's category. A seed
+  `prefix` rule names one merchant (rule 3d): an ordinary word that other
+  businesses also begin their names with (`rent`, `shell`, `spectrum`) is an
+  `exact` rule plus prefix rules on the longer forms that name the merchant
+  (`shell oil`), and a brand's own store in another category gets a longer
+  rule (`target optical`). `tests/unit/test_seed_rules.py` lists the names
+  each way; check a new seed row against them. The model
   labels each merchant and direction separately (`CategorizeItem.direction`,
-  `categorize/v2`) and may call money in a refund. `tests/support/
+  `categorize/v3`) and may call money in a refund. What a category means
+  (a membership to a public radio station or another nonprofit is
+  `gifts_donations`, issue #146) is the prompt's; which merchant a
+  description names is the seed rules' (spec 003 rule 9a), and the two agree
+  on a merchant of the same kind (rule 9b: a warehouse club is `shopping`, a
+  credit card payment `transfer`, a tax refund `income` by the seed
+  `contains` rules `tax ref` and `tax refund`). `tests/support/
   sandbox_history.py:DYNAMIC` replays Plaid's `user_transactions_dynamic`
   user (a paycheck named like a restaurant, five loan ledgers).
 - Migration names follow spec 001: `0006_webhook_fn` revises `0002_core`, and

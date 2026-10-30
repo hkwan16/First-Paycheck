@@ -8,12 +8,12 @@
     "pass_rate": 1.0
   },
   "categorization": {
-    "accuracy": 0.9669902912621359,
-    "llm_accuracy": 0.9473684210526315
+    "accuracy": 1.0,
+    "llm_accuracy": 1.0
   },
   "categorization-rules": {
-    "rules_coverage": 0.8155339805825242,
-    "rules_precision": 0.9714285714285714
+    "rules_coverage": 0.7771535580524345,
+    "rules_precision": 1.0
   },
   "checkin": {
     "fields_exact": 1.0,
