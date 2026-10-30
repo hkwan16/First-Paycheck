@@ -14,7 +14,7 @@ import { alphaUser, NO_ALPHA_USER, submitSignIn, waitForHydration } from './supp
  * The alpha, end to end, as a new user against the real API (docs/plan.md,
  * "Verification"): sign in, link Plaid's sandbox bank and fix a category,
  * upload the synthetic Acme pay stub and confirm it, read the Spending tiles,
- * save the 401(k) decision at 4% as v1 and a change as v2, then read why.
+ * step on to the 401(k), save its decision at 4% as v1 and a change as v2, then read why.
  *
  * The account must be new (scripts/e2e_stack.py makes one per run; against a
  * hosted API, create a fresh confirmed user), because the decision versions
@@ -140,10 +140,14 @@ test('a new user goes from sign-in to a verified 401(k) explanation', async ({ p
   });
 
   await test.step('save the 401(k) contribution at 4% as v1', async () => {
+    // Decisions is four steps (spec 018); the 401(k) is the second.
     await page.getByRole('link', { name: /Use these numbers in decisions/ }).click();
-    await expect(page).toHaveURL('/setup/decisions');
+    await expect(page).toHaveURL('/setup/decisions/emergency-fund');
     await waitForHydration(page);
     await expect(page.getByText('0 of 4 saved')).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('link', { name: 'Next: 401(k) match' }).click();
+    await expect(page).toHaveURL('/setup/decisions/401k');
+    await waitForHydration(page);
 
     // A new profile has no salary or match yet; the card asks for them.
     const form = card(page).getByRole('form', { name: 'Your plan details' });

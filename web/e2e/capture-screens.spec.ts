@@ -52,7 +52,7 @@ test('04, 05, 07 and 08 the Spending screen', async ({ page }) => {
 });
 
 test('09, 10, 11 and 16 the Decisions and Why screens', async ({ page }) => {
-  await page.goto('/setup/decisions');
+  await page.goto('/setup/decisions/401k');
   await settled(page);
   const card = page.getByRole('region', { name: '401(k) match' });
   const slider = card.getByRole('slider', { name: /Your contribution/ });

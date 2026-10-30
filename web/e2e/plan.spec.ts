@@ -51,6 +51,18 @@ test('reads the saved decisions back with their figures and the next 90 days', a
   await expect(k401.getByText(/^v\d+ · Saved /)).toBeVisible();
   await expect(page.getByRole('region', { name: 'Your paycheck' })).toContainText('Take-home pay');
   await expect(page.getByRole('region', { name: 'Next 90 days' })).toContainText(/Through /);
+  // Spec 018: each date's badge opens its decision's step; Back goes to the last step.
+  const badges = page.getByRole('region', { name: 'Next 90 days' }).getByRole('link');
+  for (let index = 0; index < (await badges.count()); index += 1) {
+    await expect(badges.nth(index)).toHaveAttribute(
+      'href',
+      /^\/setup\/decisions\/(emergency-fund|401k|health-plan|w4)$/,
+    );
+  }
+  await expect(page.getByRole('link', { name: 'Back to decisions' })).toHaveAttribute(
+    'href',
+    '/setup/decisions/w4',
+  );
 });
 
 test('downloads the calendar file', async ({ page }) => {

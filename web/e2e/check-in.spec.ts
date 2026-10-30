@@ -141,6 +141,28 @@ test('runs this month’s check-in again, then marks a finding done, dismissed a
   await expect(badge).toHaveText(before);
 });
 
+test('links a finding to the decision step it affects', async ({ page }) => {
+  await openIndex(page);
+  await list(page).getByRole('link', { name: thisMonth() }).click();
+  await waitForHydration(page);
+  const findings = page.getByRole('region', { name: 'What changed' });
+  await expect(findings).toBeVisible({ timeout: 30_000 });
+  // Spec 018 rule 4: a decision's finding opens that calculator's own step.
+  const affects = findings.getByRole('link', { name: /^Affects: (?!Spending map$)/ });
+  const count = await affects.count();
+  for (let index = 0; index < count; index += 1) {
+    await expect(affects.nth(index)).toHaveAttribute(
+      'href',
+      /^\/setup\/decisions\/(emergency-fund|401k|health-plan|w4)$/,
+    );
+  }
+  test.skip(count === 0, 'No finding this month affects a decision');
+  const href = (await affects.first().getAttribute('href'))!;
+  await affects.first().click();
+  await expect(page).toHaveURL(href);
+  await expect(page.getByText(/^Decision \d of 4$/)).toBeVisible({ timeout: 30_000 });
+});
+
 test('a check-in that is not the user’s is not found', async ({ page }) => {
   await page.goto('/check-in/00000000-0000-4000-8000-000000000000');
   await waitForHydration(page);
