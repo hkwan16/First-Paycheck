@@ -122,6 +122,17 @@ export const SILVER_HMO: HealthPlanOption = {
   employer_hsa_cents: 0,
 };
 
+/** The $4.00 plan issue 153's user (stub-01) chose, typed by hand. */
+export const VALUE_HMO: HealthPlanOption = {
+  name: 'Value HMO',
+  kind: 'hmo',
+  premium_per_period_cents: 400,
+  deductible_cents: 200_000,
+  coinsurance_pct: '20.00',
+  oop_max_cents: 450_000,
+  employer_hsa_cents: 0,
+};
+
 /** The enrollment deadline the sample benefits summary prints. */
 export const ENROLLMENT_DEADLINE = '2026-11-14';
 
@@ -197,6 +208,22 @@ export function sampleHealthDecision(overrides: Partial<Decision> = {}): Decisio
     is_current: true,
     ...overrides,
   };
+}
+
+/** Issue 153's user's health plan decision v1: the Value HMO, biweekly on the stub-01 salary. */
+export function stub01HealthDecision(overrides: Partial<Decision> = {}): Decision {
+  const { inputs, result } = sampleHealthPlans({
+    plans: [{ ...VALUE_HMO }],
+    pay_periods_per_year: 26,
+    salary_cents: 9_500_010,
+    selected_plan_index: 0,
+    enrollment_deadline: null,
+  });
+  return sampleHealthDecision({
+    inputs: structuredClone(inputs),
+    result: structuredClone(result),
+    ...overrides,
+  });
 }
 
 /**

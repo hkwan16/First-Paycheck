@@ -96,17 +96,25 @@ export interface DecisionSaveState {
  * Whether the inputs on a card are the calculator's current decision. The
  * comparison is structural and exact: the API stores canonical inputs
  * (integer cents, two-place percentage strings) and the cards send them in
- * that form, so equal means the same decision.
+ * that form, so equal means the same decision. `ignore` names inputs that
+ * describe the person's situation today rather than what they decided (the
+ * W-4's stub withholding, spec 014 rule 17a): they are left out on both sides,
+ * present or not.
  */
 export function decisionSaveState(
   current: Decision | null | undefined,
   inputs: unknown,
+  { ignore = [] }: { ignore?: readonly string[] } = {},
 ): DecisionSaveState {
   if (!current) {
     return { status: 'unsaved', version: null, action: 'Save this decision', label: 'Not saved' };
   }
   const { version } = current;
-  if (inputs !== null && deepEqual(current.inputs, inputs)) {
+  const without = (value: unknown) =>
+    isRecord(value) && ignore.length > 0
+      ? Object.fromEntries(Object.entries(value).filter(([key]) => !ignore.includes(key)))
+      : value;
+  if (inputs !== null && deepEqual(without(current.inputs), without(inputs))) {
     return {
       status: 'saved',
       version,
@@ -211,7 +219,10 @@ export function asW4Inputs(inputs: Record<string, unknown>): W4Input | null {
     isText(inputs.k401_contribution_pct) &&
     (inputs.age === null || isInt(inputs.age)) &&
     typeof inputs.multiple_jobs === 'boolean' &&
-    (inputs.expected_deductions_cents === null || isInt(inputs.expected_deductions_cents));
+    (inputs.expected_deductions_cents === null || isInt(inputs.expected_deductions_cents)) &&
+    // Absent in a decision saved before spec 014 rule 10a.
+    (inputs.current_withholding_per_paycheck_cents == null ||
+      isInt(inputs.current_withholding_per_paycheck_cents));
   return ok ? (inputs as unknown as W4Input) : null;
 }
 

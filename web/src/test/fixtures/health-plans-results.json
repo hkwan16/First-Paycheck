@@ -3766,5 +3766,59 @@
       "scan_end_cents": 2770000,
       "citation_keys": ["health.hdhp_definition", "health.hsa_limit", "health.federal_brackets"]
     }
+  },
+  {
+    "inputs": {
+      "plans": [
+        {
+          "name": "Value HMO",
+          "kind": "hmo",
+          "premium_per_period_cents": 400,
+          "deductible_cents": 200000,
+          "coinsurance_pct": "20.00",
+          "oop_max_cents": 450000,
+          "employer_hsa_cents": 0
+        }
+      ],
+      "pay_periods_per_year": 26,
+      "salary_cents": 9500010,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "employee_hsa_cents": 0,
+      "expected_usage": "medium",
+      "usage_low_cents": 50000,
+      "usage_medium_cents": 300000,
+      "usage_high_cents": 1000000,
+      "selected_plan_index": 0,
+      "enrollment_deadline": null
+    },
+    "result": {
+      "marginal_rate_used": "22.00",
+      "hsa_limit_cents": 440000,
+      "hdhp_min_deductible_cents": 170000,
+      "hdhp_max_oop_cents": 850000,
+      "plans": [
+        {
+          "name": "Value HMO",
+          "kind": "hmo",
+          "annual_premium_cents": 10400,
+          "hsa_eligible": false,
+          "employer_hsa_cents": 0,
+          "employee_hsa_cents": 0,
+          "hsa_capped": false,
+          "hsa_tax_savings_cents": 0,
+          "low_cost_cents": 60400,
+          "medium_cost_cents": 230400,
+          "high_cost_cents": 370400,
+          "worst_case_cents": 460400
+        }
+      ],
+      "pairs": [],
+      "recommended_index": 0,
+      "selected_index": 0,
+      "scan_step_cents": 10000,
+      "scan_end_cents": 1450000,
+      "citation_keys": ["health.federal_brackets"]
+    }
   }
 ]

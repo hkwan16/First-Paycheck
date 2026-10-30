@@ -6,7 +6,8 @@ import cases from './w4-results.json';
 /*
  * The M7 sample: J. Rivera's Form W-4 ($65,000.00, semi-monthly, single,
  * 2026, 30 by the end of the year) with the sample's saved 401(k) decision
- * (4%) and health plan decision (the Gold PPO, $62.50 a paycheck) as inputs.
+ * (4%) and health plan decision (the Gold PPO, $62.50 a paycheck) as inputs,
+ * beside the $297.76 a paycheck the sample stub withholds (spec 014 rule 10a).
  * Every result was computed by the API's own calculator (w4-results.json,
  * written by make-w4-results.py); nothing is worked out in TypeScript.
  * Invented data only.
@@ -44,8 +45,26 @@ export function sampleW4Inputs(overrides: Partial<W4Input> = {}): W4Input {
     expected_deductions_cents: null,
     other_jobs_wages_cents: 0,
     other_jobs_withholding_cents: 0,
+    current_withholding_per_paycheck_cents: 29_776,
     ...overrides,
   };
+}
+
+/**
+ * Issue 153's user (spec 014 example 11): stub-01's $3,653.85 biweekly gross,
+ * single, 24 by the end of 2026, the 401(k) at 5% and the Value HMO at $4.00 a
+ * paycheck, beside the $272.44 a paycheck the stub withholds.
+ */
+export function stub01W4Inputs(overrides: Partial<W4Input> = {}): W4Input {
+  return sampleW4Inputs({
+    salary_cents: 9_500_010,
+    pay_periods_per_year: 26,
+    k401_contribution_pct: '5.00',
+    age: 24,
+    health_premium_per_paycheck_cents: 400,
+    current_withholding_per_paycheck_cents: 27_244,
+    ...overrides,
+  });
 }
 
 /** The same with neither decision saved: no 401(k) deferral and no premium. */
