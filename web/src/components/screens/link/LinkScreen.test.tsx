@@ -352,7 +352,8 @@ describe('LinkScreen linking a bank', () => {
     const progress = await screen.findByRole('progressbar', {
       name: 'Syncing First Platypus Bank',
     });
-    expect(screen.getByRole('status')).toHaveTextContent('Waiting to start');
+    // "Starting" until the job's first read answers.
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Waiting to start'));
     expect(progress).not.toHaveAttribute('aria-valuenow');
 
     await poll();
