@@ -70,11 +70,8 @@ def test_both_suites_are_registered() -> None:
 def test_a_perfect_reader_scores_full_marks() -> None:
     fixtures = text_fixtures()
     result = extraction.score(fixtures, LabelReader([f.labels for f in fixtures]))
-    assert result.metrics == {
-        "field_accuracy": 1.0,
-        "document_accuracy": 1.0,
-        "redaction_recall": 1.0,
-    }
+    # Redaction runs before the model, so extraction-smoke gates it, at zero tolerance.
+    assert result.metrics == {"field_accuracy": 1.0, "document_accuracy": 1.0}
     assert result.cases == len(fixtures)
     assert result.failures == []
 
@@ -94,15 +91,13 @@ def test_one_wrong_field_per_stub() -> None:
     )
 
 
-def test_one_case_is_a_field_a_stub_or_a_stub_with_an_ssn() -> None:
+def test_one_case_is_a_field_or_a_stub() -> None:
     """evals/CLAUDE.md: a metric tolerates one case's worth (spec 005 rule 26)."""
     fixtures = text_fixtures()
-    with_ssn = sum(fixture.labels["ssn"] is not None for fixture in fixtures)
     result = extraction.score(fixtures, LabelReader([f.labels for f in fixtures]))
     assert result.case_worth == {
         "field_accuracy": pytest.approx(1 / (13 * len(fixtures))),
         "document_accuracy": pytest.approx(1 / len(fixtures)),
-        "redaction_recall": pytest.approx(1 / with_ssn),
     }
 
 

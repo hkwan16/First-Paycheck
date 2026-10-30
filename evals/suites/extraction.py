@@ -13,8 +13,10 @@ whichever is larger, as evals/CLAUDE.md says):
   three dates and the nine money fields including the computed other
   deductions), the share whose proposed value equals the label exactly.
 - ``document_accuracy``: the share of stubs with all 13 right.
-- ``redaction_recall``: of the stubs that print an SSN in full, the share
-  whose ``redaction_count`` is non-zero.
+
+Redaction runs before the model and does not depend on it, so this suite does
+not score it: ``extraction-smoke`` gates ``redaction_recall`` over the same
+stubs at zero tolerance, where an LLM suite would tolerate one missed SSN.
 """
 
 from __future__ import annotations
@@ -66,14 +68,11 @@ class PayStubReader(Protocol):
 
 
 def score(fixtures: Sequence[Fixture], reader: PayStubReader) -> SuiteResult:
-    right = documents_right = with_ssn = redacted = 0
+    right = documents_right = 0
     failures: list[str] = []
     for fixture in fixtures:
         labels = fixture.labels
         prepared = prepare_document(fixture.data, labels["content_type"])
-        if labels["ssn"] is not None:
-            with_ssn += 1
-            redacted += prepared.redaction_count > 0
         if not prepared.model_pages:
             failures.append(f"{labels['id']}: no readable page")
             continue
@@ -96,15 +95,13 @@ def score(fixtures: Sequence[Fixture], reader: PayStubReader) -> SuiteResult:
         metrics={
             "field_accuracy": right / (count * len(SCORED_FIELDS)) if count else 1.0,
             "document_accuracy": documents_right / count if count else 1.0,
-            "redaction_recall": redacted / with_ssn if with_ssn else 1.0,
         },
         cases=count,
         failures=failures,
-        # One case: a field, a stub, a stub that prints an SSN.
+        # One case: a field, a stub.
         case_worth={
             "field_accuracy": 1 / (count * len(SCORED_FIELDS)) if count else 0.0,
             "document_accuracy": 1 / count if count else 0.0,
-            "redaction_recall": 1 / with_ssn if with_ssn else 0.0,
         },
     )
 

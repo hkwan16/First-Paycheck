@@ -24,7 +24,7 @@ REPORT = {
             "cases": 30,
             "failures": ["stub-12 net_cents: expected 224574, got 224575"],
             "cost_cents": 96.5,
-            "regressions": ["field_accuracy 0.9100 < baseline 0.9500"],
+            "regressions": ["field_accuracy 0.9100 < baseline 0.9500 (tolerance 0.0200)"],
         },
     },
     "spent_cents": 96.5,
@@ -35,7 +35,7 @@ def test_a_regression_names_the_suite_metric_and_run() -> None:
     body = nightly.issue_body(REPORT, exit_code=1, run_url=RUN_URL, llm_ran=True)
     assert nightly.TITLE == "Nightly evals regressed"
     assert "extraction" in body
-    assert "field_accuracy 0.9100 < baseline 0.9500" in body
+    assert "field_accuracy 0.9100 < baseline 0.9500 (tolerance 0.0200)" in body
     assert "stub-12 net_cents" in body
     assert RUN_URL in body
     assert "96.50 cents" in body
@@ -65,7 +65,7 @@ def test_failures_are_capped_per_suite() -> None:
                 "cases": 500,
                 "failures": failures,
                 "cost_cents": 0.4,
-                "regressions": ["accuracy 0.5000 < baseline 0.9000"],
+                "regressions": ["accuracy 0.5000 < baseline 0.9000 (tolerance 0.0270)"],
             }
         }
     }

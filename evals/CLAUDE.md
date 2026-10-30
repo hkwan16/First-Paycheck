@@ -55,10 +55,11 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   fonts, so they are committed and not compared. SSNs are in the never-issued
   900-999 area.
 - `suites/extraction.py` (`extraction`, LLM): the real pipeline and Sonnet over
-  the stubs; `field_accuracy`, `document_accuracy`, `redaction_recall`.
-  Raises `SuiteUnavailable` (exit 2) without `ANTHROPIC_API_KEY`. Its baseline
-  is measured: 1.0 on all three in every live run on October 29, about 55
-  cents a run (spec 005 targets 0.95, 0.70, 1.0).
+  the stubs; `field_accuracy`, `document_accuracy`. Redaction runs before the
+  model, so `extraction-smoke` scores it, at zero tolerance. Raises
+  `SuiteUnavailable` (exit 2) without `ANTHROPIC_API_KEY`. Its baseline is
+  measured: 1.0 on both in every live run on October 29, about 55 cents a run
+  (spec 005 targets 0.95, 0.70).
 - `suites/extraction_smoke.py` (`extraction-smoke`, free): the same pipeline
   with `FakeGateway`; checks every stub yields a proposal, SSNs are redacted,
   and neither the SSN nor an unmasked account number reaches the model input
@@ -151,15 +152,15 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   the nightly by itself, while a second miss on a small metric, or a slide of
   more than 2 points on a large one, does. Today: benefits `document_accuracy`
   and `retirement_accuracy` (5 summaries) 20 points, extraction
-  `document_accuracy` (30 stubs) 3.3, `redaction_recall` (19 stubs with an SSN)
-  5.3, extraction `field_accuracy` (390 fields) and benefits
+  `document_accuracy` (30 stubs) 3.3, extraction `field_accuracy` (390 fields) and benefits
   `plan_field_accuracy` (72) 2, categorization `llm_accuracy` 14.7 and
   `accuracy` 2.7 (one label covers all 14 `sunrise bakery` rows, of the 95 the
   model labels and the 515 in all). A metric above its baseline passes. The
   report gives each metric's tolerance under `tolerances`. `test_run.py` checks
   the rule through the CLI; each LLM suite's tests check its `case_worth`.
-  `redaction_recall` does not depend on the model; `extraction-smoke` gates it
-  at zero tolerance over the same stubs.
+  A metric that does not depend on the model belongs in a free suite, which
+  tolerates nothing, never in an LLM suite (why `extraction` leaves
+  `redaction_recall` to `extraction-smoke`).
 - A new suite needs a registry entry and a baseline entry (a test checks both).
 - Update the baseline only with `--update-baseline`, in a commit of its own, with
   the reason in the message.
