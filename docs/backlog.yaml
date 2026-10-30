@@ -1692,3 +1692,141 @@ issues:
     # Fixed October 30: spec 018 rules 11-17. Under 780px the nav is one
     # disclosure button (about 56px, was 425px at 390x844); the smoke spec
     # checks every screen's h1 ends in the first screenful.
+  # Found on October 30 clicking every button on production at phone and
+  # desktop widths (e2e@firstpaycheck.test, after PRs #157-#159).
+  - title: "A verified explanation written before #147 still says the chosen 401(k) rate is in effect"
+    body: >-
+      The e2e account's 401(k) explanation (explain/v1, checked Oct 29) says
+      "You are already contributing 5%" and "the $3,800.00 match you get
+      now", while its pay stub shows 3%. #147 fixed what new explanations
+      say, but a stored verified explanation is shown forever and the Why
+      page offers no way to write it again. An explanation is checked against
+      the facts it was written from; when the facts it would be written from
+      now differ (here, the stub's rate joined the context), it should read
+      as out of date and offer to be written again. Change spec 008 first.
+      Failing test first. Done when the e2e account's 401(k) Why page no
+      longer presents the old text as current and can write a new one.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: High
+  - title: "The Why pages offer an explanation the emergency fund can never have"
+    body: >-
+      Spec 011 says an emergency fund decision is never explained, and the
+      Plan page shows none for it. The Why index still lists it under "Each
+      saved decision has a plain-language explanation", and its page offers
+      "Write the explanation", which fails with the raw API message
+      "emergency_fund decisions cannot be explained yet". Failing test
+      first. Done when the Why pages say what the emergency fund has instead
+      and never show an internal identifier.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+  - title: "A document that fell back to manual entry while reading was off can never be read again"
+    body: >-
+      Two e2e documents uploaded while the model key was misnamed on Render
+      say "Automatic reading is off right now" a day after reading came
+      back, and the only ways forward are typing every field or Replace. The
+      source pane also says "Source, as the AI saw it" for lines the AI never
+      saw. When manual entry was caused by the model being unavailable (not a
+      refusal or an unreadable page), the person should be able to ask for
+      the reading again, and the notice should say what happened rather than
+      what is true now. Change spec 004 first. Failing test first.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+  - title: "Spending says 0 paychecks and no confirmed pay stub when the stub is in another month"
+    body: >-
+      The e2e account's September reads "Income $4,050.12, 0 paychecks,
+      after taxes and deductions", and the diagram's first node says "No
+      confirmed pay stub", although a confirmed stub (paid Apr 10) exists.
+      paycheck_count counts confirmed stubs dated in the period (spec 007 rule
+      26), so the words claim something the number does not measure. Change
+      the wording in spec 007 and 010 first so each says what it counts.
+      Failing test first.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+  - title: "Changing the emergency fund contribution leaves a dead end to get the projected date back"
+    body: >-
+      Change contribution on the goal clears its target date (spec 011 rule
+      17) and says "Save the decision again to project one", but the card
+      still shows the decision's own inputs, so its button reads "Saved as
+      v1" and does nothing. Setting the contribution back to the saved amount
+      loses the date for good. The goal and the decision also disagree about
+      the monthly amount with nothing saying so. Change spec 011 first so the
+      projection follows the contribution the goal holds. Failing test first.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+  - title: "A paused emergency fund goal still says it is on pace"
+    body: >-
+      Pausing the goal shows "Paused" next to "On pace to reach it by Jan 6,
+      2027". A paused goal is not on pace for anything. Failing test first.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+  - title: "Focus falls to the page when the pressed control in a decision card goes away"
+    body: >-
+      In the 401(k) card, Cancel and Save plan details close the form and
+      focus lands on the body; the same happens after the health plan
+      editor's "Use your benefits summary" and the W-4's "Apply suggestion".
+      A keyboard or screen reader user loses their place. web/CLAUDE.md asks
+      that focus after an action that removes its control moves somewhere
+      useful. Failing test first.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+  - title: "Using the benefits summary drops the saved health plan choice even when the plans match"
+    body: >-
+      The health plan editor's "Use your benefits summary" clears the chosen
+      plan, so a saved decision reads "Choose the plan you will enroll in to
+      save", although the summary's plans are the ones saved; picking the
+      same plan again shows "Saved as v1". Keep the choice when the chosen
+      plan is still there. Failing test first.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+  - title: "The W-4 reminder line reads as a broken sentence"
+    body: >-
+      Under the W-4 card: "Give your employer your updated Form W-4 is on
+      your calendar for Nov 6, 2026." An event title that is an instruction
+      cannot be the subject of the sentence. Failing test first.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+  - title: "The W-4 reminder's check-in finding has no Affects link"
+    body: >-
+      Every upcoming-date finding names the part of the plan it affects
+      except "Give your employer your updated Form W-4":
+      checkin/findings.py maps calendar kinds to what they affect and has no
+      entry for w4_submit. Failing test first.
+    labels: ["area:api", "type:bug"]
+    milestone: M10
+    priority: Low
+  - title: "A check-in says it was compared on an older date right after Check in now"
+    body: >-
+      After Check in now, the October check-in says "Checked again just now.
+      This page is up to date." under "Compared with your plan on Oct 22,
+      2026". The lead reads updated_at, which only moves when a row changes,
+      so a refresh that changes nothing leaves the old date. Record when a
+      check-in was last run and show that. Change spec 015 first. Failing
+      test first.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+  - title: "Following a step footer on a phone lands with the nav half under the header"
+    body: >-
+      On a phone, following a Decisions footer link (Next or Back) lands
+      46px down the page, so the collapsed nav button (#155) sits half under
+      the sticky header. Failing test first.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+  - title: "The CSV import panel still reports an import into an account that was removed"
+    body: >-
+      After importing a CSV into a new account and removing that account,
+      the import panel still says "Imported 5 transactions into Checking
+      (CSV)." with its jobs done. Failing test first.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Low
