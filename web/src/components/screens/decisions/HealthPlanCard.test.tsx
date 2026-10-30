@@ -291,6 +291,66 @@ describe('HealthPlanCard saving', () => {
     await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v1'));
   });
 
+  it('keeps the chosen plan when the benefits summary has it again (issue 168)', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const { user } = await renderReady();
+    await user.click(within(card()).getByRole('button', { name: 'Edit plans' }));
+    await user.click(within(card()).getByRole('button', { name: 'Use your benefits summary' }));
+
+    expect(within(choice()).getByRole('button', { name: 'Gold PPO' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await settle();
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v1'));
+    expect(within(card()).queryByText('Choose the plan you will enroll in to save.')).toBeNull();
+  });
+
+  it('follows the chosen plan to its new place when another plan is removed', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const seen = requests();
+    const { user } = await renderReady();
+    await user.click(within(card()).getByRole('button', { name: 'Edit plans' }));
+    await user.click(within(card()).getByRole('button', { name: 'Remove plan 1' }));
+    await user.click(within(card()).getByRole('button', { name: 'Compare these plans' }));
+
+    expect(within(choice()).getByRole('button', { name: 'Gold PPO' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await settle();
+    await waitFor(() => expect(seen.calc.at(-1)).toMatchObject({ selected_plan_index: 0 }));
+    expect(seen.calc.at(-1)).toMatchObject({ plans: [GOLD_PPO, SAVER_HDHP] });
+  });
+
+  it('drops the choice when the chosen plan has other terms now, even under its name', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const seen = requests();
+    const { user } = await renderReady();
+    await user.click(within(card()).getByRole('button', { name: 'Edit plans' }));
+    const gold = within(card()).getByRole('group', { name: 'Plan 2' });
+    fireEvent.change(within(gold).getByLabelText('Premium per paycheck'), {
+      target: { value: '70.00' },
+    });
+    await user.click(within(card()).getByRole('button', { name: 'Compare these plans' }));
+
+    expect(within(choice()).getByRole('button', { name: 'Gold PPO' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    expect(
+      within(card()).getByText('Choose the plan you will enroll in to save.'),
+    ).toBeInTheDocument();
+    await settle();
+    await waitFor(() => expect(seen.calc.at(-1)).toMatchObject({ selected_plan_index: null }));
+  });
+
   it('reloads and offers the next version when another save got there first', async () => {
     decisionsReady();
     benefitsConfirmed();

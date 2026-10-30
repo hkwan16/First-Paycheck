@@ -43,6 +43,7 @@ import { AmountField } from './AmountField';
 import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
 import { amountText, readAmount, saveBadgeTone, saveErrorText } from './decision-format';
 import {
+  choiceAmong,
   costAt,
   costText,
   hdhpNotice,
@@ -164,7 +165,8 @@ export function HealthPlanCard() {
   const applyPlans = (next: HealthPlanOption[], from: Source) =>
     edit(() => {
       setOverride({ plans: next, source: from });
-      setSelected(null);
+      // The chosen plan stays chosen while the new plans still offer it (issue 168).
+      setSelected(choiceAmong(plans, selectedValue, next));
       setEditing(false);
     });
 

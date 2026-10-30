@@ -605,7 +605,9 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
   leaves you $260 ahead a year". No color: the word carries it. The Plan page's `net_cost`
   figures read the same way (`figureText`). The sample's third plan, Saver HDHP, comes out ahead
   at low use. Saving needs a
-  chosen plan (a 422 `plan_not_selected` says so); an enrollment deadline adds a calendar event,
+  chosen plan (a 422 `plan_not_selected` says so); a new table (Use your benefits summary, an
+  edited one) keeps the choice when it still has the chosen plan with every term the same, in
+  whatever place (`choiceAmong`, issue 168), and drops it otherwise; an enrollment deadline adds a calendar event,
   shown under the card.
 - **`W4Card`** (spec 014): salary and pay schedule from the profile and the confirmed pay stub,
   the age from the birth year (null without one: no catch-up), and, read-only under "From your

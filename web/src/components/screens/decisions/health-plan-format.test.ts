@@ -12,6 +12,7 @@ import {
   SILVER_HMO,
 } from '@/test/fixtures/planning';
 import {
+  choiceAmong,
   costAt,
   costText,
   draftFromOption,
@@ -276,5 +277,29 @@ describe('plan drafts', () => {
         },
       ],
     });
+  });
+});
+
+describe('choiceAmong (issue 168)', () => {
+  const plans = [BRONZE_HSA, GOLD_PPO, SAVER_HDHP];
+
+  it('keeps the chosen plan where it is when the new plans have it there', () => {
+    expect(choiceAmong(plans, 1, structuredClone(plans))).toBe(1);
+  });
+
+  it('follows the chosen plan to its new place', () => {
+    expect(choiceAmong(plans, 1, [GOLD_PPO, SAVER_HDHP])).toBe(0);
+    expect(choiceAmong(plans, 1, [SILVER_HMO, BRONZE_HSA, SAVER_HDHP, GOLD_PPO])).toBe(3);
+  });
+
+  it('matches by every term, so the same name with another premium is another plan', () => {
+    const dearer = { ...GOLD_PPO, premium_per_period_cents: 7_000 };
+    expect(choiceAmong(plans, 1, [BRONZE_HSA, dearer, SAVER_HDHP])).toBeNull();
+  });
+
+  it('is null with nothing chosen, or nothing to choose from', () => {
+    expect(choiceAmong(plans, null, plans)).toBeNull();
+    expect(choiceAmong(null, null, plans)).toBeNull();
+    expect(choiceAmong(plans, 1, [])).toBeNull();
   });
 });

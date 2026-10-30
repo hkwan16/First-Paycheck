@@ -7,6 +7,7 @@ import type {
   PlanKind,
   PlanPair,
 } from '@/lib/api/types';
+import { deepEqual } from '@/lib/deep-equal';
 import { formatMoney, formatNetCost, formatRate, netCost } from '@/lib/money';
 import { amountText, readAmount } from './decision-format';
 
@@ -84,6 +85,27 @@ export function plansFromBenefits(
     deadline: chosen.find((plan) => plan.enrollment_deadline)?.enrollment_deadline ?? null,
     left: newest.length - chosen.length,
   };
+}
+
+/**
+ * Where the chosen plan is among plans that replace the compared ones (a
+ * benefits summary, an edited table), so the choice survives a new table
+ * that still offers it (issue 168): its own place when the plan there has
+ * the same terms, else the first plan with every term the same, else null.
+ * Plans match by all their terms, never the name alone: a plan renamed or
+ * repriced is another plan to choose. Compares what the API and the person
+ * gave; computes nothing.
+ */
+export function choiceAmong(
+  plans: readonly HealthPlanOption[] | null,
+  selected: number | null,
+  next: readonly HealthPlanOption[],
+): number | null {
+  const chosen = selected === null ? undefined : plans?.[selected];
+  if (chosen === undefined || selected === null) return null;
+  if (deepEqual(next[selected], chosen)) return selected;
+  const index = next.findIndex((plan) => deepEqual(plan, chosen));
+  return index === -1 ? null : index;
 }
 
 /** A plan's expected yearly net cost at a usage scenario, as the API computed it. */
