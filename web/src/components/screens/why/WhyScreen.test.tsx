@@ -6,8 +6,10 @@ import {
   sampleExplanation,
   sampleFallbackExplanation,
 } from '@/test/fixtures/decisions';
+import { EMERGENCY_DECISION_ID } from '@/test/fixtures/planning';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
 import { db, savedDecision } from '@/test/msw/db';
+import { savedEmergencyFund } from '@/test/msw/planning-handlers';
 import { apiUrl } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderWithProviders, screen, waitFor, within } from '@/test/render';
@@ -242,6 +244,40 @@ describe('WhyScreen with no explanation yet', () => {
     expect(
       screen.getByRole('region', { name: '401(k) match calculator result' }),
     ).toHaveTextContent('Contribution for the full match4% of salary');
+  });
+});
+
+describe('WhyScreen for an emergency fund (spec 011 rule 18, issue 162)', () => {
+  beforeEach(() => savedEmergencyFund());
+
+  it('says it has no written explanation, offers none, and shows the calculator result', async () => {
+    const bodies = explainBodies();
+    renderWhy(EMERGENCY_DECISION_ID);
+    const none = await screen.findByRole('region', { name: 'No written explanation' });
+    expect(none).toHaveTextContent('no tax rule applies, so there is nothing to explain or cite');
+    expect(screen.queryByRole('button', { name: /explanation/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/emergency_fund/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Nothing on this page came from a language model/)).toBeInTheDocument();
+
+    const result = screen.getByRole('region', { name: 'Emergency fund calculator result' });
+    // A saved result, not a written explanation that failed.
+    expect(within(result).queryByText('Fallback')).not.toBeInTheDocument();
+    const rows = within(result)
+      .getAllByRole('term')
+      .map((term) => [term.textContent, term.nextElementSibling?.textContent]);
+    expect(rows).toEqual([
+      ['Target, 3 months of essentials', '$5,469.75'],
+      ['Suggested range, 3 to 6 months', '$5,469.75 to $10,939.50'],
+      ['Already saved', '39.12% of the target'],
+      ['Still to save', '$3,329.75'],
+      ['Months to reach it', '12 months'],
+      ['Per paycheck, 24 a year', '$150.00'],
+    ]);
+    expect(screen.getByRole('link', { name: 'Change it on its step' })).toHaveAttribute(
+      'href',
+      '/setup/decisions/emergency-fund',
+    );
+    expect(bodies).toEqual([]);
   });
 });
 

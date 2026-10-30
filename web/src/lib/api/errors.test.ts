@@ -22,6 +22,23 @@ describe('apiErrorMessage', () => {
     expect(apiErrorMessage(error, FALLBACK)).toBe('Input should be a UUID');
   });
 
+  // Spec 008 rule 22a, issue 162: a message naming an identifier is not for people.
+  it.each([
+    'emergency_fund decisions cannot be explained yet',
+    'body.decision_id: Input should be a valid UUID',
+    'Plaid rejected the request (INVALID_PUBLIC_TOKEN)',
+  ])('shows the fallback instead of %j', (message) => {
+    expect(apiErrorMessage({ error: { code: 'x', message } }, FALLBACK)).toBe(FALLBACK);
+    expect(apiErrorMessage(new ApiError(422, { error: { code: 'x', message } }), FALLBACK)).toBe(
+      FALLBACK,
+    );
+  });
+
+  it('shows a sentence that only mentions a form or a 401(k)', () => {
+    const message = 'Upload a PDF, PNG or JPEG of your W-4 or 401(k) summary';
+    expect(apiErrorMessage({ error: { code: 'x', message } }, FALLBACK)).toBe(message);
+  });
+
   it.each([[new TypeError('Failed to fetch')], [null], [undefined], ['oops'], [{ error: {} }]])(
     'falls back for %j',
     (error) => {

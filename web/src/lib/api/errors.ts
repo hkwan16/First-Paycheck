@@ -70,6 +70,16 @@ export function apiErrorCode(error: unknown): string | undefined {
   return typeof error.error.code === 'string' ? error.error.code : undefined;
 }
 
+/** A word with an underscore inside: a field, a code or an enum value (`emergency_fund`). */
+const IDENTIFIER = /\b[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+\b/;
+
+/**
+ * Whether an API message reads as a sentence for people (spec 008 rule 22a):
+ * the API writes its own that way, but a validation error names fields and
+ * an older API may name an identifier, which is never shown.
+ */
+export const isPersonMessage = (message: string) => message !== '' && !IDENTIFIER.test(message);
+
 const isRateLimited = (error: unknown) =>
   (error instanceof ApiError && error.status === 429) || apiErrorCode(error) === 'rate_limited';
 
@@ -78,8 +88,9 @@ const isRateLimited = (error: unknown) =>
  * Retry-After, through `rateLimitMessage`). Otherwise the API's errors carry
  * a message written for people (`{ error: { message } }`, a 413
  * `body_too_large` included) and FastAPI's validation errors a `detail`
- * list; anything else (a network failure, a thrown TypeError) gets the
- * caller's fallback, never a raw technical string.
+ * list; anything else (a network failure, a thrown TypeError), and a message
+ * that names an identifier (`isPersonMessage`), gets the caller's fallback,
+ * never a raw technical string.
  */
 export function apiErrorMessage(error: unknown, fallback: string): string {
   if (isRateLimited(error)) {
@@ -87,11 +98,13 @@ export function apiErrorMessage(error: unknown, fallback: string): string {
   }
   if (!isRecord(error)) return fallback;
   if (isRecord(error.error) && typeof error.error.message === 'string' && error.error.message) {
-    return error.error.message;
+    return isPersonMessage(error.error.message) ? error.error.message : fallback;
   }
   if (Array.isArray(error.detail)) {
     const [first] = error.detail as unknown[];
-    if (isRecord(first) && typeof first.msg === 'string' && first.msg) return first.msg;
+    if (isRecord(first) && typeof first.msg === 'string' && isPersonMessage(first.msg)) {
+      return first.msg;
+    }
   }
   return fallback;
 }

@@ -1,5 +1,4 @@
 import type {
-  CalculatorKind,
   CalendarEvent,
   Goal,
   PayFrequency,
@@ -9,6 +8,7 @@ import type {
 } from '@/lib/api/types';
 import { calculatorIdOf } from '@/lib/decisions';
 import type { Hue } from '@/lib/design/tone';
+import { isExplained } from '@/lib/explanations';
 import { formatMoney, formatNetCost, formatNumber, formatRate } from '@/lib/money';
 import { CALCULATOR_CARDS } from '../decisions/DecisionCard';
 
@@ -52,9 +52,6 @@ export function figureText(figure: PlanFigure): string {
   }
 }
 
-/** Calculators the API can explain; an emergency fund has no IRS source (spec 011). */
-const EXPLAINED: ReadonlySet<CalculatorKind> = new Set(['k401_match', 'health_plans', 'w4']);
-
 export type ExplanationView = PlanDecision['explanation']['status'] | 'stale' | 'unavailable';
 
 /**
@@ -64,7 +61,7 @@ export type ExplanationView = PlanDecision['explanation']['status'] | 'stale' | 
  * for it.
  */
 export function explanationView(decision: PlanDecision): ExplanationView {
-  if (!EXPLAINED.has(decision.calculator)) return 'unavailable';
+  if (!isExplained(decision.calculator)) return 'unavailable';
   const { status, stale } = decision.explanation;
   return status === 'verified' && stale ? 'stale' : status;
 }

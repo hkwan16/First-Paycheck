@@ -79,14 +79,14 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     upload.ts, download.ts, keys.ts, errors.ts, hooks/), auth/ (next-path, protected,
                     validation, errors, account), supabase/ (env, client, server, proxy),
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
-                    documents.ts, decisions.ts, decision-steps.ts, deep-equal.ts, features.ts,
-                    focus-handoff.ts, land-at-top.ts,
+                    documents.ts, decisions.ts, decision-steps.ts, deep-equal.ts, explanations.ts,
+                    features.ts, focus-handoff.ts, land-at-top.ts,
                     findings.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts,
                     page-hydration.ts, page-title.ts, log-error.ts
 src/app/dev/screens/{link,account,spending,confirm,confirm/manual,confirm/unread,confirm/benefits,confirm/extracting,
                     confirm/failed,confirm/confirmed,decisions/{emergency-fund,401k,health-plan,w4,
-                    after-alpha},why,why/fallback,why/stale,why-index,check-in,
+                    after-alpha},why,why/fallback,why/stale,why/emergency-fund,why-index,check-in,
                     check-in/complete,check-in-index,plan,plan/empty}  a screen on the sample data, no
                     API (development only); `account` is Link with the header's account menu
 src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, queued animation frames settled
@@ -186,7 +186,10 @@ The arrow turns over `--duration-fast`, zero under reduced motion; nothing anima
   `code`, `error` (the body's error, so it reads like a bare body) and `retryAfterSeconds` from
   Retry-After. A mutation that throws its own class (`ResultMismatch`, `PayStubUnbalanced`) extends
   `ApiError`, and so do `UploadError` and `DownloadError`. Turn errors into sentences with
-  `apiErrorMessage(error, fallback)`, never by printing the object.
+  `apiErrorMessage(error, fallback)`, never by printing the object. It shows the API's message
+  only when it reads as a sentence for people (`isPersonMessage`: no word with an underscore,
+  such as `emergency_fund` or a field path), else the caller's fallback (spec 008 rule 22a,
+  issue 162), so write a fallback that stands on its own.
 - **Limits** (M10): every write route can answer 429 `rate_limited` (with Retry-After, which the
   API exposes through CORS) and 413 `body_too_large`. `apiErrorMessage` turns any 429 into the one
   sentence `rateLimitMessage` makes, "You have reached the limit for now. Try again in about 20
@@ -657,6 +660,15 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
 
 `/why/[decisionId]` (`WhyScreen`) reads the decision and its explanation; `/why`
 (`WhyIndexScreen`) lists current decisions with their versions.
+
+- **Never explained** (spec 011 rule 18, issue 162): `isExplained(calculator)`
+  (`lib/explanations.ts`, mirroring the API's `BENEFITS_QUERIES`) is false for an emergency
+  fund. Its Why page offers no explanation: a "No written explanation" card says why (no tax rule
+  applies) and `CalculatorResultCard` shows the saved result (`FundResultRows`, with
+  `fallback={false}`: no "Fallback" badge) with "Change it on its step". The index's lead does
+  not claim every decision has an explanation, and the emergency fund's row says "Calculator
+  result, no written explanation". The Plan page's `explanationView` uses the same helper.
+  Sample: `/dev/screens/why/emergency-fund`.
 
 - **Verified**: status checks (numbers checked, citations, retries), the concept, "Your numbers"
   with the verifier's "=" marks, what would change the answer, sources (IRS citations as outbound

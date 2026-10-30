@@ -25,6 +25,7 @@ import type {
   Transaction,
 } from '@/lib/api/types';
 import { deepEqual } from '@/lib/deep-equal';
+import { formatMoney } from '@/lib/money';
 import {
   k401Result,
   sampleCalendarEvent,
@@ -355,7 +356,11 @@ async function saveDecision(request: Request) {
     const parent = db.decisions.find((d) => d.id === body.supersedes_id);
     if (!parent) return notFound('Decision not found');
     if (parent.calculator !== body.calculator) {
-      return appError(422, 'supersedes_mismatch', 'supersedes_id belongs to another calculator');
+      return appError(
+        422,
+        'supersedes_mismatch',
+        'The version this replaces belongs to another decision',
+      );
     }
     if (db.decisions.some((d) => d.supersedes_id === parent.id)) return conflict();
     version = parent.version + 1;
@@ -389,6 +394,17 @@ async function saveDecision(request: Request) {
   return HttpResponse.json(saved, { status: 201 });
 }
 
+/** The API's sentence for a decision it never explains (spec 008 rule 22a). */
+export const EXPLANATION_UNAVAILABLE =
+  "An emergency fund decision has no written explanation: no tax rule applies, so the calculator's result is the whole answer.";
+
+/** A document's type in words, as the API's messages name it (spec 008 rule 22a). */
+const DOCUMENT_NAMES: Record<DocumentType, string> = {
+  pay_stub: 'a pay stub',
+  offer_letter: 'an offer letter',
+  benefits: 'a benefits summary',
+};
+
 /** The rows one explain run writes (spec 008 rules 15 and 16). */
 function explainRun(decisionId: string): Explanation[] {
   const outcome = db.explainOutcomes.shift() ?? 'verified';
@@ -405,7 +421,12 @@ function explainRun(decisionId: string): Explanation[] {
 
 async function explain(request: Request) {
   const { decision_id: decisionId, force = false } = (await request.json()) as ExplainIn;
-  if (!db.decisions.some((d) => d.id === decisionId)) return notFound('Decision not found');
+  const decision = db.decisions.find((d) => d.id === decisionId);
+  if (!decision) return notFound('Decision not found');
+  // Spec 011 rule 18: an emergency fund is never explained.
+  if (decision.calculator === 'emergency_fund') {
+    return appError(422, 'explanation_unavailable', EXPLANATION_UNAVAILABLE);
+  }
   const rows = db.explanations.get(decisionId) ?? [];
   // Spec 008 rule 20: the stored verified row only while it is current.
   const verified = rows.filter((r) => r.verified).at(-1);
@@ -553,7 +574,7 @@ export const handlers = [
         return appError(
           422,
           'replace_type_mismatch',
-          `A ${type} upload cannot replace a ${old.type} document`,
+          `This upload is ${DOCUMENT_NAMES[type]} and cannot replace ${DOCUMENT_NAMES[old.type]}`,
         );
       }
     }
@@ -588,7 +609,7 @@ export const handlers = [
       return appError(
         422,
         'extraction_unsupported',
-        'offer_letter documents cannot be extracted yet',
+        'This is an offer letter, which cannot be read yet',
       );
     }
     if (document.status === 'manual_entry_required' && !canReadAgain(document)) {
@@ -628,7 +649,7 @@ export const handlers = [
       return appError(
         422,
         'pay_stub_unbalanced',
-        `Gross minus deductions is ${result.expected_net_cents} cents, but net is ${result.net_cents} cents`,
+        `Gross minus deductions is ${formatMoney(result.expected_net_cents)}, but net is ${formatMoney(result.net_cents)}`,
         result,
       );
     }

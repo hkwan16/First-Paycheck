@@ -3,6 +3,7 @@ import type {
   Decision,
   DecisionList,
   EmergencyFundInput,
+  EmergencyFundResult,
   HealthPlansInput,
   K401MatchInput,
   K401MatchResult,
@@ -165,6 +166,26 @@ export function asEmergencyFundInputs(inputs: Record<string, unknown>): Emergenc
     ] as const
   ).every((key) => isInt(inputs[key]));
   return ok ? (inputs as unknown as EmergencyFundInput) : null;
+}
+
+/** A saved `emergency_fund` decision's result, or null when it is not that shape. */
+export function asEmergencyFundResult(result: Record<string, unknown>): EmergencyFundResult | null {
+  const ok =
+    (
+      [
+        'target_cents',
+        'three_month_target_cents',
+        'six_month_target_cents',
+        'shortfall_cents',
+        'per_paycheck_contribution_cents',
+        'horizon_months',
+      ] as const
+    ).every((key) => isInt(result[key])) &&
+    typeof result.funded === 'boolean' &&
+    typeof result.reachable === 'boolean' &&
+    isText(result.funded_pct) &&
+    (result.months_to_target === null || isInt(result.months_to_target));
+  return ok ? (result as unknown as EmergencyFundResult) : null;
 }
 
 const PLAN_KINDS = new Set(['hdhp', 'ppo', 'hmo']);

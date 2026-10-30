@@ -123,6 +123,12 @@ const SCREENS: readonly Screen[] = [
     sample: true,
   },
   {
+    path: '/dev/screens/why/emergency-fund',
+    name: 'why-emergency-fund',
+    heading: 'Why this decision',
+    sample: true,
+  },
+  {
     path: '/dev/screens/why/stale',
     name: 'why-stale',
     heading: 'Why contribute 4% to your 401(k)',

@@ -11,10 +11,15 @@ import { apiErrorMessage } from '@/lib/api/errors';
 import { useDecisions } from '@/lib/api/hooks';
 import { formatDate } from '@/lib/dates';
 import { calculatorIdOf, CALCULATOR_LABELS } from '@/lib/decisions';
+import { isExplained } from '@/lib/explanations';
 import { firstDecisionRoute, whyRoute } from '@/lib/routes';
 import { CALCULATOR_CARDS } from '../decisions/DecisionCard';
 
-/** `/why`: every current decision, each linking to its explanation. */
+/**
+ * `/why`: every current decision, each linking to its page: its explanation,
+ * or for an emergency fund, which is never explained, its calculator result
+ * (spec 011 rule 18).
+ */
 export function WhyIndexScreen() {
   const decisions = useDecisions();
   const items = decisions.data?.items;
@@ -23,7 +28,7 @@ export function WhyIndexScreen() {
     <>
       <PageTitle
         title="Why each decision"
-        lead="Each saved decision has a plain-language explanation, checked against the calculator before you see it."
+        lead="Why each decision came out the way it did. Explanations are checked against the calculator before you see them; an emergency fund has no tax rule to explain, so its page shows the calculator's result."
       />
       {decisions.isError ? (
         <Notice tone="warning" role="alert">
@@ -60,6 +65,7 @@ export function WhyIndexScreen() {
                     </Link>
                     <div className="text-small text-ink-3">
                       v{current.version} · Saved {formatDate(current.created_at)}
+                      {!isExplained(calculator) && ' · Calculator result, no written explanation'}
                     </div>
                   </div>
                 </li>
