@@ -11,6 +11,8 @@ decision holds the rate chosen, the stub what goes in now (issue 132).
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
@@ -33,6 +35,7 @@ __all__ = [
     "BENEFITS_PASSAGES",
     "BENEFITS_QUERIES",
     "ExplainSetup",
+    "context_digest",
     "explain_context",
     "explain_setup",
     "health_notes",
@@ -522,6 +525,20 @@ def explain_context(
     )
 
 
+def context_digest(context: ExplainContext) -> str:
+    """The SHA-256 (lowercase hex) of the context as canonical JSON (spec 008
+    rule 19a): sorted keys, no whitespace, UTF-8. The context holds every fact,
+    note and passage a run is written from and checked against, so two runs
+    with the same digest were given the same things."""
+    canonical = json.dumps(
+        context.model_dump(mode="json"),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 @dataclass(frozen=True)
 class ExplainSetup:
     """Everything a run of ``verify.flow.run_explain`` takes besides the model,
@@ -531,6 +548,11 @@ class ExplainSetup:
     allowed_numbers: AllowedNumbers
     citation_keys: frozenset[str]
     fallback: ExplanationDraft
+
+    @property
+    def digest(self) -> str:
+        """What every row of a run from this setup stores (rule 19a)."""
+        return context_digest(self.context)
 
 
 def explain_setup(

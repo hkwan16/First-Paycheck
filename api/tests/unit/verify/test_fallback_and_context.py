@@ -22,6 +22,7 @@ from retrieval.context import (
     NO_STUB_NOTE,
     STUB_DIFFERS_NOTE,
     STUB_SAME_NOTE,
+    context_digest,
     explain_context,
     explain_setup,
     name_numbers,
@@ -256,6 +257,42 @@ def test_context_for_issue_132() -> None:
     # Notes add no number a draft could repeat ("401(k)" is a name, not a figure).
     for note in (STUB_DIFFERS_NOTE, STUB_SAME_NOTE, NO_STUB_NOTE):
         assert extract_numbers(note) == [], note
+
+
+def test_context_digest_follows_the_facts() -> None:
+    """Spec 008 rule 19a: the digest is the context's, so it changes exactly when
+    what a run would be given changes."""
+    inputs, result = decision("issue-132")
+
+    def digest(
+        pay_stub_pct: Decimal | None,
+        passages: list[BenefitsPassage] | None = None,
+        citations: list[Citation] = SEEDED,
+    ) -> str:
+        setup = explain_setup(
+            "k401_match", inputs, result, citations, passages or [], pay_stub_pct=pay_stub_pct
+        )
+        assert setup.digest == context_digest(setup.context)
+        return setup.digest
+
+    at_three = digest(Decimal("3.00"))
+    assert len(at_three) == 64
+    assert set(at_three) <= set("0123456789abcdef")
+    # The same facts: the same digest, and the rate is compared by value.
+    assert digest(Decimal("3.00")) == at_three
+    assert digest(Decimal("3")) == at_three
+    # Any other input to the context: another digest.
+    others = {
+        digest(None),
+        digest(Decimal("5.00")),
+        digest(
+            Decimal("3.00"),
+            [BenefitsPassage(uuid.uuid4(), 0, "Matching vests after a year.", 0.1)],
+        ),
+        digest(Decimal("3.00"), citations=SEEDED[:-1]),
+    }
+    assert at_three not in others
+    assert len(others) == 4
 
 
 def test_context_without_a_pay_stub() -> None:

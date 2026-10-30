@@ -93,7 +93,11 @@ td.gap { width: 6%; border-top: 0; }
       <tr>{% for figure in pair %}{% if not loop.first %}<td class="gap"></td>{% endif %}<td class="label">{{ figure.label }}</td><td class="num">{{ figure | figure }}</td>{% endfor %}{% if pair | length == 1 %}<td class="gap"></td><td></td><td></td>{% endif %}</tr>
 {% endfor %}
     </table>
+{% if decision.explanation.stale %}
+    <p class="status stale">{{ stale_label }}</p>
+{% else %}
     <p class="status {{ decision.explanation.status }}">{{ explanation_labels[decision.explanation.status] }}</p>
+{% endif %}
   </div>
 {% else %}
   <p class="muted">No decisions saved yet.</p>
@@ -140,6 +144,9 @@ td.gap { width: 6%; border-top: 0; }
 {% for decision in explained %}
   <div class="why">
     <h3>{{ calculator_titles[decision.calculator] }}</h3>
+{% if decision.explanation.stale %}
+    <p class="status stale">{{ stale_label }}</p>
+{% else %}
     <p class="status {{ decision.explanation.status }}">{{ explanation_labels[decision.explanation.status] }}</p>
     <p class="concept">{{ decision.explanation.concept }}</p>
 {% for paragraph in decision.explanation.text.split("\n\n") %}
@@ -151,6 +158,7 @@ td.gap { width: 6%; border-top: 0; }
       <li>{{ citation.title }} ({{ citation.source }}): <span class="url">{{ citation.url }}</span></li>
 {% endfor %}
     </ul>
+{% endif %}
 {% endif %}
   </div>
 {% else %}

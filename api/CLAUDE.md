@@ -193,8 +193,8 @@ Rules:
   `0011_no_model_reason`, `0009_w4_calendar_kind`, `0012_checkin_findings`,
   `0013_plan_export_job`, `0014_delete_account_fn`, `0015_loan_account_kind`,
   `0016_rule_match_contains`, `0017_document_replaced_by`,
-  `0018_check_in_last_run_at` (each revises the one before it); the head is
-  `0018_check_in_last_run_at`.
+  `0018_check_in_last_run_at`, `0019_explanation_context_digest` (each revises
+  the one before it); the head is `0019_explanation_context_digest`.
 - Adding an enum label is `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with
   `AFTER` when the order means something, as `by_kind` does for
   `account_kind`); the downgrade maps the rows that use it and rebuilds the
@@ -326,10 +326,21 @@ explanation, `GET /calendar` shows the check it implies.
   verifier checks numbers and citations only; whether drafts call the chosen
   rate the one in effect is the explain eval's `rate_framing` metric, read by
   `Gateway.judge_rate_claim`, not a check. The gateway sends `explain/v2`; fallback rows are `fallback/v3`.
+- **An explanation goes out of date** (spec 008 rule 19a, issue 161). Every
+  row of a run stores `context_digest`, the SHA-256 of the `ExplainContext` it
+  was written from (`retrieval/context.py:context_digest`, `ExplainSetup.digest`).
+  `GET /decisions/{id}/explanation` and `GET /plan` rebuild the context the
+  decision would be explained from now (`routers/explain.py:current_setup`:
+  citations, benefits passages, the newest stub's rate; reads only) and report
+  `stale` (`is_stale`) when the digest differs, is null (rows before `0018`) or
+  the row's `prompt_version` is not what a run writes now. `POST /explain`
+  without `force` returns the latest verified row only while it is current. A
+  row written in a test that should read as current needs the current digest
+  and versions (`tests/support/plan_user.py:current_digest`).
 - **No transaction across a model call.** `POST /explain` takes `UserSessions`
   (a factory, `app/deps.py`): read in one session, call the gateway with none
-  open, write in a second. `LlmGateway` is lazy, so a 404 or a stored verified
-  explanation needs no model; an unconfigured model is 503 `llm_unavailable`.
+  open, write in a second. `LlmGateway` is lazy, so a 404 or a stored current
+  verified explanation needs no model; an unconfigured model is 503 `llm_unavailable`.
   A run that reaches the model counts against `ratelimit.EXPLAIN_RUNS` (30 per
   clock hour, 429 with `Retry-After`); stored answers, 404s and 503s are free.
 - **IRS passages** are curated in `db/seed/irs_citations/<prefix>.yaml`,
@@ -577,7 +588,7 @@ table `plan_exports` (`enable_rls`, SELECT and INSERT only).
   current decisions in `calculator_kind` order with `figures` (fields copied by
   their path, `inputs.x` or `result.plans[i].y`; no arithmetic, a test follows
   every key), the explanation status from the latest row (`verified`,
-  `fallback`, `none`) with its citations, `GET /goals`'s goals (`goal_out`),
+  `fallback`, `none`) with its citations and `stale`, `GET /goals`'s goals (`goal_out`),
   upcoming events from today to today + 90 days ordered by `due_at`, `kind`,
   `id`, the newest pay stub and `completeness`. A total the plan needs belongs
   in `calc/`, not here.

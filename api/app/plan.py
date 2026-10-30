@@ -18,7 +18,7 @@ from sqlalchemy import column, select, table
 from sqlalchemy.orm import Session
 
 from app.routers.calendar import CalendarEventOut
-from app.routers.explain import CitationOut
+from app.routers.explain import CitationOut, current_setup, is_explainable, is_stale
 from app.routers.goals import GoalOut, goal_out
 from app.types import UtcDateTime
 from calc.registry import calculator
@@ -65,6 +65,8 @@ class PlanExplanation(BaseModel):
     text: str | None
     created_at: UtcDateTime | None
     citations: list[CitationOut]
+    # Spec 008 rule 19a, as GET /decisions/{id}/explanation reports it; false for none.
+    stale: bool
 
 
 class PlanDecision(BaseModel):
@@ -234,11 +236,23 @@ def _explanation(session: Session, decision: Decision) -> PlanExplanation:
     ).first()
     if row is None or not (row.verified or row.fallback):
         return PlanExplanation(
-            status="none", id=None, concept=None, text=None, created_at=None, citations=[]
+            status="none",
+            id=None,
+            concept=None,
+            text=None,
+            created_at=None,
+            citations=[],
+            stale=False,
         )
     # The emergency fund has no tax year and no IRS passages (spec 011).
     year = decision.inputs.get("tax_year")
     known = for_calculator(session, decision.calculator, int(year)) if year is not None else []
+    # A row for a calculator that is not explained (none is ever written) is not current.
+    stale = (
+        is_stale(row, current_setup(session, decision, known))
+        if is_explainable(decision.calculator)
+        else True
+    )
     return PlanExplanation(
         status="verified" if row.verified else "fallback",
         id=row.id,
@@ -255,6 +269,7 @@ def _explanation(session: Session, decision: Decision) -> PlanExplanation:
             )
             for citation in by_key(known, row.citations)
         ],
+        stale=stale,
     )
 
 

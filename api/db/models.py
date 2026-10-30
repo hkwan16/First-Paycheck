@@ -824,6 +824,7 @@ class Explanation(Base):
         CheckConstraint("jsonb_typeof(what_ifs) = 'array'", name="what_ifs_array"),
         CheckConstraint("jsonb_typeof(citations) = 'array'", name="citations_array"),
         CheckConstraint("jsonb_typeof(verification) = 'object'", name="verification_object"),
+        CheckConstraint("context_digest ~ '^[0-9a-f]{64}$'", name="context_digest_sha256"),
         ForeignKeyConstraint(
             ["finding_id", "user_id"],
             ["check_in_findings.id", "check_in_findings.user_id"],
@@ -852,6 +853,9 @@ class Explanation(Base):
     fallback: Mapped[bool] = mapped_column(Boolean)
     # The verifier's counts (spec 008 rule 14).
     verification: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=_JSON_OBJECT)
+    # SHA-256 of the context the run was written from (spec 008 rule 19a); null
+    # on rows written before 0018, which therefore read as out of date.
+    context_digest: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=_CLOCK_TIMESTAMP
     )

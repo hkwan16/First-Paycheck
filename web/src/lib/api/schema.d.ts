@@ -335,7 +335,8 @@ export interface paths {
     };
     /**
      * Get Explanation
-     * @description The decision's latest explanation; 404 when it has none.
+     * @description The decision's latest explanation, ``stale`` when written from other facts
+     *     than it would be now (rule 19a); 404 when it has none.
      */
     get: operations['get_explanation'];
     put?: never;
@@ -441,7 +442,8 @@ export interface paths {
     put?: never;
     /**
      * Explain
-     * @description Explain a decision; returns the existing verified explanation unless ``force``.
+     * @description Explain a decision; returns the stored verified explanation while it is
+     *     current, unless ``force`` (rule 20).
      */
     post: operations['explain'];
     delete?: never;
@@ -1752,6 +1754,8 @@ export interface components {
       prompt_version: string;
       /** Retries */
       retries: number;
+      /** Stale */
+      stale: boolean;
       /** Text */
       text: string;
       verification: components['schemas']['VerificationOut'];
@@ -2678,6 +2682,8 @@ export interface components {
       created_at: string | null;
       /** Id */
       id: string | null;
+      /** Stale */
+      stale: boolean;
       /**
        * Status
        * @enum {string}

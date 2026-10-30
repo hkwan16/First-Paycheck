@@ -145,6 +145,12 @@ def test_explanation_status_from_the_latest_row(
         ["health.hsa_limit"],
     )
     assert decisions["w4"]["explanation"]["status"] == "verified"
+    # The plan user's rows carry the current digests and versions (spec 008 rule 19a).
+    assert [k401["stale"], health["stale"], decisions["w4"]["explanation"]["stale"]] == [
+        False,
+        False,
+        False,
+    ]
     assert decisions["emergency_fund"]["explanation"] == {
         "status": "none",
         "id": None,
@@ -152,6 +158,7 @@ def test_explanation_status_from_the_latest_row(
         "text": None,
         "created_at": None,
         "citations": [],
+        "stale": False,
     }
 
 

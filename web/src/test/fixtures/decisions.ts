@@ -204,6 +204,7 @@ export function sampleExplanation(overrides: Partial<Explanation> = {}): Explana
       citations_unknown: [],
       has_citation: true,
     },
+    stale: false,
     created_at: '2026-10-17T15:59:30Z',
     ...overrides,
   };
