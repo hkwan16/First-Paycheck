@@ -228,6 +228,13 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   `calc.pay_dates.PERIODS`, exact, null without a frequency, never stored. The
   web offers it as the starting salary in the plan details form, which saves
   it with `PUT /profile`; the API never writes the profile from a stub.
+  It also adds `retirement_contribution_pct` (rule 24b): the retirement line as
+  a share of gross, two places half up, from
+  `calc/pay_stub.py:retirement_contribution_pct` over `calc.money.rate_pct`
+  (the same arithmetic as spec 015's `actual_pct`), null without a positive
+  gross, never stored. The 401(k) card starts from it when nothing is saved,
+  and `POST /explain` states it beside the chosen rate (spec 008 rule 7a).
+  `app/routers/pay_stubs.py:newest_pay_stub` is the newest stub in that order.
 - Refusal, a spent budget, no readable page or no model (no gateway, or
   `LLMMisconfigured`: the API rejected the key or the model id) make the
   document `manual_entry_required` on the first attempt; schema and other API

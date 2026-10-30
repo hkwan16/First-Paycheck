@@ -2521,6 +2521,11 @@ export interface components {
       period_start: string;
       /** Retirement Contribution Cents */
       retirement_contribution_cents: number;
+      /**
+       * Retirement Contribution Pct
+       * @description retirement_contribution_cents as a percentage of gross_cents, two places half up (spec 005 rule 24b): the 401(k) rate this paycheck shows. Null without a positive gross. Computed on read, never stored.
+       */
+      readonly retirement_contribution_pct: string | null;
       /** Social Security Cents */
       social_security_cents: number;
       /** State Tax Cents */

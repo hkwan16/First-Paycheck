@@ -20,7 +20,8 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from calc.cashflow import LINES, LineKey
-from calc.checkin import change_cents, expected_deferral_cents, goal_pace, rate_pct
+from calc.checkin import change_cents, expected_deferral_cents, goal_pace
+from calc.money import rate_pct
 from calc.pay_dates import add_months
 from db.enums import (
     CalendarKind,

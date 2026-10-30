@@ -136,7 +136,7 @@ SPEC_006 = Path(__file__).resolve().parents[2] / "docs" / "specs" / "006-401k-ma
 def test_every_spec_006_example_is_a_case() -> None:
     """The example table's test names (`test_x_y`) are the case ids (`spec-006-x-y`)."""
     names = re.findall(r"^\| \w+ \| `test_(\w+)`", SPEC_006.read_text(), flags=re.MULTILINE)
-    assert len(names) == 12
+    assert len(names) == 13
     ids = {case.id for case in calc.load_cases()}
     for name in names:
         assert f"spec-006-{name.replace('_', '-')}" in ids, name

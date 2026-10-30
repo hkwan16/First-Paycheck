@@ -292,6 +292,25 @@ def test_zero_contribution() -> None:
     )
 
 
+def test_stub_01_rate_with_a_half_cent_tie() -> None:
+    # Issue 132: stub-01's $3,653.85 biweekly is 9,500,010 a year and shows 3%.
+    # E_full is 475,000.50 exactly, which rounds half up to 475,001.
+    expect(
+        run(9_500_010, 26, TIERED, "3"),
+        full_pct="5",
+        match_cur=285_000,
+        match_full=380_000,
+        missed=95_000,
+        emp_cur=285_000,
+        emp_full=475_001,
+        per_pp=7_308,
+        after_tax=5_700,
+        rate="22",
+        limit=2_450_000,
+        capped=False,
+    )
+
+
 # ---------------------------------------------------------------- edge cases
 
 

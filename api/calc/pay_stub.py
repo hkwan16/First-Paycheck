@@ -1,5 +1,6 @@
-"""Pay stub arithmetic: the confirm gate (spec 005 rule 21, spec amendment 17)
-and the yearly salary a stub implies (spec 005 rule 24a).
+"""Pay stub arithmetic: the confirm gate (spec 005 rule 21, spec amendment 17),
+the yearly salary a stub implies (spec 005 rule 24a) and the 401(k) rate it
+shows (spec 005 rule 24b).
 
 Gross minus every deduction must equal net, to the cent. The server checks it
 on ``POST /docs/{id}/confirm`` (a 422 with this diff), the client checks it as
@@ -9,15 +10,27 @@ the user edits, and the ``pay_stub_balances`` constraint is the backstop.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from decimal import Decimal
+from enum import StrEnum
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from calc.money import rate_pct
 from calc.pay_dates import PERIODS, PayFrequency
 
 Cents = Annotated[int, Field(strict=True)]
 
-__all__ = ["Balance", "PayStubAmounts", "annual_salary_cents", "balance", "total_cents"]
+__all__ = [
+    "Balance",
+    "PayStubAmounts",
+    "StubRate",
+    "annual_salary_cents",
+    "balance",
+    "retirement_contribution_pct",
+    "stub_rate",
+    "total_cents",
+]
 
 
 class PayStubAmounts(BaseModel):
@@ -63,6 +76,34 @@ def annual_salary_cents(gross_cents: int, pay_frequency: PayFrequency | None) ->
     if pay_frequency is None:
         return None
     return gross_cents * PERIODS[pay_frequency]
+
+
+def retirement_contribution_pct(retirement_cents: int, gross_cents: int) -> Decimal | None:
+    """The 401(k) rate a stub shows: the retirement deduction as a percentage
+    of this paycheck's gross, exact, then two places half up (spec 005 rule 24b).
+
+    10,962 of 365,385 is 3.00; nothing withheld is 0.00. None when the gross
+    is not positive, so there is nothing to take a share of.
+    """
+    if gross_cents <= 0:
+        return None
+    return rate_pct(retirement_cents, gross_cents)
+
+
+class StubRate(StrEnum):
+    """What the newest confirmed pay stub says about a chosen 401(k) rate
+    (spec 008 rule 7a)."""
+
+    NONE = "none"  # no confirmed stub: what goes in now is not known
+    CHOSEN = "chosen"  # the stub shows the chosen rate: it is in effect
+    OTHER = "other"  # the stub shows another rate: the chosen one is not in effect yet
+
+
+def stub_rate(chosen: Decimal, pay_stub_pct: Decimal | None) -> StubRate:
+    """Compare the rates by value, so 3.00 on the stub is a chosen 3."""
+    if pay_stub_pct is None:
+        return StubRate.NONE
+    return StubRate.CHOSEN if pay_stub_pct == chosen else StubRate.OTHER
 
 
 def balance(amounts: PayStubAmounts) -> Balance:
