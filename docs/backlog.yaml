@@ -1864,3 +1864,16 @@ issues:
     priority: Low
     status: done
     # Fixed October 30: the panel reports an import only while its account exists.
+  - title: "Spending's Transactions card follows the period picker"
+    body: >-
+      On the Spending screen, picking an earlier month changes the summary
+      and the cash flow, but the Transactions card keeps listing the newest
+      transactions, and the diagram's category popovers list only the rows
+      on that newest page. GET /transactions takes start and end (spec 003
+      rule 17); the cards never sent them. Change spec 003 first. Failing
+      test first.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: done
+    # Fixed October 30: spec 003 rule 17a. The card and the popovers read the summary's period.
