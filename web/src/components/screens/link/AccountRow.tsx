@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useAccountTransactionCount, useUpdateAccount } from '@/lib/api/hooks';
 import { apiErrorMessage } from '@/lib/api/errors';
 import type { Account } from '@/lib/api/types';
-import { maskLabel } from '@/lib/accounts';
+import { institutionName, maskLabel } from '@/lib/accounts';
 import {
   institutionInitials,
   patchForRole,
@@ -59,7 +59,7 @@ export function AccountRow({ account }: { account: Account }) {
     <div role="group" aria-labelledby={nameId} className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <IconTile tone="blue" label={institutionInitials(account.institution_name)} />
+          <IconTile tone="blue" label={institutionInitials(institutionName(account))} />
           <div className="min-w-0">
             <div className="font-semibold">
               <span id={nameId}>{account.name}</span>

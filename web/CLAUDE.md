@@ -216,7 +216,9 @@ The arrow turns over `--duration-fast`, zero under reduced motion; nothing anima
   sees: findings it retracts show on the check-in's next read.
   An imported CSV account (`provider: 'csv'`) has no Sync now (the API answers 422
   `not_plaid_item`), and its institution is removed, not unlinked (`removalWords` in
-  `components/screens/link/account-format.ts`).
+  `components/screens/link/account-format.ts`). An institution is named by `institutionName`
+  (`lib/accounts.ts`: its name, else "Imported CSV" or "Linked bank") everywhere: the Link
+  group heading, the account's initials tile and the Spending summary (issue 183).
   Documents: `invalidateDocuments` after an upload or extraction, `invalidateAfterConfirm`
   (documents, pay stubs, benefits plans, the profile and the plan) after a confirm. Decisions: `invalidateDecisions` (the list and every
   `GET /decisions/{id}`) and `invalidateAfterDecision` (also calendar, plan and goals) after a save.
