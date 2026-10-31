@@ -12,13 +12,15 @@ from llm.schemas import (
     BenefitsExtraction,
     BenefitsSummaryExtraction,
     CategoryBatch,
+    ClaimDraft,
     ExplanationDraft,
     ExtractedField,
     NumberClaim,
     PayStubExtraction,
-    RateClaimDraft,
     RateClaimRequest,
     RateClaimVerdict,
+    WithholdingClaimRequest,
+    WithholdingClaimVerdict,
 )
 
 
@@ -203,7 +205,44 @@ def test_registry_names_every_schema() -> None:
         "BenefitsSummaryExtraction": BenefitsSummaryExtraction,
         "ExplanationDraft": ExplanationDraft,
         "RateClaimVerdict": RateClaimVerdict,
+        "WithholdingClaimVerdict": WithholdingClaimVerdict,
     } == SCHEMAS
+
+
+def test_withholding_claim_request_holds_the_amounts_outcomes_and_draft() -> None:
+    """Spec 008 rule 24d: the judge reads both withholdings, both outcomes and the
+    draft's words, nothing else."""
+    request = WithholdingClaimRequest(
+        entries_withholding="$423.16",
+        pay_stub_withholding="$272.44",
+        entries_outcome="a refund of $0.02",
+        pay_stub_outcome="a balance due of $3,918.70",
+        draft=ClaimDraft(concept="c", text="t", what_ifs=[]),
+    )
+    assert request.model_dump(mode="json") == {
+        "entries_withholding": "$423.16",
+        "pay_stub_withholding": "$272.44",
+        "entries_outcome": "a refund of $0.02",
+        "pay_stub_outcome": "a balance due of $3,918.70",
+        "draft": {"concept": "c", "text": "t", "what_ifs": []},
+    }
+    with pytest.raises(ValidationError):
+        WithholdingClaimRequest.model_validate({**request.model_dump(), "chosen_rate": "5%"})
+
+
+def test_withholding_claim_verdict_quotes_a_sentence_exactly_when_it_claims() -> None:
+    claim = WithholdingClaimVerdict(
+        reason="It calls the entries' $423.16 what is withheld now.",
+        claims_entries_in_effect=True,
+        sentence="Your employer withholds $423.16 from each paycheck.",
+    )
+    assert claim.sentence == "Your employer withholds $423.16 from each paycheck."
+    none = WithholdingClaimVerdict(reason="Only the stub is now.", claims_entries_in_effect=False)
+    assert none.sentence is None
+    with pytest.raises(ValidationError, match="sentence"):
+        WithholdingClaimVerdict(reason="r", claims_entries_in_effect=True, sentence=None)
+    with pytest.raises(ValidationError, match="sentence"):
+        WithholdingClaimVerdict(reason="r", claims_entries_in_effect=False, sentence="It does.")
 
 
 def test_rate_claim_request_holds_the_three_rates_and_the_draft() -> None:
@@ -212,7 +251,7 @@ def test_rate_claim_request_holds_the_three_rates_and_the_draft() -> None:
         chosen_rate="5%",
         pay_stub_rate=None,
         full_match_rate="5%",
-        draft=RateClaimDraft(concept="c", text="t", what_ifs=["w"]),
+        draft=ClaimDraft(concept="c", text="t", what_ifs=["w"]),
     )
     assert request.model_dump(mode="json") == {
         "chosen_rate": "5%",
@@ -221,7 +260,7 @@ def test_rate_claim_request_holds_the_three_rates_and_the_draft() -> None:
         "draft": {"concept": "c", "text": "t", "what_ifs": ["w"]},
     }
     with pytest.raises(ValidationError):
-        RateClaimDraft.model_validate({"concept": "c", "text": "t", "what_ifs": [], "numbers": []})
+        ClaimDraft.model_validate({"concept": "c", "text": "t", "what_ifs": [], "numbers": []})
 
 
 def test_rate_claim_verdict_quotes_a_sentence_exactly_when_it_claims() -> None:

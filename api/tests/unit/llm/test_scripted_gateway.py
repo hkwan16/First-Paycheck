@@ -24,13 +24,15 @@ from llm.gateway import (
     reply_with,
 )
 from llm.schemas import (
+    ClaimDraft,
     ExplainCitation,
     ExplainContext,
     ExplainFact,
     ExplanationDraft,
-    RateClaimDraft,
     RateClaimRequest,
     RateClaimVerdict,
+    WithholdingClaimRequest,
+    WithholdingClaimVerdict,
 )
 
 NOW = dt.datetime(2026, 10, 21, 15, 0, tzinfo=dt.UTC)
@@ -100,7 +102,7 @@ REQUEST = RateClaimRequest(
     chosen_rate="5%",
     pay_stub_rate="3%",
     full_match_rate="5%",
-    draft=RateClaimDraft(concept="c", text="You are already contributing 5%.", what_ifs=[]),
+    draft=ClaimDraft(concept="c", text="You are already contributing 5%.", what_ifs=[]),
 )
 CLAIM = RateClaimVerdict(
     reason="It calls the chosen 5% current while the stub shows 3%.",
@@ -120,3 +122,32 @@ def test_the_judge_is_scripted_and_the_fake_reads_no_claim() -> None:
         ("explain", "judge_rate_claim/v1"),
     ]
     assert json.loads(str(gateway.contents[0])) == REQUEST.model_dump(mode="json")
+
+
+WITHHOLDING_REQUEST = WithholdingClaimRequest(
+    entries_withholding="$423.16",
+    pay_stub_withholding="$272.44",
+    entries_outcome="a refund of $0.02",
+    pay_stub_outcome="a balance due of $3,918.70",
+    draft=ClaimDraft(
+        concept="c", text="Your employer withholds $423.16 from each paycheck.", what_ifs=[]
+    ),
+)
+WITHHOLDING_CLAIM = WithholdingClaimVerdict(
+    reason="It calls the entries' $423.16 what is withheld now; the stub withholds $272.44.",
+    claims_entries_in_effect=True,
+    sentence="Your employer withholds $423.16 from each paycheck.",
+)
+
+
+def test_the_withholding_judge_is_scripted_and_the_fake_reads_no_claim() -> None:
+    """Spec 008 rule 24d: the same as the rate-claim judge, on its own prompt."""
+    gateway, ledger = scripted(reply_with(WITHHOLDING_CLAIM), None)
+    assert gateway.judge_withholding_claim(USER, WITHHOLDING_REQUEST) == WITHHOLDING_CLAIM
+    default = gateway.judge_withholding_claim(USER, WITHHOLDING_REQUEST)
+    assert (default.claims_entries_in_effect, default.sentence) == (False, None)
+    assert [(entry.purpose.value, entry.prompt_version) for entry in ledger.entries] == [
+        ("explain", "judge_withholding_claim/v1"),
+        ("explain", "judge_withholding_claim/v1"),
+    ]
+    assert json.loads(str(gateway.contents[0])) == WITHHOLDING_REQUEST.model_dump(mode="json")

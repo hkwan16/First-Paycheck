@@ -30,6 +30,13 @@
   "explain-smoke": {
     "flow_correct": 1.0
   },
+  "explain-w4": {
+    "cited": 1.0,
+    "first_try_verified": 1.0,
+    "judge_accuracy": 1.0,
+    "no_fallback": 1.0,
+    "withholding_framing": 1.0
+  },
   "extraction": {
     "document_accuracy": 1.0,
     "field_accuracy": 1.0

@@ -27,26 +27,20 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from typing import Protocol
 
-from app.config import Settings
 from db.seed.load import SEED_CSV, read_seed_rules
 from evals.gen.transactions import DEFAULT_CSV, Row, read_csv
-from evals.suites.base import Budget, Suite, SuiteResult, SuiteUnavailable
+from evals.suites.base import Budget, Suite, SuiteResult
+from evals.suites.live import live_gateway
 from llm.gateway import (
-    MICROCENTS_PER_CENT,
     CategorizeItem,
-    LedgerEntry,
     LLMError,
-    LLMGateway,
     LLMRefused,
-    MemoryLedger,
 )
 from llm.schemas import CategoryBatch
 from sync.categories import is_money_in
 from sync.categorize import BATCH_SIZE, RuleBook, Unit, normalize_merchant
 
 EVAL_USER = uuid.UUID("00000000-0000-4000-8000-0000000ca7e9")
-# The gateway's per-user daily cap is not the eval's limit: --max-cost-cents is.
-UNCAPPED_DAILY_CENTS = 1_000_000
 
 
 class CategoryLabeler(Protocol):
@@ -156,29 +150,10 @@ def score(
     )
 
 
-def _settings() -> Settings:
-    return Settings()
-
-
 def run(budget: Budget) -> SuiteResult:
-    settings = _settings()
-    if settings.anthropic_api_key is None:
-        raise SuiteUnavailable("ANTHROPIC_API_KEY is not set")
-    spent: list[float] = []
-
-    def charge(entry: LedgerEntry) -> None:
-        cents = entry.cost_microcents / MICROCENTS_PER_CENT
-        spent.append(cents)
-        budget.charge(cents)
-
-    gateway = LLMGateway(
-        settings.model_copy(
-            update={"llm_fake": False, "llm_daily_budget_cents": UNCAPPED_DAILY_CENTS}
-        ),
-        ledger=MemoryLedger(on_record=charge),
-    )
-    result = score(read_csv(DEFAULT_CSV), gateway)
-    return replace(result, cost_cents=sum(spent))
+    live = live_gateway(budget)
+    result = score(read_csv(DEFAULT_CSV), live.gateway)
+    return replace(result, cost_cents=live.spent_cents)
 
 
 SUITE = Suite(name="categorization", llm=True, run=run)

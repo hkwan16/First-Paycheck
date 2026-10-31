@@ -25,6 +25,7 @@ __all__ = [
     "CategoryAssignment",
     "CategoryBatch",
     "Cents",
+    "ClaimDraft",
     "DateField",
     "ExplainCitation",
     "ExplainContext",
@@ -44,10 +45,11 @@ __all__ = [
     "PlanExtraction",
     "PlanKindField",
     "PlanKindValue",
-    "RateClaimDraft",
     "RateClaimRequest",
     "RateClaimVerdict",
     "TextField",
+    "WithholdingClaimRequest",
+    "WithholdingClaimVerdict",
     "YearsField",
 ]
 
@@ -256,8 +258,9 @@ class ExplainContext(_Strict):
     benefits_passages: list[str]
 
 
-class RateClaimDraft(_Strict):
-    """The words of an explanation the rate-claim judge reads (spec 008 rule 24a)."""
+class ClaimDraft(_Strict):
+    """The words of an explanation an eval judge reads: the rate-claim judge's
+    (spec 008 rule 24a) and the withholding-claim judge's (rule 24d)."""
 
     concept: str
     text: str
@@ -273,7 +276,7 @@ class RateClaimRequest(_Strict):
     pay_stub_rate: str | None
     # None: the plan has no employer match.
     full_match_rate: str | None
-    draft: RateClaimDraft
+    draft: ClaimDraft
 
 
 class RateClaimVerdict(_Strict):
@@ -306,6 +309,55 @@ class RateClaimVerdict(_Strict):
         return self
 
 
+class WithholdingClaimRequest(_Strict):
+    """What ``judge_withholding_claim`` sends: the explain-w4 eval's question about
+    one final row, with amounts formatted like the explain facts ("$423.16") and
+    each outcome in words ("a balance due of $3,918.70")."""
+
+    entries_withholding: str
+    # None: no confirmed pay stub on the decision's schedule, so what is withheld
+    # now is not known.
+    pay_stub_withholding: str | None
+    entries_outcome: str
+    # None exactly when pay_stub_withholding is.
+    pay_stub_outcome: str | None
+    draft: ClaimDraft
+
+
+class WithholdingClaimVerdict(_Strict):
+    """``judge_withholding_claim`` output (spec 008 rule 24d): whether the draft says
+    the withholding the W-4 entries give, or the projection with them, is what
+    happens now, and the sentence that says so. It measures a draft in the eval
+    and never gates one."""
+
+    reason: str = Field(
+        description=(
+            "One or two sentences: which withholding each present-tense sentence describes,"
+            " worked out before the answer"
+        )
+    )
+    claims_entries_in_effect: bool = Field(
+        description=(
+            "True when a sentence describes the entries' withholding or their projection as"
+            " what happens now"
+        )
+    )
+    sentence: str | None = Field(
+        default=None,
+        description="The first sentence that makes the claim, copied exactly; null when none does",
+    )
+
+    @model_validator(mode="after")
+    def _sentence_exactly_when_claimed(self) -> WithholdingClaimVerdict:
+        quoted = self.sentence is not None and self.sentence.strip() != ""
+        if quoted != self.claims_entries_in_effect:
+            raise ValueError(
+                "sentence must quote the claim when claims_entries_in_effect is true, and be"
+                " null when it is false"
+            )
+        return self
+
+
 SCHEMAS: dict[str, type[BaseModel]] = {
     "CategoryBatch": CategoryBatch,
     "PayStubExtraction": PayStubExtraction,
@@ -313,4 +365,5 @@ SCHEMAS: dict[str, type[BaseModel]] = {
     "BenefitsSummaryExtraction": BenefitsSummaryExtraction,
     "ExplanationDraft": ExplanationDraft,
     "RateClaimVerdict": RateClaimVerdict,
+    "WithholdingClaimVerdict": WithholdingClaimVerdict,
 }

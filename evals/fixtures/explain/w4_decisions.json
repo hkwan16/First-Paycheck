@@ -2,7 +2,7 @@
   {
     "id": "w4-step2-unequal-jobs",
     "calculator": "w4",
-    "note": "Spec 014 example 9: both spouses check Step 2 with unequal pay, so the suggestion is a Step 4(b) entry.",
+    "note": "Spec 014 example 9: both spouses check Step 2 with unequal pay, so the suggestion is a Step 4(b) entry. No pay stub.",
     "inputs": {
       "salary_cents": 9000000,
       "pay_periods_per_year": 26,
@@ -12,8 +12,172 @@
       "other_jobs_wages_cents": 3000000,
       "other_jobs_withholding_cents": 142012
     },
+    "pay_stub_withholding_cents": null,
     "benefits_passages": [
       "Medical premiums are taken from your pay before federal income tax."
     ]
+  },
+  {
+    "id": "issue-181-stub-01",
+    "calculator": "w4",
+    "note": "Spec 014 example 11, the e2e account (issue 181): the entries would withhold $423.16 a paycheck, two cents from even; stub-01 withholds $272.44, which leaves $3,918.70 due. Saved before issue 153, with no stub figure.",
+    "inputs": {
+      "salary_cents": 9500010,
+      "pay_periods_per_year": 26,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "k401_contribution_pct": "5",
+      "age": 24,
+      "health_premium_per_paycheck_cents": 400
+    },
+    "pay_stub_withholding_cents": 27244,
+    "benefits_passages": [
+      "Your medical premium and your 401(k) contributions are deducted before federal income tax is figured."
+    ]
+  },
+  {
+    "id": "stub-withholds-more",
+    "calculator": "w4",
+    "note": "Spec 014 example 12: the stub withholds $297.76 a paycheck, a $2,018.24 refund if nothing changes; the entries would land eight cents from even.",
+    "inputs": {
+      "salary_cents": 6500000,
+      "pay_periods_per_year": 24,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "k401_contribution_pct": "4",
+      "age": 30,
+      "health_premium_per_paycheck_cents": 6250
+    },
+    "pay_stub_withholding_cents": 29776,
+    "benefits_passages": []
+  },
+  {
+    "id": "stub-rounded-to-the-dollar",
+    "calculator": "w4",
+    "note": "Spec 014 example 13: a second job; the stub withholds $147.00, the entries' $146.92 rounded by payroll, and both leave about $2,360 due.",
+    "inputs": {
+      "salary_cents": 5000000,
+      "pay_periods_per_year": 26,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "other_jobs_wages_cents": 2000000,
+      "other_jobs_withholding_cents": 39000
+    },
+    "pay_stub_withholding_cents": 14700,
+    "benefits_passages": []
+  },
+  {
+    "id": "stub-withholds-nothing",
+    "calculator": "w4",
+    "note": "Spec 014 example 14: the stub withholds nothing, so the whole $5,620.00 is due if nothing changes.",
+    "inputs": {
+      "salary_cents": 6500000,
+      "pay_periods_per_year": 26,
+      "filing_status": "single",
+      "tax_year": 2026
+    },
+    "pay_stub_withholding_cents": 0,
+    "benefits_passages": []
+  },
+  {
+    "id": "stub-holds-the-entries",
+    "calculator": "w4",
+    "note": "Spec 014 example 3: the stub withholds the entries' $193.65, so they are in effect.",
+    "inputs": {
+      "salary_cents": 6500000,
+      "pay_periods_per_year": 26,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "k401_contribution_pct": "5",
+      "health_premium_per_paycheck_cents": 6250
+    },
+    "pay_stub_withholding_cents": 19365,
+    "benefits_passages": []
+  },
+  {
+    "id": "credits-cover-the-tax-stub-holds-nothing",
+    "calculator": "w4",
+    "note": "Spec 014 example 6: credits cover the tax, so the entries withhold nothing, and so does the stub.",
+    "inputs": {
+      "salary_cents": 4000000,
+      "pay_periods_per_year": 26,
+      "filing_status": "head_of_household",
+      "tax_year": 2026,
+      "dependents_credit_cents": 440000
+    },
+    "pay_stub_withholding_cents": 0,
+    "benefits_passages": []
+  },
+  {
+    "id": "no-stub-second-job",
+    "calculator": "w4",
+    "note": "Spec 014 example 5 with no pay stub: a balance due, and a Step 4(c) suggestion.",
+    "inputs": {
+      "salary_cents": 5000000,
+      "pay_periods_per_year": 26,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "other_jobs_wages_cents": 2000000,
+      "other_jobs_withholding_cents": 39000
+    },
+    "pay_stub_withholding_cents": null,
+    "benefits_passages": []
+  },
+  {
+    "id": "no-stub-even",
+    "calculator": "w4",
+    "note": "Spec 014 example 1 with no pay stub: ten cents from even.",
+    "inputs": {
+      "salary_cents": 5187000,
+      "pay_periods_per_year": 26,
+      "filing_status": "single",
+      "tax_year": 2026
+    },
+    "pay_stub_withholding_cents": null,
+    "benefits_passages": []
+  },
+  {
+    "id": "extra-withholding-stub-without-it",
+    "calculator": "w4",
+    "note": "Spec 014 example 8: the entries add $100.00 of Step 4(c), a $2,599.90 refund; the stub withholds $216.15, ten cents from even, and the suggestion lowers Step 4(c).",
+    "inputs": {
+      "salary_cents": 6500000,
+      "pay_periods_per_year": 26,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "extra_withholding_cents": 10000
+    },
+    "pay_stub_withholding_cents": 21615,
+    "benefits_passages": []
+  },
+  {
+    "id": "capped-401k-stub-withholds-less",
+    "calculator": "w4",
+    "note": "Spec 014 example 10: a 401(k) at the deferral limit; the stub withholds $1,500.00, $4,464.00 short for the year.",
+    "inputs": {
+      "salary_cents": 25000000,
+      "pay_periods_per_year": 26,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "k401_contribution_pct": "15",
+      "age": 30
+    },
+    "pay_stub_withholding_cents": 150000,
+    "benefits_passages": []
+  },
+  {
+    "id": "other-income-stub-holds-the-entries",
+    "calculator": "w4",
+    "note": "Spec 014 example 7: other income and deductions, semimonthly; the stub withholds the entries' $337.92.",
+    "inputs": {
+      "salary_cents": 8000000,
+      "pay_periods_per_year": 24,
+      "filing_status": "single",
+      "tax_year": 2026,
+      "other_income_cents": 200000,
+      "deductions_cents": 500000
+    },
+    "pay_stub_withholding_cents": 33792,
+    "benefits_passages": []
   }
 ]

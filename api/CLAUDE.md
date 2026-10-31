@@ -112,12 +112,16 @@ Rules:
   edited; a change is a new version.
 - One public method per prompt: `categorize` (`categorize/v3`),
   `extract_pay_stub` (`extract_pay_stub/v1`), `extract_benefits`
-  (`extract_benefits/v2`), `explain` (`explain/v2`) and `judge_rate_claim`
+  (`extract_benefits/v2`), `explain` (`explain/v3`), `judge_rate_claim`
   (`judge_rate_claim/v1`, schema `RateClaimVerdict`; spec 008 rule 24a), the
   explain eval's judge of whether a final explanation calls the chosen 401(k)
-  rate the one in effect. Nothing in `app/` or `jobs/` calls the judge; its
-  front matter names the `explain` purpose, so it runs on
-  `LLM_MODEL_EXPLAIN` with no setting or `llm_purpose` label of its own.
+  rate the one in effect, and `judge_withholding_claim`
+  (`judge_withholding_claim/v1`, schema `WithholdingClaimVerdict`; rule 24d),
+  the explain-w4 eval's judge of whether a final W-4 explanation calls the
+  entries' withholding or their projection what happens now. Nothing in
+  `app/` or `jobs/` calls a judge; their front matter names the `explain`
+  purpose, so they run on `LLM_MODEL_EXPLAIN` with no setting or
+  `llm_purpose` label of their own.
 - `LLM_FAKE=true` swaps in `FakeGateway`, which shares the budget, validation
   and ledger code and answers from `tests/fixtures/llm/` (categorize, extract);
   it writes an explanation from the facts and judges every draft "no claim".
@@ -314,24 +318,39 @@ explanation, `GET /calendar` shows the check it implies.
   text.
 - **The rate chosen is not the rate in effect** (spec 008 rule 7a, issue
   132). A decision's `contribution_pct` is what the person picked;
-  `POST /explain` reads the newest stub's rate in its first session
-  (`routers/pay_stubs.py:newest_pay_stub_rate`) and passes it as
-  `pay_stub_pct` to `retrieval/context.py:explain_setup`, which builds the
-  context (facts `Contribution rate you chose` and `401(k) contribution rate
-  your latest pay stub shows`), the allowed numbers (`pay_stub_numbers`) and
-  the fallback, for the route and the eval suites alike. Which of the three
-  cases holds is `calc/pay_stub.py:stub_rate` (`StubRate.CHOSEN`, `OTHER`,
-  `NONE`), decided once; the context's note and the fallback's sentences are
-  looked up by it. It never goes into the decision, which is immutable. The
-  verifier checks numbers and citations only; whether drafts call the chosen
-  rate the one in effect is the explain eval's `rate_framing` metric, read by
-  `Gateway.judge_rate_claim`, not a check. The gateway sends `explain/v2`; fallback rows are `fallback/v3`.
+  `POST /explain` reads the newest stub in its first session
+  (`routers/pay_stubs.py:newest_pay_stub`, then `pay_stub_rate`) and passes
+  its rate as `pay_stub_pct` to `retrieval/context.py:explain_setup`, which
+  builds the context (facts `Contribution rate you chose` and `401(k)
+  contribution rate your latest pay stub shows`), the allowed numbers
+  (`pay_stub_numbers`) and the fallback, for the route and the eval suites
+  alike. Which of the three cases holds is `calc/pay_stub.py:stub_rate`
+  (`StubRate.CHOSEN`, `OTHER`, `NONE`), decided once; the context's note and
+  the fallback's sentences are looked up by it. It never goes into the
+  decision, which is immutable. The verifier checks numbers and citations
+  only; whether drafts call the chosen rate the one in effect is the explain
+  eval's `rate_framing` metric, read by `Gateway.judge_rate_claim`, not a
+  check. The gateway sends `explain/v3`; fallback rows are `fallback/v4`.
+- **The entries' withholding is not the withholding in effect** (spec 008
+  rule 7b, issue 181), the same pattern for a W-4 decision. The same read of
+  the newest stub gives `pay_stub_withholding_cents`
+  (`routers/pay_stubs.py:pay_stub_withholding`: its `federal_withholding_cents`
+  when `calc/pay_stub.py:withholding_on_schedule` says it is on the decision's
+  pay schedule, else None), read at explain time and never from the
+  decision's own `current_withholding_per_paycheck_cents`.
+  `calc/pay_stub.py:stub_withholding` (`StubWithholding.ENTRIES`, `OTHER`,
+  `NONE`) is the one case; the facts (`Federal income tax these entries would
+  withhold per paycheck`, `Federal income tax your latest pay stub withholds
+  per paycheck`, and for `OTHER` the year and the refund or balance due at the
+  stub from `calc/w4.py:at_withholding`), the notes, the allowed numbers and
+  the fallback follow from it. The explain-w4 eval's `withholding_framing`,
+  read by `Gateway.judge_withholding_claim`, measures the drafts.
 - **An explanation goes out of date** (spec 008 rule 19a, issue 161). Every
   row of a run stores `context_digest`, the SHA-256 of the `ExplainContext` it
   was written from (`retrieval/context.py:context_digest`, `ExplainSetup.digest`).
   `GET /decisions/{id}/explanation` and `GET /plan` rebuild the context the
   decision would be explained from now (`routers/explain.py:current_setup`:
-  citations, benefits passages, the newest stub's rate; reads only) and report
+  citations, benefits passages, the newest stub's rate and withholding; reads only) and report
   `stale` (`is_stale`) when the digest differs, is null (rows before `0018`) or
   the row's `prompt_version` is not what a run writes now. `POST /explain`
   without `force` returns the latest verified row only while it is current. A
@@ -516,7 +535,9 @@ adds the `calendar_kind` label `w4_submit`; no new table or function.
   null so results stored before them still validate
   (`json_schema_serialization_defaults_required`, so the schema still lists
   them as required). Stubs store no year-to-date figures, so the comparison
-  assumes every paycheck of the year withholds the same.
+  assumes every paycheck of the year withholds the same. `at_withholding(data,
+  result, w0)` is rule 10a on its own, over a stored result; `w4()` and the
+  explanation (spec 008 rule 7b) both use it.
 - **Constants.** `calc/data/pub15t_<year>.json` behind `calc.data.pub15t(year)`
   (Worksheet 1A line 1g and the annual STANDARD and Step 2 checkbox tables,
   column B implied by the next row). `tests/unit/calc/test_pub15t_data.py`
@@ -526,7 +547,8 @@ adds the `calendar_kind` label `w4_submit`; no new table or function.
   employer your updated Form W-4") due the next expected pay date; a new
   version dismisses the old one.
 - **Explain.** `retrieval/context.py` has W-4 facts (numbers only) and
-  `w4_notes` (no digits); `verify/fallback.py` writes the W-4 fallback.
+  `w4_notes` (no digits), both beside what the newest stub withholds (spec 008
+  rule 7b, above); `verify/fallback.py` writes the W-4 fallback.
   Citations: `db/seed/irs_citations/w4.yaml` (Pub 15-T web edition, the 2026
   Form W-4, IR-2025-103, the 401(k) Resource Guide). The verifier skips Form
   W-4 step numbers ("Step 2", "Steps 3") the way it skips "Form 1040".

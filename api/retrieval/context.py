@@ -6,7 +6,10 @@ checks this on every spec 006 and spec 012 example). Labels carry no numbers
 of their own; a health plan's name may, and ``name_numbers`` lets the verifier
 accept them (spec 012 rule 16). A 401(k) decision also gets the rate the
 newest confirmed pay stub shows, which is not part of the decision: the
-decision holds the rate chosen, the stub what goes in now (issue 132).
+decision holds the rate chosen, the stub what goes in now (issue 132). A W-4
+decision gets what that stub withholds each paycheck the same way: the
+decision holds what its entries would withhold, the stub what is withheld now
+(issue 181).
 """
 
 from __future__ import annotations
@@ -20,8 +23,8 @@ from typing import Any
 
 from calc.health_plans import HealthPlansInput, HealthPlansResult
 from calc.k401 import K401MatchInput, K401MatchResult
-from calc.pay_stub import StubRate, stub_rate
-from calc.w4 import W4Input, W4Result
+from calc.pay_stub import StubRate, StubWithholding, stub_rate, stub_withholding
+from calc.w4 import AtWithholding, W4Input, W4Result, at_withholding
 from db.enums import CalculatorKind
 from llm.schemas import ExplainCitation, ExplainContext, ExplainFact, ExplanationDraft
 from retrieval.benefits_search import BenefitsPassage
@@ -34,6 +37,9 @@ from verify.numbers import extract_numbers
 __all__ = [
     "BENEFITS_PASSAGES",
     "BENEFITS_QUERIES",
+    "W4_NO_STUB_NOTE",
+    "W4_STUB_DIFFERS_NOTE",
+    "W4_STUB_SAME_NOTE",
     "ExplainSetup",
     "context_digest",
     "explain_context",
@@ -100,12 +106,33 @@ def k401_notes(result: K401MatchResult, *, has_match: bool) -> list[str]:
     return notes
 
 
-def pay_stub_numbers(calculator: str, pay_stub_pct: Decimal | None) -> dict[str, str]:
-    """The pay stub's rate keyed for ``AllowedNumbers.from_decision`` (spec 008
-    rule 12): a ``_pct`` key, so it reads as a percentage."""
-    if calculator != CalculatorKind.K401_MATCH or pay_stub_pct is None:
-        return {}
-    return {"pay_stub_contribution_pct": str(pay_stub_pct)}
+def pay_stub_numbers(
+    calculator: str,
+    inputs: Mapping[str, Any],
+    result: Mapping[str, Any],
+    *,
+    pay_stub_pct: Decimal | None = None,
+    pay_stub_withholding_cents: int | None = None,
+) -> dict[str, Any]:
+    """What the pay stub adds to a decision's figures, keyed for
+    ``AllowedNumbers.from_decision`` (spec 008 rule 12): a 401(k) decision's stub
+    rate under a ``_pct`` key, read as a percentage (rule 7a); a W-4 decision's
+    stub withholding and the year's withholding and refund at it under ``_cents``
+    keys, read as money (rule 7b)."""
+    if calculator == CalculatorKind.K401_MATCH and pay_stub_pct is not None:
+        return {"pay_stub_contribution_pct": str(pay_stub_pct)}
+    if calculator == CalculatorKind.W4 and pay_stub_withholding_cents is not None:
+        at = at_withholding(
+            W4Input.model_validate(inputs),
+            W4Result.model_validate(result),
+            pay_stub_withholding_cents,
+        )
+        return {
+            "pay_stub_withholding_per_paycheck_cents": pay_stub_withholding_cents,
+            "pay_stub_annual_withholding_cents": at.annual_withholding_cents,
+            "pay_stub_refund_cents": at.refund_cents,
+        }
+    return {}
 
 
 def _k401_facts(
@@ -295,9 +322,56 @@ def _health_facts(data: HealthPlansInput, result: HealthPlansResult) -> list[Exp
     return facts
 
 
-REFUND_NOTE = "The projection is a refund: more is withheld than the year's tax."
-BALANCE_DUE_NOTE = "The projection is a balance due: less is withheld than the year's tax."
-EVEN_NOTE = "What is withheld matches the projected tax for the year."
+# Spec 008 rule 7b: what the newest confirmed pay stub withholds against what the
+# W-4 entries would. No digits, like every note ("W-4" is a name, not a figure).
+W4_STUB_SAME_NOTE = (
+    "The latest pay stub withholds what these entries give, so they are already in effect:"
+    " it is what is withheld from each paycheck now."
+)
+W4_STUB_DIFFERS_NOTE = (
+    "The latest pay stub withholds a different amount from what these entries give. The pay"
+    " stub shows what is withheld from each paycheck now; these entries change it only once"
+    " the employer has the new Form W-4, so the projection with them is not what happens now."
+)
+W4_NO_STUB_NOTE = (
+    "No confirmed pay stub on this pay schedule shows what is withheld from each paycheck"
+    " now, so it is not known whether these entries are in effect."
+)
+W4_STUB_NOTES: dict[StubWithholding, str] = {
+    StubWithholding.NONE: W4_NO_STUB_NOTE,
+    StubWithholding.ENTRIES: W4_STUB_SAME_NOTE,
+    StubWithholding.OTHER: W4_STUB_DIFFERS_NOTE,
+}
+# The projection with the entries, by the sign of the refund.
+REFUND_NOTE = (
+    "With these entries the projection is a refund: they would withhold more than the year's tax."
+)
+BALANCE_DUE_NOTE = (
+    "With these entries the projection is a balance due: they would withhold less than the"
+    " year's tax."
+)
+EVEN_NOTE = "With these entries what is withheld would match the projected tax for the year."
+# The outcome at the stub's withholding, when it differs from the entries'.
+STUB_REFUND_NOTE = (
+    "At what the latest pay stub withholds, the year ends in a refund: more is withheld than"
+    " the year's tax."
+)
+STUB_BALANCE_DUE_NOTE = (
+    "At what the latest pay stub withholds, the year ends in a balance due: less is withheld"
+    " than the year's tax."
+)
+STUB_EVEN_NOTE = (
+    "At what the latest pay stub withholds, what is withheld matches the projected tax for the"
+    " year."
+)
+
+
+def _by_sign(cents: int, refund: str, balance_due: str, even: str) -> str:
+    if cents > 0:
+        return refund
+    return balance_due if cents < 0 else even
+
+
 STEP2_NOTE = (
     "Step 2 is checked, so this job's withholding uses half the standard deduction and half"
     " of each tax bracket, on the assumption that the other job pays about the same."
@@ -328,15 +402,34 @@ K401_CAPPED_NOTE = (
 )
 
 
-def w4_notes(data: W4Input, result: W4Result) -> list[str]:
-    """The plain-words situation: refund or balance due, Step 2, the suggestion and
-    the caveats. No digits, so a draft that repeats a note adds no number."""
-    if result.projected_refund_cents > 0:
-        notes = [REFUND_NOTE]
-    elif result.projected_refund_cents < 0:
-        notes = [BALANCE_DUE_NOTE]
-    else:
-        notes = [EVEN_NOTE]
+def _at_stub(
+    data: W4Input, result: W4Result, pay_stub_withholding_cents: int | None
+) -> AtWithholding | None:
+    """Rule 10a's figures at the stub, only when the stub withholds another amount
+    (spec 008 rule 7b): at the entries' own amount they are the projection's."""
+    case = stub_withholding(result.withholding_per_paycheck_cents, pay_stub_withholding_cents)
+    if case is not StubWithholding.OTHER or pay_stub_withholding_cents is None:
+        return None
+    return at_withholding(data, result, pay_stub_withholding_cents)
+
+
+def w4_notes(
+    data: W4Input, result: W4Result, *, pay_stub_withholding_cents: int | None
+) -> list[str]:
+    """The plain-words situation: what the stub says against the entries (spec 008
+    rule 7b), refund or balance due with the entries and at the stub, Step 2, the
+    suggestion and the caveats. No digits, so a draft that repeats a note adds no
+    number."""
+    case = stub_withholding(result.withholding_per_paycheck_cents, pay_stub_withholding_cents)
+    notes = [
+        W4_STUB_NOTES[case],
+        _by_sign(result.projected_refund_cents, REFUND_NOTE, BALANCE_DUE_NOTE, EVEN_NOTE),
+    ]
+    at_stub = _at_stub(data, result, pay_stub_withholding_cents)
+    if at_stub is not None:
+        notes.append(
+            _by_sign(at_stub.refund_cents, STUB_REFUND_NOTE, STUB_BALANCE_DUE_NOTE, STUB_EVEN_NOTE)
+        )
     if data.multiple_jobs:
         notes.append(STEP2_NOTE if data.other_jobs_wages_cents > 0 else STEP2_ALONE_NOTE)
     notes += {
@@ -359,13 +452,43 @@ def _refund_fact(label: str, cents: int) -> ExplainFact:
     return ExplainFact(label=label, value=dollars(cents))
 
 
-def _w4_facts(data: W4Input, result: W4Result) -> list[ExplainFact]:
+def _w4_facts(
+    data: W4Input, result: W4Result, pay_stub_withholding_cents: int | None
+) -> list[ExplainFact]:
+    """Whose each withholding figure is, the entries' or the stub's (spec 008 rule 7b)."""
+
     def fact(label: str, cents: int) -> ExplainFact:
         return ExplainFact(label=label, value=dollars(cents))
 
+    at_stub = _at_stub(data, result, pay_stub_withholding_cents)
     facts = [
-        fact("Federal income tax withheld per paycheck", result.withholding_per_paycheck_cents),
-        fact("Federal income tax withheld per year", result.annual_withholding_cents),
+        fact(
+            "Federal income tax these entries would withhold per paycheck",
+            result.withholding_per_paycheck_cents,
+        )
+    ]
+    if pay_stub_withholding_cents is not None:
+        facts.append(
+            fact(
+                "Federal income tax your latest pay stub withholds per paycheck",
+                pay_stub_withholding_cents,
+            )
+        )
+    facts.append(
+        fact(
+            "Federal income tax these entries would withhold per year",
+            result.annual_withholding_cents,
+        )
+    )
+    if at_stub is not None:
+        facts.append(
+            fact(
+                "Federal income tax withheld per year if every paycheck withholds what your"
+                " latest pay stub does",
+                at_stub.annual_withholding_cents,
+            )
+        )
+    facts += [
         fact(
             "Projected federal income tax for the year before credits", result.projected_tax_cents
         ),
@@ -373,7 +496,13 @@ def _w4_facts(data: W4Input, result: W4Result) -> list[ExplainFact]:
             "Projected federal income tax for the year after credits",
             result.projected_tax_after_credits_cents,
         ),
-        _refund_fact("Projected refund", result.projected_refund_cents),
+        _refund_fact("Projected refund with these entries", result.projected_refund_cents),
+    ]
+    if at_stub is not None:
+        facts.append(
+            _refund_fact("Projected refund at your pay stub's withholding", at_stub.refund_cents)
+        )
+    facts += [
         fact("Projected taxable income", result.projected_taxable_income_cents),
         fact(
             "Wages subject to income tax withholding per paycheck",
@@ -474,9 +603,13 @@ def explain_context(
     passages: Sequence[BenefitsPassage],
     *,
     pay_stub_pct: Decimal | None = None,
+    pay_stub_withholding_cents: int | None = None,
 ) -> ExplainContext:
     """``pay_stub_pct`` is the newest confirmed stub's 401(k) rate (spec 008 rule
-    7a), None without a stub; only a ``k401_match`` decision uses it."""
+    7a), None without a stub; only a ``k401_match`` decision uses it.
+    ``pay_stub_withholding_cents`` is what that stub withholds each paycheck when
+    it is on the decision's pay schedule, else None (rule 7b); only a ``w4``
+    decision uses it."""
     if calculator == CalculatorKind.HEALTH_PLANS:
         plans = HealthPlansInput.model_validate(inputs)
         compared = HealthPlansResult.model_validate(result)
@@ -497,8 +630,10 @@ def explain_context(
         return ExplainContext(
             calculator=calculator,
             tax_year=entries.tax_year,
-            facts=_w4_facts(entries, projected),
-            notes=w4_notes(entries, projected),
+            facts=_w4_facts(entries, projected, pay_stub_withholding_cents),
+            notes=w4_notes(
+                entries, projected, pay_stub_withholding_cents=pay_stub_withholding_cents
+            ),
             citations=[
                 ExplainCitation(key=c.key, title=c.title, passage=c.passage)
                 for c in _ordered(citations, projected.citation_keys)
@@ -542,7 +677,7 @@ def context_digest(context: ExplainContext) -> str:
 @dataclass(frozen=True)
 class ExplainSetup:
     """Everything a run of ``verify.flow.run_explain`` takes besides the model,
-    built once from the same pay stub rate for ``POST /explain`` and the evals."""
+    built once from the same reading of the pay stub for ``POST /explain`` and the evals."""
 
     context: ExplainContext
     allowed_numbers: AllowedNumbers
@@ -563,20 +698,42 @@ def explain_setup(
     passages: Sequence[BenefitsPassage],
     *,
     pay_stub_pct: Decimal | None,
+    pay_stub_withholding_cents: int | None,
 ) -> ExplainSetup:
     """The context, the numbers the verifier allows, the citation keys and the
-    fallback for one decision (spec 008 rules 7-17)."""
+    fallback for one decision (spec 008 rules 7-17), all from the same reading of
+    the newest stub: its 401(k) rate (rule 7a) and what it withholds each
+    paycheck on the decision's pay schedule (rule 7b)."""
     keys = frozenset(citation.key for citation in citations)
     return ExplainSetup(
         context=explain_context(
-            calculator, inputs, result, citations, passages, pay_stub_pct=pay_stub_pct
+            calculator,
+            inputs,
+            result,
+            citations,
+            passages,
+            pay_stub_pct=pay_stub_pct,
+            pay_stub_withholding_cents=pay_stub_withholding_cents,
         ),
         allowed_numbers=AllowedNumbers.from_decision(
             inputs,
             result,
             name_numbers(calculator, inputs),
-            pay_stub_numbers(calculator, pay_stub_pct),
+            pay_stub_numbers(
+                calculator,
+                inputs,
+                result,
+                pay_stub_pct=pay_stub_pct,
+                pay_stub_withholding_cents=pay_stub_withholding_cents,
+            ),
         ),
         citation_keys=keys,
-        fallback=fallback_draft(calculator, inputs, result, keys, pay_stub_pct=pay_stub_pct),
+        fallback=fallback_draft(
+            calculator,
+            inputs,
+            result,
+            keys,
+            pay_stub_pct=pay_stub_pct,
+            pay_stub_withholding_cents=pay_stub_withholding_cents,
+        ),
     )

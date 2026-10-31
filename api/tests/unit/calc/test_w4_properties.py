@@ -8,7 +8,7 @@ from typing import Any
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from calc.w4 import W4Input, w4
+from calc.w4 import W4Input, at_withholding, w4
 
 # Examples per property; tests/support/hypothesis_profiles.py sets the rest.
 EXAMPLES = settings(max_examples=150)
@@ -113,6 +113,23 @@ def test_the_comparison_adds_up(salary: int, rest: dict[str, Any]) -> None:
     assert (
         result.projected_refund_cents - result.current_refund_cents
         == (result.withholding_per_paycheck_cents - current) * periods
+    )
+
+
+@EXAMPLES
+@given(SALARY, entries(), st.integers(0, 500_000))
+def test_at_withholding_matches_the_comparison(
+    salary: int, rest: dict[str, Any], stub: int
+) -> None:
+    """Spec 008 rule 7b: the explanation's figures at the stub, from a result saved
+    with no comparison, are what the calculator gives with that stub."""
+    data = build(salary, rest)
+    saved = w4(data.model_copy(update={"current_withholding_per_paycheck_cents": None}))
+    compared = w4(data.model_copy(update={"current_withholding_per_paycheck_cents": stub}))
+    at = at_withholding(data, saved, stub)
+    assert (at.annual_withholding_cents, at.refund_cents) == (
+        compared.current_annual_withholding_cents,
+        compared.current_refund_cents,
     )
 
 

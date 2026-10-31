@@ -1,6 +1,7 @@
 """Pay stub arithmetic: the confirm gate (spec 005 rule 21, spec amendment 17),
-the yearly salary a stub implies (spec 005 rule 24a) and the 401(k) rate it
-shows (spec 005 rule 24b).
+the yearly salary a stub implies (spec 005 rule 24a), the 401(k) rate it
+shows (spec 005 rule 24b), and what the rate and the federal withholding it
+shows say against a decision (spec 008 rules 7a and 7b).
 
 Gross minus every deduction must equal net, to the cent. The server checks it
 on ``POST /docs/{id}/confirm`` (a 422 with this diff), the client checks it as
@@ -25,11 +26,14 @@ __all__ = [
     "Balance",
     "PayStubAmounts",
     "StubRate",
+    "StubWithholding",
     "annual_salary_cents",
     "balance",
     "retirement_contribution_pct",
     "stub_rate",
+    "stub_withholding",
     "total_cents",
+    "withholding_on_schedule",
 ]
 
 
@@ -104,6 +108,37 @@ def stub_rate(chosen: Decimal, pay_stub_pct: Decimal | None) -> StubRate:
     if pay_stub_pct is None:
         return StubRate.NONE
     return StubRate.CHOSEN if pay_stub_pct == chosen else StubRate.OTHER
+
+
+def withholding_on_schedule(
+    federal_withholding_cents: int, pay_frequency: PayFrequency | None, pay_periods_per_year: int
+) -> int | None:
+    """What a stub withholds each paycheck, when its paycheck is one of
+    ``pay_periods_per_year`` (spec 008 rule 7b, spec 014 rule 10a): None for a
+    stub on another pay schedule, whose paycheck is a different length. A stub
+    with no pay frequency is taken to be on the schedule; a stored 0 is a
+    confirmed amount."""
+    if pay_frequency is not None and PERIODS[pay_frequency] != pay_periods_per_year:
+        return None
+    return federal_withholding_cents
+
+
+class StubWithholding(StrEnum):
+    """What the newest confirmed pay stub says about the federal withholding a
+    W-4 decision's entries give (spec 008 rule 7b)."""
+
+    NONE = "none"  # no stub on the pay schedule: what is withheld now is not known
+    ENTRIES = "entries"  # the stub withholds what the entries give: they are in effect
+    OTHER = "other"  # the stub withholds another amount: the entries are not in effect yet
+
+
+def stub_withholding(entries_cents: int, pay_stub_withholding_cents: int | None) -> StubWithholding:
+    """Compare whole cents, so a stub payroll rounded to the dollar is another amount."""
+    if pay_stub_withholding_cents is None:
+        return StubWithholding.NONE
+    if pay_stub_withholding_cents == entries_cents:
+        return StubWithholding.ENTRIES
+    return StubWithholding.OTHER
 
 
 def balance(amounts: PayStubAmounts) -> Balance:

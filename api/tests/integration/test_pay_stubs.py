@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Connection
 
 from app.db import user_session_for
-from app.routers.pay_stubs import newest_pay_stub_rate
+from app.routers.pay_stubs import newest_pay_stub, pay_stub_rate, pay_stub_withholding
 from tests.conftest import FixtureUser
 from tests.support.factories import STUB_01, make_document, make_pay_stub
 
@@ -91,10 +91,14 @@ def test_contribution_rate_of_stub_01(
     assert only["annual_salary_cents"] == 9_500_010
 
 
-def test_newest_pay_stub_rate(db_connection: Connection, user_a: FixtureUser) -> None:
-    """What POST /explain states beside the chosen rate (spec 008 rule 7a)."""
+def test_what_the_newest_pay_stub_shows(db_connection: Connection, user_a: FixtureUser) -> None:
+    """What POST /explain states beside the chosen 401(k) rate and the W-4 entries'
+    withholding (spec 008 rules 7a and 7b)."""
     with user_session_for(user_a.id, bind=db_connection) as session:
-        assert newest_pay_stub_rate(session) is None
+        none = newest_pay_stub(session)
+        assert none is None
+        assert pay_stub_rate(none) is None
+        assert pay_stub_withholding(none, 26) is None
     document = make_document(db_connection, user_a.id, with_blob=False)
     make_pay_stub(db_connection, user_a.id, document, **STUB_01)
     newer = make_document(db_connection, user_a.id, with_blob=False)
@@ -109,10 +113,16 @@ def test_newest_pay_stub_rate(db_connection: Connection, user_a: FixtureUser) ->
             "period_end": dt.date(2026, 4, 19),
             "retirement_contribution_cents": 0,
             "net_cents": STUB_01["net_cents"] + STUB_01["retirement_contribution_cents"],
+            "federal_withholding_cents": 0,
+            "state_tax_cents": STUB_01["state_tax_cents"] + STUB_01["federal_withholding_cents"],
         },
     )
     with user_session_for(user_a.id, bind=db_connection) as session:
-        assert str(newest_pay_stub_rate(session)) == "0.00"
+        newest = newest_pay_stub(session)
+        assert str(pay_stub_rate(newest)) == "0.00"
+        # A confirmed 0 is withheld; a biweekly stub says nothing of a semimonthly year.
+        assert pay_stub_withholding(newest, 26) == 0
+        assert pay_stub_withholding(newest, 24) is None
 
 
 def test_annual_salary_is_null_without_a_pay_frequency(

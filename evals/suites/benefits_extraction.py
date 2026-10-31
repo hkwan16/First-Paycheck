@@ -27,17 +27,13 @@ from collections.abc import Sequence
 from dataclasses import replace
 from typing import Any, Protocol
 
-from app.config import Settings
 from evals.gen.make_benefits import Fixture, load_fixtures
-from evals.suites.base import Budget, Suite, SuiteResult, SuiteUnavailable
+from evals.suites.base import Budget, Suite, SuiteResult
+from evals.suites.live import live_gateway
 from ingest.pipeline import prepare_document
 from ingest.proposal import PLAN_FIELDS, Proposal, benefits_proposal
 from llm.gateway import (
-    MICROCENTS_PER_CENT,
-    LedgerEntry,
     LLMError,
-    LLMGateway,
-    MemoryLedger,
     ModelPage,
 )
 from llm.schemas import BenefitsSummaryExtraction
@@ -46,8 +42,6 @@ EVAL_USER = uuid.UUID("00000000-0000-4000-8000-0000000be7ef")
 PLAN_KEYS = tuple(spec.key for spec in PLAN_FIELDS)
 # Where null and 0 mean the same thing to confirm.
 ZERO_IS_NULL = frozenset({"employer_hsa_cents"})
-# The gateway's per-user daily cap is not the eval's limit: --max-cost-cents is.
-UNCAPPED_DAILY_CENTS = 1_000_000
 
 
 class BenefitsReader(Protocol):
@@ -137,29 +131,10 @@ def score(fixtures: Sequence[Fixture], reader: BenefitsReader) -> SuiteResult:
     )
 
 
-def _settings() -> Settings:
-    return Settings()
-
-
 def run(budget: Budget) -> SuiteResult:
-    settings = _settings()
-    if settings.anthropic_api_key is None:
-        raise SuiteUnavailable("ANTHROPIC_API_KEY is not set")
-    spent: list[float] = []
-
-    def charge(entry: LedgerEntry) -> None:
-        cents = entry.cost_microcents / MICROCENTS_PER_CENT
-        spent.append(cents)
-        budget.charge(cents)
-
-    gateway = LLMGateway(
-        settings.model_copy(
-            update={"llm_fake": False, "llm_daily_budget_cents": UNCAPPED_DAILY_CENTS}
-        ),
-        ledger=MemoryLedger(on_record=charge),
-    )
-    result = score(load_fixtures(), gateway)
-    return replace(result, cost_cents=sum(spent))
+    live = live_gateway(budget)
+    result = score(load_fixtures(), live.gateway)
+    return replace(result, cost_cents=live.spent_cents)
 
 
 SUITE = Suite(name="benefits-extraction", llm=True, run=run)

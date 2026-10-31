@@ -21,6 +21,15 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
 - `run.py`: CLI, suite selection (`free`, `llm`, `all` aliases), baseline comparison.
 - `suites/base.py`: `Suite`, `SuiteResult`, `Budget`. `suites/__init__.py`: the registry.
 - `suites/<name>.py`: one module per suite exposing `SUITE`.
+- `suites/live.py`: `live_gateway(budget)`, the real-model gateway every LLM
+  suite's `run` uses, its ledger charging the run's `Budget` (and
+  `SuiteUnavailable` without `ANTHROPIC_API_KEY`). Tests patch its `_settings`
+  and `_gateway`.
+- `suites/claim_judge.py`: `ClaimJudge`, the judging, calibration and failure
+  lines the explain suites' claim judges share (rate-claim and
+  withholding-claim). A suite supplies the judge's name, the claim in words,
+  its call and its verdict's claim; calibration items are any `ClaimItem` (id,
+  draft, labeled `claims`, request).
 - `fixtures/<suite>/`: inputs and labels. `fixtures/calc/*.json` holds spec
   examples as `[{"id", "route", "request", "expected"}]`.
 - `fixtures/transactions.csv`: 534 synthetic labeled transactions
@@ -120,7 +129,8 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   seed citations read from `api/db/seed/irs_citations/`, no database.
   `first_try_verified`, `no_fallback`, `cited`. Its baseline is measured:
   1.0 on all five metrics in three live runs on October 30, about 47 cents a
-  run (spec 008 targets 0.8, 0.95, 1.0). `rate_framing` (issue
+  run (spec 008 targets 0.8, 0.95, 1.0); a run on `explain/v3` (issue 181)
+  measured the same, 47 cents. `rate_framing` (issue
   132): over the 18 decisions whose stub shows another rate or none, the share
   whose final row does not claim the chosen rate is already in effect, as an
   LLM judge reads it (`Gateway.judge_rate_claim`, `judge_rate_claim/v1`, spec
@@ -138,11 +148,32 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   `judge ...` failure lines first. The judge's prompt never quotes an item (a
   test checks). `SuiteUnavailable` without `ANTHROPIC_API_KEY`; scoring is
   unit-tested with scripted judges.
+- `fixtures/explain/w4_decisions.json`: 12 synthetic `w4` inputs (spec 014
+  examples), each with what its pay stub withholds a paycheck
+  (`pay_stub_withholding_cents`, null for none; spec 008 rule 7b): 6 another
+  amount than the entries (issue 181's decision, example 11 at stub-01's
+  $272.44, among them; one more, one nothing, one within a dollar), 3 the
+  entries' own amount, 3 no stub. The first one, example 9 with no stub, is the
+  smoke suite's W-4 decision.
+- `suites/explain_w4.py` (`explain-w4`, LLM): the explain flow and model over
+  those decisions; `first_try_verified`, `no_fallback`, `cited` as in
+  `explain`, and `withholding_framing` (issue 181): over the 9 decisions whose
+  stub withholds another amount or none, the share whose final row does not
+  call the entries' withholding or their projection what happens now, as the
+  `judge_withholding_claim/v1` judge reads it (`Gateway.judge_withholding_claim`,
+  spec 008 rule 24d; it is sent both withholdings, both outcomes in words and
+  the row's words). `judge_accuracy` is the share of the 24 hand-labeled items in
+  `fixtures/explain/withholding_claims.json` (10 claims, 14 not; rule 24e) it
+  reads as labeled. A suite of its own so the 401(k) suite's metrics and
+  baseline keep their meaning. Its baseline is measured: 1.0 on all five metrics in three live runs on October 30, 21 to 23 cents a run. `SuiteUnavailable` without
+  `ANTHROPIC_API_KEY`; scoring is unit-tested with scripted judges.
 - `suites/explain_smoke.py` (`explain-smoke`, free): the same flow with
-  `ScriptedGateway` over six scripted runs (pass, fail-then-pass,
-  fail-twice on a 401(k) decision; pass and fail-twice on the W-4 decision in
-  `fixtures/explain/w4_decisions.json`, spec 014 example 9; a pass on issue
-  132's decision that states the stub's rate, spec 008 rule 7a);
+  `ScriptedGateway` over eight scripted runs (pass, fail-then-pass,
+  fail-twice on a 401(k) decision; pass and fail-twice on the first W-4
+  decision in `fixtures/explain/w4_decisions.json`, spec 014 example 9; a pass
+  on issue 132's decision that states the stub's rate, spec 008 rule 7a; a
+  pass and a fail-twice on issue 181's W-4 decision whose draft and fallback
+  state the stub's withholding, rule 7b);
   `flow_correct`
   checks rows, the retry's feedback and that the fallback verifies and is
   cited. Fixture entries name their `calculator` (default `k401_match`) and
@@ -196,7 +227,7 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   `accuracy` 2.6 (one label covers all 14 `sunrise bakery` rows, of the 119 the
   model labels and the 534 in all), explain 3.4 (29 decisions), its
   `rate_framing` 5.6 (a share of only the 18 it scores) and its
-  `judge_accuracy` 2.7 (37 calibration items). A metric above its baseline passes. The
+  `judge_accuracy` 2.7 (37 calibration items); explain-w4 8.3 (12 decisions), its `withholding_framing` 11.1 (a share of the 9 it scores) and its `judge_accuracy` 4.2 (24 items). A metric above its baseline passes. The
   report gives each metric's tolerance under `tolerances`. `test_run.py` checks
   the rule through the CLI; each LLM suite's tests check its `case_worth`.
   A metric that does not depend on the model belongs in a free suite, which

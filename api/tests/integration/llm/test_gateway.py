@@ -42,14 +42,16 @@ from llm.gateway import (
 from llm.schemas import (
     BenefitsSummaryExtraction,
     CategoryBatch,
+    ClaimDraft,
     ExplainCitation,
     ExplainContext,
     ExplainFact,
     ExplanationDraft,
     PayStubExtraction,
-    RateClaimDraft,
     RateClaimRequest,
     RateClaimVerdict,
+    WithholdingClaimRequest,
+    WithholdingClaimVerdict,
 )
 from tests.conftest import FixtureUser
 from tests.support.factories import make_job
@@ -588,8 +590,8 @@ def test_explain_sends_the_context_and_the_feedback(
 
     rows = ledger(db_connection, user_a)
     assert [(row["purpose"], row["prompt_version"]) for row in rows] == [
-        ("explain", "explain/v2"),
-        ("explain", "explain/v2"),
+        ("explain", "explain/v3"),
+        ("explain", "explain/v3"),
     ]
 
 
@@ -607,7 +609,7 @@ def test_fake_explains_with_facts_that_verify(
     assert [claim.value for claim in draft.numbers] == ["3%", "$600.00"]
     allowed = AllowedNumbers.from_decision({"missed_cents": 60_000, "contribution_pct": "3.00"})
     assert verify_explanation(draft, allowed, {"k401.employer_match"}).passed
-    assert ledger(db_connection, user_a)[0]["prompt_version"] == "explain/v2"
+    assert ledger(db_connection, user_a)[0]["prompt_version"] == "explain/v3"
 
 
 # The explain eval's rate-claim judge (spec 008 rule 24a) ---------------------------
@@ -616,7 +618,7 @@ JUDGE_REQUEST = RateClaimRequest(
     chosen_rate="5%",
     pay_stub_rate="3%",
     full_match_rate="5%",
-    draft=RateClaimDraft(
+    draft=ClaimDraft(
         concept="Your employer matches what you put in.",
         text="You are already contributing 5%.",
         what_ifs=[],
@@ -649,6 +651,45 @@ def test_judge_rate_claim_sends_the_request_on_the_explain_model(
         "ok",
     )
     assert row["cost_microcents"] > 0
+
+
+WITHHOLDING_REQUEST = WithholdingClaimRequest(
+    entries_withholding="$423.16",
+    pay_stub_withholding="$272.44",
+    entries_outcome="a refund of $0.02",
+    pay_stub_outcome="a balance due of $3,918.70",
+    draft=ClaimDraft(
+        concept="How your Form W-4 sets your withholding.",
+        text="Your employer withholds $423.16 of federal income tax from each paycheck.",
+        what_ifs=[],
+    ),
+)
+WITHHOLDING_ANSWER = {
+    "reason": "It calls the entries' $423.16 what is withheld now; the stub withholds $272.44.",
+    "claims_entries_in_effect": True,
+    "sentence": "Your employer withholds $423.16 of federal income tax from each paycheck.",
+}
+
+
+def test_judge_withholding_claim_sends_the_request_on_the_explain_model(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    """Spec 008 rule 24d."""
+    api = Api(ok(WITHHOLDING_ANSWER))
+    verdict = gateway(db_connection, api).judge_withholding_claim(user_a.id, WITHHOLDING_REQUEST)
+    assert verdict == WithholdingClaimVerdict.model_validate(WITHHOLDING_ANSWER)
+    [request] = api.requests
+    assert request["model"] == "claude-sonnet-5-5"
+    schema = request["output_config"]["format"]["schema"]
+    assert list(schema["properties"]) == ["reason", "claims_entries_in_effect", "sentence"]
+    [sent] = request["messages"]
+    assert json.loads(sent["content"]) == WITHHOLDING_REQUEST.model_dump(mode="json")
+    [row] = ledger(db_connection, user_a)
+    assert (row["purpose"], row["prompt_version"], row["status"]) == (
+        "explain",
+        "judge_withholding_claim/v1",
+        "ok",
+    )
 
 
 def test_a_verdict_that_claims_without_a_sentence_is_a_schema_error(

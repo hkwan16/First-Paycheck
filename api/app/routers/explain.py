@@ -24,7 +24,7 @@ from app import ratelimit
 from app.auth import CurrentUser
 from app.deps import LlmGateway, Now, UserSession, UserSessions
 from app.errors import AppError, NotFound, error_responses
-from app.routers.pay_stubs import newest_pay_stub_rate
+from app.routers.pay_stubs import newest_pay_stub, pay_stub_rate, pay_stub_withholding
 from app.types import UtcDateTime
 from db.enums import CalculatorKind
 from db.models import Decision, Explanation
@@ -118,17 +118,25 @@ def _tax_year(decision: Decision) -> int:
 
 
 def current_setup(session: Session, decision: Decision, citations: list[Citation]) -> ExplainSetup:
-    """What a run would be given now, from reads only (rules 7, 7a and 19a): the
-    benefits passages, the newest stub's rate and the decision's ``citations``.
-    A calculator that is not explained is 422 ``explanation_unavailable``."""
+    """What a run would be given now, from reads only (rules 7, 7a, 7b and 19a):
+    the benefits passages, what the newest stub shows and the decision's
+    ``citations``. A calculator that is not explained is 422
+    ``explanation_unavailable``."""
     query = _benefits_query(decision)
     passages = benefits_search.search(session, decision.user_id, query, BENEFITS_PASSAGES)
-    # What goes into the 401(k) now, beside the rate the decision chose (rule 7a).
-    pay_stub_pct = newest_pay_stub_rate(session)
     inputs: dict[str, Any] = decision.inputs
     result: dict[str, Any] = decision.result
+    # What payroll does now, beside what the decision chose: the 401(k) rate going
+    # in (rule 7a) and the federal income tax withheld (rule 7b), from one read.
+    stub = newest_pay_stub(session)
     return explain_setup(
-        decision.calculator, inputs, result, citations, passages, pay_stub_pct=pay_stub_pct
+        decision.calculator,
+        inputs,
+        result,
+        citations,
+        passages,
+        pay_stub_pct=pay_stub_rate(stub),
+        pay_stub_withholding_cents=pay_stub_withholding(stub, int(inputs["pay_periods_per_year"])),
     )
 
 
