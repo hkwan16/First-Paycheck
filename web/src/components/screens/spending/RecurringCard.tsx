@@ -21,7 +21,6 @@ import {
   MAX_NAME,
   recurringBadge,
   renameError,
-  userStatusText,
 } from './recurring-format';
 
 function RenameForm({
@@ -151,7 +150,6 @@ export function RecurringCard() {
       <ListRows as="ul">
         {charges.map((charge) => {
           const badge = recurringBadge(charge);
-          const marked = userStatusText(charge);
           const ignored = charge.user_status === 'ignored';
           return (
             <li
@@ -182,7 +180,6 @@ export function RecurringCard() {
                   className={cn('font-semibold', ignored ? 'text-ink-3' : 'text-ink')}
                 />
                 <Badge tone={badge.tone}>{badge.text}</Badge>
-                {marked && <Badge>{marked}</Badge>}
                 {ignored ? (
                   <Button size="sm" onClick={() => save(charge, { user_status: null })}>
                     Undo
