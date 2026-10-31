@@ -433,8 +433,10 @@ def test_the_live_suite_drafts_and_judges_through_one_gateway(
 
 
 def test_w4_smoke_decision_is_spec_014_example_9() -> None:
-    [decision] = explain.load_decisions(explain.W4_FIXTURES)
+    """The smoke suite's W-4 pass and fail-twice explain the first W-4 decision."""
+    decision = explain.load_decisions(explain.W4_FIXTURES)[0]
     assert decision.calculator == "w4"
+    assert decision.pay_stub_withholding_cents is None
     assert decision.result["suggestion"] == "increase_deductions"
     assert decision.result["suggested_deductions_cents"] == 1_068_300
     keys = {citation.key for citation in explain.seed_citations(2026, "w4")}
@@ -452,14 +454,29 @@ def test_w4_smoke_decision_is_spec_014_example_9() -> None:
 def test_smoke_passes() -> None:
     result = explain_smoke.run(Budget(0))
     assert result.metrics == {"flow_correct": 1.0}
-    assert result.cases == 6
+    assert result.cases == 8
     assert {scenario.calculator for scenario in explain_smoke.SCENARIOS} == {"k401_match", "w4"}
     assert {scenario.decision_id for scenario in explain_smoke.SCENARIOS} == {
         None,
         "issue-132-stub-01-chose-full-match",
+        "issue-181-stub-01",
     }
     assert result.failures == []
     assert result.cost_cents == 0
+
+
+def test_smoke_w4_fallback_states_the_stub_withholding() -> None:
+    """Spec 008 rule 7b: issue 181's fallback says what the stub withholds now."""
+    decisions = explain.load_decisions(explain.W4_FIXTURES)
+    [scenario] = [s for s in explain_smoke.SCENARIOS if s.name == "w4-stub-differs-fail-twice"]
+    [decision] = [d for d in decisions if d.id == scenario.decision_id]
+    gateway = ScriptedGateway(
+        Settings(_env_file=None, llm_fake=True), script=scenario.script, ledger=MemoryLedger()
+    )
+    final = explain.explain_decision(gateway, decision)[-1]
+    assert final.fallback
+    assert "Your latest pay stub withholds $272.44 a paycheck now." in final.draft.text
+    assert "you would owe about $3,918.70" in final.draft.text
 
 
 def test_smoke_reports_a_flow_that_does_not_match() -> None:

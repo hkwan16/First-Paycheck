@@ -4,8 +4,8 @@ and model over 29 synthetic 401(k) decisions.
 Each decision in ``evals/fixtures/explain/decisions.json`` is a ``k401_match``
 input and the rate its pay stub shows (``pay_stub_contribution_pct``, null for
 no stub; spec 008 rule 7a), 14 of them a rate other than the one chosen; its
-result is computed here through ``calc/registry.py`` (the explain-smoke suite
-also loads ``w4_decisions.json`` this way), and its citations
+result is computed here through ``calc/registry.py`` (the explain-smoke and
+explain-w4 suites load ``w4_decisions.json`` this way), and its citations
 are the verified seed passages read from ``api/db/seed/irs_citations/``, so no
 database is needed. The flow is ``verify.flow.run_explain`` exactly as
 ``POST /explain`` runs it. The gateway records to an in-memory ledger that
@@ -58,8 +58,8 @@ from verify.flow import Attempt, Drafter, run_explain
 from verify.format import percent
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "explain" / "decisions.json"
-# The explain-smoke suite's W-4 decision (spec 014 rule 19); the live suite stays on
-# the 401(k) decisions.
+# The W-4 decisions (spec 014 rule 19, spec 008 rule 7b): the explain-smoke suite's and
+# the explain-w4 suite's; this suite stays on the 401(k) decisions.
 W4_FIXTURES = FIXTURES.with_name("w4_decisions.json")
 # The rate-claim judge's calibration items (spec 008 rule 24b).
 RATE_CLAIMS = FIXTURES.with_name("rate_claims.json")
@@ -286,6 +286,19 @@ def calibrate(judge: RateJudge, items: Sequence[RateClaimItem]) -> tuple[int, li
     return matched, failures
 
 
+def flow_failures(decision_id: str, attempts: Sequence[Attempt]) -> list[str]:
+    """A line for each draft that failed verification, and one for a fallback."""
+    failures = [
+        f"{decision_id} attempt {attempt.attempt}: "
+        + attempt.verification.feedback().replace("\n", "; ")
+        for attempt in attempts
+        if not attempt.fallback and not attempt.verified
+    ]
+    if attempts[-1].fallback:
+        failures.append(f"{decision_id}: fell back after {len(attempts) - 1} draft(s)")
+    return failures
+
+
 def score(
     decisions: Sequence[EvalDecision],
     drafter: Drafter,
@@ -311,14 +324,7 @@ def score(
                 )
             else:
                 framed += 1
-        for attempt in attempts:
-            if not attempt.fallback and not attempt.verified:
-                failures.append(
-                    f"{decision.id} attempt {attempt.attempt}: "
-                    + attempt.verification.feedback().replace("\n", "; ")
-                )
-        if final.fallback:
-            failures.append(f"{decision.id}: fell back after {len(attempts) - 1} draft(s)")
+        failures += flow_failures(decision.id, attempts)
     matched, misread = calibrate(judge, calibration)
     count = len(decisions)
     return SuiteResult(

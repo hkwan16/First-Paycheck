@@ -1,0 +1,222 @@
+[
+  {
+    "id": "live-employer-withholds-the-entries",
+    "entries_cents": 42316,
+    "pay_stub_cents": 27244,
+    "entries_refund_cents": 2,
+    "pay_stub_refund_cents": -391870,
+    "text": "Your employer withholds $423.16 of federal income tax from each paycheck, which adds up to $11,002.16 over the year.",
+    "claims": true,
+    "decision": "issue-181-stub-01"
+  },
+  {
+    "id": "live-almost-exactly-matched",
+    "entries_cents": 42316,
+    "pay_stub_cents": 27244,
+    "entries_refund_cents": 2,
+    "pay_stub_refund_cents": -391870,
+    "text": "In other words, withholding is almost exactly matched.",
+    "claims": true,
+    "decision": "issue-181-stub-01"
+  },
+  {
+    "id": "on-track-for-the-entries-refund",
+    "entries_cents": 42316,
+    "pay_stub_cents": 27244,
+    "entries_refund_cents": 2,
+    "pay_stub_refund_cents": -391870,
+    "text": "You are on track for a refund of about $0.02.",
+    "claims": true
+  },
+  {
+    "id": "already-comes-out",
+    "entries_cents": 42316,
+    "pay_stub_cents": 27244,
+    "entries_refund_cents": 2,
+    "pay_stub_refund_cents": -391870,
+    "text": "Each paycheck, $423.16 already comes out for federal income tax.",
+    "claims": true
+  },
+  {
+    "id": "no-stub-employer-withholds",
+    "entries_cents": 15555,
+    "pay_stub_cents": null,
+    "entries_refund_cents": -10,
+    "pay_stub_refund_cents": null,
+    "text": "Your employer withholds $155.55 from each paycheck.",
+    "claims": true
+  },
+  {
+    "id": "no-stub-short-for-the-year",
+    "entries_cents": 15555,
+    "pay_stub_cents": null,
+    "entries_refund_cents": -10,
+    "pay_stub_refund_cents": null,
+    "text": "Right now your withholding leaves you about $0.10 short for the year.",
+    "claims": true
+  },
+  {
+    "id": "stub-holds-the-entries-true-claim",
+    "entries_cents": 19365,
+    "pay_stub_cents": 19365,
+    "entries_refund_cents": -10,
+    "pay_stub_refund_cents": -10,
+    "text": "Your employer withholds $193.65 from each paycheck now.",
+    "claims": true
+  },
+  {
+    "id": "already-covers-when-the-stub-refunds",
+    "entries_cents": 21367,
+    "pay_stub_cents": 29776,
+    "entries_refund_cents": 8,
+    "pay_stub_refund_cents": 201824,
+    "text": "Your withholding already covers your tax almost exactly.",
+    "claims": true
+  },
+  {
+    "id": "claim-in-the-concept",
+    "entries_cents": 42316,
+    "pay_stub_cents": 27244,
+    "entries_refund_cents": 2,
+    "pay_stub_refund_cents": -391870,
+    "concept": "Your paychecks already withhold just what the year's tax needs.",
+    "text": "These entries would withhold $423.16 a paycheck.",
+    "claims": true
+  },
+  {
+    "id": "claim-in-a-what-if",
+    "entries_cents": 42316,
+    "pay_stub_cents": 27244,
+    "entries_refund_cents": 2,
+    "pay_stub_refund_cents": -391870,
+    "text": "These entries would withhold $423.16 a paycheck.",
+    "what_ifs": ["You already withhold $423.16 a paycheck, so Step 4(c) can stay empty."],
+    "claims": true
+  },
+  {
+    "id": "entries-would-withhold",
+    "entries_cents": 42316,
+    "pay_stub_cents": 27244,
+    "entries_refund_cents": 2,
+    "pay_stub_refund_cents": -391870,
+    "text": "These Form W-4 entries would withhold $423.16 of federal income tax from each paycheck.",
+    "claims": false
+  },
+  {
+    "id": "stub-now-and-if-nothing-changes",
+    "entries_cents": 42316,
+    "pay_stub_cents": 27244,
+    "entries_refund_cents": 2,
+    "pay_stub_refund_cents": -391870,
+    "text": "Your latest pay stub withholds $272.44 a paycheck now, so if nothing changes you would owe about $3,918.70.",
+    "claims": false
+  },
+  {
+    "id": "once-the-employer-has-the-form",
+    "entries_cents": 42316,
+    "pay_stub_cents": 27244,
+    "entries_refund_cents": 2,
+    "pay_stub_refund_cents": -391870,
+    "text": "Once your employer has the new form, each paycheck will withhold $423.16, and the year would end with a refund of about $0.02.",
+    "claims": false
+  },
+  {
+    "id": "with-these-entries-would-match",
+    "entries_cents": 42316,
+    "pay_stub_cents": 27244,
+    "entries_refund_cents": 2,
+    "pay_stub_refund_cents": -391870,
+    "text": "With these entries, what is withheld would almost exactly match your tax.",
+    "claims": false
+  },
+  {
+    "id": "on-track-for-the-stub-balance-due",
+    "entries_cents": 42316,
+    "pay_stub_cents": 27244,
+    "entries_refund_cents": 2,
+    "pay_stub_refund_cents": -391870,
+    "text": "Right now you are on track to owe about $3,918.70 at tax time.",
+    "claims": false
+  },
+  {
+    "id": "payroll-takes-the-stub-amount",
+    "entries_cents": 42316,
+    "pay_stub_cents": 27244,
+    "entries_refund_cents": 2,
+    "pay_stub_refund_cents": -391870,
+    "text": "Payroll takes $272.44 of federal income tax from each paycheck today.",
+    "claims": false
+  },
+  {
+    "id": "entries-as-the-subject",
+    "entries_cents": 42316,
+    "pay_stub_cents": 27244,
+    "entries_refund_cents": 2,
+    "pay_stub_refund_cents": -391870,
+    "text": "These entries withhold $423.16 a paycheck, against the $272.44 your pay stub shows.",
+    "claims": false
+  },
+  {
+    "id": "already-saved-entries",
+    "entries_cents": 42316,
+    "pay_stub_cents": 27244,
+    "entries_refund_cents": 2,
+    "pay_stub_refund_cents": -391870,
+    "text": "You have already saved entries that would cover the year's tax.",
+    "claims": false
+  },
+  {
+    "id": "no-stub-would-withhold",
+    "entries_cents": 15555,
+    "pay_stub_cents": null,
+    "entries_refund_cents": -10,
+    "pay_stub_refund_cents": null,
+    "text": "These entries would withhold $155.55 from each paycheck.",
+    "claims": false
+  },
+  {
+    "id": "no-stub-if-applied",
+    "entries_cents": 15555,
+    "pay_stub_cents": null,
+    "entries_refund_cents": -10,
+    "pay_stub_refund_cents": null,
+    "text": "If your employer applies these entries, you would owe about $0.10.",
+    "claims": false
+  },
+  {
+    "id": "stub-refund-if-nothing-changes",
+    "entries_cents": 21367,
+    "pay_stub_cents": 29776,
+    "entries_refund_cents": 8,
+    "pay_stub_refund_cents": 201824,
+    "text": "Your pay stub withholds $297.76 a paycheck, so if nothing changes you would get a refund of about $2,018.24.",
+    "claims": false
+  },
+  {
+    "id": "on-track-for-the-stub-refund",
+    "entries_cents": 21367,
+    "pay_stub_cents": 29776,
+    "entries_refund_cents": 8,
+    "pay_stub_refund_cents": 201824,
+    "text": "You are on track for a refund of about $2,018.24.",
+    "claims": false
+  },
+  {
+    "id": "if-you-hand-in-the-entries",
+    "entries_cents": 21367,
+    "pay_stub_cents": 29776,
+    "entries_refund_cents": 8,
+    "pay_stub_refund_cents": 201824,
+    "text": "If you hand in these entries, each paycheck would withhold $213.67 and the year would end close to even.",
+    "claims": false
+  },
+  {
+    "id": "no-stub-suggestion",
+    "entries_cents": 14692,
+    "pay_stub_cents": null,
+    "entries_refund_cents": -236008,
+    "pay_stub_refund_cents": null,
+    "text": "The suggested Step 4(c) entry of $91.00 would bring the projection to a refund of about $5.92.",
+    "claims": false
+  }
+]

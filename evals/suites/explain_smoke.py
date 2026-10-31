@@ -1,13 +1,16 @@
 """The explain-smoke suite (free, spec 008 rule 25): the explain flow with a
-scripted ``FakeGateway`` over six scenarios.
+scripted ``FakeGateway`` over eight scenarios.
 
 Each scenario scripts the model's drafts for a fixture decision (the first one
 of its calculator, or the one it names) and states the rows the flow must
 produce: verified on the first try, a failing draft then a verified one, and
 two failing drafts then the fallback, for a 401(k) decision; verified on the
 first try and the fallback after two failing drafts for a W-4 decision (spec
-014 rule 19); and, on issue 132's decision (5% chosen, the pay stub at 3%), a
-first try that states the stub's rate and verifies (rule 7a).
+014 rule 19); on issue 132's decision (5% chosen, the pay stub at 3%), a
+first try that states the stub's rate and verifies (rule 7a); and on issue
+181's W-4 decision (the stub withholding $272.44, the entries $423.16), a first
+try that states the stub's withholding and verifies, and a fallback that
+states it and verifies (rule 7b).
 ``flow_correct`` is the share of scenarios whose rows (count, ``attempt``,
 ``retries``, ``verified``, ``fallback``) match, whose fallback (when there is
 one) verifies and is cited, and whose retry carried the first failure. No
@@ -47,6 +50,7 @@ BAD = reply_with(
 # FakeGateway's own draft: the facts as given, citing the first key. It verifies.
 GOOD: ScriptStep = None
 ISSUE_132 = "issue-132-stub-01-chose-full-match"
+ISSUE_181 = "issue-181-stub-01"
 
 
 @dataclass(frozen=True)
@@ -72,6 +76,18 @@ SCENARIOS = (
     Scenario("w4-fail-twice", (BAD, BAD), FAIL_TWICE, calculator="w4"),
     # Spec 008 rule 7a: the fake states the stub's 3%, which the verifier allows.
     Scenario("stub-differs-pass", (GOOD,), ((1, 0, True, False),), decision_id=ISSUE_132),
+    # Spec 008 rule 7b: the fake states the stub's $272.44, which the verifier allows,
+    # and the fallback states it, the $3,918.70 due at it, and verifies.
+    Scenario(
+        "w4-stub-differs-pass",
+        (GOOD,),
+        ((1, 0, True, False),),
+        calculator="w4",
+        decision_id=ISSUE_181,
+    ),
+    Scenario(
+        "w4-stub-differs-fail-twice", (BAD, BAD), FAIL_TWICE, calculator="w4", decision_id=ISSUE_181
+    ),
 )
 
 
