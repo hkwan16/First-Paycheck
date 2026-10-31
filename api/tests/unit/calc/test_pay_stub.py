@@ -1,4 +1,5 @@
-"""The confirm arithmetic gate (spec 005 rule 21 and its hand-worked examples)."""
+"""The confirm arithmetic gate (spec 005 rule 21 and its hand-worked examples), and
+what a stub says against a decision (spec 008 rules 7a and 7b)."""
 
 from __future__ import annotations
 
@@ -7,15 +8,19 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
+from calc.pay_dates import PERIODS, PayFrequency
 from calc.pay_stub import (
     Balance,
     PayStubAmounts,
     StubRate,
+    StubWithholding,
     annual_salary_cents,
     balance,
     retirement_contribution_pct,
     stub_rate,
+    stub_withholding,
     total_cents,
+    withholding_on_schedule,
 )
 
 MOCKUP = {
@@ -127,3 +132,42 @@ def test_contribution_rate_zero_gross() -> None:
 def test_stub_rate(chosen: str, pay_stub_pct: str | None, expected: StubRate) -> None:
     stub = None if pay_stub_pct is None else Decimal(pay_stub_pct)
     assert stub_rate(Decimal(chosen), stub) is expected
+
+
+# Spec 008 rule 7b: what the stub withholds, on the decision's pay schedule.
+@pytest.mark.parametrize(
+    ("withheld", "frequency", "periods", "expected"),
+    [
+        (27_244, "biweekly", 26, 27_244),
+        (27_244, None, 26, 27_244),
+        (29_776, "semimonthly", 26, None),
+        (0, "biweekly", 26, 0),
+    ],
+)
+def test_withholding_on_schedule(
+    withheld: int, frequency: PayFrequency | None, periods: int, expected: int | None
+) -> None:
+    assert withholding_on_schedule(withheld, frequency, periods) == expected
+
+
+def test_withholding_on_schedule_for_every_frequency() -> None:
+    for frequency, periods in PERIODS.items():
+        assert withholding_on_schedule(100, frequency, periods) == 100
+        others = {count for count in PERIODS.values() if count != periods}
+        assert all(withholding_on_schedule(100, frequency, count) is None for count in others)
+
+
+# Spec 008 rule 7b: the stub's case, compared in whole cents.
+@pytest.mark.parametrize(
+    ("entries", "pay_stub", "expected"),
+    [
+        (42_316, None, StubWithholding.NONE),
+        (42_316, 42_316, StubWithholding.ENTRIES),
+        (0, 0, StubWithholding.ENTRIES),
+        (14_692, 14_700, StubWithholding.OTHER),
+        (42_316, 27_244, StubWithholding.OTHER),
+        (21_615, 0, StubWithholding.OTHER),
+    ],
+)
+def test_stub_withholding(entries: int, pay_stub: int | None, expected: StubWithholding) -> None:
+    assert stub_withholding(entries, pay_stub) is expected

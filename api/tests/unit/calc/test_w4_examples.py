@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from calc.w4 import W4Input, W4Result, w4
+from calc.w4 import AtWithholding, W4Input, W4Result, at_withholding, w4
 
 BASE_KEYS = [
     "w4.percentage_method",
@@ -400,6 +400,57 @@ def test_no_stub_no_comparison() -> None:
     assert result == run(6_500_000, 26)
     with_stub = run(6_500_000, 26, current_withholding_per_paycheck_cents=0)
     assert result.model_dump(exclude=COMPARISON) == with_stub.model_dump(exclude=COMPARISON)
+
+
+# Spec 008 rule 7b: the explanation reads rule 10a's figures from a saved decision's
+# own result, which may predate rule 10a, so it never reruns the calculator.
+@pytest.mark.parametrize(
+    ("salary", "periods", "entries", "stub", "expected"),
+    [
+        (
+            9_500_010,
+            26,
+            {"k401_contribution_pct": "5", "age": 24, "health_premium_per_paycheck_cents": 400},
+            27_244,
+            (708_344, -391_870),
+        ),
+        (
+            6_500_000,
+            24,
+            {"k401_contribution_pct": "4", "age": 30, "health_premium_per_paycheck_cents": 6_250},
+            29_776,
+            (714_624, 201_824),
+        ),
+        (
+            5_000_000,
+            26,
+            {"other_jobs_wages_cents": 2_000_000, "other_jobs_withholding_cents": 39_000},
+            14_700,
+            (382_200, -235_800),
+        ),
+        (6_500_000, 26, {}, 0, (0, -562_000)),
+    ],
+)
+def test_at_withholding_is_rule_10a_from_a_saved_result(
+    salary: int, periods: int, entries: dict[str, Any], stub: int, expected: tuple[int, int]
+) -> None:
+    saved = run(salary, periods, **entries)
+    assert comparison(saved) == (None, None)
+    data = W4Input.model_validate(
+        {
+            "salary_cents": salary,
+            "pay_periods_per_year": periods,
+            "filing_status": "single",
+            "tax_year": 2026,
+            **entries,
+        }
+    )
+    annual, refund = expected
+    assert at_withholding(data, saved, stub) == AtWithholding(
+        annual_withholding_cents=annual, refund_cents=refund
+    )
+    compared = run(salary, periods, **entries, current_withholding_per_paycheck_cents=stub)
+    assert comparison(compared) == (annual, refund)
 
 
 def test_result_without_the_comparison_still_reads() -> None:

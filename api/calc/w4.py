@@ -40,10 +40,12 @@ __all__ = [
     "MULTIPLE_JOBS_KEY",
     "PRETAX_DEFERRAL_KEY",
     "TARGET_CENTS",
+    "AtWithholding",
     "Schedule",
     "Suggestion",
     "W4Input",
     "W4Result",
+    "at_withholding",
     "w4",
 ]
 
@@ -165,6 +167,34 @@ class W4Result(BaseModel):
     suggested_deductions_cents: Cents = Field(description="Step 4(b) to use, for the year")
     suggested_refund_cents: SignedCents
     citation_keys: list[str]
+
+
+class AtWithholding(BaseModel):
+    """Rule 10a at one withholding per paycheck: the year's withholding and the
+    refund (negative, balance due) against the projected tax."""
+
+    model_config = ConfigDict(frozen=True)
+
+    annual_withholding_cents: Cents
+    refund_cents: SignedCents
+
+
+def _at(per_paycheck_cents: int, periods: int, other_cents: int) -> AtWithholding:
+    """``other_cents`` is the refund apart from this job's withholding: the other
+    jobs' withholding less the tax after credits."""
+    annual = per_paycheck_cents * periods
+    return AtWithholding(annual_withholding_cents=annual, refund_cents=annual + other_cents)
+
+
+def at_withholding(data: W4Input, result: W4Result, per_paycheck_cents: int) -> AtWithholding:
+    """Rule 10a's figures if every paycheck withholds ``per_paycheck_cents``,
+    against the tax in ``result`` (``w4(data)``, or a saved decision's result,
+    which may predate rule 10a). The explanation states them (spec 008 rule 7b)."""
+    return _at(
+        per_paycheck_cents,
+        data.pay_periods_per_year,
+        data.other_jobs_withholding_cents - result.projected_tax_after_credits_cents,
+    )
 
 
 def _deferral(data: W4Input, year: TaxYearData) -> tuple[Decimal, bool]:
@@ -308,8 +338,9 @@ def w4(data: W4Input) -> W4Result:
         current_annual: int | None = None
         current_refund: int | None = None
         if data.current_withholding_per_paycheck_cents is not None:
-            current_annual = data.current_withholding_per_paycheck_cents * periods
-            current_refund = current_annual + other
+            at_stub = _at(data.current_withholding_per_paycheck_cents, periods, other)
+            current_annual = at_stub.annual_withholding_cents
+            current_refund = at_stub.refund_cents
 
         # Rules 11 to 14: the suggestion.
         extra = data.extra_withholding_cents
