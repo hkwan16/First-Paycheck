@@ -263,6 +263,16 @@ describe('LinkScreen accounts', () => {
     );
   });
 
+  it("draws an unnamed imported institution's tile from the name its group shows", async () => {
+    // Issue 183: the group said "Imported CSV" while its account's tile said "?".
+    db.accounts.push({ ...structuredClone(sampleCsvAccount), institution_name: null });
+    renderLink();
+    const account = await screen.findByRole('group', { name: 'Credit union checking' });
+    expect(within(accountsCard()).getByText('Imported CSV')).toBeInTheDocument();
+    expect(within(account).getByText('IC')).toBeInTheDocument();
+    expect(within(account).queryByText('?')).toBeNull();
+  });
+
   it('removes an imported institution: no Sync now, and Remove instead of Unlink', async () => {
     db.accounts.push(structuredClone(sampleCsvAccount));
     const deletes = requests('DELETE', `/sync/items/${CREDIT_UNION_ITEM_ID}`);
