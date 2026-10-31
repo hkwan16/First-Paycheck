@@ -80,7 +80,7 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     validation, errors, account), supabase/ (env, client, server, proxy),
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
                     documents.ts, decisions.ts, decision-steps.ts, deep-equal.ts, explanations.ts,
-                    features.ts, focus-handoff.ts, land-at-top.ts,
+                    escape-cancel.ts, features.ts, focus-handoff.ts, land-at-top.ts,
                     findings.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts,
                     page-hydration.ts, page-title.ts, log-error.ts
@@ -497,7 +497,12 @@ What the audit found and fixed:
   the first control of what replaced it: the 401(k) slider, the health plan usage); a swapped pair
   (Mark reached, Not reached yet) focuses the counterpart; a removed plan or tier focuses the one
   in its place, an added one its first field; Apply suggestion focuses the W-4 entry it filled.
-  Use it for any new control that removes itself.
+  Use it for any new control that removes itself. Escape cancels every inline editor that has a
+  Cancel (the goal's contribution, the 401(k) plan details, the health plan table, the recurring
+  Rename, a Confirm field) through one handler, `cancelOnEscape(cancel)` (`lib/escape-cancel.ts`,
+  issue 184), on the editor's `<form>` and given the function Cancel calls, so focus returns the
+  same way. It leaves Escape to a control that called `preventDefault()` on it first and to an
+  input method that is composing; an editor with no Cancel (the first plan details) gets none.
 - Motion: every `animate-` and `transition` was checked (`Bar`, `Button`, `Seg`, `Skeleton`,
   `DropZone`, `FieldRow`, `UserMenu`, the Sankey's popover and bands; Recharts runs with no
   animation). Durations are tokens that reduced motion sets to zero; the indeterminate bar and the

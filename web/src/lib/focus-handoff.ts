@@ -8,10 +8,10 @@ import { useCallback, useLayoutEffect, useRef } from 'react';
  *
  * - Opening an editor in place of the button that opens it focuses the
  *   editor's first field.
- * - Closing an editor (save, cancel, or a choice that replaces it) returns
- *   focus to the control that opens it again; an editor nobody opened (the
- *   first time details are asked for) hands focus to the first control of
- *   what replaces it.
+ * - Closing an editor (save, Cancel or Escape through `cancelOnEscape`, or a
+ *   choice that replaces it) returns focus to the control that opens it
+ *   again; an editor nobody opened (the first time details are asked for)
+ *   hands focus to the first control of what replaces it.
  * - A swap of one control for its counterpart (Mark reached, Not reached yet)
  *   focuses the counterpart; a removed row focuses the row that takes its place.
  * - An action that fills in fields focuses the field it filled.

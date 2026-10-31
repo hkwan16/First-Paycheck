@@ -8,6 +8,7 @@ import { FieldError } from '@/components/ui/FieldError';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { cn } from '@/lib/cn';
+import { cancelOnEscape } from '@/lib/escape-cancel';
 import type { ConfirmAction, ReviewField } from './confirmReducer';
 import { confidenceBadge, fieldDisplay } from './field-format';
 
@@ -74,13 +75,13 @@ export const FieldRow = memo(function FieldRow({
     focusNext.current = 'edit';
     dispatch({ type: 'cancel', key });
   };
+  const onEscape = cancelOnEscape(cancel);
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       save();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      cancel();
+    } else {
+      onEscape(event);
     }
   };
 
