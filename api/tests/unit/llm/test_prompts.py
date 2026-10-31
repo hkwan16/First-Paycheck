@@ -149,7 +149,7 @@ def test_pay_stub_prompt_names_every_line_kind_and_field() -> None:
         assert f"`{frequency}`" in prompt.system
 
 
-@pytest.mark.parametrize("version", ["v1", "v2"])
+@pytest.mark.parametrize("version", ["v1", "v2", "v3"])
 def test_explain(version: str) -> None:
     prompt = load_prompt("explain", version)
     assert prompt.version == f"explain/{version}"
@@ -168,9 +168,8 @@ def test_explain(version: str) -> None:
 
 def test_explain_v2_keeps_the_chosen_rate_apart_from_the_stub() -> None:
     """Spec 008 rule 8 (issue 132): v1 told the model to describe "their current
-    contribution" with only the chosen rate in the facts; v2 names both facts,
-    says the chosen rate "would" or "will" happen, and is the version the gateway
-    sends."""
+    contribution" with only the chosen rate in the facts; v2 names both facts and
+    says the chosen rate "would" or "will" happen."""
     v1 = load_prompt("explain", "v1").system
     v2 = load_prompt("explain", "v2").system
     assert "at their current contribution" in v1
@@ -188,7 +187,32 @@ def test_explain_v2_keeps_the_chosen_rate_apart_from_the_stub() -> None:
     # passage's percentages.
     assert '"the next 2%"' in v2
     assert '"100% vested"' in v2
-    assert EXPLAIN_PROMPT == ("explain", "v2")
+
+
+def test_explain_v3_keeps_the_entries_withholding_apart_from_the_stub() -> None:
+    """Spec 008 rules 7b and 8 (issue 181): v2 had no W-4 rules, so a draft called the
+    entries' withholding what payroll withholds now. v3 is v2's text plus the W-4
+    rules, names the facts they are about, and is the version the gateway sends."""
+    v2 = load_prompt("explain", "v2").system
+    v3 = load_prompt("explain", "v3").system
+    # Every 401(k) and number rule of v2 is still there, word for word.
+    kept = [line for line in v2.splitlines() if line.startswith("- ") and "notes" not in line]
+    assert len(kept) > 15
+    for line in kept:
+        if line.startswith("- `text`"):
+            assert line.removesuffix(".") in v3, line
+        else:
+            assert line in v3, line
+    for label in (
+        "Federal income tax these entries would withhold per paycheck",
+        "Federal income tax your latest pay stub withholds per paycheck",
+        "Projected refund with these entries",
+        "Projected balance due at your pay stub's withholding",
+    ):
+        assert f"`{label}`" in v3, label
+    assert "do not say what is withheld now" in v3
+    assert "rejects" not in v3
+    assert EXPLAIN_PROMPT == ("explain", "v3")
 
 
 def test_judge_rate_claim() -> None:

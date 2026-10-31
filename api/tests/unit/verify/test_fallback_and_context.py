@@ -181,7 +181,13 @@ def stub_rate(example: str, stub: str) -> Decimal | None:
 def test_every_fact_passes_the_verifier(example: str, stub: str) -> None:
     inputs, result = decision(example)
     setup = explain_setup(
-        "k401_match", inputs, result, SEEDED, [], pay_stub_pct=stub_rate(example, stub)
+        "k401_match",
+        inputs,
+        result,
+        SEEDED,
+        [],
+        pay_stub_pct=stub_rate(example, stub),
+        pay_stub_withholding_cents=None,
     )
     for fact in setup.context.facts:
         check = verify_explanation(
@@ -203,7 +209,13 @@ def test_every_fact_passes_the_verifier(example: str, stub: str) -> None:
 def test_fallback_passes_the_verifier(example: str, stub: str) -> None:
     inputs, result = decision(example)
     setup = explain_setup(
-        "k401_match", inputs, result, SEEDED, [], pay_stub_pct=stub_rate(example, stub)
+        "k401_match",
+        inputs,
+        result,
+        SEEDED,
+        [],
+        pay_stub_pct=stub_rate(example, stub),
+        pay_stub_withholding_cents=None,
     )
     check = verify_explanation(setup.fallback, setup.allowed_numbers, setup.citation_keys)
     assert check.passed, (setup.fallback.text, check)
@@ -270,7 +282,13 @@ def test_context_digest_follows_the_facts() -> None:
         citations: list[Citation] = SEEDED,
     ) -> str:
         setup = explain_setup(
-            "k401_match", inputs, result, citations, passages or [], pay_stub_pct=pay_stub_pct
+            "k401_match",
+            inputs,
+            result,
+            citations,
+            passages or [],
+            pay_stub_pct=pay_stub_pct,
+            pay_stub_withholding_cents=None,
         )
         assert setup.digest == context_digest(setup.context)
         return setup.digest
@@ -319,7 +337,9 @@ def test_context_without_a_pay_stub() -> None:
 )
 def test_issue_132_drafts(stub: Decimal | None, text: str, unmatched: tuple[str, ...]) -> None:
     inputs, result = decision("issue-132")
-    setup = explain_setup("k401_match", inputs, result, SEEDED, [], pay_stub_pct=stub)
+    setup = explain_setup(
+        "k401_match", inputs, result, SEEDED, [], pay_stub_pct=stub, pay_stub_withholding_cents=None
+    )
     draft = ExplanationDraft(
         concept="c", text=text, numbers=[], what_ifs=[], citation_keys=["k401.employer_match"]
     )
@@ -341,18 +361,37 @@ def test_fallback_for_issue_132() -> None:
 
 
 def test_pay_stub_numbers() -> None:
-    assert pay_stub_numbers("k401_match", Decimal("3.00")) == {"pay_stub_contribution_pct": "3.00"}
-    assert pay_stub_numbers("k401_match", None) == {}
-    assert pay_stub_numbers("health_plans", Decimal("3.00")) == {}
-    allowed = AllowedNumbers.from_decision({}, {}, pay_stub_numbers("k401_match", Decimal("3.69")))
+    inputs, result = decision("issue-132")
+
+    def numbers(calculator: str, rate: Decimal | None) -> dict[str, Any]:
+        return pay_stub_numbers(calculator, inputs, result, pay_stub_pct=rate)
+
+    assert numbers("k401_match", Decimal("3.00")) == {"pay_stub_contribution_pct": "3.00"}
+    assert numbers("k401_match", None) == {}
+    assert numbers("health_plans", Decimal("3.00")) == {}
+    allowed = AllowedNumbers.from_decision({}, {}, numbers("k401_match", Decimal("3.69")))
     assert allowed.percents == {Decimal("3.69")}
 
 
-def test_other_calculators_ignore_the_pay_stub_rate() -> None:
+def test_other_calculators_ignore_the_pay_stub() -> None:
     inputs, result = health_decision("1")
-    plain = explain_setup("health_plans", inputs, result, HEALTH_SEEDED, [], pay_stub_pct=None)
+    plain = explain_setup(
+        "health_plans",
+        inputs,
+        result,
+        HEALTH_SEEDED,
+        [],
+        pay_stub_pct=None,
+        pay_stub_withholding_cents=None,
+    )
     with_stub = explain_setup(
-        "health_plans", inputs, result, HEALTH_SEEDED, [], pay_stub_pct=Decimal("3.00")
+        "health_plans",
+        inputs,
+        result,
+        HEALTH_SEEDED,
+        [],
+        pay_stub_pct=Decimal("3.00"),
+        pay_stub_withholding_cents=27_244,
     )
     assert plain == with_stub
     assert with_stub.context == explain_context("health_plans", inputs, result, HEALTH_SEEDED, [])

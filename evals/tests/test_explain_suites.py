@@ -428,7 +428,7 @@ def test_the_live_suite_drafts_and_judges_through_one_gateway(
     assert result.cost_cents == 0
     [ledger] = ledgers
     versions = [entry.prompt_version for entry in ledger.entries]
-    assert versions.count("explain/v2") == 29
+    assert versions.count("explain/v3") == 29
     assert versions.count("judge_rate_claim/v1") == 18 + len(items)
 
 

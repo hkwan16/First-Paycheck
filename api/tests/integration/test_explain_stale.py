@@ -23,15 +23,19 @@ from sqlalchemy import Connection, text
 
 from app.db import user_session_for
 from db.models import Explanation
+from retrieval.context import W4_STUB_DIFFERS_NOTE, W4_STUB_SAME_NOTE
 from tests.conftest import FixtureUser
 from tests.integration.test_explain import (
     BAD,
     GOOD,
     ISSUE_132,
+    STUB_AT_THE_ENTRIES,
+    W4_ISSUE_181,
     Script,
     confirm_stub,
     explain,
     save,
+    save_other,
 )
 from tests.support.factories import make_document
 
@@ -276,3 +280,22 @@ def test_plan_reports_a_stale_explanation(
     assert (k401()["status"], k401()["stale"]) == ("verified", False)
     confirm_stub(db_connection, user_a)
     assert (k401()["status"], k401()["stale"]) == ("verified", True)
+
+
+def test_a_newer_stub_with_another_withholding_makes_a_w4_explanation_stale(
+    script: Script, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    """Issue 181 (spec 008 rule 7b): explained at stub-01's $272.44; once the
+    employer applies the form, the next stub withholds the entries' $423.16."""
+    client = client_as(user_a)
+    confirm_stub(db_connection, user_a)
+    decision_id = save_other(client, "w4", "/calc/w4", W4_ISSUE_181)
+    script(GOOD, GOOD)
+    written = explain(client, decision_id)
+    assert script.sent[0]["context"]["notes"][0] == W4_STUB_DIFFERS_NOTE
+    confirm_stub(db_connection, user_a, **STUB_AT_THE_ENTRIES)
+    assert read(client, decision_id)["stale"] is True
+    again = explain(client, decision_id)
+    assert again["id"] != written["id"]
+    assert script.sent[1]["context"]["notes"][0] == W4_STUB_SAME_NOTE
+    assert run_count(db_connection, decision_id) == 2

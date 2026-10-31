@@ -14,8 +14,8 @@ from typing import Any
 
 from calc.health_plans import HealthPlansInput, HealthPlansResult
 from calc.k401 import K401MatchInput, K401MatchResult
-from calc.pay_stub import StubRate, stub_rate
-from calc.w4 import W4Input, W4Result
+from calc.pay_stub import StubRate, StubWithholding, stub_rate, stub_withholding
+from calc.w4 import W4Input, W4Result, at_withholding
 from llm.schemas import ExplanationDraft, NumberClaim
 from verify.format import dollars, net_cost, percent
 
@@ -25,8 +25,11 @@ __all__ = ["FALLBACK_VERSION", "fallback_draft"]
 # not a prompt, so a change to it is a new version here. v2 (issue 132): the
 # 401(k) text speaks of the rate chosen, states the pay stub's rate, and says
 # "already" only when the stub shows the rate chosen. v3 (issue 154): a
-# negative health plan cost reads as an amount ahead (spec 012 rule 17).
-FALLBACK_VERSION = "fallback/v3"
+# negative health plan cost reads as an amount ahead (spec 012 rule 17). v4
+# (issue 181): the W-4 text says what the entries would withhold, states what
+# the pay stub withholds now and the refund or balance due at it (spec 008
+# rule 7b).
+FALLBACK_VERSION = "fallback/v4"
 
 K401_CONCEPT = "Your employer's 401(k) match and what it costs you to earn all of it."
 HEALTH_CONCEPT = "Comparing health plans by what each costs you in a year, not just by the premium."
@@ -199,16 +202,51 @@ def _projection_words(cents: int) -> str:
     return "no refund and nothing to pay"
 
 
-def _w4(data: W4Input, result: W4Result) -> tuple[str, list[NumberClaim]]:
+def _w4_stub_sentences(
+    data: W4Input, result: W4Result, pay_stub_withholding_cents: int | None
+) -> tuple[list[str], list[NumberClaim]]:
+    """What the newest stub withholds against the entries (spec 008 rule 7b): the
+    same, so they are in effect; another amount, with the year at it; or nothing."""
+    case = stub_withholding(result.withholding_per_paycheck_cents, pay_stub_withholding_cents)
+    if case is StubWithholding.NONE or pay_stub_withholding_cents is None:
+        return [], []
+    stub = dollars(pay_stub_withholding_cents)
+    claims = [NumberClaim(value=stub, label="Your latest pay stub withholds per paycheck")]
+    if case is StubWithholding.ENTRIES:
+        return [
+            f"Your latest pay stub withholds {stub} a paycheck, the same as these entries, so they"
+            " are in effect now."
+        ], claims
+    at = at_withholding(data, result, pay_stub_withholding_cents)
+    amount = dollars(abs(at.refund_cents))
+    if at.refund_cents > 0:
+        outcome = f"get a refund of about {amount}"
+        claims.append(NumberClaim(value=amount, label="Refund at your pay stub's withholding"))
+    elif at.refund_cents < 0:
+        outcome = f"owe about {amount}"
+        claims.append(NumberClaim(value=amount, label="Balance due at your pay stub's withholding"))
+    else:
+        outcome = "owe nothing and get nothing back"
+    return [
+        f"Your latest pay stub withholds {stub} a paycheck now.",
+        f"If every paycheck this year withholds that, {dollars(at.annual_withholding_cents)} in"
+        f" all, you would {outcome}.",
+        "These entries change that once you give your employer your updated Form W-4.",
+    ], claims
+
+
+def _w4(
+    data: W4Input, result: W4Result, pay_stub_withholding_cents: int | None
+) -> tuple[str, list[NumberClaim]]:
     per_paycheck = dollars(result.withholding_per_paycheck_cents)
     yearly = dollars(result.annual_withholding_cents)
     tax = dollars(result.projected_tax_after_credits_cents)
     sentences = [
-        f"With these Form W-4 entries your employer withholds {per_paycheck} of federal income"
-        f" tax from each paycheck, {yearly} over the year.",
+        f"These Form W-4 entries would withhold {per_paycheck} of federal income tax from each"
+        f" paycheck, {yearly} over the year.",
     ]
     claims = [
-        NumberClaim(value=per_paycheck, label="Withheld per paycheck"),
+        NumberClaim(value=per_paycheck, label="These entries would withhold per paycheck"),
         NumberClaim(value=tax, label="Projected federal income tax after credits"),
     ]
     tax_sentence = f"Your projected federal income tax for {data.tax_year} is {tax}"
@@ -221,11 +259,19 @@ def _w4(data: W4Input, result: W4Result) -> tuple[str, list[NumberClaim]]:
         )
     refund = result.projected_refund_cents
     if refund > 0:
-        sentences.append(f"{tax_sentence}, so you would get a refund of about {dollars(refund)}.")
+        sentences.append(
+            f"{tax_sentence}, so with these entries you would get a refund of about"
+            f" {dollars(refund)}."
+        )
     elif refund < 0:
-        sentences.append(f"{tax_sentence}, so you would owe about {dollars(-refund)}.")
+        sentences.append(
+            f"{tax_sentence}, so with these entries you would owe about {dollars(-refund)}."
+        )
     else:
-        sentences.append(f"{tax_sentence}, which matches what is withheld.")
+        sentences.append(f"{tax_sentence}, which matches what these entries would withhold.")
+    stub_sentences, stub_claims = _w4_stub_sentences(data, result, pay_stub_withholding_cents)
+    sentences += stub_sentences
+    claims += stub_claims
     pretax = []
     if result.k401_annual_cents:
         pretax.append(f"{dollars(result.k401_annual_cents)} of 401(k) contributions")
@@ -279,13 +325,16 @@ def fallback_draft(
     allowed_citation_keys: Collection[str],
     *,
     pay_stub_pct: Decimal | None = None,
+    pay_stub_withholding_cents: int | None = None,
 ) -> ExplanationDraft:
     """The code-written explanation; ``pay_stub_pct`` (spec 008 rule 7a) is the
-    newest stub's 401(k) rate, None without a stub, read for ``k401_match`` only."""
+    newest stub's 401(k) rate, None without a stub, read for ``k401_match`` only;
+    ``pay_stub_withholding_cents`` (rule 7b) is what that stub withholds each
+    paycheck on the decision's pay schedule, None otherwise, read for ``w4`` only."""
     if calculator == "w4":
         entries = W4Input.model_validate(inputs)
         projected = W4Result.model_validate(result)
-        text, claims = _w4(entries, projected)
+        text, claims = _w4(entries, projected, pay_stub_withholding_cents)
         return ExplanationDraft(
             concept=W4_CONCEPT,
             text=text,

@@ -81,15 +81,27 @@ def newest_pay_stub(session: Session) -> PayStub | None:
     return session.scalars(select(PayStub).order_by(*NEWEST_FIRST).limit(1)).first()
 
 
-def newest_pay_stub_rate(session: Session) -> Decimal | None:
-    """The 401(k) rate the newest confirmed stub shows (spec 005 rule 24b), the
-    same figure as its ``PayStubOut.retirement_contribution_pct``; None without
-    a stub or a positive gross. ``POST /explain`` states it (spec 008 rule 7a)."""
-    stub = newest_pay_stub(session)
+def pay_stub_rate(stub: PayStub | None) -> Decimal | None:
+    """The 401(k) rate a confirmed stub shows (spec 005 rule 24b), the same figure
+    as its ``PayStubOut.retirement_contribution_pct``; None without a stub or a
+    positive gross. ``POST /explain`` states the newest one's (spec 008 rule 7a)."""
     if stub is None:
         return None
     return pay_stub_calc.retirement_contribution_pct(
         stub.retirement_contribution_cents, stub.gross_cents
+    )
+
+
+def pay_stub_withholding(stub: PayStub | None, pay_periods_per_year: int) -> int | None:
+    """What a confirmed stub withholds each paycheck for federal income tax, when
+    its paycheck is one of ``pay_periods_per_year``; None without a stub or for a
+    stub on another pay schedule. ``POST /explain`` states the newest one's beside
+    a W-4 decision's entries (spec 008 rule 7b)."""
+    if stub is None:
+        return None
+    frequency = None if stub.pay_frequency is None else frequency_named(stub.pay_frequency)
+    return pay_stub_calc.withholding_on_schedule(
+        stub.federal_withholding_cents, frequency, pay_periods_per_year
     )
 
 

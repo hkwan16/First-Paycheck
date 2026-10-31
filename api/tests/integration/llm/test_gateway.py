@@ -588,8 +588,8 @@ def test_explain_sends_the_context_and_the_feedback(
 
     rows = ledger(db_connection, user_a)
     assert [(row["purpose"], row["prompt_version"]) for row in rows] == [
-        ("explain", "explain/v2"),
-        ("explain", "explain/v2"),
+        ("explain", "explain/v3"),
+        ("explain", "explain/v3"),
     ]
 
 
@@ -607,7 +607,7 @@ def test_fake_explains_with_facts_that_verify(
     assert [claim.value for claim in draft.numbers] == ["3%", "$600.00"]
     allowed = AllowedNumbers.from_decision({"missed_cents": 60_000, "contribution_pct": "3.00"})
     assert verify_explanation(draft, allowed, {"k401.employer_match"}).passed
-    assert ledger(db_connection, user_a)[0]["prompt_version"] == "explain/v2"
+    assert ledger(db_connection, user_a)[0]["prompt_version"] == "explain/v3"
 
 
 # The explain eval's rate-claim judge (spec 008 rule 24a) ---------------------------

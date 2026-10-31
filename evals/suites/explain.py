@@ -79,12 +79,16 @@ class EvalDecision:
     calculator: str = CALCULATOR
     # The rate the newest confirmed pay stub shows, None for no stub (rule 7a).
     pay_stub_pct: Decimal | None = None
+    # What that stub withholds each paycheck on the decision's pay schedule, None
+    # for none (rule 7b); W-4 decisions only.
+    pay_stub_withholding_cents: int | None = None
 
 
 def load_decisions(path: Path = FIXTURES) -> list[EvalDecision]:
     """The fixture decisions, inputs and results in the stored (JSON) form. An entry
     names its ``calculator`` (default ``k401_match``); the registry computes its result.
-    ``pay_stub_contribution_pct`` is the stub's rate as the API reports it, or null."""
+    ``pay_stub_contribution_pct`` is the stub's rate as the API reports it, or null;
+    ``pay_stub_withholding_cents`` what it withholds each paycheck, or null."""
     decisions = []
     for entry in json.loads(path.read_text()):
         name = entry.get("calculator", CALCULATOR)
@@ -100,6 +104,7 @@ def load_decisions(path: Path = FIXTURES) -> list[EvalDecision]:
                 benefits_passages=tuple(entry["benefits_passages"]),
                 calculator=name,
                 pay_stub_pct=_rate(entry.get("pay_stub_contribution_pct")),
+                pay_stub_withholding_cents=entry.get("pay_stub_withholding_cents"),
             )
         )
     return decisions
@@ -143,6 +148,7 @@ def explain_decision(drafter: Drafter, decision: EvalDecision) -> list[Attempt]:
         citations,
         passages,
         pay_stub_pct=decision.pay_stub_pct,
+        pay_stub_withholding_cents=decision.pay_stub_withholding_cents,
     )
     return run_explain(
         drafter,
