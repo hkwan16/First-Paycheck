@@ -7,11 +7,23 @@ export interface RecurringBadgeView {
 }
 
 /**
- * The detector's status (spec 009 rules 12-14) as a badge: a new charge or a
- * changed price needs a look (warning), a stopped one is off, an active one
- * is just there (neutral).
+ * The row's one status badge (spec 009 rule 19). Once the person has marked
+ * the charge it says only what they decided, in neutral: their word replaces
+ * the detector's, which the check-in still reports. Unmarked, it is the
+ * detector's status (rules 12-14): a new charge or a changed price needs a
+ * look (warning), a stopped one is off, an active one is just there (neutral).
  */
 export function recurringBadge(charge: RecurringCharge): RecurringBadgeView {
+  switch (charge.user_status) {
+    case 'ignored':
+      return { tone: 'neutral', text: 'Not recurring' };
+    case 'confirmed':
+      return { tone: 'neutral', text: 'You confirmed it' };
+    case 'cancelled':
+      return { tone: 'neutral', text: 'You cancelled it' };
+    case null:
+      break;
+  }
   switch (charge.status) {
     case 'new':
       return { tone: 'warning', text: 'New' };
@@ -21,20 +33,6 @@ export function recurringBadge(charge: RecurringCharge): RecurringBadgeView {
       return { tone: 'off', text: 'Stopped' };
     case 'active':
       return { tone: 'neutral', text: 'Active' };
-  }
-}
-
-/** What the person said about the charge (spec 009 rule 17), or null for nothing yet. */
-export function userStatusText(charge: RecurringCharge): string | null {
-  switch (charge.user_status) {
-    case 'ignored':
-      return 'Not recurring';
-    case 'confirmed':
-      return 'You confirmed it';
-    case 'cancelled':
-      return 'You cancelled it';
-    default:
-      return null;
   }
 }
 

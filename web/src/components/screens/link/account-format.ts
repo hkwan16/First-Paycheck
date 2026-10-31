@@ -1,11 +1,15 @@
+import { institutionName } from '@/lib/accounts';
 import type { AccountTransactionCount } from '@/lib/api/hooks';
 import type { Account, AccountPatch, AccountRole, SyncProvider } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import { formatNumber } from '@/lib/money';
 
-/** Two letters for an institution's icon tile: "Chase" is CH, "First Platypus Bank" FP. */
-export function institutionInitials(name: string | null): string {
-  const words = (name ?? '').trim().split(/\s+/).filter(Boolean);
+/**
+ * Two letters for an institution's icon tile: "Chase" is CH, "First Platypus
+ * Bank" FP. Pass `institutionName(account)`, the name its group shows.
+ */
+export function institutionInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
   const [first, second] = words;
   if (!first) return '?';
   const letters = second ? `${first[0]}${second[0]}` : first.slice(0, 2);
@@ -46,8 +50,7 @@ export function groupByInstitution(accounts: readonly Account[]): InstitutionGro
   for (const account of accounts) {
     const group = groups.get(account.sync_item_id) ?? {
       itemId: account.sync_item_id,
-      name:
-        account.institution_name ?? (account.provider === 'csv' ? 'Imported CSV' : 'Linked bank'),
+      name: institutionName(account),
       provider: account.provider,
       accounts: [],
     };

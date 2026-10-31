@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import type { HealthPlanOption, PlanKind } from '@/lib/api/types';
+import { cancelOnEscape } from '@/lib/escape-cancel';
 import { useFocusHandoff } from '@/lib/focus-handoff';
 import { AmountField } from './AmountField';
 import {
@@ -23,7 +24,7 @@ export interface PlanOptionsFormProps {
   /** The plans to start from; none starts one empty plan. */
   initial: readonly HealthPlanOption[] | null;
   onCompare: (plans: HealthPlanOption[]) => void;
-  /** Shown as Cancel when there are plans to go back to. */
+  /** Shown as Cancel when there are plans to go back to; Escape does it too. */
   onCancel?: () => void;
   /** Shown when a confirmed benefits summary has plans to go back to. */
   onUseBenefits?: () => void;
@@ -75,6 +76,7 @@ export function PlanOptionsForm({
       aria-label="Your health plan options"
       noValidate
       onSubmit={submit}
+      onKeyDown={cancelOnEscape(onCancel)}
       className="flex flex-col gap-4"
     >
       <p className="m-0 text-small text-ink-3">

@@ -9,6 +9,7 @@ import { Notice } from '@/components/ui/Notice';
 import { Tile } from '@/components/ui/Tile';
 import { apiErrorMessage } from '@/lib/api/errors';
 import { useUpdateGoal } from '@/lib/api/hooks';
+import { cancelOnEscape } from '@/lib/escape-cancel';
 import { useFocusHandoff } from '@/lib/focus-handoff';
 import type { Account, Goal, GoalPatch } from '@/lib/api/types';
 import { formatRate } from '@/lib/money';
@@ -62,6 +63,11 @@ export function EmergencyGoal({ goal, accounts, funded, horizonMonths }: Emergen
     });
   };
 
+  const cancelContribution = () => {
+    focus.moveTo('change');
+    setDraft(null);
+  };
+
   const pace = goalPace(goal, { funded, horizonMonths });
 
   return (
@@ -98,6 +104,7 @@ export function EmergencyGoal({ goal, accounts, funded, horizonMonths }: Emergen
           aria-label="Change the monthly contribution"
           noValidate
           onSubmit={saveContribution}
+          onKeyDown={cancelOnEscape(cancelContribution)}
           className="flex flex-wrap items-end gap-3"
         >
           <AmountField
@@ -115,13 +122,7 @@ export function EmergencyGoal({ goal, accounts, funded, horizonMonths }: Emergen
             <Button type="submit" size="sm" variant="primary" loading={update.isPending}>
               Save contribution
             </Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                focus.moveTo('change');
-                setDraft(null);
-              }}
-            >
+            <Button size="sm" onClick={cancelContribution}>
               Cancel
             </Button>
           </div>

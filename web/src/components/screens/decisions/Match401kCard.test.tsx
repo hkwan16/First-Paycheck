@@ -492,6 +492,40 @@ describe('Match401kCard focus (issue 167)', () => {
     await waitFor(() => expect(changePlan()).toHaveFocus());
   });
 
+  it('closes the plan details with Escape from any control, back on Change plan details (issue 184)', async () => {
+    savedDecision();
+    const puts: unknown[] = [];
+    server.events.on('request:start', ({ request }) => {
+      if (request.method === 'PUT') puts.push(request.url);
+    });
+    const { user } = await renderReady();
+    await user.click(changePlan());
+    await user.type(within(form()).getByLabelText('Yearly salary'), '1{Escape}');
+    expect(within(card()).queryByRole('form', { name: 'Your plan details' })).toBeNull();
+    expect(changePlan()).toHaveFocus();
+
+    // From a control that is not a text field, the filing status.
+    await user.click(changePlan());
+    expect(within(form()).getByLabelText('Yearly salary')).toHaveValue('65,000.00');
+    await user.click(within(form()).getByRole('button', { name: 'Head of household' }));
+    await user.keyboard('{Escape}');
+    expect(within(card()).queryByRole('form', { name: 'Your plan details' })).toBeNull();
+    expect(changePlan()).toHaveFocus();
+    expect(puts).toEqual([]);
+  });
+
+  it('keeps the first plan details open on Escape, with nothing to go back to', async () => {
+    decisionsReady();
+    db.profile = { ...db.profile, birth_year: null };
+    const { user } = renderCard();
+    const details = await within(
+      await screen.findByRole('region', { name: '401(k) match' }),
+    ).findByRole('form', { name: 'Your plan details' });
+    await user.type(within(details).getByLabelText('Year you were born'), '19{Escape}');
+    expect(within(card()).getByRole('form', { name: 'Your plan details' })).toBeInTheDocument();
+    expect(within(details).getByLabelText('Year you were born')).toHaveValue('19');
+  });
+
   it('hands focus to the contribution once the first plan details are saved', async () => {
     decisionsReady();
     db.profile = { ...db.profile, birth_year: null };

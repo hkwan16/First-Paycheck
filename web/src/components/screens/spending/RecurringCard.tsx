@@ -15,14 +15,9 @@ import { useRecurring, useUpdateRecurring } from '@/lib/api/hooks';
 import type { RecurringCharge, RecurringPatch } from '@/lib/api/types';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/dates';
+import { cancelOnEscape } from '@/lib/escape-cancel';
 import { formatNumber } from '@/lib/money';
-import {
-  cadenceLabel,
-  MAX_NAME,
-  recurringBadge,
-  renameError,
-  userStatusText,
-} from './recurring-format';
+import { cadenceLabel, MAX_NAME, recurringBadge, renameError } from './recurring-format';
 
 function RenameForm({
   charge,
@@ -45,7 +40,7 @@ function RenameForm({
   };
 
   return (
-    <form onSubmit={submit} className="flex min-w-0 flex-col">
+    <form onSubmit={submit} onKeyDown={cancelOnEscape(onCancel)} className="flex min-w-0 flex-col">
       <div className="flex flex-wrap items-center gap-2">
         <Input
           size="sm"
@@ -57,12 +52,6 @@ function RenameForm({
           value={name}
           autoFocus
           onChange={(event) => setName(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              onCancel();
-            }
-          }}
         />
         <Button type="submit" size="sm" variant="primary">
           Save
@@ -151,7 +140,6 @@ export function RecurringCard() {
       <ListRows as="ul">
         {charges.map((charge) => {
           const badge = recurringBadge(charge);
-          const marked = userStatusText(charge);
           const ignored = charge.user_status === 'ignored';
           return (
             <li
@@ -182,7 +170,6 @@ export function RecurringCard() {
                   className={cn('font-semibold', ignored ? 'text-ink-3' : 'text-ink')}
                 />
                 <Badge tone={badge.tone}>{badge.text}</Badge>
-                {marked && <Badge>{marked}</Badge>}
                 {ignored ? (
                   <Button size="sm" onClick={() => save(charge, { user_status: null })}>
                     Undo

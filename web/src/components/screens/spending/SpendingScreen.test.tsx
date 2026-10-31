@@ -87,6 +87,14 @@ describe('SpendingScreen summary', () => {
     expect(summaryRegion()).toHaveTextContent('Chase ··4821 and ··7730');
   });
 
+  it('names an unnamed imported account as the Link screen does', async () => {
+    // Issue 183: one helper names an institution, so Spending never says "Linked bank" for a CSV.
+    db.accounts.push({ ...structuredClone(sampleCsvAccount), institution_name: null });
+    await renderSpending();
+    expect(summaryRegion()).toHaveTextContent('Imported CSV Credit union checking');
+    expect(summaryRegion()).not.toHaveTextContent('Linked bank');
+  });
+
   it('says when more went out than came in', async () => {
     spendingDb.cashflow.spending.left_over_cents = -12_345;
     await renderSpending();

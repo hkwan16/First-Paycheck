@@ -7,7 +7,7 @@ import { Money } from '@/components/ui/Money';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatTile } from '@/components/ui/StatTile';
-import { maskLabel } from '@/lib/accounts';
+import { institutionName, maskLabel } from '@/lib/accounts';
 import { apiErrorMessage } from '@/lib/api/errors';
 import { useAccounts } from '@/lib/api/hooks';
 import type { Account, AccountKind, SpendingSummary } from '@/lib/api/types';
@@ -23,7 +23,7 @@ function accountsText(accounts: readonly Account[], kinds?: readonly AccountKind
   const byInstitution = new Map<string, string[]>();
   for (const account of accounts) {
     if (!account.is_active || (kinds && !kinds.includes(account.kind))) continue;
-    const name = account.institution_name ?? 'Linked bank';
+    const name = institutionName(account);
     const masks = byInstitution.get(name) ?? [];
     masks.push(maskLabel(account.mask) ?? account.name);
     byInstitution.set(name, masks);

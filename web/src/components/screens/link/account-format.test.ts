@@ -20,7 +20,7 @@ describe('institutionInitials', () => {
     ['Chase', 'CH'],
     ['First Platypus Bank', 'FP'],
     ['  bank of   the west ', 'BO'],
-    [null, '?'],
+    ['Imported CSV', 'IC'],
     ['', '?'],
   ])('%j reads %s', (name, initials) => {
     expect(institutionInitials(name)).toBe(initials);

@@ -461,6 +461,31 @@ describe('HealthPlanCard focus (issue 167)', () => {
     }
   });
 
+  it('closes the plan table with Escape, back on Edit plans, keeping the plans (issue 184)', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const { user } = await renderReady();
+    await user.click(editPlans());
+    await user.type(planName(1), ' Plus{Escape}');
+    expect(within(card()).queryByRole('form', { name: 'Your health plan options' })).toBeNull();
+    expect(editPlans()).toHaveFocus();
+
+    await user.click(editPlans());
+    expect(planName(1)).toHaveValue(BRONZE_HSA.name);
+  });
+
+  it('keeps the first typed plan table open on Escape, with nothing to go back to', async () => {
+    decisionsReady();
+    const { user } = renderCard();
+    const typed = await within(
+      await screen.findByRole('region', { name: 'Health plan' }),
+    ).findByRole('form', { name: 'Your health plan options' });
+    await user.type(within(typed).getByLabelText('Plan name'), 'Silver{Escape}');
+    expect(within(card()).getByRole('form', { name: 'Your health plan options' })).toBeVisible();
+    expect(within(typed).getByLabelText('Plan name')).toHaveValue('Silver');
+  });
+
   it('hands focus to the usage once the first typed plans are compared', async () => {
     decisionsReady();
     const { user } = renderCard();

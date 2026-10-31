@@ -12,6 +12,7 @@ import { useUpdateProfile } from '@/lib/api/hooks';
 import { apiErrorMessage } from '@/lib/api/errors';
 import type { FilingStatus, PayFrequency, PayStub, Profile } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
+import { cancelOnEscape } from '@/lib/escape-cancel';
 import { useFocusHandoff } from '@/lib/focus-handoff';
 import { examplePlaceholder } from './decision-format';
 import {
@@ -45,7 +46,7 @@ export interface PlanDetailsFormProps {
   payStub: PayStub | undefined;
   /** Called once the profile is saved. */
   onSaved: () => void;
-  /** Shown as Cancel when the profile already has everything (changing it). */
+  /** Shown as Cancel when the profile already has everything (changing it); Escape does it too. */
   onCancel?: () => void;
   /** The form, which takes focus (its first field) when it opens in place of a button. */
   ref?: Ref<HTMLFormElement>;
@@ -104,6 +105,7 @@ export function PlanDetailsForm({
       aria-label="Your plan details"
       noValidate
       onSubmit={submit}
+      onKeyDown={cancelOnEscape(onCancel)}
       className="flex flex-col gap-4"
     >
       <p className="m-0 text-small text-ink-3">
