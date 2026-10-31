@@ -16,7 +16,7 @@ import { db } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
 import { benefitsWaiting, planningDb } from '@/test/msw/planning-handlers';
 import { server } from '@/test/msw/server';
-import { act, renderWithProviders, screen, waitFor, within } from '@/test/render';
+import { act, fireEvent, renderWithProviders, screen, waitFor, within } from '@/test/render';
 import { ConfirmScreen } from './ConfirmScreen';
 
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
@@ -231,6 +231,20 @@ describe('ConfirmScreen review', () => {
     expect(row('Medicare')).toHaveTextContent('$39.27');
     expect(within(row('Medicare')).getByRole('button', { name: 'Edit Medicare' })).toHaveFocus();
     expect(within(fieldsCard()).getByText('The math checks out.')).toBeInTheDocument();
+  });
+
+  it('Enter while an input method is composing keeps the draft open', async () => {
+    const { user } = await renderLoaded();
+    await user.click(within(row('Medicare')).getByRole('button', { name: 'Edit Medicare' }));
+    const input = within(row('Medicare')).getByRole('textbox', { name: 'Medicare' });
+    await user.clear(input);
+    await user.type(input, '40.00');
+    // The Enter that commits a composition belongs to the input method, not the row.
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
+    expect(within(row('Medicare')).getByRole('textbox', { name: 'Medicare' })).toHaveValue('40.00');
+    expect(
+      within(row('Medicare')).queryByRole('button', { name: 'Confirmed Medicare' }),
+    ).not.toBeInTheDocument();
   });
 
   it('edits a date with a date input and a frequency with a select', async () => {
