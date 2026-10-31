@@ -75,6 +75,22 @@ describe('RecurringCard', () => {
     ).toBeInTheDocument();
   });
 
+  it('says only what the person decided once they mark a charge, and the detector again on Undo', async () => {
+    // Issue 182: Spotify kept "Active" beside "Not recurring".
+    const { user } = await renderCard();
+    await user.click(within(row('Spotify')).getByRole('button', { name: 'Not recurring' }));
+
+    expect(within(row('Spotify')).getByText('Not recurring')).toBeInTheDocument();
+    expect(within(row('Spotify')).queryByText('Active')).not.toBeInTheDocument();
+    await waitFor(() => expect(spendingDb.recurring[3]!.user_status).toBe('ignored'));
+    expect(within(row('Spotify')).queryByText('Active')).not.toBeInTheDocument();
+
+    await user.click(within(row('Spotify')).getByRole('button', { name: 'Undo' }));
+    expect(await within(row('Spotify')).findByText('Active')).toBeInTheDocument();
+    // The only "Not recurring" left is the button that marks it again.
+    expect(within(row('Spotify')).getByText('Not recurring').closest('button')).not.toBeNull();
+  });
+
   it('renames a charge in place, showing the new name before the server answers', async () => {
     slowPatches();
     const sent = patches();
@@ -168,6 +184,7 @@ describe('RecurringCard', () => {
     spendingDb.recurring[0] = { ...sampleRecurring[0]!, user_status: 'ignored' };
     await renderCard();
     expect(within(row('Hulu')).getByText('Not recurring')).toBeInTheDocument();
+    expect(within(row('Hulu')).queryByText('Stopped')).not.toBeInTheDocument();
     expect(within(row('Hulu')).getByRole('button', { name: 'Undo' })).toBeInTheDocument();
   });
 });
