@@ -439,6 +439,21 @@ describe('EmergencyFundCard goal', () => {
     await waitFor(() => expect(button('Mark reached')).toHaveFocus());
   });
 
+  it('cancels a new contribution with Escape, back on Change contribution (issue 184)', async () => {
+    const seen = requests();
+    const { user } = await renderWithGoal();
+    await user.click(within(goal()).getByRole('button', { name: 'Change contribution' }));
+    const input = within(goal()).getByLabelText('New monthly contribution');
+    await user.clear(input);
+    await user.type(input, '999{Escape}');
+
+    expect(
+      within(goal()).queryByRole('form', { name: 'Change the monthly contribution' }),
+    ).toBeNull();
+    expect(within(goal()).getByRole('button', { name: 'Change contribution' })).toHaveFocus();
+    expect(seen.goal).toEqual([]);
+  });
+
   it('says what to fix in a new contribution before sending it', async () => {
     const seen = requests();
     const { user } = await renderWithGoal();
