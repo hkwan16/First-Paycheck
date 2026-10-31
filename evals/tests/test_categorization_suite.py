@@ -8,8 +8,9 @@ from collections.abc import Sequence
 
 import pytest
 
+from app.config import Settings
 from evals.gen.transactions import DEFAULT_CSV, read_csv
-from evals.suites import SUITES, categorization
+from evals.suites import SUITES, categorization, live
 from evals.suites.base import Budget, SuiteUnavailable
 from llm.gateway import CategorizeItem, LLMRefused, LLMUnavailable
 from llm.schemas import CategoryAssignment, CategoryBatch
@@ -132,8 +133,8 @@ def test_a_wrong_label_is_reported() -> None:
 
 
 def test_categorization_needs_an_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    no_key = categorization.Settings(_env_file=None, anthropic_api_key=None)
-    monkeypatch.setattr(categorization, "_settings", lambda: no_key)
+    no_key = Settings(_env_file=None, anthropic_api_key=None)
+    monkeypatch.setattr(live, "_settings", lambda: no_key)
     with pytest.raises(SuiteUnavailable, match="ANTHROPIC_API_KEY"):
         categorization.run(Budget(100))
 

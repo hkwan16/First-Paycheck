@@ -12,7 +12,7 @@ import pytest
 from pydantic import SecretStr
 
 from app.config import Settings
-from evals.suites import explain, explain_smoke
+from evals.suites import explain, explain_smoke, live
 from evals.suites.base import Budget, SuiteUnavailable
 from llm.gateway import (
     JUDGE_RATE_CLAIM_PROMPT,
@@ -23,9 +23,9 @@ from llm.gateway import (
 )
 from llm.prompts import load_prompt
 from llm.schemas import (
+    ClaimDraft,
     ExplainContext,
     ExplanationDraft,
-    RateClaimDraft,
     RateClaimRequest,
     RateClaimVerdict,
 )
@@ -212,7 +212,7 @@ def test_rate_framing_is_the_judges_verdict_on_the_scored_decisions() -> None:
     assert len(judge.requests) == 18
     [issue] = [r for r, d in zip(judge.requests, scored, strict=True) if d.id == ISSUE_132]
     assert (issue.chosen_rate, issue.pay_stub_rate, issue.full_match_rate) == ("5%", "3%", "5%")
-    assert issue.draft == RateClaimDraft(
+    assert issue.draft == ClaimDraft(
         concept="Your employer's match.",
         text=f"{CLAIM} Your employer adds money to it.",
         what_ifs=[],
@@ -266,7 +266,7 @@ def test_the_request_names_no_stub_and_no_match_as_null() -> None:
         None,
         "5%",
     )
-    assert no_stub.draft == RateClaimDraft(concept="c", text="t", what_ifs=["w"])
+    assert no_stub.draft == ClaimDraft(concept="c", text="t", what_ifs=["w"])
     no_match = explain.decision_request(by_id["no-match-stub-differs"], draft)
     assert (no_match.chosen_rate, no_match.pay_stub_rate, no_match.full_match_rate) == (
         "6%",
@@ -399,7 +399,7 @@ def test_one_case_is_a_decision_and_the_judged_metrics_count_only_their_own() ->
 def test_the_live_suite_needs_a_key(monkeypatch: pytest.MonkeyPatch) -> None:
     # Explicitly no key: a key in the shell's environment must not make this a live call.
     no_key = Settings(_env_file=None, anthropic_api_key=None)
-    monkeypatch.setattr(explain, "_settings", lambda: no_key)
+    monkeypatch.setattr(live, "_settings", lambda: no_key)
     with pytest.raises(SuiteUnavailable, match="ANTHROPIC_API_KEY"):
         explain.run(Budget(100))
 
@@ -410,14 +410,14 @@ def test_the_live_suite_drafts_and_judges_through_one_gateway(
     """run() wires the gateway in as both drafter and judge, over the calibration
     items, and charges its ledger; FakeGateway stands in for the model here."""
     settings = Settings(_env_file=None, anthropic_api_key=SecretStr("sk-ant-test"))
-    monkeypatch.setattr(explain, "_settings", lambda: settings)
+    monkeypatch.setattr(live, "_settings", lambda: settings)
     ledgers: list[MemoryLedger] = []
 
     def gateway(settings: Settings, ledger: MemoryLedger) -> FakeGateway:
         ledgers.append(ledger)
         return FakeGateway(settings, ledger=ledger)
 
-    monkeypatch.setattr(explain, "_gateway", gateway)
+    monkeypatch.setattr(live, "_gateway", gateway)
     result = explain.run(Budget(0))
     items = explain.load_rate_claims()
     assert result.metrics["first_try_verified"] == 1.0

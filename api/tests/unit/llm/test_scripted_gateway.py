@@ -24,11 +24,11 @@ from llm.gateway import (
     reply_with,
 )
 from llm.schemas import (
+    ClaimDraft,
     ExplainCitation,
     ExplainContext,
     ExplainFact,
     ExplanationDraft,
-    RateClaimDraft,
     RateClaimRequest,
     RateClaimVerdict,
     WithholdingClaimRequest,
@@ -102,7 +102,7 @@ REQUEST = RateClaimRequest(
     chosen_rate="5%",
     pay_stub_rate="3%",
     full_match_rate="5%",
-    draft=RateClaimDraft(concept="c", text="You are already contributing 5%.", what_ifs=[]),
+    draft=ClaimDraft(concept="c", text="You are already contributing 5%.", what_ifs=[]),
 )
 CLAIM = RateClaimVerdict(
     reason="It calls the chosen 5% current while the stub shows 3%.",
@@ -129,7 +129,7 @@ WITHHOLDING_REQUEST = WithholdingClaimRequest(
     pay_stub_withholding="$272.44",
     entries_outcome="a refund of $0.02",
     pay_stub_outcome="a balance due of $3,918.70",
-    draft=RateClaimDraft(
+    draft=ClaimDraft(
         concept="c", text="Your employer withholds $423.16 from each paycheck.", what_ifs=[]
     ),
 )

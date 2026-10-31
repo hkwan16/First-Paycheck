@@ -10,8 +10,9 @@ from typing import Any
 
 import pytest
 
+from app.config import Settings
 from evals.gen.make_pay_stubs import load_fixtures
-from evals.suites import SUITES, extraction, extraction_smoke
+from evals.suites import SUITES, extraction, extraction_smoke, live
 from evals.suites.base import Budget, SuiteUnavailable
 from llm.gateway import ModelPage
 from llm.schemas import PayStubExtraction
@@ -114,8 +115,8 @@ def test_the_reader_sees_only_redacted_text() -> None:
 
 def test_extraction_needs_an_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     # Explicitly no key: a key in the shell's environment must not make this a live call.
-    no_key = extraction.Settings(_env_file=None, anthropic_api_key=None)
-    monkeypatch.setattr(extraction, "_settings", lambda: no_key)
+    no_key = Settings(_env_file=None, anthropic_api_key=None)
+    monkeypatch.setattr(live, "_settings", lambda: no_key)
     with pytest.raises(SuiteUnavailable, match="ANTHROPIC_API_KEY"):
         extraction.run(Budget(100))
 

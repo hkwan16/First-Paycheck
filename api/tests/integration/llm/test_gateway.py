@@ -42,12 +42,12 @@ from llm.gateway import (
 from llm.schemas import (
     BenefitsSummaryExtraction,
     CategoryBatch,
+    ClaimDraft,
     ExplainCitation,
     ExplainContext,
     ExplainFact,
     ExplanationDraft,
     PayStubExtraction,
-    RateClaimDraft,
     RateClaimRequest,
     RateClaimVerdict,
     WithholdingClaimRequest,
@@ -618,7 +618,7 @@ JUDGE_REQUEST = RateClaimRequest(
     chosen_rate="5%",
     pay_stub_rate="3%",
     full_match_rate="5%",
-    draft=RateClaimDraft(
+    draft=ClaimDraft(
         concept="Your employer matches what you put in.",
         text="You are already contributing 5%.",
         what_ifs=[],
@@ -658,7 +658,7 @@ WITHHOLDING_REQUEST = WithholdingClaimRequest(
     pay_stub_withholding="$272.44",
     entries_outcome="a refund of $0.02",
     pay_stub_outcome="a balance due of $3,918.70",
-    draft=RateClaimDraft(
+    draft=ClaimDraft(
         concept="How your Form W-4 sets your withholding.",
         text="Your employer withholds $423.16 of federal income tax from each paycheck.",
         what_ifs=[],

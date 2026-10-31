@@ -25,6 +25,7 @@ __all__ = [
     "CategoryAssignment",
     "CategoryBatch",
     "Cents",
+    "ClaimDraft",
     "DateField",
     "ExplainCitation",
     "ExplainContext",
@@ -44,7 +45,6 @@ __all__ = [
     "PlanExtraction",
     "PlanKindField",
     "PlanKindValue",
-    "RateClaimDraft",
     "RateClaimRequest",
     "RateClaimVerdict",
     "TextField",
@@ -258,7 +258,7 @@ class ExplainContext(_Strict):
     benefits_passages: list[str]
 
 
-class RateClaimDraft(_Strict):
+class ClaimDraft(_Strict):
     """The words of an explanation an eval judge reads: the rate-claim judge's
     (spec 008 rule 24a) and the withholding-claim judge's (rule 24d)."""
 
@@ -276,7 +276,7 @@ class RateClaimRequest(_Strict):
     pay_stub_rate: str | None
     # None: the plan has no employer match.
     full_match_rate: str | None
-    draft: RateClaimDraft
+    draft: ClaimDraft
 
 
 class RateClaimVerdict(_Strict):
@@ -321,7 +321,7 @@ class WithholdingClaimRequest(_Strict):
     entries_outcome: str
     # None exactly when pay_stub_withholding is.
     pay_stub_outcome: str | None
-    draft: RateClaimDraft
+    draft: ClaimDraft
 
 
 class WithholdingClaimVerdict(_Strict):

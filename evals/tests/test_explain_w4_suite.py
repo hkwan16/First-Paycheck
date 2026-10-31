@@ -13,7 +13,7 @@ from pydantic import SecretStr
 
 from app.config import Settings
 from calc.pay_stub import StubWithholding, stub_withholding
-from evals.suites import explain, explain_smoke, explain_w4
+from evals.suites import explain, explain_smoke, explain_w4, live
 from evals.suites.base import Budget, SuiteUnavailable
 from llm.gateway import (
     JUDGE_WITHHOLDING_CLAIM_PROMPT,
@@ -24,9 +24,9 @@ from llm.gateway import (
 )
 from llm.prompts import load_prompt
 from llm.schemas import (
+    ClaimDraft,
     ExplainContext,
     ExplanationDraft,
-    RateClaimDraft,
     WithholdingClaimRequest,
     WithholdingClaimVerdict,
 )
@@ -206,7 +206,7 @@ def test_withholding_framing_is_the_judges_verdict_on_the_scored_decisions() -> 
         pay_stub_withholding="$272.44",
         entries_outcome="a refund of $0.02",
         pay_stub_outcome="a balance due of $3,918.70",
-        draft=RateClaimDraft(
+        draft=ClaimDraft(
             concept="How your Form W-4 sets your withholding.",
             text=f"{CLAIM} Your refund will be small.",
             what_ifs=[],
@@ -364,7 +364,7 @@ def test_one_case_is_a_decision_and_the_judged_metrics_count_only_their_own() ->
 
 def test_the_live_suite_needs_a_key(monkeypatch: pytest.MonkeyPatch) -> None:
     no_key = Settings(_env_file=None, anthropic_api_key=None)
-    monkeypatch.setattr(explain_w4, "_settings", lambda: no_key)
+    monkeypatch.setattr(live, "_settings", lambda: no_key)
     with pytest.raises(SuiteUnavailable, match="ANTHROPIC_API_KEY"):
         explain_w4.run(Budget(100))
 
@@ -373,14 +373,14 @@ def test_the_live_suite_drafts_and_judges_through_one_gateway(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = Settings(_env_file=None, anthropic_api_key=SecretStr("sk-ant-test"))
-    monkeypatch.setattr(explain_w4, "_settings", lambda: settings)
+    monkeypatch.setattr(live, "_settings", lambda: settings)
     ledgers: list[MemoryLedger] = []
 
     def gateway(settings: Settings, ledger: MemoryLedger) -> FakeGateway:
         ledgers.append(ledger)
         return FakeGateway(settings, ledger=ledger)
 
-    monkeypatch.setattr(explain_w4, "_gateway", gateway)
+    monkeypatch.setattr(live, "_gateway", gateway)
     result = explain_w4.run(Budget(0))
     items = explain_w4.load_withholding_claims()
     assert result.metrics["first_try_verified"] == 1.0

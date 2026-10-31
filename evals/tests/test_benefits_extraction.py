@@ -11,8 +11,9 @@ from typing import Any
 
 import pytest
 
+from app.config import Settings
 from evals.gen import make_benefits as gen
-from evals.suites import SUITES, benefits_extraction
+from evals.suites import SUITES, benefits_extraction, live
 from evals.suites.base import Budget, SuiteUnavailable
 from ingest.pipeline import prepare_document
 from llm.gateway import ModelPage
@@ -223,7 +224,7 @@ def test_every_summary_is_read_from_its_text_layer() -> None:
 
 
 def test_benefits_extraction_needs_an_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    no_key = benefits_extraction.Settings(_env_file=None, anthropic_api_key=None)
-    monkeypatch.setattr(benefits_extraction, "_settings", lambda: no_key)
+    no_key = Settings(_env_file=None, anthropic_api_key=None)
+    monkeypatch.setattr(live, "_settings", lambda: no_key)
     with pytest.raises(SuiteUnavailable, match="ANTHROPIC_API_KEY"):
         benefits_extraction.run(Budget(100))

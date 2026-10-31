@@ -9,7 +9,8 @@ explain-w4 suites load ``w4_decisions.json`` this way), and its citations
 are the verified seed passages read from ``api/db/seed/irs_citations/``, so no
 database is needed. The flow is ``verify.flow.run_explain`` exactly as
 ``POST /explain`` runs it. The gateway records to an in-memory ledger that
-charges the run's ``Budget`` before each result is read.
+charges the run's ``Budget`` before each result is read (``evals/suites/live.py``);
+the judging is ``evals/suites/claim_judge.py``'s.
 
 Metrics (higher is better; each tolerates one case's worth or 2 points,
 whichever is larger, as evals/CLAUDE.md says):
@@ -34,23 +35,17 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from decimal import Decimal
+from functools import partial
 from pathlib import Path
 from typing import Any, Protocol
 
-from app.config import Settings
 from calc.pay_stub import StubRate, stub_rate
 from calc.registry import calculator as registered_calculator
 from db.seed.load import read_seed_citations
-from evals.suites.base import Budget, Suite, SuiteResult, SuiteUnavailable
-from llm.gateway import (
-    MICROCENTS_PER_CENT,
-    Gateway,
-    LedgerEntry,
-    LLMError,
-    LLMGateway,
-    MemoryLedger,
-)
-from llm.schemas import ExplanationDraft, RateClaimDraft, RateClaimRequest, RateClaimVerdict
+from evals.suites.base import Budget, Suite, SuiteResult
+from evals.suites.claim_judge import ClaimJudge
+from evals.suites.live import live_gateway
+from llm.schemas import ClaimDraft, ExplanationDraft, RateClaimRequest, RateClaimVerdict
 from retrieval.benefits_search import BenefitsPassage
 from retrieval.citations import Citation
 from retrieval.context import explain_setup
@@ -65,8 +60,6 @@ W4_FIXTURES = FIXTURES.with_name("w4_decisions.json")
 RATE_CLAIMS = FIXTURES.with_name("rate_claims.json")
 EVAL_USER = uuid.UUID("00000000-0000-4000-8000-0000000e7a1e")
 CALCULATOR = "k401_match"
-# The gateway's per-user daily cap is not the eval's limit: --max-cost-cents is.
-UNCAPPED_DAILY_CENTS = 1_000_000
 
 
 @dataclass(frozen=True)
@@ -177,7 +170,7 @@ class RateClaimItem:
     chosen_pct: Decimal
     pay_stub_pct: Decimal | None
     full_match_pct: Decimal | None
-    draft: RateClaimDraft
+    draft: ClaimDraft
     # Whether the draft claims the chosen rate is in effect: the expected verdict.
     claims: bool
     # The fixture decision a live sentence came from, or None for a written one.
@@ -197,7 +190,7 @@ def load_rate_claims(path: Path = RATE_CLAIMS) -> list[RateClaimItem]:
             chosen_pct=Decimal(entry["chosen_pct"]),
             pay_stub_pct=_rate(entry["pay_stub_pct"]),
             full_match_pct=_rate(entry["full_match_pct"]),
-            draft=RateClaimDraft(
+            draft=ClaimDraft(
                 concept=entry.get("concept", ""),
                 text=entry["text"],
                 what_ifs=entry.get("what_ifs", []),
@@ -213,7 +206,7 @@ def rate_claim_request(
     chosen_pct: Decimal,
     pay_stub_pct: Decimal | None,
     full_match_pct: Decimal | None,
-    draft: RateClaimDraft,
+    draft: ClaimDraft,
 ) -> RateClaimRequest:
     """The judge's question, with every rate written the way the explain facts write it."""
     return RateClaimRequest(
@@ -237,21 +230,8 @@ def decision_request(decision: EvalDecision, draft: ExplanationDraft) -> RateCla
         Decimal(str(decision.inputs["contribution_pct"])),
         decision.pay_stub_pct,
         full_match_pct(decision),
-        RateClaimDraft(concept=draft.concept, text=draft.text, what_ifs=list(draft.what_ifs)),
+        ClaimDraft(concept=draft.concept, text=draft.text, what_ifs=list(draft.what_ifs)),
     )
-
-
-def judged(judge: RateJudge, request: RateClaimRequest) -> RateClaimVerdict | LLMError:
-    """The judge's verdict, or the error it failed with: a failed call counts as
-    a miss and the run goes on (spec 008 rule 24a)."""
-    try:
-        return judge.judge_rate_claim(EVAL_USER, request)
-    except LLMError as exc:
-        return exc
-
-
-def _failed(exc: LLMError) -> str:
-    return f"the rate-claim judge failed: {type(exc).__name__}: {exc}"
 
 
 def frames_rate_scored(decision: EvalDecision) -> bool:
@@ -263,27 +243,14 @@ def frames_rate_scored(decision: EvalDecision) -> bool:
     return stub_rate(chosen, decision.pay_stub_pct) is not StubRate.CHOSEN
 
 
-def _claim_label(claims: bool) -> str:
-    return "a claim" if claims else "no claim"
-
-
-def calibrate(judge: RateJudge, items: Sequence[RateClaimItem]) -> tuple[int, list[str]]:
-    """How many items the judge reads as labeled, and a failure line for each miss."""
-    matched = 0
-    failures: list[str] = []
-    for item in items:
-        verdict = judged(judge, item.request)
-        if isinstance(verdict, LLMError):
-            failures.append(f"judge {item.id}: {_failed(verdict)}")
-        elif verdict.claims_chosen_rate_in_effect == item.claims:
-            matched += 1
-        else:
-            failures.append(
-                f"judge {item.id}: labeled {_claim_label(item.claims)}, judged"
-                f" {_claim_label(verdict.claims_chosen_rate_in_effect)}:"
-                f" {verdict.sentence or item.draft.text!r} ({verdict.reason})"
-            )
-    return matched, failures
+def rate_judge(judge: RateJudge) -> ClaimJudge[RateClaimRequest, RateClaimVerdict]:
+    """The rate-claim judge as ``rate_framing`` and ``judge_accuracy`` ask it."""
+    return ClaimJudge(
+        name="rate-claim",
+        claim="the chosen rate is in effect",
+        ask=partial(judge.judge_rate_claim, EVAL_USER),
+        claims=lambda verdict: verdict.claims_chosen_rate_in_effect,
+    )
 
 
 def flow_failures(decision_id: str, attempts: Sequence[Attempt]) -> list[str]:
@@ -305,6 +272,7 @@ def score(
     judge: RateJudge,
     calibration: Sequence[RateClaimItem],
 ) -> SuiteResult:
+    rates = rate_judge(judge)
     first_try = fallbacks = cited = framed = scored = 0
     failures: list[str] = []
     for decision in decisions:
@@ -315,17 +283,13 @@ def score(
         cited += bool(final.draft.citation_keys)
         if frames_rate_scored(decision):
             scored += 1
-            verdict = judged(judge, decision_request(decision, final.draft))
-            if isinstance(verdict, LLMError):
-                failures.append(f"{decision.id}: {_failed(verdict)}")
-            elif verdict.claims_chosen_rate_in_effect:
-                failures.append(
-                    f"{decision.id}: claims the chosen rate is in effect: {verdict.sentence!r}"
-                )
-            else:
+            failure = rates.framing_failure(decision.id, decision_request(decision, final.draft))
+            if failure is None:
                 framed += 1
+            else:
+                failures.append(failure)
         failures += flow_failures(decision.id, attempts)
-    matched, misread = calibrate(judge, calibration)
+    matched, misread = rates.calibrate(calibration)
     count = len(decisions)
     return SuiteResult(
         metrics={
@@ -346,34 +310,11 @@ def score(
     )
 
 
-def _settings() -> Settings:
-    return Settings()
-
-
-def _gateway(settings: Settings, ledger: MemoryLedger) -> Gateway:
-    return LLMGateway(settings, ledger=ledger)
-
-
 def run(budget: Budget) -> SuiteResult:
-    settings = _settings()
-    if settings.anthropic_api_key is None:
-        raise SuiteUnavailable("ANTHROPIC_API_KEY is not set")
-    spent: list[float] = []
-
-    def charge(entry: LedgerEntry) -> None:
-        cents = entry.cost_microcents / MICROCENTS_PER_CENT
-        spent.append(cents)
-        budget.charge(cents)
-
-    gateway = _gateway(
-        settings.model_copy(
-            update={"llm_fake": False, "llm_daily_budget_cents": UNCAPPED_DAILY_CENTS}
-        ),
-        MemoryLedger(on_record=charge),
-    )
+    live = live_gateway(budget)
     # One gateway drafts and judges, so both are charged to the run's budget.
-    result = score(load_decisions(), gateway, gateway, load_rate_claims())
-    return replace(result, cost_cents=sum(spent))
+    result = score(load_decisions(), live.gateway, live.gateway, load_rate_claims())
+    return replace(result, cost_cents=live.spent_cents)
 
 
 SUITE = Suite(name="explain", llm=True, run=run)

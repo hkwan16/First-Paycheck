@@ -232,7 +232,7 @@ def test_judge_rate_claim() -> None:
         assert f"`{field}`" in prompt.system, field
     for field in schemas.RateClaimRequest.model_fields:
         assert f"`{field}`" in prompt.system, field
-    for field in schemas.RateClaimDraft.model_fields:
+    for field in schemas.ClaimDraft.model_fields:
         assert f"`draft.{field}`" in prompt.system, field
     # The cases the regular expressions could not tell apart (spec 008 rule 24): a
     # condition, a rate as the subject, and the full-match rate read against both rates.
@@ -254,7 +254,7 @@ def test_judge_withholding_claim() -> None:
         assert f"`{field}`" in prompt.system, field
     for field in schemas.WithholdingClaimRequest.model_fields:
         assert f"`{field}`" in prompt.system, field
-    for field in schemas.RateClaimDraft.model_fields:
+    for field in schemas.ClaimDraft.model_fields:
         assert f"`draft.{field}`" in prompt.system, field
     # The cases rule 24d names: the entries as the subject, and an outcome read
     # against both withholdings.

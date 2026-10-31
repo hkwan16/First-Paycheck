@@ -21,6 +21,15 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
 - `run.py`: CLI, suite selection (`free`, `llm`, `all` aliases), baseline comparison.
 - `suites/base.py`: `Suite`, `SuiteResult`, `Budget`. `suites/__init__.py`: the registry.
 - `suites/<name>.py`: one module per suite exposing `SUITE`.
+- `suites/live.py`: `live_gateway(budget)`, the real-model gateway every LLM
+  suite's `run` uses, its ledger charging the run's `Budget` (and
+  `SuiteUnavailable` without `ANTHROPIC_API_KEY`). Tests patch its `_settings`
+  and `_gateway`.
+- `suites/claim_judge.py`: `ClaimJudge`, the judging, calibration and failure
+  lines the explain suites' claim judges share (rate-claim and
+  withholding-claim). A suite supplies the judge's name, the claim in words,
+  its call and its verdict's claim; calibration items are any `ClaimItem` (id,
+  draft, labeled `claims`, request).
 - `fixtures/<suite>/`: inputs and labels. `fixtures/calc/*.json` holds spec
   examples as `[{"id", "route", "request", "expected"}]`.
 - `fixtures/transactions.csv`: 534 synthetic labeled transactions

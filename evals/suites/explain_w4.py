@@ -5,7 +5,8 @@ Each decision in ``evals/fixtures/explain/w4_decisions.json`` is a ``w4`` input 
 what its pay stub withholds each paycheck (``pay_stub_withholding_cents``, null for
 none; spec 008 rule 7b); six withhold another amount than the entries (issue 181's
 decision among them), three what the entries give, three have no stub. Results,
-citations and the flow are the explain suite's (``evals/suites/explain.py``).
+citations and the flow are the explain suite's (``evals/suites/explain.py``), and the judging
+``evals/suites/claim_judge.py``'s.
 
 Metrics (higher is better; each tolerates one case's worth or 2 points, whichever
 is larger, as evals/CLAUDE.md says):
@@ -26,33 +27,26 @@ import json
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+from functools import partial
 from pathlib import Path
 from typing import Protocol
 
-from app.config import Settings
 from calc.pay_stub import StubWithholding, stub_withholding
 from calc.w4 import W4Input, W4Result, at_withholding
-from evals.suites.base import Budget, Suite, SuiteResult, SuiteUnavailable
+from evals.suites.base import Budget, Suite, SuiteResult
+from evals.suites.claim_judge import ClaimJudge
 from evals.suites.explain import (
     EVAL_USER,
-    UNCAPPED_DAILY_CENTS,
     W4_FIXTURES,
     EvalDecision,
     explain_decision,
     flow_failures,
     load_decisions,
 )
-from llm.gateway import (
-    MICROCENTS_PER_CENT,
-    Gateway,
-    LedgerEntry,
-    LLMError,
-    LLMGateway,
-    MemoryLedger,
-)
+from evals.suites.live import live_gateway
 from llm.schemas import (
+    ClaimDraft,
     ExplanationDraft,
-    RateClaimDraft,
     WithholdingClaimRequest,
     WithholdingClaimVerdict,
 )
@@ -90,7 +84,7 @@ def withholding_claim_request(
     pay_stub_cents: int | None,
     entries_refund_cents: int,
     pay_stub_refund_cents: int | None,
-    draft: RateClaimDraft,
+    draft: ClaimDraft,
 ) -> WithholdingClaimRequest:
     """The judge's question, with every amount written the way the explain facts write it."""
     return WithholdingClaimRequest(
@@ -113,7 +107,7 @@ class WithholdingClaimItem:
     pay_stub_cents: int | None
     entries_refund_cents: int
     pay_stub_refund_cents: int | None
-    draft: RateClaimDraft
+    draft: ClaimDraft
     # Whether the draft claims the entries are in effect: the expected verdict.
     claims: bool
     # The fixture decision a live sentence was written for, or None for a written one.
@@ -138,7 +132,7 @@ def load_withholding_claims(path: Path = WITHHOLDING_CLAIMS) -> list[Withholding
             pay_stub_cents=entry["pay_stub_cents"],
             entries_refund_cents=entry["entries_refund_cents"],
             pay_stub_refund_cents=entry["pay_stub_refund_cents"],
-            draft=RateClaimDraft(
+            draft=ClaimDraft(
                 concept=entry.get("concept", ""),
                 text=entry["text"],
                 what_ifs=entry.get("what_ifs", []),
@@ -165,7 +159,7 @@ def decision_request(decision: EvalDecision, draft: ExplanationDraft) -> Withhol
         stub,
         result.projected_refund_cents,
         at_stub,
-        RateClaimDraft(concept=draft.concept, text=draft.text, what_ifs=list(draft.what_ifs)),
+        ClaimDraft(concept=draft.concept, text=draft.text, what_ifs=list(draft.what_ifs)),
     )
 
 
@@ -177,44 +171,16 @@ def frames_withholding_scored(decision: EvalDecision) -> bool:
     return case is not StubWithholding.ENTRIES
 
 
-def judged(
-    judge: WithholdingJudge, request: WithholdingClaimRequest
-) -> WithholdingClaimVerdict | LLMError:
-    """The judge's verdict, or the error it failed with: a failed call counts as a
-    miss and the run goes on (spec 008 rule 24d)."""
-    try:
-        return judge.judge_withholding_claim(EVAL_USER, request)
-    except LLMError as exc:
-        return exc
-
-
-def _failed(exc: LLMError) -> str:
-    return f"the withholding-claim judge failed: {type(exc).__name__}: {exc}"
-
-
-def _claim_label(claims: bool) -> str:
-    return "a claim" if claims else "no claim"
-
-
-def calibrate(
-    judge: WithholdingJudge, items: Sequence[WithholdingClaimItem]
-) -> tuple[int, list[str]]:
-    """How many items the judge reads as labeled, and a failure line for each miss."""
-    matched = 0
-    failures: list[str] = []
-    for item in items:
-        verdict = judged(judge, item.request)
-        if isinstance(verdict, LLMError):
-            failures.append(f"judge {item.id}: {_failed(verdict)}")
-        elif verdict.claims_entries_in_effect == item.claims:
-            matched += 1
-        else:
-            failures.append(
-                f"judge {item.id}: labeled {_claim_label(item.claims)}, judged"
-                f" {_claim_label(verdict.claims_entries_in_effect)}:"
-                f" {verdict.sentence or item.draft.text!r} ({verdict.reason})"
-            )
-    return matched, failures
+def withholding_judge(
+    judge: WithholdingJudge,
+) -> ClaimJudge[WithholdingClaimRequest, WithholdingClaimVerdict]:
+    """The withholding-claim judge as ``withholding_framing`` and ``judge_accuracy`` ask it."""
+    return ClaimJudge(
+        name="withholding-claim",
+        claim="the entries are in effect",
+        ask=partial(judge.judge_withholding_claim, EVAL_USER),
+        claims=lambda verdict: verdict.claims_entries_in_effect,
+    )
 
 
 def score(
@@ -223,6 +189,7 @@ def score(
     judge: WithholdingJudge,
     calibration: Sequence[WithholdingClaimItem],
 ) -> SuiteResult:
+    withholdings = withholding_judge(judge)
     first_try = fallbacks = cited = framed = scored = 0
     failures: list[str] = []
     for decision in decisions:
@@ -233,17 +200,15 @@ def score(
         cited += bool(final.draft.citation_keys)
         if frames_withholding_scored(decision):
             scored += 1
-            verdict = judged(judge, decision_request(decision, final.draft))
-            if isinstance(verdict, LLMError):
-                failures.append(f"{decision.id}: {_failed(verdict)}")
-            elif verdict.claims_entries_in_effect:
-                failures.append(
-                    f"{decision.id}: claims the entries are in effect: {verdict.sentence!r}"
-                )
-            else:
+            failure = withholdings.framing_failure(
+                decision.id, decision_request(decision, final.draft)
+            )
+            if failure is None:
                 framed += 1
+            else:
+                failures.append(failure)
         failures += flow_failures(decision.id, attempts)
-    matched, misread = calibrate(judge, calibration)
+    matched, misread = withholdings.calibrate(calibration)
     count = len(decisions)
     return SuiteResult(
         metrics={
@@ -264,34 +229,11 @@ def score(
     )
 
 
-def _settings() -> Settings:
-    return Settings()
-
-
-def _gateway(settings: Settings, ledger: MemoryLedger) -> Gateway:
-    return LLMGateway(settings, ledger=ledger)
-
-
 def run(budget: Budget) -> SuiteResult:
-    settings = _settings()
-    if settings.anthropic_api_key is None:
-        raise SuiteUnavailable("ANTHROPIC_API_KEY is not set")
-    spent: list[float] = []
-
-    def charge(entry: LedgerEntry) -> None:
-        cents = entry.cost_microcents / MICROCENTS_PER_CENT
-        spent.append(cents)
-        budget.charge(cents)
-
-    gateway = _gateway(
-        settings.model_copy(
-            update={"llm_fake": False, "llm_daily_budget_cents": UNCAPPED_DAILY_CENTS}
-        ),
-        MemoryLedger(on_record=charge),
-    )
+    live = live_gateway(budget)
     # One gateway drafts and judges, so both are charged to the run's budget.
-    result = score(load_w4_decisions(), gateway, gateway, load_withholding_claims())
-    return replace(result, cost_cents=sum(spent))
+    result = score(load_w4_decisions(), live.gateway, live.gateway, load_withholding_claims())
+    return replace(result, cost_cents=live.spent_cents)
 
 
 SUITE = Suite(name="explain-w4", llm=True, run=run)
