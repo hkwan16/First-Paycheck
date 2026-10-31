@@ -19,25 +19,24 @@ describe('recurringBadge', () => {
   const IGNORED = { tone: 'neutral', text: 'Not recurring' } as const;
   const CONFIRMED = { tone: 'neutral', text: 'You confirmed it' } as const;
   const CANCELLED = { tone: 'neutral', text: 'You cancelled it' } as const;
-  const cases: [RecurringCharge['status'], RecurringCharge['user_status'], RecurringBadgeView][] =
-    [
-      ['new', null, NEW],
-      ['changed', null, CHANGED],
-      ['stopped', null, STOPPED],
-      ['active', null, ACTIVE],
-      ['new', 'ignored', IGNORED],
-      ['changed', 'ignored', IGNORED],
-      ['stopped', 'ignored', IGNORED],
-      ['active', 'ignored', IGNORED],
-      ['new', 'confirmed', CONFIRMED],
-      ['changed', 'confirmed', CONFIRMED],
-      ['stopped', 'confirmed', CONFIRMED],
-      ['active', 'confirmed', CONFIRMED],
-      ['new', 'cancelled', CANCELLED],
-      ['changed', 'cancelled', CANCELLED],
-      ['stopped', 'cancelled', CANCELLED],
-      ['active', 'cancelled', CANCELLED],
-    ];
+  const cases: [RecurringCharge['status'], RecurringCharge['user_status'], RecurringBadgeView][] = [
+    ['new', null, NEW],
+    ['changed', null, CHANGED],
+    ['stopped', null, STOPPED],
+    ['active', null, ACTIVE],
+    ['new', 'ignored', IGNORED],
+    ['changed', 'ignored', IGNORED],
+    ['stopped', 'ignored', IGNORED],
+    ['active', 'ignored', IGNORED],
+    ['new', 'confirmed', CONFIRMED],
+    ['changed', 'confirmed', CONFIRMED],
+    ['stopped', 'confirmed', CONFIRMED],
+    ['active', 'confirmed', CONFIRMED],
+    ['new', 'cancelled', CANCELLED],
+    ['changed', 'cancelled', CANCELLED],
+    ['stopped', 'cancelled', CANCELLED],
+    ['active', 'cancelled', CANCELLED],
+  ];
 
   it.each(cases)('%s with the mark %s reads %j', (status, userStatus, badge) => {
     expect(recurringBadge({ ...PARKLINE!, status, user_status: userStatus })).toEqual(badge);
