@@ -485,3 +485,24 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Time saved or lost:** Not measured.
 
 **Revised before merge:** Making spending rules money-out only also stopped refunds from netting (the `user_good` October's United Airlines refund, -50,000, became uncategorized and changed spec 007's figures). The coordinator replaced it with direction-aware precedence: money out goes user exact, user prefix, seed exact, seed prefix; money in goes user exact, user prefix, seed contains, seed exact, seed prefix. The paycheck is still `income` (`payroll` beats the prefix `sweetgreen` for money in), the refund is `travel` again, the model may call money in a refund, and a user rule applies both ways. A failing precedence row (`united airlines`, -50,000 -> `travel`) reproduced it first; the migration test now runs the categorize rules pass after 0016 to show the cleared rows come back right.
+
+## 2026-10-30: the W-4 explanation tells the stub's withholding from the entries' (issue 181)
+
+**Task:** The e2e account's W-4 explanation (`explain/v2`) said "Your employer withholds $423.16 of federal income tax from each paycheck ... withholding is almost exactly matched", while its pay stub withholds $272.44 and the W-4 card says $3,918.70 is due if nothing changes. Issue 132's 401(k) bug, on the W-4.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Spec 008 rule 7b and spec 014 rule 19 first, a reproduction of the context and fallback for spec 014 example 11, failing calc, context, fallback, route and stale tests, then the code; a new eval suite with its own judge, measured live.
+
+**What it produced:** `calc/pay_stub.py:withholding_on_schedule` and `stub_withholding` (entries, other, none); `calc/w4.py:at_withholding`, which `w4()` now uses for rule 10a too; `POST /explain` reads the newest stub once for the 401(k) rate and the federal withholding; W-4 facts that say whose each figure is, the stub's withholding and the balance due at it as facts, allowed numbers and fallback text (`fallback/v4`); `explain/v3` (v2 plus W-4 rules); `judge_withholding_claim/v1` and the `explain-w4` suite (12 decisions, 24 calibration items). Live: explain-w4 1.0 on all five metrics in three runs (22.82, 22.43, 21.39 cents); the 401(k) explain suite on v3 1.0 on all five (47.14 cents).
+
+**What was wrong:**
+- The root cause was in the context, not the model alone: the fact was labeled `Federal income tax withheld per paycheck`, the refund note said "more is withheld than the year's tax", and the fallback itself said "your employer withholds $423.16". No stub figure reached the model.
+- A first scripted calibration test used a decision the judge scores, so the scripted judge was asked about a request it had no label for; the test now uses a decision it does not score.
+- Two live runs started together hung for over 30 minutes in an SSL read at 1.3 s of CPU (probably the laptop sleeping; the 120 s request timeout did not fire). They were killed and rerun one at a time; their partial spend is not known, at most a few cents.
+
+**How it was caught:** The production explanation (user report); the reproduction printed the old context and fallback; the integration tests through `POST /explain` with the fake model failed before the fix.
+
+**Fix:** As above, in the subagent's branch.
+
+**Time saved or lost:** Not measured.

@@ -1891,6 +1891,11 @@ issues:
     labels: ["area:api", "area:evals", "type:bug"]
     milestone: M10
     priority: High
+    status: done
+    # Fixed October 30: spec 008 rule 7b. POST /explain reads what the newest stub
+    # withholds on the decision's schedule, the facts say whose each figure is and
+    # state the balance due at the stub (calc/w4.py:at_withholding); explain/v3,
+    # fallback/v4 and the explain-w4 eval with its withholding-claim judge.
   - title: "A recurring charge marked not recurring still says Active"
     body: >-
       On Spending, pressing Not recurring on a recurring charge adds a "Not

@@ -120,7 +120,8 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   seed citations read from `api/db/seed/irs_citations/`, no database.
   `first_try_verified`, `no_fallback`, `cited`. Its baseline is measured:
   1.0 on all five metrics in three live runs on October 30, about 47 cents a
-  run (spec 008 targets 0.8, 0.95, 1.0). `rate_framing` (issue
+  run (spec 008 targets 0.8, 0.95, 1.0); a run on `explain/v3` (issue 181)
+  measured the same, 47 cents. `rate_framing` (issue
   132): over the 18 decisions whose stub shows another rate or none, the share
   whose final row does not claim the chosen rate is already in effect, as an
   LLM judge reads it (`Gateway.judge_rate_claim`, `judge_rate_claim/v1`, spec
