@@ -10,7 +10,12 @@ from pydantic import BaseModel
 
 from db.enums import LlmPurpose
 from llm import schemas
-from llm.gateway import CATEGORIZE_PROMPT, EXPLAIN_PROMPT, JUDGE_RATE_CLAIM_PROMPT
+from llm.gateway import (
+    CATEGORIZE_PROMPT,
+    EXPLAIN_PROMPT,
+    JUDGE_RATE_CLAIM_PROMPT,
+    JUDGE_WITHHOLDING_CLAIM_PROMPT,
+)
 from llm.prompts import PROMPTS_DIR, Prompt, PromptError, all_prompts, load_prompt, parse_prompt
 
 VALID = """---
@@ -234,6 +239,27 @@ def test_judge_rate_claim() -> None:
     assert '"if you stay at ..."' in prompt.system
     assert '"The 6% you picked already gets the whole match"' in prompt.system
     assert "`pay_stub_rate` equals `full_match_rate`" in prompt.system
+    assert chr(0x2014) not in prompt.system
+
+
+def test_judge_withholding_claim() -> None:
+    """Spec 008 rule 24d: the explain-w4 eval's judge runs on the explain model,
+    explains every field it reads and writes, and is the version the gateway sends."""
+    prompt = load_prompt("judge_withholding_claim", "v1")
+    assert JUDGE_WITHHOLDING_CLAIM_PROMPT == ("judge_withholding_claim", "v1")
+    assert prompt.version == "judge_withholding_claim/v1"
+    assert prompt.purpose is LlmPurpose.EXPLAIN
+    assert prompt.schema is schemas.WithholdingClaimVerdict
+    for field in schemas.WithholdingClaimVerdict.model_fields:
+        assert f"`{field}`" in prompt.system, field
+    for field in schemas.WithholdingClaimRequest.model_fields:
+        assert f"`{field}`" in prompt.system, field
+    for field in schemas.RateClaimDraft.model_fields:
+        assert f"`draft.{field}`" in prompt.system, field
+    # The cases rule 24d names: the entries as the subject, and an outcome read
+    # against both withholdings.
+    assert "the entries (or the amount they give) are the subject" in prompt.system
+    assert "`pay_stub_outcome`" in prompt.system
     assert chr(0x2014) not in prompt.system
 
 
