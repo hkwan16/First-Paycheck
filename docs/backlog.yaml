@@ -1900,6 +1900,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed October 30: spec 009 rule 19. One badge per row; the person's mark replaces the detector's.
   - title: "An imported CSV institution shows a question mark as its icon"
     body: >-
       After a CSV import, the Link screen lists the account under "Imported
@@ -1909,6 +1911,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed October 30: institutionName names it for the group, the tile and the Spending summary.
   - title: "Escape does not close the emergency fund goal's contribution editor"
     body: >-
       The goal's Change contribution editor closes only with Cancel. The
@@ -1919,3 +1923,5 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed October 30: cancelOnEscape on every inline editor with a Cancel, focus back to its opener.
