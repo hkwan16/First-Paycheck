@@ -1877,3 +1877,45 @@ issues:
     priority: Medium
     status: done
     # Fixed October 30: spec 003 rule 17a. The card and the popovers read the summary's period.
+  - title: "The W-4 explanation calls the projected withholding what payroll withholds now"
+    body: >-
+      The e2e account's W-4 explanation (explain/v2, written Oct 30) says
+      "Your employer withholds $423.16 of federal income tax from each
+      paycheck" and that withholding is almost exactly matched to the tax.
+      $423.16 is the projection with the W-4 entries; the pay stub withholds
+      $272.44, and the W-4 card says $3,918.70 is due at tax time if nothing
+      changes. The explanation should tell the withholding payroll applies
+      now from the one the new W-4 would give, the way rule 7a does for the
+      401(k) rate, and state the balance due at the stub's withholding.
+      Change specs 008 and 014 first. Failing test first, with an eval case.
+    labels: ["area:api", "area:evals", "type:bug"]
+    milestone: M10
+    priority: High
+  - title: "A recurring charge marked not recurring still says Active"
+    body: >-
+      On Spending, pressing Not recurring on a recurring charge adds a "Not
+      recurring" badge but keeps the "Active" badge beside it, so the row
+      says both. Once the person marks it, the row should say only what they
+      decided. Failing test first.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+  - title: "An imported CSV institution shows a question mark as its icon"
+    body: >-
+      After a CSV import, the Link screen lists the account under "Imported
+      CSV", but its icon tile shows "?" because the account has no
+      institution name. The tile should use the name the group shows.
+      Failing test first.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+  - title: "Escape does not close the emergency fund goal's contribution editor"
+    body: >-
+      The goal's Change contribution editor closes only with Cancel. The
+      Confirm screen's field editor and the recurring charge Rename form both
+      close on Escape and return focus to the button that opened them. The
+      goal's editor (and any other inline editor on the decision cards)
+      should do the same. Failing test first.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Low
