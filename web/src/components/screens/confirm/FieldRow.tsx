@@ -77,7 +77,8 @@ export const FieldRow = memo(function FieldRow({
   };
   const onEscape = cancelOnEscape(cancel);
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
-    if (event.key === 'Enter') {
+    // The Enter that commits an input method's composition is not a save.
+    if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
       event.preventDefault();
       save();
     } else {
