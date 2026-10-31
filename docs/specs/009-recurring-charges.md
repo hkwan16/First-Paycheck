@@ -65,6 +65,10 @@ Code: the pure detector and status rules in `api/sync/recurring.py`, the amount 
 17. `PATCH /recurring/{id}` accepts `user_status` (`confirmed`: yes, this recurs; `ignored`: not a recurring charge, kept out of check-ins; `cancelled`: the user cancelled it, so the check-in can confirm it stopped; `null` clears it) and `merchant_clean` (a rename, trimmed, 1-100 characters). Omitted fields are unchanged; an unknown field is 422; an empty body returns the charge unchanged.
 18. `GET /recurring` lists every charge of the user (ignored ones included, so they can be restored), ordered by `merchant_clean`, then `cadence`, then `id`.
 
+### Spending screen
+
+19. **One status badge per charge, and the person's word wins.** Each row of the Spending screen's Recurring charges card shows one status badge (`recurringBadge` in `web/src/components/screens/spending/recurring-format.ts`). With no `user_status`, it is the detector's `status`: `new` reads "New" and `changed` "Price changed", both a warning; `stopped` reads "Stopped", off; `active` reads "Active", neutral. Once the person has marked the charge, the badge says only what they decided, whatever the detector's status: `ignored` reads "Not recurring", `confirmed` "You confirmed it", `cancelled` "You cancelled it", all neutral. Rule 11 still holds: the detector keeps its status, and the check-in (spec 015) still reports a confirmed or cancelled charge that is new, changed or stopped (an ignored one is kept out of check-ins, rule 17). Undo (`user_status: null`) brings the detector's badge back. Fixed on October 30: a charge marked Not recurring kept the detector's "Active" beside it, so the row said both.
+
 ## Hand-worked examples
 
 ### Detection (`api/tests/unit/sync/test_recurring.py`)
@@ -122,6 +126,18 @@ Working:
 | 5 | `test_only_the_users_transactions_count` | B has the same Netflix charges; run A's job | A's rows only; B has none |
 | 6 | `test_patch_marks_ignored_and_renames` | `PATCH {"user_status": "ignored", "merchant_clean": " Netflix "}` | 200; `user_status = ignored`, name "Netflix", status unchanged |
 | 7 | `test_patch_validation` | Empty name; a `status` field; `user_status: "paused"` | 422 each |
+
+### The row's badge (rule 19, `web/src/components/screens/spending/recurring-format.test.ts`, "recurringBadge")
+
+| `status` | `user_status` | Badge | Tone |
+|---|---|---|---|
+| `new` | null | New | warning |
+| `changed` | null | Price changed | warning |
+| `stopped` | null | Stopped | off |
+| `active` | null | Active | neutral |
+| any of the four | `ignored` | Not recurring | neutral |
+| any of the four | `confirmed` | You confirmed it | neutral |
+| any of the four | `cancelled` | You cancelled it | neutral |
 
 ## Edge cases
 
