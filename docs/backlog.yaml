@@ -1930,3 +1930,18 @@ issues:
     priority: Low
     status: done
     # Fixed October 30: cancelOnEscape on every inline editor with a Cancel, focus back to its opener.
+  - title: "Target desktop only: drop the phone project, phone checks and the phone side nav"
+    body: >-
+      The product owner decided on November 1 that First Paycheck targets the
+      desktop website only. Remove the Playwright phone project and its
+      baselines, the phone branches in the e2e specs and the alpha capture,
+      and the side nav's disclosure under 780px (spec 018 rules 11-17) with
+      its unit tests. Keep plain narrow-window CSS and the desktop
+      screenshots as they are. Change spec 018 first. Done when no test,
+      spec or guide mentions a phone width and every desktop baseline still
+      matches.
+    labels: ["area:web", "area:docs"]
+    milestone: M10
+    priority: Medium
+    status: done
+    # Fixed November 1: spec 018 rules 11-17 removed; the side nav is the plain list at every width.
