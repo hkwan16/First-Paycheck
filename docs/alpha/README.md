@@ -19,23 +19,26 @@ A person moves through the product in this order:
 
 ### Recording and screenshots
 
-A 90-second recording of that path is [`alpha-demo.mp4`](alpha-demo.mp4). The screenshots in [`screenshots/`](screenshots/) were taken from production on November 1 as the synthetic test user, with the model live. Playwright captured both through the product's own pages (`web/playwright.capture.config.ts`).
+A 90-second recording of that path is [`alpha-demo.mp4`](alpha-demo.mp4), recorded by Playwright through the product's own pages (`web/playwright.capture.config.ts`). The screenshots in [`screenshots/`](screenshots/) were taken from production on November 1, signed in as the synthetic test user with the model live, through Claude in Chrome.
 
 | File | Shows |
 |---|---|
-| `01-sign-in.png` | The sign-in screen |
-| `03-link-linked.png` | The linked accounts with their roles and balances, and the pay stub rows with their redaction badges |
-| `06-confirm-review.png` | The Confirm screen: Claude's proposed fields beside the redacted source lines |
-| `04-spending-transactions.png`, `05-spending-rule-notice.png` | Transactions with their category sources, and a fix saved as a rule |
-| `07-spending-tiles.png`, `08-spending-sankey.png` | The Spending tiles, and the cash-flow diagram with a category's popover open |
-| `09-decisions-v1.png`, `10-decisions-v2.png` | The 401(k) step with its saved version, then the next version after a change |
-| `11-why-verified.png` | A verified explanation with its IRS citation |
-| `12-plan.png` | The plan with its decisions, goals, and next 90 days |
-| `13-check-in.png`, `14-check-in-now.png` | A check-in's findings, cash flow against the plan, and net worth, then the list after "Check in now" |
+| `01-link-accounts.jpg` | The seven linked sandbox accounts, with their roles and balances |
+| `02-link-documents.jpg` | The uploaded documents, each with its redaction badge and status |
+| `03-confirm-review.jpg` | The Confirm screen: Claude's proposed fields with their confidence, beside the redacted source, with the selected field's line outlined |
+| `04-spending-summary.jpg` | October's summary tiles (income, essentials, flexible, and savings) |
+| `05-spending-cash-flow.jpg` | The cash-flow diagram from income to categories, with the Dining popover open |
+| `06-spending-transactions.jpg` | Transactions with their category source: a rule, the AI with its confidence, or a fix by the person |
+| `07-decisions-401k.jpg` | The 401(k) step: the employer's match, the pay stub's current rate, and the calculator's result |
+| `08-decisions-w4.jpg` | The W-4 step, reading the saved 401(k) and health plan decisions |
+| `09-why-verified.jpg` | The W-4 explanation: 25 of 25 numbers match the calculator, and 3 of 3 citations resolve to IRS sources |
+| `10-plan.jpg` | The plan: the paycheck, each decision, the exports, and the next 90 days |
+| `11-check-in-findings.jpg` | October's check-in: new recurring charges, each with the part of the plan it affects |
+| `12-check-in-cash-flow.jpg` | November's cash flow against the plan, and net worth by month |
 
-![The Confirm screen, with each proposed field beside its redacted source line](screenshots/06-confirm-review.png)
+![The Confirm screen, with each proposed field beside the redacted pay stub](screenshots/03-confirm-review.jpg)
 
-![A verified explanation of the 401(k) decision](screenshots/11-why-verified.png)
+![A verified explanation of the W-4 decision, with its IRS sources](screenshots/09-why-verified.jpg)
 
 ### Functional and placeholder features
 
