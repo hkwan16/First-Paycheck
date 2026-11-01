@@ -114,8 +114,11 @@ src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, queued animatio
                     fixtures/plan.ts (`GET /plan` built from the decision, goal, calendar and pay
                     stub fixtures; export jobs), msw/plan-handlers.ts (`planDb`)
 e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions,
-                    plan, import, check-in, alpha), support/auth.ts, support/api.ts,
-                    support/spending.ts (a period with transactions), fixtures/ (synthetic
+                    plan, import, check-in, alpha; capture-setup, capture-screens, capture-demo
+                    for the alpha document), support/auth.ts, support/api.ts,
+                    support/spending.ts (a period with transactions), support/capture.ts (the
+                    capture's upload, confirm and screenshots), support/demo.ts (the demo's
+                    captions, pointer and MP4), fixtures/ (synthetic
                     acme-paystub.pdf and the script that makes it, bank-export.csv), baselines
 ../docs/user-test/  the 5-to-8-person user test kit (script, quiz, consent, observation sheet)
 ```
@@ -954,6 +957,36 @@ links the sandbox bank and fixes a category, uploads and confirms the Acme stub,
 Spending tiles, goes on to Decisions (the emergency fund step) and through its footer to the 401(k),
 saves it at 4% as v1 and a change as v2, and expects "Verified against
 calculator" with an irs.gov source (what the fake model produces).
+
+### Alpha capture and demo recording
+
+`playwright.capture.config.ts` runs against a deployed web app (`E2E_WEB_URL`, no dev server) and
+writes the alpha document's PNGs to `E2E_CAPTURE_DIR`; its header has the exact production
+commands, with and without the saved session. `capture-setup.spec.ts` and
+`capture-screens.spec.ts` sit around the product's own `decisions` (without the issue 172 test,
+which checks a window height, not data), `plan` and `check-in` specs. Each run uploads the Acme
+stub (through Replace when a stub is already waiting for review) and follows the new document by
+the id `POST /docs` returned, never by its place in the list (`uploadAcmeStub` in
+`support/capture.ts`). `confirmAcmeFields` reads the proposal from the screen's own
+`GET /docs/{id}`, types each value that is missing or read wrong, and confirms the rest at once,
+so it works with a model (proposals), the fake model, or none (manual entry). `settled` ignores
+hidden busy regions: Next keeps the previous page in the DOM, hidden, after a client-side
+navigation.
+
+`capture-demo.spec.ts` (project `capture-demo`, last) records the 90-second demo: one 1280x720
+`recordVideo` window from the saved session (no email or password typed), a caption per scene
+and an animated pointer through Playwright's screencast overlays (`support/demo.ts`), smooth
+scrolls and holds. Off camera, in a second window, it uploads the stub and waits for its read, and
+writes the 401(k) explanation while the recording moves on to the health plan and the W-4. It cuts
+the first screen's load and converts the WebM with ffmpeg (`FFMPEG`, default Homebrew's) to H.264
+with `+faststart` at CRF 24, to `docs/alpha/alpha-demo.mp4` (`E2E_DEMO_MP4` elsewhere; a local
+run points it at a scratch file so the committed document is not touched). It confirms one stub,
+saves one 401(k) version and its explanation, so a rerun works over its own state. To try it on
+the local stack: `uv run python -m scripts.e2e_stack up` with your own `E2E_*` ports and database,
+`next build` with `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_URL` and
+`NEXT_PUBLIC_FEATURES=sankey` pointing at it, `next start` on `E2E_PORT`, import a synthetic CSV
+for transactions when the stack has no Plaid keys, then run the config with `E2E_WEB_URL` and
+`E2E_API_URL` set to the stack.
 
 ## Feature flags
 
