@@ -297,25 +297,62 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
   await expect(page).toHaveURL('/plan');
 });
 
-test.describe('on a phone', () => {
-  test.use({ viewport: { width: 390, height: 844 } });
+/** The page as a step link's landing scrolls it to the top (`landAtTopIfRequested`). */
+interface AtLanding {
+  path: string;
+  heading: string;
+  scrollY: number;
+  /** The top of the new page's root node, the first in `<main>`: what Next measures. */
+  top: number;
+  viewport: number;
+  scrollPaddingTop: number;
+}
 
-  /** The scroll offset, and whether the collapsed nav button clears the sticky header. */
-  const placement = (page: Page) =>
-    page.evaluate(() => {
-      const header = document.querySelector('header')!.getBoundingClientRect();
-      const nav = document.querySelector('nav[aria-label="Setup steps"] > button')!;
-      return { scrollY: window.scrollY, clear: nav.getBoundingClientRect().top >= header.bottom };
-    });
+/**
+ * Record the page each time it is scrolled with `window.scrollTo`. On a step
+ * link that is `landAtTopIfRequested`, in the new page's layout effect: the
+ * commit Next's own scroll check runs in, with the browser's clamped offset
+ * and the new page in the DOM, just before it scrolls.
+ */
+function recordLandings(page: Page) {
+  return page.addInitScript(() => {
+    const landings: AtLanding[] = [];
+    (window as unknown as { __landings: AtLanding[] }).__landings = landings;
+    const scrollTo = window.scrollTo.bind(window);
+    window.scrollTo = ((...args: Parameters<typeof window.scrollTo>) => {
+      const html = document.documentElement;
+      const root = document.querySelector('main')?.firstElementChild;
+      landings.push({
+        path: location.pathname,
+        heading: document.querySelector('main h1')?.textContent ?? '',
+        scrollY: window.scrollY,
+        top: root?.getBoundingClientRect().top ?? Number.NaN,
+        viewport: html.clientHeight,
+        scrollPaddingTop: parseFloat(getComputedStyle(html).scrollPaddingTop) || 0,
+      });
+      scrollTo(...args);
+    }) as typeof window.scrollTo;
+  });
+}
+
+test.describe('in a short window', () => {
+  /*
+   * Issue 172 shows only when the clamp leaves the new page's top edge in view;
+   * at 1280 wide that is a window about 625 to 675px tall (a scan on November 1).
+   * The test checks that this window still shows it, so it cannot pass vacuously.
+   */
+  test.use({ viewport: { width: 1280, height: 650 } });
 
   test('a step footer link lands at the top of the next step (issue 172)', async ({ page }) => {
     test.setTimeout(120_000);
+    await recordLandings(page);
     // From the bottom of a longer step to a shorter one, where the browser keeps
     // part of the old scroll offset while the new step loads.
     const steps = [
       ['/setup/decisions/emergency-fund', /^Next: 401\(k\) match/],
       ['/setup/decisions/health-plan', /^Back to 401\(k\) match/],
     ] as const;
+    const scrollY = () => page.evaluate(() => window.scrollY);
     for (const [from, name] of steps) {
       await page.goto(from);
       await waitForHydration(page);
@@ -323,12 +360,30 @@ test.describe('on a phone', () => {
       await expect(link).toBeVisible({ timeout: 30_000 });
       await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 30_000 });
       await link.scrollIntoViewIfNeeded();
-      expect((await placement(page)).scrollY).toBeGreaterThan(0);
+      expect(await scrollY()).toBeGreaterThan(0);
 
       await link.click();
       await expect(page).toHaveURL('/setup/decisions/401k');
       await settled(page);
-      expect(await placement(page)).toEqual({ scrollY: 0, clear: true });
+      expect(await scrollY(), `following the footer from ${from}`).toBe(0);
+
+      // It landed at the top from the state Next leaves alone: the new page in
+      // the DOM, scrolled down, its top edge in view. Without that, 0 proves nothing.
+      const landings = await page.evaluate(
+        () => (window as unknown as { __landings: AtLanding[] }).__landings,
+      );
+      const landing = landings.find((at) => at.path === '/setup/decisions/401k');
+      const reproduces =
+        landing !== undefined &&
+        landing.heading === 'How much to put in your 401(k)' &&
+        landing.scrollY > 0 &&
+        landing.top >= landing.scrollPaddingTop &&
+        landing.top <= landing.viewport;
+      expect(
+        reproduces,
+        'this window no longer reproduces issue 172 (spec 018 rule 6a); rescan the window ' +
+          `height. From ${from}, as the page landed: ${JSON.stringify(landing ?? 'no landing')}`,
+      ).toBe(true);
     }
   });
 });

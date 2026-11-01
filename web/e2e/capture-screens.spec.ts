@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { e2eUser, NO_E2E_USER } from './support/auth';
-import { CAPTURE_DIR, DESKTOP, NO_CAPTURE_DIR, PHONE, settled, shot } from './support/capture';
+import { CAPTURE_DIR, NO_CAPTURE_DIR, settled, shot } from './support/capture';
 
 /*
  * Spending, Decisions, Why, Plan and the check-in screens, over the data the
@@ -53,7 +53,7 @@ test('04, 05, 07 and 08 the Spending screen', async ({ page }) => {
   await shot(transactions, '05-spending-rule-notice');
 });
 
-test('09, 10, 11 and 16 the Decisions and Why screens', async ({ page }) => {
+test('09, 10 and 11 the Decisions and Why screens', async ({ page }) => {
   await page.goto('/setup/decisions/401k');
   await settled(page);
   const card = page.getByRole('region', { name: '401(k) match' });
@@ -70,11 +70,6 @@ test('09, 10, 11 and 16 the Decisions and Why screens', async ({ page }) => {
   await save.click();
   await expect(save).toHaveText(/^Saved as v\d+/, { timeout: 30_000 });
   await shot(card, '10-decisions-v2');
-
-  await page.setViewportSize(PHONE);
-  await settled(page);
-  await shot(page, '16-decisions-phone');
-  await page.setViewportSize(DESKTOP);
 
   await card.getByRole('link', { name: 'Why this decision' }).click();
   await expect(page).toHaveURL(/\/why\/[^/]+$/);

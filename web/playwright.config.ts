@@ -15,10 +15,11 @@ const desktop = { ...devices['Desktop Chrome'], viewport: { width: 1280, height:
 const plaidSandbox = process.env.E2E_PLAID_SANDBOX?.trim() !== '0';
 
 /**
- * Smoke and visual checks at the two widths the mockup targets, plus the auth
- * flows against the configured Supabase project. The server is `next dev`
- * because /dev/kit is a 404 in production builds; the e2e flag hides dev-only
- * overlays from the screenshots, and the sankey flag draws the cash flow.
+ * Smoke and visual checks at desktop width (the product targets the desktop
+ * website only), plus the auth flows against the configured Supabase project.
+ * The server is `next dev` because /dev/kit is a 404 in production builds; the
+ * e2e flag hides dev-only overlays from the screenshots, and the sankey flag
+ * draws the cash flow.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -41,16 +42,6 @@ export default defineConfig({
   },
   projects: [
     { name: 'desktop', testMatch: 'smoke.spec.ts', use: desktop },
-    {
-      name: 'phone',
-      testMatch: 'smoke.spec.ts',
-      use: {
-        ...devices['iPhone 14'],
-        // CI installs Chromium only; the device still sets touch, mobile UA and DPR.
-        browserName: 'chromium',
-        viewport: { width: 390, height: 844 },
-      },
-    },
     // Signs in once and saves the session; skips without E2E_USER_EMAIL/PASSWORD.
     { name: 'setup', testMatch: 'auth.setup.ts', use: desktop },
     {

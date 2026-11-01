@@ -32,18 +32,18 @@ over a generated OpenAPI client, and Supabase Auth. The visual target is Mockup 
 pnpm comes from Corepack (`"packageManager"` in `package.json`). If `pnpm` is not on your PATH,
 run `corepack enable` once, or prefix commands with `corepack pnpm`. Node 22.13+ is required.
 
-| Command                                 | What it does                                                                         |
-| --------------------------------------- | ------------------------------------------------------------------------------------ |
-| `pnpm dev`                              | Next dev server on :3000                                                             |
-| `pnpm build`                            | Production build (also typechecks)                                                   |
-| `pnpm lint`                             | ESLint, zero warnings allowed                                                        |
-| `pnpm format` / `pnpm format:check`     | Prettier with Tailwind class sorting                                                 |
-| `pnpm typecheck`                        | `next typegen` (route types) then `tsc --noEmit`                                     |
-| `pnpm test` / `pnpm test:watch`         | Vitest (jsdom, Testing Library, MSW) over `src/**/*.test.ts(x)`                      |
-| `pnpm e2e`                              | Playwright: smoke (axe, screenshots, a Tab walk at 1280x820 and 390x844), auth flows |
-| `pnpm exec playwright install chromium` | One-time browser install for `pnpm e2e`                                              |
-| `pnpm gen:api`                          | Regenerate `src/lib/api/schema.d.ts` from `../api/openapi.json`                      |
-| `pnpm check:api`                        | Regenerate and fail if the committed schema drifted (CI)                             |
+| Command                                 | What it does                                                             |
+| --------------------------------------- | ------------------------------------------------------------------------ |
+| `pnpm dev`                              | Next dev server on :3000                                                 |
+| `pnpm build`                            | Production build (also typechecks)                                       |
+| `pnpm lint`                             | ESLint, zero warnings allowed                                            |
+| `pnpm format` / `pnpm format:check`     | Prettier with Tailwind class sorting                                     |
+| `pnpm typecheck`                        | `next typegen` (route types) then `tsc --noEmit`                         |
+| `pnpm test` / `pnpm test:watch`         | Vitest (jsdom, Testing Library, MSW) over `src/**/*.test.ts(x)`          |
+| `pnpm e2e`                              | Playwright: smoke (axe, screenshots, a Tab walk at 1280x820), auth flows |
+| `pnpm exec playwright install chromium` | One-time browser install for `pnpm e2e`                                  |
+| `pnpm gen:api`                          | Regenerate `src/lib/api/schema.d.ts` from `../api/openapi.json`          |
+| `pnpm check:api`                        | Regenerate and fail if the committed schema drifted (CI)                 |
 
 `pnpm e2e` starts `next dev` on :3100 (`/dev/kit` is a 404 in production builds) with
 `NEXT_PUBLIC_FEATURES=e2e,sankey`. `playwright.config.ts` loads `web/.env.local` (variables
@@ -153,30 +153,23 @@ Chrome (`components/chrome`): `Wordmark`, `Header` (`chips`, `account` slot, `mi
 `HeaderAccount` (server: "Sample data" chip and `UserMenu` from the Supabase user), `UserMenu` (the
 user chip as a disclosure button with "Sign out" and "Delete account"; see "Deleting the account"),
 `DeleteAccountConfirm`, `NavStep` (`size` md 22px, sm 18px for a decision step), `SideNav`
-(`current`, `done` from `lib/setup-progress.ts`, `hrefs` for id-bound screens, `calculators`,
-`pathname`; "Decisions" nests its four steps, see "Decisions screen"; one list, stacked at every
-width; under 780px it sits behind a disclosure button, see "Side nav on a phone"), `AppSideNav`
-(current item and `pathname` from the URL), `Shell` (header, nav column `1 1 200px` up to 240px,
+(`current`, `done` from `lib/setup-progress.ts`, `hrefs` for id-bound screens, `calculators`;
+"Decisions" nests its four steps, see "Decisions screen"; one list, stacked at every width),
+`AppSideNav` (current item from the URL), `Shell` (header, nav column `1 1 200px` up to 240px,
 full width above the page under 780px, main `999 1 560px`, skip link), `PageTitle` (`title`, `lead`, `aside`,
 `eyebrow`), `StepFooter` (`back`, `next` with `primary`, `disabled` and `loading`; a disabled
 next is a real disabled button, never a dead link; its links land the next page at the top, with
 Next's scroll off and `onNavigate={requestLandAtTop}`, which the new page's `HydrationMarker`
 carries out: `lib/land-at-top.ts`, spec 018 rule 6a, issue 172).
 
-### Side nav on a phone
+### Desktop only
 
-Spec 018 rules 11-17 (issue 155). Under 780px (`max-nav:`; the `nav` breakpoint token) the nav's
-first child, a `<button>` with `aria-expanded` and `aria-controls`, is all that shows above the
-page: the current item's `NavStep` and label ("Decisions: 401(k) match" for a step), and "n of 4
-setup steps done" (`setupStepsDone`, the four setup marks the list shows). Pressing it shows the
-same list in the page flow under it (`max-nav:hidden` comes off), pushing the page down; it is a
-disclosure, not a sheet, so there is no focus trap, backdrop or scroll lock to get right. Escape
-inside the nav closes it and focuses the button; choosing a link closes it (`onChoose` on every
-`ItemLink`); a new `pathname` closes it (state adjusted during render, so returning to the page
-does not reopen it). At 780px and wider the button is `nav:hidden` and the list always shows, so
-desktop is unchanged pixel for pixel. Its name in Chromium has a space before each hidden comma
-("match , done , 1 of 4 setup steps done"), like the nav links: match it with `\s*,` in e2e.
-The arrow turns over `--duration-fast`, zero under reduced motion; nothing animates the list.
+First Paycheck targets the desktop website only (November 1, 2026). The Playwright smoke runs at
+1280x820 and there is no phone project or phone baseline. Spec 018 rules 11-17 (the side nav's
+phone disclosure, issue 155) were removed with it: the side nav is the plain list at every width.
+Narrow-window CSS that is cheap to keep stays (`max-nav:` and `max-sm:` grids, `Shell`'s nav column
+stacking under 780px, the Sankey's `FlowStack` under a 640px container), but nothing is designed
+or checked for a phone.
 
 ## Data layer
 
@@ -466,16 +459,12 @@ A failure says "Your account was not deleted." with the reason and keeps the per
 
 ## Accessibility audit (M10)
 
-Every sample screen runs in the smoke spec at 1280 and 390: axe, the visual baseline, and a Tab
+Every sample screen runs in the smoke spec at 1280x820: axe, the visual baseline, and a Tab
 walk (`tabWalk`): every control a person can Tab to (tabindex 0; a roving group's one stop) is
 reached, each shows a focus ring (an outline on it, or on the ancestor that draws one for a
 visually hidden input, as `DropZone` does), none lands under the sticky header, and Tab leaves the
-page (a date field takes one Tab per part and is not a trap). At 390 the side nav's links are
-hidden behind its disclosure button: when Tab reaches the button the walk presses Enter, as a
-person would, tags the links it shows and walks them too, and fails if any nav button is still
-collapsed at the end, so no control is skipped for being hidden. Each screen also checks that its
-h1 ends within the first screenful (1280x820 and 390x844) and, at 390, that the nav above the page
-is at most 80px. M10 added the sample screens that
+page (a date field takes one Tab per part and is not a trap). Each screen also checks that its
+h1 ends within the first screenful. M10 added the sample screens that
 were missing: sign-in after a deletion (`/sign-in?deleted=1`), Confirm while reading, failed and
 confirmed, and `account` (the account menu); the unlink and account deletion confirmations are
 checked in place.
@@ -588,11 +577,8 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
   done). The current step has `aria-current="page"`; "Decisions" never does on a step. A step is
   done when its calculator is live and saved (`setupProgress`, keyed by the calculator id);
   "Decisions" when every live one is. A step that is not live is muted with "After alpha" under
-  its label (its name ends ", After alpha") and still links to its placeholder page. Under 780px
-  the nav is one control above the page ("Decisions: 401(k) match", with the setup progress), so
-  a step's heading and card start in the first screenful; the open list shows the steps indented
-  under "Decisions" as on desktop (see "Side nav on a phone"). `navKeyForPath` returns the
-  calculator id for a step's path.
+  its label (its name ends ", After alpha") and still links to its placeholder page.
+  `navKeyForPath` returns the calculator id for a step's path.
 
 - **`Match401kCard`** always renders the same `DecisionCard` frame (a region named by its title)
   and swaps its body: skeleton, error, a link to Confirm when there is no confirmed pay stub,
@@ -926,8 +912,11 @@ plan choice (typing two synthetic plans when no benefits summary is confirmed) w
 deadline (reaching that step through the 401(k)'s footer), and saves a W-4 version that reads
 those two decisions (checking "If you change nothing" states the `current_refund_cents` of the
 calculator's own answer), with its reminder, then checks every step is done in the nav and follows the
-footer to the plan; at 390x844 it follows a Next and a Back footer link from the bottom of a step
-and checks the next page sits at the top with the nav button clear of the header (issue 172).
+footer to the plan; in a 1280x650 window it follows a Next and a Back footer link from the bottom
+of a step and checks the next page sits at the top (issue 172). Only a window about 625 to 675px
+tall shows the bug on desktop, so the test checks that this one still does: an init script wraps
+`window.scrollTo`, and the landing's call must find the new page scrolled down with its top edge in
+view (the state Next leaves alone), or the test fails asking for the height to be rescanned.
 Decisions cannot be
 deleted, so it reads the current version instead of assuming v1. `plan.spec.ts` (project
 `authenticated-plan`, after decisions) reads the four decisions back on `/plan` (and the nav's

@@ -9,8 +9,7 @@ export interface ShellProps {
 /**
  * From the mockup's `.shell`, `.nav` and `.main`: a wrapping row where the nav
  * takes 200-240px and the main column takes the rest; below 780px the nav
- * spans the full width above the content, where SideNav is one disclosure
- * control until opened (spec 018 rule 11).
+ * spans the full width above the content.
  */
 export function Shell({ header, nav, children }: ShellProps) {
   return (

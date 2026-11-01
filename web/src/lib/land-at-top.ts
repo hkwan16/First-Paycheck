@@ -4,9 +4,8 @@
  * edge is out of view. Following a link at the bottom of a long step, the
  * browser first clamps the scroll offset to the new page, which is still
  * short while its cards load; the new page's top edge is then in view, so
- * Next leaves it there, and on a phone the collapsed nav button above it
- * sits under the sticky header. A step change is a new page, so it starts
- * at the top.
+ * Next leaves it there, part way down with the page's top under the sticky
+ * header. A step change is a new page, so it starts at the top.
  *
  * The link asks (`onNavigate`, with Next's own scroll off); the new page's
  * `HydrationMarker`, which every page renders as its last child, scrolls once

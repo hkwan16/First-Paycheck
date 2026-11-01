@@ -506,3 +506,24 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above, in the subagent's branch.
 
 **Time saved or lost:** Not measured.
+
+## 2026-11-01: desktop only, and where issue 172 shows on desktop
+
+**Task:** The product owner decided First Paycheck targets the desktop website only. Remove the Playwright phone project and its 64 baselines, the phone branches in the e2e specs and the alpha capture, and the side nav's disclosure under 780px (spec 018 rules 11-17), without changing a desktop pixel. Keep issue 172's fix (a step footer link lands at the top) and its e2e test, which ran only at 390x844.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Spec 018 first, then the unit tests (a failing "no button" test), then the code; the issue 172 test had to fail at a desktop width with the fix turned off before it could replace the phone one.
+
+**What it produced:** The side nav as the plain list at every width (no disclosure, `pathname` prop, Escape handler or `setupStepsDone`); the smoke spec's Tab walk without the disclosure step; the issue 172 test in a 1280x650 window; the spec, guides and alpha document without phone widths. Every desktop baseline matched unchanged.
+
+**What was wrong:**
+- With the fix turned off, the issue 172 test passed at 1280x820 and 1280x600, so it caught nothing at desktop. A scan of window heights from 400 to 1100 at 1024, 1280 and 1440 wide found the bug only at 625 to 675px tall (5 to 65px down): the 401(k) step is about 690px tall while it loads, so only there does the clamp leave its top edge in view. The test now uses 650, and fails at 40px with the fix off. Because a drift in that loading height would make it pass with the fix gone, it also checks its precondition (coordinator review): an init script wraps `window.scrollTo`, and the landing's call must see the new page scrolled down with its top in view. Recording at `history.pushState` instead was tried first and was too early: React runs the router's insertion effect before it swaps the segment's DOM, so the old page was still there. At 1280x820 the test now fails on that check (offset 0 at the landing), not on the final scroll.
+- The first commit swept in the 64 staged baseline deletions with the spec; the two local commits were redone before anything else was built on them.
+- The real-API plan export failed locally because WeasyPrint could not load Homebrew's pango from this Python (SIP strips `DYLD_*` through `/bin/bash`); it passed with `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib` set inside the run script. Not a product bug.
+
+**How it was caught:** Running the test with `StepFooter`'s fix turned off before trusting it; `git show --stat` after the first commits.
+
+**Fix:** As above, in the subagent's branch.
+
+**Time saved or lost:** Not measured.
