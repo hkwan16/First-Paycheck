@@ -80,9 +80,7 @@ export async function uploadAcmeStub(page: Page): Promise<string> {
   });
   const created = page.waitForResponse(
     (response) =>
-      new URL(response.url()).pathname === '/docs' &&
-      response.request().method() === 'POST' &&
-      response.ok(),
+      new URL(response.url()).pathname === '/docs' && response.request().method() === 'POST',
     { timeout: 120_000 },
   );
   const waiting = stubs.filter({ has: page.getByRole('link', { name: REVIEW_LINK }) }).first();
@@ -94,7 +92,16 @@ export async function uploadAcmeStub(page: Page): Promise<string> {
     await docs.getByLabel('Document type').selectOption('pay_stub');
     await docs.getByLabel(/Add (another|a) document/).setInputFiles(ACME_STUB);
   }
-  const { document_id: id } = (await (await created).json()) as { document_id: string };
+  const response = await created;
+  if (!response.ok()) {
+    // Most likely the upload limit (10 an hour per user, a 429 with Retry-After).
+    const retry = response.headers()['retry-after'];
+    throw new Error(
+      `The pay stub upload was refused (${response.status()}): ${await response.text()}` +
+        (retry ? ` Try again in ${Math.ceil(Number(retry) / 60)} minutes.` : ''),
+    );
+  }
+  const { document_id: id } = (await response.json()) as { document_id: string };
   // Reading is a worker job: the row links to Confirm once it is done.
   await expect(docs.locator(`a[href="/setup/confirm/${id}"]`)).toBeVisible({ timeout: 240_000 });
   return id;
