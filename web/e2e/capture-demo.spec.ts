@@ -76,11 +76,13 @@ test('records the alpha demo', async ({ browser }, testInfo) => {
   // Off camera: a stub for the recording to confirm, read before it starts.
   const offCamera = await browser.newContext({ storageState: STORAGE_STATE, viewport: DESKTOP });
   const helper = await offCamera.newPage();
-  await openLink(helper);
+  // An expired session lands on sign-in; say so before waiting on the accounts.
+  await helper.goto('/setup/link');
   await expect(
     helper,
     'The saved session has expired: run the setup project once (see playwright.capture.config.ts)',
-  ).toHaveURL(/\/setup\/link$/);
+  ).toHaveURL((url) => url.pathname === '/setup/link');
+  await openLink(helper);
   const documentId = await uploadAcmeStub(helper);
 
   const context = await browser.newContext({
