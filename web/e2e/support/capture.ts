@@ -9,7 +9,6 @@ export const CAPTURE_DIR = process.env.E2E_CAPTURE_DIR?.trim() || null;
 export const NO_CAPTURE_DIR =
   'Skipped: set E2E_CAPTURE_DIR to the folder the screenshots go in (docs/alpha/screenshots).';
 
-export const PHONE = { width: 390, height: 844 };
 export const DESKTOP = { width: 1280, height: 820 };
 
 /** Save a full-page screenshot of the page, or one of a single element. */

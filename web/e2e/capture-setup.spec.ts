@@ -2,11 +2,11 @@ import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { openLink } from './support/api';
 import { e2eUser, NO_E2E_USER, SIGNED_OUT, waitForHydration } from './support/auth';
-import { CAPTURE_DIR, DESKTOP, NO_CAPTURE_DIR, PHONE, settled, shot } from './support/capture';
+import { CAPTURE_DIR, DESKTOP, NO_CAPTURE_DIR, settled, shot } from './support/capture';
 
 /*
  * The sign-in screen, the linked accounts with the uploaded pay stub, and the
- * Confirm screen at both widths; then confirms the stub so the decisions can
+ * Confirm screen; then confirms the stub so the decisions can
  * be made over it. Serial. The bank must already be linked (capture-link, or
  * the API's sandbox route).
  */
@@ -72,7 +72,7 @@ test('03 the linked accounts with the uploaded pay stub', async ({ page }) => {
   await shot(page, '03-link-linked');
 });
 
-test('06 and 15 the Confirm screen, then confirming the stub', async ({ page }) => {
+test('06 the Confirm screen, then confirming the stub', async ({ page }) => {
   await openLink(page);
   const docs = page.getByRole('region', { name: 'Documents' });
   const row = docs
@@ -83,10 +83,6 @@ test('06 and 15 the Confirm screen, then confirming the stub', async ({ page }) 
   await expect(page).toHaveURL(/\/setup\/confirm\/[^/]+$/);
   await settled(page);
   await shot(page, '06-confirm-review');
-  await page.setViewportSize(PHONE);
-  await settled(page);
-  await shot(page, '15-confirm-phone');
-  await page.setViewportSize(DESKTOP);
 
   const fields = page.getByRole('region', { name: /^(Extracted fields|Pay stub fields)$/ });
   // Manual entry (no model read the stub): every row is open with a "Save and
