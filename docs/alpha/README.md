@@ -53,7 +53,7 @@ Production: the web app is at `https://first-paycheck-silk.vercel.app` (Vercel);
 | Delete the account | M10 | Functional: Plaid items revoked, then every row deleted. |
 | Rate limits and body sizes on every write route | M10 | Functional; a 429 says when to try again. |
 | Error boundaries per card | M10 | Functional: one broken card leaves the rest of the screen working. |
-| Accessibility audit | M10 | Done for every sample screen at 1280 and 390 px: axe at every impact, a keyboard walk, reduced motion. |
+| Accessibility audit | M10 | Done for every sample screen at 1280 px: axe at every impact, a keyboard walk, reduced motion. The 390 px phone checks were dropped on November 1, when the product became desktop only. |
 | User test with 5 to 8 people | M10 | Kit written (`docs/user-test/`); the sessions have not run. |
 | Live LLM eval baselines | M10 | Not yet: the deterministic suites run in CI; the LLM suites wait for a key. |
 | Plaid production access | M10 stretch | Not started. |
@@ -62,7 +62,7 @@ Behind the screens: row-level security on every user table with a cross-user tes
 
 ### Screenshots
 
-Screenshots are in [`screenshots/`](screenshots/), at 1280 px wide and, where marked, 390 px for phone, taken from the production web app and API on October 22 as the test user, with no model key set: the Confirm screen is the manual entry path over the redacted lines, categories come from the rules, and Why shows the calculator's result with the "not available yet" notice. Two were not captured: the sync in progress, because Plaid Link's iframe is not driven by automation (the bank was linked through the API's sandbox route, so there is no moment to capture), and the board, which needs a signed-in GitHub session.
+Screenshots are in [`screenshots/`](screenshots/), at 1280 px wide, taken from the production web app and API on October 22 as the test user, with no model key set: the Confirm screen is the manual entry path over the redacted lines, categories come from the rules, and Why shows the calculator's result with the "not available yet" notice. Two were not captured: the sync in progress, because Plaid Link's iframe is not driven by automation (the bank was linked through the API's sandbox route, so there is no moment to capture), and the board, which needs a signed-in GitHub session.
 
 | File | Shows |
 |---|---|
@@ -79,8 +79,6 @@ Screenshots are in [`screenshots/`](screenshots/), at 1280 px wide and, where ma
 | `12-plan.png` | The Plan screen with its decisions, goals and next 90 days |
 | `13-check-in.png` | A check-in: findings, the cash flow against the plan with its statuses, net worth |
 | `14-check-in-now.png` | The list of check-ins after Check in now |
-| `15-confirm-phone.png` | The Confirm screen at 390 px |
-| `16-decisions-phone.png` | The 401(k) decision step at 390 px |
 | `backlog.png` | The GitHub Project board (to capture from a signed-in session) |
 
 ## Documented backlog
