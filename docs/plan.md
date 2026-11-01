@@ -83,7 +83,7 @@ Full detail goes into `api/CLAUDE.md`, `web/CLAUDE.md` and `docs/specs/`.
 
 - **API:** FastAPI with one RLS-scoped transaction per request; pure calculators in `calc/` that import nothing but the standard library, `decimal`, `pydantic` and each other; one sync pipeline for Plaid and CSV; ingest with OCR and redaction; the LLM gateway with structured outputs, refusal handling, the cost ledger and a fake mode for tests; a verifier for explanations; a Postgres job queue with a separate worker.
 - **Web:** Next.js App Router, React 19, Tailwind v4 tokens from the mockup, TanStack Query over generated types, Supabase auth, Plaid Link. Color meanings are enforced by types and lint rules; every number comes from the API.
-- **Testing and evals:** unit, integration and RLS layers with no live network by default; Hypothesis for calculator properties; eval suites with committed baselines; Playwright end to end with visual and axe checks at 1280 and 390 px.
+- **Testing and evals:** unit, integration and RLS layers with no live network by default; Hypothesis for calculator properties; eval suites with committed baselines; Playwright end to end with visual and axe checks at 1280 px (390 px phone checks were dropped on November 1, 2026, when the product became desktop only).
 
 ## Risks
 
