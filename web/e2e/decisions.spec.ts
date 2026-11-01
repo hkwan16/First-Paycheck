@@ -297,16 +297,15 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
   await expect(page).toHaveURL('/plan');
 });
 
-test.describe('on a phone', () => {
-  test.use({ viewport: { width: 390, height: 844 } });
-
-  /** The scroll offset, and whether the collapsed nav button clears the sticky header. */
-  const placement = (page: Page) =>
-    page.evaluate(() => {
-      const header = document.querySelector('header')!.getBoundingClientRect();
-      const nav = document.querySelector('nav[aria-label="Setup steps"] > button')!;
-      return { scrollY: window.scrollY, clear: nav.getBoundingClientRect().top >= header.bottom };
-    });
+test.describe('in a short window', () => {
+  /*
+   * Issue 172 shows only when the browser's clamp leaves the new page's top
+   * edge in view (spec 018 rule 6a). The 401(k) step is about 690px tall while
+   * it loads, so without the fix a window 625 to 675px tall lands it 5 to 65px
+   * down, at 1024, 1280 and 1440 wide (a scan on November 1). 650 is the
+   * middle of that band.
+   */
+  test.use({ viewport: { width: 1280, height: 650 } });
 
   test('a step footer link lands at the top of the next step (issue 172)', async ({ page }) => {
     test.setTimeout(120_000);
@@ -316,6 +315,7 @@ test.describe('on a phone', () => {
       ['/setup/decisions/emergency-fund', /^Next: 401\(k\) match/],
       ['/setup/decisions/health-plan', /^Back to 401\(k\) match/],
     ] as const;
+    const scrollY = () => page.evaluate(() => window.scrollY);
     for (const [from, name] of steps) {
       await page.goto(from);
       await waitForHydration(page);
@@ -323,12 +323,12 @@ test.describe('on a phone', () => {
       await expect(link).toBeVisible({ timeout: 30_000 });
       await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 30_000 });
       await link.scrollIntoViewIfNeeded();
-      expect((await placement(page)).scrollY).toBeGreaterThan(0);
+      expect(await scrollY()).toBeGreaterThan(0);
 
       await link.click();
       await expect(page).toHaveURL('/setup/decisions/401k');
       await settled(page);
-      expect(await placement(page)).toEqual({ scrollY: 0, clear: true });
+      expect(await scrollY(), `following the footer from ${from}`).toBe(0);
     }
   });
 });
