@@ -17,16 +17,13 @@ type AppSideNavProps = Omit<SideNavProps, 'current'>;
  * check-in item opens the list of check-ins.
  */
 export function AppSideNav({ done, hrefs, ...props }: AppSideNavProps) {
-  const pathname = usePathname();
-  const current = navKeyForPath(pathname);
+  const current = navKeyForPath(usePathname());
   const pageHydrated = usePageHydrated();
   const withList = { checkIn: checkInNavHref(undefined), ...hrefs };
   if (done !== undefined || !pageHydrated) {
-    return (
-      <SideNav {...props} hrefs={withList} done={done} current={current} pathname={pathname} />
-    );
+    return <SideNav {...props} hrefs={withList} done={done} current={current} />;
   }
-  return <SideNavWithProgress {...props} hrefs={hrefs} current={current} pathname={pathname} />;
+  return <SideNavWithProgress {...props} hrefs={hrefs} current={current} />;
 }
 
 function SideNavWithProgress({ hrefs, ...props }: Omit<SideNavProps, 'done'>) {

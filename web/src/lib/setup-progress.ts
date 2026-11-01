@@ -1,19 +1,10 @@
 import { CALCULATORS, type CalculatorId } from './features';
 
-export const SETUP_STEPS = ['link', 'confirm', 'spending', 'decisions'] as const;
-export type SetupStep = (typeof SETUP_STEPS)[number];
+/** The four setup steps the side nav lists. */
+export type SetupStep = 'link' | 'confirm' | 'spending' | 'decisions';
 /** The side nav items that get a done mark: the setup steps, each decision step and the plan. */
 export type ProgressKey = SetupStep | CalculatorId | 'plan';
 export type SetupProgress = Record<ProgressKey, boolean>;
-
-/**
- * How many of the four setup steps the nav marks done, for the phone nav's
- * "n of 4 setup steps done" (spec 018 rule 13). A mark not known yet counts as
- * not done, as the list shows it.
- */
-export function setupStepsDone(done: Partial<SetupProgress> | undefined): number {
-  return SETUP_STEPS.filter((step) => done?.[step] === true).length;
-}
 
 /** Counts and states read from the API; this module only compares them. */
 export interface SetupFacts {

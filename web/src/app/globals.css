@@ -117,7 +117,7 @@
   --shadow-paper:
     0 1px 2px rgb(22 24 29 / 0.08), 0 8px 24px rgb(22 24 29 / 0.08), 0 0 0 1px rgb(22 24 29 / 0.06);
 
-  /* Breakpoints from the mockup: 640 phone, 780 nav collapse, 900 two-up grids. */
+  /* Breakpoints from the mockup: 780 the nav column stacks above the page, 900 two-up grids. */
   --breakpoint-nav: 48.75rem;
   --breakpoint-wide: 56.25rem;
 

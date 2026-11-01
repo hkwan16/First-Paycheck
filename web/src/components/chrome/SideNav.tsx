@@ -2,28 +2,19 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
-import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { ArrowSmallIcon, LinesIcon, PlanIcon, QuestionIcon, TrendIcon } from '@/components/icons';
+import type { ReactNode } from 'react';
+import { PlanIcon, QuestionIcon, TrendIcon } from '@/components/icons';
 import { cn } from '@/lib/cn';
 import { DECISION_STEPS, STEP_TEXT } from '@/lib/decision-steps';
 import { features, type CalculatorId } from '@/lib/features';
 import { decisionStepRoute, firstDecisionRoute } from '@/lib/routes';
-import {
-  SETUP_STEPS,
-  setupStepsDone,
-  type ProgressKey,
-  type SetupProgress,
-  type SetupStep,
-} from '@/lib/setup-progress';
+import type { ProgressKey, SetupProgress, SetupStep } from '@/lib/setup-progress';
 import { NavStep } from './NavStep';
 
 /** A nav item: a setup step, a decision step (by its calculator), or a plan screen. */
 export type NavKey = SetupStep | CalculatorId | 'why' | 'plan' | 'checkIn';
 
 const hasDoneMark = (key: NavKey): key is ProgressKey => key !== 'why' && key !== 'checkIn';
-
-const isDecisionStep = (key: NavKey): key is CalculatorId =>
-  (DECISION_STEPS as readonly NavKey[]).includes(key);
 
 interface NavItem {
   key: NavKey;
@@ -33,14 +24,12 @@ interface NavItem {
   href?: Route;
 }
 
-const DECISIONS_LABEL = 'Decisions';
-
 const SETUP: readonly NavItem[] = [
   { key: 'link', label: 'Accounts and documents', step: 1, href: '/setup/link' },
   { key: 'confirm', label: 'Confirm pay stub', step: 2, href: '/setup/confirm' },
   { key: 'spending', label: 'Spending map', step: 3, href: '/setup/spending' },
   // Its href is the first live decision step (spec 018 rule 10).
-  { key: 'decisions', label: DECISIONS_LABEL, step: 4 },
+  { key: 'decisions', label: 'Decisions', step: 4 },
 ];
 
 const PLAN: readonly NavItem[] = [
@@ -72,8 +61,6 @@ export interface SideNavProps {
   hrefs?: Partial<Record<NavKey, Route>>;
   /** Live calculators (`features.calculators`); the other decision steps are muted, After alpha. */
   calculators?: readonly CalculatorId[];
-  /** The page's path: an open list on a phone closes when it changes (spec 018 rule 15). */
-  pathname?: string;
 }
 
 const itemClasses =
@@ -87,13 +74,11 @@ function ItemLink({
   href,
   current,
   className,
-  onChoose,
   children,
 }: {
   href: Route | undefined;
   current: boolean;
   className: string;
-  onChoose: () => void;
   children: ReactNode;
 }) {
   return href ? (
@@ -101,7 +86,6 @@ function ItemLink({
       href={href}
       aria-current={current ? 'page' : undefined}
       className={cn(itemClasses, linkClasses, className)}
-      onClick={onChoose}
     >
       {children}
     </Link>
@@ -119,8 +103,6 @@ const stepDot = <span className="size-1.5 rounded-full bg-current" />;
 
 interface ListProps extends SideNavProps {
   live: readonly CalculatorId[];
-  /** A link in the list was chosen: the phone list closes. */
-  onChoose: () => void;
 }
 
 /**
@@ -140,7 +122,6 @@ function DecisionSteps({ live, ...props }: ListProps) {
               href={decisionStepRoute(id)}
               current={props.current === id}
               className={cn('gap-2 px-2.5 py-1 text-small', muted && 'text-ink-3')}
-              onChoose={props.onChoose}
             >
               <NavStep size="sm" done={done}>
                 {stepDot}
@@ -185,7 +166,6 @@ function Group({
                 href={href}
                 current={props.current === item.key}
                 className="gap-2.5 px-3 py-2 text-control"
-                onChoose={props.onChoose}
               >
                 <NavStep done={done}>{item.step}</NavStep>
                 {item.label}
@@ -200,93 +180,16 @@ function Group({
   );
 }
 
-interface Location {
-  label: string;
-  marker: ReactNode;
-  size: 'md' | 'sm';
-  done: boolean;
-}
-
-/** Where the person is, for the phone control (spec 018 rule 13). */
-function locationOf({ current, done }: SideNavProps): Location {
-  if (current === undefined) {
-    return { label: 'Setup steps', marker: <LinesIcon size={12} />, size: 'md', done: false };
-  }
-  const isDone = hasDoneMark(current) && Boolean(done?.[current]);
-  if (isDecisionStep(current)) {
-    const label = `${DECISIONS_LABEL}: ${STEP_TEXT[current].label}`;
-    return { label, marker: stepDot, size: 'sm', done: isDone };
-  }
-  const item = [...SETUP, ...PLAN].find((candidate) => candidate.key === current)!;
-  return { label: item.label, marker: item.step, size: 'md', done: isDone };
-}
-
 /**
  * From the mockup's `.nav`: setup steps (Decisions with its four steps), then
- * the plan screens. Under 780px (spec 018 rules 11-17) the same list sits
- * behind one disclosure button that names where the person is and how far
- * through setup they are; the list opens in place, pushing the page down, and
- * closes on Escape, on a link chosen and when the page changes. At 780px and
- * wider the button is not displayed and the list always shows.
+ * the plan screens, as one list at every width.
  */
-export function SideNav({ pathname, ...props }: SideNavProps) {
-  const listId = useId();
-  const controlRef = useRef<HTMLButtonElement>(null);
-  const [open, setOpen] = useState(false);
-  // An open list belongs to the page it was opened on (React's "adjust state when a prop changes").
-  const [openedOn, setOpenedOn] = useState(pathname);
-  if (pathname !== openedOn) {
-    setOpenedOn(pathname);
-    setOpen(false);
-  }
-
+export function SideNav(props: SideNavProps) {
   const live = props.calculators ?? features.calculators;
-  const where = locationOf(props);
-  const progress = `${setupStepsDone(props.done)} of ${SETUP_STEPS.length} setup steps done`;
-  const close = () => setOpen(false);
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== 'Escape' || !open) return;
-    close();
-    controlRef.current?.focus();
-  };
-
   return (
-    <nav aria-label="Setup steps" onKeyDown={onKeyDown}>
-      <button
-        ref={controlRef}
-        type="button"
-        aria-expanded={open}
-        aria-controls={listId}
-        onClick={() => setOpen(!open)}
-        className={cn(
-          itemClasses,
-          'w-full cursor-pointer gap-2.5 border-0 bg-surface px-3 py-2 text-left text-control text-ink shadow-raised nav:hidden',
-        )}
-      >
-        <NavStep size={where.size} done={where.done}>
-          {where.marker}
-        </NavStep>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span>
-            {where.label}
-            {where.done && doneText}
-            <span className="sr-only">,</span>
-          </span>
-          {/* The space between the two lines in the accessible name; a flex column ignores it. */}{' '}
-          <span className="text-tiny font-normal text-ink-3">{progress}</span>
-        </span>
-        <ArrowSmallIcon
-          size={8}
-          className={cn(
-            'flex-none transition-[rotate] duration-(--duration-fast)',
-            open ? '-rotate-90' : 'rotate-90',
-          )}
-        />
-      </button>
-      <div id={listId} className={cn('max-nav:mt-2', !open && 'max-nav:hidden')}>
-        <Group title="Setup" items={SETUP} {...props} live={live} onChoose={close} />
-        <Group title="Your plan" items={PLAN} {...props} live={live} onChoose={close} />
-      </div>
+    <nav aria-label="Setup steps">
+      <Group title="Setup" items={SETUP} {...props} live={live} />
+      <Group title="Your plan" items={PLAN} {...props} live={live} />
     </nav>
   );
 }
