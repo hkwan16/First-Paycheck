@@ -913,8 +913,10 @@ deadline (reaching that step through the 401(k)'s footer), and saves a W-4 versi
 those two decisions (checking "If you change nothing" states the `current_refund_cents` of the
 calculator's own answer), with its reminder, then checks every step is done in the nav and follows the
 footer to the plan; in a 1280x650 window it follows a Next and a Back footer link from the bottom
-of a step and checks the next page sits at the top (issue 172; 625 to 675px tall is where the bug
-shows on desktop).
+of a step and checks the next page sits at the top (issue 172). Only a window about 625 to 675px
+tall shows the bug on desktop, so the test checks that this one still does: an init script wraps
+`window.scrollTo`, and the landing's call must find the new page scrolled down with its top edge in
+view (the state Next leaves alone), or the test fails asking for the height to be rescanned.
 Decisions cannot be
 deleted, so it reads the current version instead of assuming v1. `plan.spec.ts` (project
 `authenticated-plan`, after decisions) reads the four decisions back on `/plan` (and the nav's
