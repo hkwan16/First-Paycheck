@@ -206,12 +206,12 @@ test('records the alpha demo', async ({ browser }, testInfo) => {
     await page.keyboard.press(key);
     await demo.hold(350);
   }
-  const save = k401.getByRole('button', { name: /^Save|^Saved as v/ });
-  await expect(save).toHaveText(/^Save as v\d+$/, { timeout: 30_000 });
+  const save = k401.getByRole('button', { name: /^(Save|Save changes|Saved)$/ });
+  await expect(save).toHaveText(/^Save( changes)?$/, { timeout: 30_000 });
   await expect(save).toBeEnabled({ timeout: 30_000 });
   await demo.hold(1500);
   await save.click();
-  await expect(save).toHaveText(/^Saved as v\d+$/, { timeout: 30_000 });
+  await expect(save).toHaveText('Saved', { timeout: 30_000 });
   const whyHref = await k401.getByRole('link', { name: 'Why this decision' }).getAttribute('href');
   expect(whyHref).toMatch(/^\/why\/[^/]+$/);
   // The explanation is written off camera while the recording goes on.
@@ -238,9 +238,9 @@ test('records the alpha demo', async ({ browser }, testInfo) => {
   const w4 = page.getByRole('region', { name: 'W-4, federal only' });
   await demo.scrollTo(w4.getByRole('group', { name: 'From your decisions' }));
   await demo.hold(2500);
-  // The result, not "If you change nothing": that comparison needs the stub and
-  // the plan details on one pay schedule, and the Acme stub is semimonthly.
-  await demo.scrollTo(w4.getByRole('group', { name: 'Calculator result' }));
+  // The result, which opens with "If you change nothing": what the stub's
+  // withholding leaves at tax time, on the stub's own pay schedule (issue 198).
+  await demo.scrollTo(w4.getByRole('group', { name: 'Your numbers' }));
   await demo.hold(2500);
 
   // 5. Why: the 401(k) version just saved, explained and checked.

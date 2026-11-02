@@ -30,8 +30,9 @@ test.skip(!alphaUser(), NO_ALPHA_USER);
 test.skip(!e2eApiUrl(), NO_E2E_API);
 
 const card = (page: Page) => page.getByRole('region', { name: '401(k) match' });
-const result = (page: Page) => card(page).getByRole('group', { name: 'Calculator result' });
-const saveButton = (page: Page) => card(page).getByRole('button', { name: /^Save|^Saved as v/ });
+const result = (page: Page) => card(page).getByRole('group', { name: 'Your numbers' });
+const saveButton = (page: Page) =>
+  card(page).getByRole('button', { name: /^(Save|Save changes|Saved)$/ });
 
 /** The calculator has answered for the inputs on screen. */
 async function settled(page: Page) {
@@ -156,8 +157,8 @@ test('a new user goes from sign-in to a verified 401(k) explanation', async ({ p
     await expect(form).toBeVisible({ timeout: 30_000 });
     await form.getByLabel('Yearly salary').fill('65,000');
     await form.getByRole('button', { name: 'Single' }).click();
-    await form.getByLabel('Employer adds, % of what you put in').fill('100');
-    await form.getByLabel('Up to, % of your pay').fill('4');
+    await form.getByLabel('Employer adds, as a % of what you put in').fill('100');
+    await form.getByLabel('Up to this % of your pay').fill('4');
     // The calculator's age comes from the birth year (spec 006 open question 2, settled in M6).
     await form.getByLabel('Year you were born').fill('1996');
     await form.getByRole('button', { name: 'Save plan details' }).click();
@@ -167,17 +168,17 @@ test('a new user goes from sign-in to a verified 401(k) explanation', async ({ p
     await setContribution(page, slider, 4);
     await expect(saveButton(page)).toBeEnabled();
     await saveButton(page).click();
-    await expect(saveButton(page)).toHaveText('Saved as v1', { timeout: 15_000 });
+    await expect(saveButton(page)).toHaveText('Saved', { timeout: 15_000 });
     await expect(page.getByText('1 of 4 saved')).toBeVisible();
   });
 
   await test.step('change it and save v2 over v1', async () => {
     const slider = card(page).getByRole('slider', { name: /Your contribution/ });
     await setContribution(page, slider, 6);
-    await expect(card(page).getByText('Changed since v1')).toBeVisible();
-    await expect(saveButton(page)).toHaveText('Save as v2');
+    await expect(card(page).getByText('Changes not saved')).toBeVisible();
+    await expect(saveButton(page)).toHaveText('Save changes');
     await saveButton(page).click();
-    await expect(saveButton(page)).toHaveText('Saved as v2', { timeout: 15_000 });
+    await expect(saveButton(page)).toHaveText('Saved', { timeout: 15_000 });
   });
 
   await test.step('open why and see the explanation verified against the calculator', async () => {
