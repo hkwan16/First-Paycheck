@@ -1976,7 +1976,8 @@ issues:
     labels: ["area:api", "type:bug"]
     milestone: M10
     priority: High
-    status: todo
+    status: done
+    # Fixed November 2: PR 214. One pay_change per paycheck, keyed pay_change:{paycheck_id}; migration 0021 merges the old rows.
   - title: "Confirm reads a 401(k) dash as not found and leaves the user stuck"
     body: >-
       The Acme stub prints "401(k) -", a dash meaning zero. Confirm shows
@@ -1990,7 +1991,8 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: High
-    status: todo
+    status: done
+    # Fixed November 2: PR 212. extract_pay_stub/v2 reads a dash on a line as 0 (spec 005 rule 1a).
   - title: "Link says No documents yet while documents are still loading"
     body: >-
       While the API wakes up, the Documents card shows "No documents yet" for
@@ -2000,7 +2002,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Fixed November 2: PR 212. Link shows a loading state until the documents arrive.
   # Deferred on November 1 by the product owner: cold starts are accepted for now.
   - title: "The API sleeps because GitHub runs the keepalive schedule only every few hours"
     body: >-
@@ -2024,7 +2027,8 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: High
-    status: todo
+    status: done
+    # Fixed November 2: PR 215. api/app/pay_schedule.py resolves one pay schedule for the stub and the plan.
   - title: "Link lists every copy of a pay stub as Confirmed"
     body: >-
       After issue 190 a newer confirm supersedes an older copy, but Link still
@@ -2034,7 +2038,8 @@ issues:
     labels: ["area:api", "area:web"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Fixed November 2: PR 212. DocumentOut.superseded; only the newest copy reads Confirmed.
   - title: "Spending shows two incomes, loan rows its totals leave out, and loan interest as a bill"
     body: >-
       The Income tile reads $3,240.12 (deposits labeled income) while the
@@ -2047,7 +2052,8 @@ issues:
     labels: ["area:api", "area:web"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Fixed November 2: PR 211. Spending and recurring bills read cash accounts only (api/db/accounts.py).
   - title: "Spending is eight screens tall"
     body: >-
       Spending runs 7.9 screens with 2,337 words, 93 buttons and 66 controls:
@@ -2059,7 +2065,8 @@ issues:
     labels: ["area:web"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Fixed November 2: PR 211. A shorter sankey stacked from the top, and the list opens on 10 rows behind Show all transactions.
   - title: "Check-in: one stub change makes six cards, each with a blue Done"
     body: >-
       A changed pay stub yields a pay change plus one "For your information"
@@ -2070,7 +2077,8 @@ issues:
     labels: ["area:api", "area:web"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Fixed November 2: PR 214. One pay change card per paycheck; Mark as done is a default button.
   - title: "The W-4 step shows every line of the form at once"
     body: >-
       A first-job employee usually needs only the filing status, but the step
@@ -2081,7 +2089,8 @@ issues:
     labels: ["area:web"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Fixed November 2: PR 215. The W-4 step asks one question, Anything else on your W-4?
   - title: "Why shows internals and alarms on every out-of-date explanation"
     body: >-
       The status panel shows "Explanation prompt explain/v2", "checked by plain
@@ -2093,7 +2102,8 @@ issues:
     labels: ["area:web"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Fixed November 2: PR 216. One About this explanation note; explain/v4 is at most 150 words in whole dollars.
   - title: "Destructive actions get the most weight (unlink, delete account)"
     body: >-
       The unlink confirmation makes "Yes, unlink" the blue primary and "Keep"
@@ -2103,7 +2113,8 @@ issues:
     labels: ["area:web"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Fixed November 2: PRs 212 and 216. A destructive Button variant for Unlink and Delete account.
   - title: "Decision steps put version numbers in buttons and show two primary buttons"
     body: >-
       Each step's save button says "Save as v3" next to a blue "Next", so a
@@ -2114,7 +2125,8 @@ issues:
     labels: ["area:web"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Fixed November 2: PR 215. Save, Save changes or Saved, with Next as a secondary button.
   - title: "Health plan terms need plain explanations"
     body: >-
       The comparison uses coinsurance, deductible, out-of-pocket maximum, HDHP
@@ -2124,7 +2136,8 @@ issues:
     labels: ["area:web"]
     milestone: M10
     priority: Medium
-    status: todo
+    status: done
+    # Fixed November 2: PR 215. A disclosure explains each health plan term (HEALTH_TERMS).
   - title: "Status messages appear away from the control that caused them"
     body: >-
       Sync now's result appears under the account list, far below the button,
@@ -2134,7 +2147,8 @@ issues:
     labels: ["area:web"]
     milestone: M10
     priority: Low
-    status: todo
+    status: done
+    # Fixed November 2: PR 212. Each status message sits next to the control that caused it.
   - title: "Plain-language wording on every screen"
     body: >-
       Leads and notices describe the system instead of the task ("Both feed one
@@ -2147,4 +2161,26 @@ issues:
     labels: ["area:web", "area:docs"]
     milestone: M10
     priority: High
-    status: todo
+    status: done
+    # Fixed November 2: PRs 211, 212, 214, 215 and 216. The no-ai-slop wording pass on every screen.
+  - title: "A first Plaid sync can finish with no transactions, and the Spending e2e then finds none"
+    body: >-
+      On PR 211's first CI run (November 2, 06:39 UTC), the e2e user's
+      sync.initial succeeded two seconds after the link, with no
+      PRODUCT_NOT_READY retry, yet every month from June to November showed no
+      transactions in the summary or the list, and spending.spec.ts failed
+      with "No period in the picker has transactions". The alpha user's link in
+      the same run waited out a not-ready retry and got its rows. A rerun
+      passed. Likely cause: Plaid's first /transactions/sync page was empty
+      while its transactions_update_status was not NOT_READY, and the sync
+      recorded the cursor as done (api/sync/plaid/provider.py fetch_transactions
+      checks only NOT_READY). A real user would see an empty Spending until the
+      next sync. Log what each sync page reported, reproduce against the
+      sandbox, and fix the root cause in the sync, not the test. Done when a
+      first sync that Plaid has not finished never ends as a successful empty
+      sync, with a test that fails on today's code.
+    labels: ["area:api", "type:bug"]
+    milestone: M10
+    priority: High
+    status: done
+    # Fixed November 2: PR 217. An empty cursor raises TransactionsNotReady and the sync waits (spec 002 rules 9a, 11a, 11b).
