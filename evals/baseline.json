@@ -22,19 +22,23 @@
   },
   "explain": {
     "cited": 1.0,
+    "concise": 1.0,
     "first_try_verified": 1.0,
     "judge_accuracy": 1.0,
     "no_fallback": 1.0,
-    "rate_framing": 1.0
+    "rate_framing": 1.0,
+    "whole_dollars": 1.0
   },
   "explain-smoke": {
     "flow_correct": 1.0
   },
   "explain-w4": {
     "cited": 1.0,
+    "concise": 1.0,
     "first_try_verified": 1.0,
     "judge_accuracy": 1.0,
     "no_fallback": 1.0,
+    "whole_dollars": 0.5833333333333334,
     "withholding_framing": 1.0
   },
   "extraction": {
