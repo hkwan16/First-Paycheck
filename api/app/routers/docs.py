@@ -24,6 +24,7 @@ from app.routers.benefits import BenefitsPlanOut
 from app.routers.pay_stubs import PayStubOut
 from app.types import UtcDateTime
 from calc.pay_stub import balance
+from db import pay_stubs
 from db.enums import (
     DocumentStatus,
     DocumentStatusReason,
@@ -353,7 +354,9 @@ def confirm_document(
     profile_updated = False
     if document.type is DocumentType.PAY_STUB and body.pay_stub is not None:
         stub = _pay_stub(document, body.pay_stub)
-        session.add(stub)
+        # Supersedes a copy of the same paycheck and what this upload replaced
+        # (spec 005 rules 22a-22c, issue 190), so a stub confirmed twice counts once.
+        pay_stubs.add_confirmed(session, stub)
     elif document.type is DocumentType.BENEFITS and body.benefits is not None:
         plans = _plans(document, body.benefits)
         session.add_all(plans)

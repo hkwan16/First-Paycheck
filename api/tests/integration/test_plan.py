@@ -13,6 +13,7 @@ from sqlalchemy import Connection
 
 from app.deps import get_now
 from tests.conftest import FixtureUser
+from tests.support.pay_stub_copies import replaced_late_october
 from tests.support.plan_user import NOW, PlanUser, seed_plan_user
 
 Client = Callable[[FixtureUser], TestClient]
@@ -208,3 +209,13 @@ def test_goals_match_get_goals(plan_user: PlanUser, client_as: Client, user_a: F
         "39.13",
     )
     assert goal["account_id"] == str(plan_user.account_id)
+
+
+def test_plan_pay_stub_skips_superseded_stub(
+    frozen_app: FastAPI, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    """Spec 005 rule 22d: the plan's paycheck is the newest current stub (issue 190)."""
+    _, new = replaced_late_october(client_as(user_a), db_connection, user_a)
+    stub = get_plan(client_as, user_a)["pay_stub"]
+    assert stub is not None
+    assert (stub["id"], stub["pay_date"], stub["gross_cents"]) == (str(new), "2026-10-15", 270_833)

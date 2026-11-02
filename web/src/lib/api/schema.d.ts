@@ -607,7 +607,7 @@ export interface paths {
     };
     /**
      * List Pay Stubs
-     * @description The user's confirmed pay stubs, newest pay date first.
+     * @description The user's current confirmed pay stubs, newest pay date first.
      */
     get: operations['list_pay_stubs'];
     put?: never;

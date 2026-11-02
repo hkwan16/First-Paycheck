@@ -33,11 +33,13 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    column,
     func,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.sql.elements import ColumnElement
 
 from db.enums import (
     AccountKind,
@@ -544,13 +546,50 @@ def _deduction() -> Mapped[int]:
     return mapped_column(BigInteger, server_default=text("0"))
 
 
+def employer_key(name: ColumnElement[Any]) -> ColumnElement[str]:
+    """How spec 005 rule 22a compares employers: whitespace runs collapsed, the
+    ends trimmed, lowercased, a missing name as ''. The generated
+    ``pay_stubs.employer_key`` and ``db/pay_stubs.py``'s lookup both use it."""
+    collapsed = func.regexp_replace(func.coalesce(name, ""), r"\s+", " ", "g")
+    return func.lower(func.btrim(collapsed), type_=Text)
+
+
+PAY_STUB_SUPERSEDED_FK = "fk_pay_stubs_superseded_by_id_pay_stubs"
+
+
 class PayStub(Base):
-    """Confirmed fields from one pay stub; written only by POST /docs/{id}/confirm."""
+    """Confirmed fields from one pay stub; written only by POST /docs/{id}/confirm.
+
+    A newer confirm of the same paycheck (or of a replacement upload) sets
+    ``superseded_by_id``; readers see only current rows, through
+    ``db/pay_stubs.py:current_pay_stubs`` (spec 005 rules 22a-22e, issue 190).
+    """
 
     __tablename__ = "pay_stubs"
     __table_args__ = (
+        UniqueConstraint("id", "user_id"),
         UniqueConstraint("document_id"),
         ForeignKeyConstraint(["document_id", "user_id"], ["documents.id", "documents.user_id"]),
+        # Deferred: confirm marks the old row with the new row's id, then inserts it.
+        ForeignKeyConstraint(
+            ["superseded_by_id", "user_id"],
+            ["pay_stubs.id", "pay_stubs.user_id"],
+            name=PAY_STUB_SUPERSEDED_FK,
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        CheckConstraint("superseded_by_id <> id", name="superseded_by_other"),
+        # One current stub per paycheck (spec 005 rule 22c).
+        Index(
+            "uq_pay_stubs_current_paycheck",
+            "user_id",
+            "employer_key",
+            "pay_date",
+            "period_start",
+            "period_end",
+            unique=True,
+            postgresql_where=text("superseded_by_id IS NULL"),
+        ),
         CheckConstraint("period_start <= period_end", name="period_ordered"),
         CheckConstraint("gross_cents > 0", name="gross_positive"),
         CheckConstraint("net_cents >= 0", name="net_non_negative"),
@@ -590,6 +629,11 @@ class PayStub(Base):
     medical_premium_cents: Mapped[int] = _deduction()
     other_deductions_cents: Mapped[int] = _deduction()
     net_cents: Mapped[int] = mapped_column(BigInteger)
+    employer_key: Mapped[str] = mapped_column(
+        Text, Computed(employer_key(column("employer_name", Text)), persisted=True)
+    )
+    # Null while current; the stub that superseded this one (spec 005 rule 22b).
+    superseded_by_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     created_at: Mapped[dt.datetime] = _created_at()
 
 

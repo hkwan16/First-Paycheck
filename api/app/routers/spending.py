@@ -21,7 +21,8 @@ from app.deps import Now, UserSession
 from app.errors import AppError, error_responses
 from calc.spending import Bucket, CategorySum, CategoryTotal, summarize
 from db.enums import AccountKind
-from db.models import Account, PayStub, Transaction
+from db.models import Account, Transaction
+from db.pay_stubs import paid_between_count
 from sync.categories import CATEGORIES, CATEGORY_BUCKETS
 
 router = APIRouter(prefix="/spending", tags=["spending"])
@@ -175,13 +176,11 @@ def spending_summary(
 def summary_for(session: Session, first: dt.date, last: dt.date) -> SpendingSummary:
     """The summary of an already validated period (``GET /cashflow`` shares it)."""
     totals = summarize(_category_sums(session, first, last), CATEGORY_BUCKETS)
-    paychecks = session.scalar(
-        select(func.count()).select_from(PayStub).where(PayStub.pay_date.between(first, last))
-    )
+    paychecks = paid_between_count(session, first, last)
     return SpendingSummary(
         start=first,
         end=last,
-        paycheck_count=int(paychecks or 0),
+        paycheck_count=paychecks,
         ledger_rows_skipped=_ledger_rows(session, first, last),
         category_buckets=dict(CATEGORY_BUCKETS),
         account_kinds_counted=list(SPENDING_ACCOUNT_KINDS),

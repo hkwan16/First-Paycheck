@@ -8591,7 +8591,7 @@
     },
     "/pay-stubs": {
       "get": {
-        "description": "The user's confirmed pay stubs, newest pay date first.",
+        "description": "The user's current confirmed pay stubs, newest pay date first.",
         "operationId": "list_pay_stubs",
         "responses": {
           "200": {
