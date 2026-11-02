@@ -178,7 +178,7 @@ test('choosing another period reloads the totals and the diagram together', asyn
   await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0);
 });
 
-test('a category fix is saved as a rule and survives a reload', async ({ page }) => {
+test('a category fix holds for the merchant and survives a reload', async ({ page }) => {
   const table = await openSpending(page);
   const select = table.getByRole('combobox').first();
   const name = (await select.getAttribute('aria-label')) ?? '';
