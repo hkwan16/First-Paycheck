@@ -11,12 +11,13 @@ import type { Hue } from '@/lib/design/tone';
 import { isExplained } from '@/lib/explanations';
 import { formatMoney, formatNetCost, formatNumber, formatRate } from '@/lib/money';
 import { CALCULATOR_CARDS } from '../decisions/DecisionCard';
+import { refundText } from '../decisions/w4-format';
 
 /*
  * Words for the Plan screen (spec 016). Every figure is a field of
  * `GET /plan`, formatted as its `kind` says (a negative `net_cost` reads as an
- * amount ahead, spec 012 rule 17); nothing is added, compared or
- * rounded here.
+ * amount ahead, spec 012 rule 17, and a `refund` as a refund or an amount due,
+ * spec 016 rule 3); nothing is added, compared or rounded here.
  */
 
 /** The emergency fund's months figure is null when the target is past the 10-year horizon. */
@@ -43,6 +44,9 @@ export function figureText(figure: PlanFigure): string {
     case 'net_cost':
       // A health plan's yearly net cost: a negative one reads as an amount ahead.
       return formatNetCost(expect(figure, isNumber));
+    case 'refund':
+      // A W-4 outcome, in the W-4 card's own words.
+      return refundText(expect(figure, isNumber));
     case 'percent':
       return formatRate(expect(figure, isString));
     case 'count':

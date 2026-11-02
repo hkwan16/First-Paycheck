@@ -48,7 +48,7 @@ test('reads the saved decisions back with their figures and the next 90 days', a
   ]);
   const k401 = page.getByRole('region', { name: '401(k) match' });
   await expect(k401.getByText('Your contribution')).toBeVisible();
-  await expect(k401.getByText(/^v\d+ · Saved /)).toBeVisible();
+  await expect(k401.getByText(/^Saved /)).toBeVisible();
   await expect(page.getByRole('region', { name: 'Your paycheck' })).toContainText('Take-home pay');
   await expect(page.getByRole('region', { name: 'Next 90 days' })).toContainText(/Through /);
   // Spec 018: each date's badge opens its decision's step; Back goes to the last step.
@@ -88,7 +88,7 @@ test('downloads the calendar file', async ({ page }) => {
   const exportCard = page.getByRole('region', { name: 'Export' });
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    exportCard.getByRole('button', { name: 'Add to calendar (.ics)' }).click(),
+    exportCard.getByRole('button', { name: 'Add to calendar' }).click(),
   ]);
   expect(download.suggestedFilename()).toBe('first-paycheck-calendar.ics');
   const text = await readFile((await download.path())!, 'utf8');

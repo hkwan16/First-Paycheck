@@ -4352,6 +4352,7 @@
             "enum": [
               "money",
               "net_cost",
+              "refund",
               "percent",
               "count",
               "text"

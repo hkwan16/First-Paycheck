@@ -78,14 +78,14 @@ export function ExportCard() {
         </Button>
         <Button onClick={saveCalendar} loading={calendar.isPending}>
           <CalendarSmallIcon size={16} />
-          Add to calendar (.ics)
+          Add to calendar
         </Button>
       </div>
 
       {exporter.startError !== null && !exporter.isStarting && (
         <Notice tone="warning" compact role="alert">
-          Could not start the PDF.{' '}
-          {apiErrorMessage(exporter.startError, 'The server could not be reached. Try again.')}
+          We could not start your PDF.{' '}
+          {apiErrorMessage(exporter.startError, 'Check your connection and try again.')}
         </Notice>
       )}
       {following && (
@@ -102,8 +102,7 @@ export function ExportCard() {
         <Notice tone="warning" compact role="alert" className="items-center">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <span>
-              Could not download your PDF.{' '}
-              {apiErrorMessage(pdf.error, 'The server could not be reached.')}
+              We could not download your PDF. {apiErrorMessage(pdf.error, 'Check your connection.')}
             </span>
             <Button size="sm" onClick={retryPdf}>
               <RefreshIcon />
@@ -114,8 +113,8 @@ export function ExportCard() {
       )}
       {calendar.isError && (
         <Notice tone="warning" compact role="alert">
-          Could not download your calendar.{' '}
-          {apiErrorMessage(calendar.error, 'The server could not be reached. Try again.')}
+          We could not download your calendar file.{' '}
+          {apiErrorMessage(calendar.error, 'Check your connection and try again.')}
         </Notice>
       )}
       {/* Always rendered, so the polite region exists before its text arrives. */}

@@ -45,7 +45,7 @@ describe('usePlan', () => {
       ['Your contribution', '4.00'],
       ['Contribution for the full match', '4.00'],
       ['Employer match a year', 260_000],
-      ['Match missed a year', 0],
+      ['Match you miss a year', 0],
     ]);
     expect(k401.explanation.status).toBe('verified');
     expect(plan.pay_stub?.net_cents).toBe(199_604);

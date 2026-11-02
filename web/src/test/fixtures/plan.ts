@@ -69,15 +69,15 @@ function figuresOf(decision: Decision): PlanFigure[] {
         f('result.target_cents', 'Target', 'money'),
         f('inputs.monthly_contribution_cents', 'Monthly contribution', 'money'),
         f('result.per_paycheck_contribution_cents', 'Per paycheck', 'money'),
-        f('result.months_to_target', 'Months to target', 'count'),
-        f('result.funded_pct', 'Funded today', 'percent'),
+        f('result.months_to_target', 'Months to reach it', 'count'),
+        f('result.funded_pct', 'Saved so far', 'percent'),
       ];
     case 'k401_match':
       return [
         f('inputs.contribution_pct', 'Your contribution', 'percent'),
         f('result.full_match_pct', 'Contribution for the full match', 'percent'),
         f('result.employer_match_cents_current', 'Employer match a year', 'money'),
-        f('result.missed_cents', 'Match missed a year', 'money'),
+        f('result.missed_cents', 'Match you miss a year', 'money'),
       ];
     case 'health_plans': {
       const plan = `result.plans[${String(decision.result.selected_index)}]`;
@@ -91,13 +91,17 @@ function figuresOf(decision: Decision): PlanFigure[] {
     }
     case 'w4': {
       const found = [
-        f('result.withholding_per_paycheck_cents', 'Federal withholding per paycheck', 'money'),
         f(
-          'result.projected_tax_after_credits_cents',
-          `Projected federal tax for ${String(decision.inputs.tax_year)}`,
+          'result.withholding_per_paycheck_cents',
+          'Federal tax withheld per paycheck with your new W-4',
           'money',
         ),
-        f('result.projected_refund_cents', 'Projected refund (negative is owed)', 'money'),
+        f(
+          'result.projected_tax_after_credits_cents',
+          `Federal income tax for ${String(decision.inputs.tax_year)}`,
+          'money',
+        ),
+        f('result.projected_refund_cents', 'At tax time with your new W-4', 'refund'),
       ];
       const suggestion = decision.result.suggestion;
       if (
@@ -107,14 +111,12 @@ function figuresOf(decision: Decision): PlanFigure[] {
         found.push(
           f(
             'result.suggested_extra_withholding_cents',
-            'Suggested Step 4(c) extra withholding per paycheck',
+            'Extra withholding per paycheck, W-4 Step 4(c)',
             'money',
           ),
         );
       } else if (suggestion === 'increase_deductions') {
-        found.push(
-          f('result.suggested_deductions_cents', 'Suggested Step 4(b) deductions', 'money'),
-        );
+        found.push(f('result.suggested_deductions_cents', 'Deductions, W-4 Step 4(b)', 'money'));
       }
       return found;
     }

@@ -55,12 +55,24 @@ def long_date(value: dt.date) -> str:
     return f"{value:%b} {value.day}, {value.year}"
 
 
+def refund(cents: int) -> str:
+    """A refund (positive) or balance due (negative), as the W-4 card says it
+    (spec 016 rule 3): ``8`` -> ``$0.08 refund``, ``-391870`` -> ``$3,918.70 due``."""
+    if cents > 0:
+        return f"{dollars(cents)} refund"
+    if cents < 0:
+        return f"{dollars(-cents)} due"
+    return "Nothing due, no refund"
+
+
 def figure_value(figure: PlanFigure) -> str:
     value = figure.value
     if figure.kind == "money" and isinstance(value, int):
         return dollars(value)
     if figure.kind == "net_cost" and isinstance(value, int):
         return net_cost(value)
+    if figure.kind == "refund" and isinstance(value, int):
+        return refund(value)
     if figure.kind == "percent" and isinstance(value, str):
         return percent(Decimal(value))
     if figure.kind == "count" and (value is None or isinstance(value, int)):
