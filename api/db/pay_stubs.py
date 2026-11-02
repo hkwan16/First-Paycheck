@@ -16,7 +16,7 @@ import uuid
 from sqlalchemy import Select, Text, Update, and_, func, literal, or_, select, text, update
 from sqlalchemy.orm import Session, aliased
 
-from db.models import PAY_STUB_SUPERSEDED_FK, Document, PayStub, employer_key
+from db.models import Document, PayStub, employer_key
 
 __all__ = [
     "NEWEST_FIRST",
@@ -92,8 +92,8 @@ def add_confirmed(session: Session, stub: PayStub) -> None:
     second confirm of a copy wait, then see this one's stub and supersede it,
     rather than collide on ``uq_pay_stubs_current_paycheck``. The old rows are
     marked with the new id before the new row exists (the unique index would
-    refuse it while they are current), so the reference is deferred; it is
-    checked here, once the new row is flushed, rather than at commit.
+    refuse it while they are current), so the reference is deferred to commit,
+    which the route's session runs before it answers.
     """
     session.execute(
         text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
@@ -103,7 +103,3 @@ def add_confirmed(session: Session, stub: PayStub) -> None:
     session.execute(_supersede(stub))
     session.add(stub)
     session.flush()
-    # IMMEDIATE checks what is pending now; DEFERRED again for any later
-    # confirm in the same transaction (tests run several in one).
-    session.execute(text(f"SET CONSTRAINTS {PAY_STUB_SUPERSEDED_FK} IMMEDIATE"))
-    session.execute(text(f"SET CONSTRAINTS {PAY_STUB_SUPERSEDED_FK} DEFERRED"))

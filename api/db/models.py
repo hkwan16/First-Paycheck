@@ -554,9 +554,6 @@ def employer_key(name: ColumnElement[Any]) -> ColumnElement[str]:
     return func.lower(func.btrim(collapsed), type_=Text)
 
 
-PAY_STUB_SUPERSEDED_FK = "fk_pay_stubs_superseded_by_id_pay_stubs"
-
-
 class PayStub(Base):
     """Confirmed fields from one pay stub; written only by POST /docs/{id}/confirm.
 
@@ -574,7 +571,7 @@ class PayStub(Base):
         ForeignKeyConstraint(
             ["superseded_by_id", "user_id"],
             ["pay_stubs.id", "pay_stubs.user_id"],
-            name=PAY_STUB_SUPERSEDED_FK,
+            name="fk_pay_stubs_superseded_by_id_pay_stubs",
             deferrable=True,
             initially="DEFERRED",
         ),
