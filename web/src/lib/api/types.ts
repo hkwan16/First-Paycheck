@@ -40,6 +40,7 @@ export type PayStub = Schemas['PayStubOut'];
 export type ConfirmIn = Schemas['ConfirmIn'];
 export type Confirmed = Schemas['Confirmed'];
 export type Profile = Schemas['ProfileOut'];
+export type PaySchedule = Schemas['PaySchedule'];
 export type ProfileIn = Schemas['ProfileIn'];
 export type FilingStatus = Schemas['FilingStatus'];
 export type MatchTier = Schemas['MatchTier-Output'];

@@ -68,6 +68,18 @@ export function formatNetCost(cents: number, options: { decimals?: 0 | 2 } = {})
   return ahead ? `${amount} ahead` : amount;
 }
 
+/**
+ * A refund at tax time the API computed, in words (spec 014 rule 21):
+ * `"$0.08 refund"`, a negative one as `"$3,449.92 due"`, zero as
+ * `"Nothing due, no refund"`. The sign is the API's, read from `formatMoney`'s
+ * own text; this only picks the words.
+ */
+export function formatRefund(cents: number): string {
+  const text = formatMoney(cents);
+  if (text.startsWith('-')) return `${text.slice(1)} due`;
+  return cents === 0 ? 'Nothing due, no refund' : `${text} refund`;
+}
+
 export type TransactionFlow = 'in' | 'out' | 'none';
 
 /**

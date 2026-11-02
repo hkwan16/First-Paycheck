@@ -1,4 +1,4 @@
-"""The user's profile: what the calculators need to know (spec 005 rule 25).
+"""The user's profile: what the calculators need to know (spec 005 rules 25-25a).
 
 ``birth_year`` settles spec 006 open question 2: the client sends the 401(k)
 calculator ``age = tax_year - birth_year`` (the age reached by December 31 of
@@ -13,10 +13,12 @@ from typing import Any, Self
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.orm import Session
 
 from app.auth import CurrentUser
 from app.deps import Now, UserSession
 from app.errors import AppError, error_responses
+from app.pay_schedule import PaySchedule, pay_schedule
 from app.types import UtcDateTime
 from calc.k401 import MAX_TIERS, MatchTier, tiers_ascending
 from calc.types import PositiveCents
@@ -64,20 +66,33 @@ class ProfileIn(ProfileFields):
 class ProfileOut(ProfileFields):
     # Null until the profile is first saved.
     updated_at: UtcDateTime | None
+    pay_schedule: PaySchedule | None = Field(
+        description=(
+            "The pay schedule every calculator uses (spec 005 rule 25a): the newest "
+            "confirmed stub's, else pay_frequency; null without either. Computed on read."
+        )
+    )
 
 
-def _out(profile: Profile | None) -> ProfileOut:
-    if profile is None:
-        return ProfileOut(updated_at=None)
+def _out(session: Session, profile: Profile | None) -> ProfileOut:
+    saved = (
+        {}
+        if profile is None
+        else {name: getattr(profile, name) for name in ProfileFields.model_fields}
+    )
     return ProfileOut.model_validate(
-        {name: getattr(profile, name) for name in ProfileOut.model_fields}
+        {
+            **saved,
+            "updated_at": None if profile is None else profile.updated_at,
+            "pay_schedule": pay_schedule(session, profile),
+        }
     )
 
 
 @router.get("", responses=error_responses(401))
 def get_profile(session: UserSession, user: CurrentUser) -> ProfileOut:
     """The saved profile, or the defaults when nothing is saved yet."""
-    return _out(session.get(Profile, user.id))
+    return _out(session, session.get(Profile, user.id))
 
 
 @router.put("", responses=error_responses(401, 422))
@@ -98,4 +113,4 @@ def put_profile(body: ProfileIn, session: UserSession, user: CurrentUser, now: N
         .returning(Profile)
     )
     profile = session.scalars(statement, execution_options={"populate_existing": True}).one()
-    return _out(profile)
+    return _out(session, profile)

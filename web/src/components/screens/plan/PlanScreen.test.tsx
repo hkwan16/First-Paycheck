@@ -91,7 +91,7 @@ describe('PlanScreen with every decision saved', () => {
     expect(figure(health, 'Expected cost a year at medium use')).toHaveTextContent('$2,025.00');
     const w4 = region('W-4, federal only');
     expect(figure(w4, 'Federal withholding per paycheck')).toHaveTextContent('$213.67');
-    expect(figure(w4, 'Projected refund (negative is owed)')).toHaveTextContent('$0.08');
+    expect(figure(w4, 'Refund or amount due at tax time')).toHaveTextContent('$0.08 refund');
   });
 
   it('says a health plan that comes out ahead is that much ahead, with no minus sign', async () => {

@@ -8,7 +8,7 @@ import type {
   Profile,
 } from '@/lib/api/types';
 import { deepEqual } from '@/lib/deep-equal';
-import { emptyProfile } from './documents';
+import { emptyProfile, payScheduleOf, samplePayStub, stub01PayStub } from './documents';
 import cases from './k401-results.json';
 
 /*
@@ -94,6 +94,7 @@ export const stub01Profile: Profile = {
   ...emptyProfile,
   salary_cents: 9_500_010,
   pay_frequency: 'biweekly',
+  pay_schedule: payScheduleOf(stub01PayStub(), { pay_frequency: 'biweekly' }),
   filing_status: 'single',
   match_tiers: [
     { employee_pct_upto: '3.00', employer_pct: '100.00' },
@@ -109,6 +110,7 @@ export const sampleProfile: Profile = {
   ...emptyProfile,
   salary_cents: 6_500_000,
   pay_frequency: 'semimonthly',
+  pay_schedule: payScheduleOf(samplePayStub(), { pay_frequency: 'semimonthly' }),
   filing_status: 'single',
   match_tiers: [{ employee_pct_upto: '4.00', employer_pct: '100.00' }],
   // 30 by the end of 2026, the age every sample 401(k) case is calculated at.

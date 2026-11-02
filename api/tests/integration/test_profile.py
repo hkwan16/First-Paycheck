@@ -13,6 +13,7 @@ from sqlalchemy import Connection, text
 
 from app.deps import get_now
 from tests.conftest import FixtureUser
+from tests.support.pay_stub_copies import confirm_stub, replaced_late_october
 
 Client = Callable[[FixtureUser], TestClient]
 
@@ -28,6 +29,8 @@ DEFAULTS: dict[str, Any] = {
     "vesting_years": None,
     "birth_year": None,
 }
+# What GET and PUT add on read: the pay schedule (rule 25a), none without a stub or an entry.
+OUT_DEFAULTS: dict[str, Any] = {**DEFAULTS, "pay_schedule": None}
 FULL: dict[str, Any] = {
     "salary_cents": 6_500_000,
     "pay_frequency": "semimonthly",
@@ -48,7 +51,7 @@ FULL: dict[str, Any] = {
 def test_defaults_before_anything_is_saved(client_as: Client, user_a: FixtureUser) -> None:
     response = client_as(user_a).get("/profile")
     assert response.status_code == 200
-    assert response.json() == {**DEFAULTS, "updated_at": None}
+    assert response.json() == {**OUT_DEFAULTS, "updated_at": None}
 
 
 def test_put_then_get(db_connection: Connection, client_as: Client, user_a: FixtureUser) -> None:
@@ -75,7 +78,7 @@ def test_put_replaces_the_whole_profile(client_as: Client, user_a: FixtureUser) 
     replaced = client.put("/profile", json={"salary_cents": 7_000_000})
     assert replaced.status_code == 200
     assert {k: v for k, v in replaced.json().items() if k != "updated_at"} == {
-        **DEFAULTS,
+        **OUT_DEFAULTS,
         "salary_cents": 7_000_000,
     }
 
@@ -120,7 +123,7 @@ def test_put_validates(client_as: Client, user_a: FixtureUser, change: dict[str,
 
 def test_profiles_are_per_user(client_as: Client, user_a: FixtureUser, user_b: FixtureUser) -> None:
     assert client_as(user_a).put("/profile", json=FULL).status_code == 200
-    assert client_as(user_b).get("/profile").json() == {**DEFAULTS, "updated_at": None}
+    assert client_as(user_b).get("/profile").json() == {**OUT_DEFAULTS, "updated_at": None}
 
 
 def test_birth_year_up_to_the_current_year(
@@ -133,3 +136,62 @@ def test_birth_year_up_to_the_current_year(
     saved = client.put("/profile", json={"birth_year": 2026})
     assert saved.status_code == 200, saved.text
     assert client.get("/profile").json()["birth_year"] == 2026
+
+
+# ---------------------------------------------------------------- pay schedule (rule 25a)
+
+
+def test_pay_schedule_is_the_newest_stubs(
+    db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Issue 198: plan details saved at every two weeks, the Acme stub paid twice a month.
+
+    The stub a Replace corrected was confirmed paid later (2026-10-31); it is
+    superseded, so the schedule names the current one's 2026-10-15.
+    """
+    client = client_as(user_a)
+    replaced_late_october(client, db_connection, user_a)
+    schedule = {
+        "frequency": "semimonthly",
+        "periods_per_year": 24,
+        "source": "pay_stub",
+        "pay_stub_date": "2026-10-15",
+    }
+    saved = client.put("/profile", json={**FULL, "pay_frequency": "biweekly"})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["pay_frequency"] == "biweekly"
+    assert saved.json()["pay_schedule"] == schedule
+    assert client.get("/profile").json()["pay_schedule"] == schedule
+
+
+def test_pay_schedule_falls_back_to_the_profile(
+    db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    client = client_as(user_a)
+    assert client.put("/profile", json={**FULL, "pay_frequency": "weekly"}).status_code == 200
+    weekly = {
+        "frequency": "weekly",
+        "periods_per_year": 52,
+        "source": "profile",
+        "pay_stub_date": None,
+    }
+    assert client.get("/profile").json()["pay_schedule"] == weekly
+
+    # A newest stub that prints no schedule leaves the profile's in place.
+    confirm_stub(client, db_connection, user_a, pay_frequency=None)
+    assert client.get("/profile").json()["pay_schedule"] == weekly
+
+
+def test_pay_schedule_from_a_stub_before_any_profile(
+    db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    client = client_as(user_a)
+    confirm_stub(client, db_connection, user_a)
+    body = client.get("/profile").json()
+    assert body["updated_at"] is None
+    assert body["pay_schedule"] == {
+        "frequency": "semimonthly",
+        "periods_per_year": 24,
+        "source": "pay_stub",
+        "pay_stub_date": "2026-10-15",
+    }

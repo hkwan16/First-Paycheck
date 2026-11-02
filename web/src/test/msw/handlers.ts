@@ -21,6 +21,7 @@ import type {
   LinkItemRequest,
   LinkedItem,
   PayStubValues,
+  Profile,
   ProfileIn,
   Transaction,
 } from '@/lib/api/types';
@@ -32,7 +33,12 @@ import {
   sampleExplanation,
   sampleFallbackExplanation,
 } from '../fixtures/decisions';
-import { canReadAgain, samplePayStub, sampleValues } from '../fixtures/documents';
+import {
+  canReadAgain,
+  payScheduleOf,
+  samplePayStub,
+  sampleValues,
+} from '../fixtures/documents';
 import { sampleJob, SAMPLE_NOW, SAMPLE_SYNCED_AT } from '../fixtures/sample';
 import { checkinHandlers } from './checkin-handlers';
 import { db, emptyDb } from './db';
@@ -440,6 +446,12 @@ async function explain(request: Request) {
 }
 
 /** Default handlers: the happy path for every route the web app calls. */
+/** `GET /profile` and `PUT /profile`: the saved profile with the pay schedule read now (rule 25a). */
+const profileOut = (): Profile => ({
+  ...db.profile,
+  pay_schedule: payScheduleOf(db.payStubs[0], db.profile),
+});
+
 export const handlers = [
   // First: its benefits confirm handler passes pay stubs on to the one below.
   ...planningHandlers,
@@ -682,7 +694,7 @@ export const handlers = [
 
   http.get(apiUrl('/pay-stubs'), () => HttpResponse.json(db.payStubs)),
 
-  http.get(apiUrl('/profile'), () => HttpResponse.json(db.profile)),
+  http.get(apiUrl('/profile'), () => HttpResponse.json(profileOut())),
 
   // Spec 017: every row the user owns goes with the account; a repeat is 204 too.
   http.delete(apiUrl('/me'), () => {
@@ -707,8 +719,9 @@ export const handlers = [
       start_date: body.start_date ?? null,
       updated_at: SAMPLE_NOW,
       vesting_years: body.vesting_years ?? null,
+      pay_schedule: null,
     };
-    return HttpResponse.json(db.profile);
+    return HttpResponse.json(profileOut());
   }),
 
   // The calculator itself: answers from the API's own results (k401-results.json).

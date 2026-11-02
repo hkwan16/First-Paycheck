@@ -16,6 +16,8 @@ import calendar
 import datetime as dt
 from typing import Literal
 
+from calc.types import PayPeriods
+
 __all__ = [
     "PERIODS",
     "PayFrequency",
@@ -26,7 +28,12 @@ __all__ = [
 ]
 
 PayFrequency = Literal["weekly", "biweekly", "semimonthly", "monthly"]
-PERIODS: dict[PayFrequency, int] = {"weekly": 52, "biweekly": 26, "semimonthly": 24, "monthly": 12}
+PERIODS: dict[PayFrequency, PayPeriods] = {
+    "weekly": 52,
+    "biweekly": 26,
+    "semimonthly": 24,
+    "monthly": 12,
+}
 _STEP_DAYS: dict[PayFrequency, int] = {"weekly": 7, "biweekly": 14}
 # Enough months ahead to always find a semimonthly or monthly date.
 _MONTHS_AHEAD = 3

@@ -46,7 +46,7 @@ _current_decisions = table("current_decisions", column("id"))
 
 # ``net_cost`` is money too: a yearly net cost whose negative value reads as an
 # amount ahead (spec 012 rule 17), so clients pick those words by kind.
-FigureKind = Literal["money", "net_cost", "percent", "count", "text"]
+FigureKind = Literal["money", "net_cost", "refund", "percent", "count", "text"]
 ExplanationStatus = Literal["verified", "fallback", "none"]
 
 
@@ -179,7 +179,7 @@ def _w4(data: dict[str, Any]) -> list[PlanFigure]:
             "money",
         ),
         _figure(
-            data, "result.projected_refund_cents", "Projected refund (negative is owed)", "money"
+            data, "result.projected_refund_cents", "Refund or amount due at tax time", "refund"
         ),
     ]
     suggestion = data["result"]["suggestion"]

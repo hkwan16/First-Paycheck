@@ -21,10 +21,17 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.errors import AppError
+from app.pay_schedule import pay_schedule
 from calc.emergency_fund import EmergencyFundInput, EmergencyFundResult, emergency_fund
 from calc.health_plans import HealthPlansInput
 from calc.k401 import K401MatchInput
-from calc.pay_dates import PERIODS, PayFrequency, add_months, frequency_for_periods, next_pay_date
+from calc.pay_dates import (
+    PayFrequency,
+    add_months,
+    frequency_for_periods,
+    frequency_named,
+    next_pay_date,
+)
 from calc.w4 import W4Input
 from db.enums import (
     AccountRole,
@@ -90,13 +97,12 @@ def apply(
 
 
 def _pay_frequency(session: Session, user_id: uuid.UUID, periods: int) -> PayFrequency:
-    """The profile's pay frequency, else the one the decision's pay periods imply."""
-    profile = session.get(Profile, user_id)
-    if profile is not None and profile.pay_frequency is not None:
-        for frequency in PERIODS:
-            if frequency == profile.pay_frequency:
-                return frequency
-    return frequency_for_periods(periods)
+    """The user's pay schedule (spec 005 rule 25a), else the one the decision's pay
+    periods imply."""
+    schedule = pay_schedule(session, session.get(Profile, user_id))
+    if schedule is None:
+        return frequency_for_periods(periods)
+    return frequency_named(schedule.frequency)
 
 
 def _next_pay_date(session: Session, user_id: uuid.UUID, periods: int, today: dt.date) -> dt.date:
