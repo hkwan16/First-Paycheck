@@ -623,6 +623,24 @@ Every entry has a dated heading and these fields, in this order. A field that do
 
 **Fix:** As above, in the subagent's branch.
 
+## 2026-11-01: the decision steps' pay schedule, save words and plain language (issues 198, 203, 206, 207, 209)
+
+**Task:** Usability fixes on the four decision steps and the plan details form: one pay schedule everywhere (the e2e account's stub said twice a month, 24 paychecks, while the plan details said every two weeks, 26), plain save words with one primary action, the W-4 behind one question, every health plan term explained, and the wording of every string the steps show, the API's calculator messages included.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** The shared usability brief (spec first, failing tests first, reproduce the bug end to end, no-ai-slop wording for a 22-year-old in a first job, no version numbers in labels, one primary button per region).
+
+**What it produced:** Spec 005 rule 25a and `api/app/pay_schedule.py`: the newest current stub's frequency when it prints one, else the profile's, returned as `Profile.pay_schedule` and used for the decision effects' next pay date; every card reads it, the plan details form shows the stub's schedule read-only and never copies it into the profile, and the emergency fund asks "How often are you paid?" when nothing states one. `decisionSaveState` words with no version (Save, Save changes, Saved; Not saved, Changes not saved, Saved Oct 17), the footer's next as a secondary button, the health usage as a what-if left out of the save comparison, a badge that holds while the plan table is open. The W-4's "Anything else on your W-4?" question (`hasMoreEntries`), its refund in words and the method as one sentence with Publication 15-T as a source link (and a `refund` figure kind on the Plan). `HEALTH_TERMS` in a `<details>` disclosure and the typed plan table's hints. A Playwright regression test in `web/e2e/decisions.spec.ts` that saves the profile at every two weeks under the semimonthly Acme stub.
+
+**What was wrong:**
+- The root cause of issue 198 was the plan details form, which copied the stub's frequency into the profile on save, and the client's `payFrequencyOf`, which read the profile first. The older stub-01 (biweekly) had seeded the profile; the Acme stub confirmed later never took effect. The e2e account's salary, $95,000.10, is stub-01's $3,653.85 times 26, saved by that same form: an entry, not a parse or display bug.
+- Two API test helpers set the profile to biweekly under the semimonthly sample stub, which the old order hid; with the stub winning they failed until their stubs were made biweekly.
+- A first cut of the W-4 test for "No clears the entries" expected a new request; the inputs went back to ones already cached, so there was none, which is the cache working.
+- The emergency fund card repeated `FundResultRows` line for line; it now uses it, so the Why page and the card cannot drift.
+
+**How it was caught:** The Playwright reproduction failing on "Per paycheck, 26 a year" before the fix; unit tests from the spec examples failing first; the W-4 and health card tests against the MSW handlers.
+
 ## 2026-11-01: check-in findings repeated after a newer copy of a pay stub, and one stub change read as six (issues 194, 202, 209)
 
 **Task:** On production, November's check-in went from 7 findings to 13 after the Acme stub was confirmed again: six findings twice plus one, while the status line said "This page is up to date". One stub change also showed as six cards, each with a blue primary Done. Fix both and reword every check-in string for a first-job reader.

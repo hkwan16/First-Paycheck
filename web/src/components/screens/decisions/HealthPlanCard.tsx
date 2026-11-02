@@ -6,11 +6,9 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
-import { Money } from '@/components/ui/Money';
 import { Notice } from '@/components/ui/Notice';
 import { Seg } from '@/components/ui/Seg';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Tile } from '@/components/ui/Tile';
 import { apiErrorMessage } from '@/lib/api/errors';
 import {
   useBenefitsPlans,
@@ -20,26 +18,12 @@ import {
   usePayStubs,
   useProfile,
   useSaveDecision,
-  type CalcState,
 } from '@/lib/api/hooks';
-import type {
-  HealthcareUsage,
-  HealthPlanOption,
-  HealthPlansInput,
-  HealthPlansResult,
-} from '@/lib/api/types';
-import { cn } from '@/lib/cn';
+import type { HealthcareUsage, HealthPlanOption, HealthPlansInput } from '@/lib/api/types';
 import { useFocusHandoff } from '@/lib/focus-handoff';
 import { formatDate } from '@/lib/dates';
-import {
-  asHealthPlansInputs,
-  currentDecision,
-  decisionSaveState,
-  payPeriodsFor,
-} from '@/lib/decisions';
-import { toneText } from '@/lib/design/tone';
-import { formatRate } from '@/lib/money';
-import { whyRoute } from '@/lib/routes';
+import { asHealthPlansInputs, currentDecision, decisionSaveState } from '@/lib/decisions';
+import { decisionStepRoute, whyRoute } from '@/lib/routes';
 import { AmountField } from './AmountField';
 import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
 import {
@@ -51,24 +35,16 @@ import {
 } from './decision-format';
 import {
   choiceAmong,
-  costAt,
-  costText,
-  hdhpNotice,
-  headline,
-  hsaEffect,
-  pairText,
-  PLAN_KIND_LABELS,
+  HEALTH_TERMS,
+  HEALTH_WHAT_IF_INPUTS,
   plansFromBenefits,
   USAGE_DEFAULTS,
   usageLabel,
   USAGES,
 } from './health-plan-format';
-import { payFrequencyOf } from './plan-details';
+import { HEALTH_CALC_PATH, PlanResult, type Scenarios } from './HealthPlanResult';
 import { PlanOptionsForm } from './PlanOptionsForm';
 
-const CALC_PATH = '/calc/health-plans';
-
-type Scenarios = Record<HealthcareUsage, number>;
 type Source = 'benefits' | 'saved' | 'typed';
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
@@ -133,22 +109,22 @@ export function HealthPlanCard() {
     decisions.data !== undefined &&
     benefits.data !== undefined;
   const payStub = payStubs.data?.[0];
-  const periods = loaded ? payPeriodsFor(payFrequencyOf(profile.data, payStub)) : null;
+  const periods = profile.data?.pay_schedule?.periods_per_year ?? null;
   const salary = profile.data?.salary_cents ?? null;
   const filing = profile.data?.filing_status ?? null;
   const showForm = editing || plans === null;
 
-  // The comparison is on screen: everything it reads is there and no plan table is open.
-  const comparing =
+  // Everything the decision reads is there. The plan table opening in place of the
+  // comparison changes none of it (spec 012 rule 18a).
+  const decidable =
     loaded &&
-    !showForm &&
     plans !== null &&
     payStub !== undefined &&
     periods !== null &&
     salary !== null &&
     filing !== null;
-  const inputs: HealthPlansInput | null =
-    comparing && hsaRead.cents !== null
+  const decided: HealthPlansInput | null =
+    decidable && hsaRead.cents !== null
       ? {
           plans,
           pay_periods_per_year: periods,
@@ -164,9 +140,13 @@ export function HealthPlanCard() {
           enrollment_deadline: deadlineValue || null,
         }
       : null;
-  const calc = useCalc(CALC_PATH, inputs);
-  // On the comparison, the badge compares what is set; elsewhere, only whether a version exists.
-  const state = decisionSaveState(current, comparing ? inputs : (current?.inputs ?? null));
+  // Calculated only while the comparison is on screen.
+  const inputs = showForm ? null : decided;
+  const calc = useCalc(HEALTH_CALC_PATH, inputs);
+  // The badge compares what is decided, the usage left out: it is a what-if (spec 012 rule 18).
+  const state = decisionSaveState(current, decidable ? decided : (current?.inputs ?? null), {
+    ignore: HEALTH_WHAT_IF_INPUTS,
+  });
   const edit = (apply: () => void) => {
     apply();
     if (save.isError) save.reset();
@@ -201,11 +181,11 @@ export function HealthPlanCard() {
         <span className="sr-only">Loading your health plans.</span>
       </div>
     );
-  } else if (!payStub || periods === null) {
+  } else if (!payStub) {
     body = (
       <>
         <Notice tone="blue" compact icon={null}>
-          The comparison reads your pay schedule and tax year from a confirmed pay stub.
+          This step reads your tax year from a confirmed pay stub.
         </Notice>
         <div>
           <Button href="/setup/confirm" variant="primary">
@@ -214,11 +194,11 @@ export function HealthPlanCard() {
         </div>
       </>
     );
-  } else if (salary === null || filing === null) {
+  } else if (salary === null || filing === null || periods === null) {
     body = (
       <Notice tone="blue" compact icon={null}>
-        The comparison needs your salary and filing status for the tax an HSA saves. Add them with
-        Change plan details on the 401(k) card.
+        This step needs your yearly salary, filing status and pay schedule to work out the tax an
+        HSA saves. <Link href={decisionStepRoute('401k_match')}>Add them on the 401(k) step</Link>.
       </Notice>
     );
   } else if (showForm) {
@@ -226,8 +206,8 @@ export function HealthPlanCard() {
       <>
         {plans === null && (
           <p className="m-0 text-small text-ink-3">
-            No benefits summary is confirmed, so the plans to compare are typed here. Confirming a
-            benefits summary fills them in.
+            No benefits summary is confirmed yet, so type in the plans your employer offers.
+            Confirming your benefits summary fills them in.
           </p>
         )}
         <PlanOptionsForm
@@ -279,7 +259,7 @@ export function HealthPlanCard() {
           label="Your own HSA contribution this year"
           value={hsaValue}
           error={hsaRead.error}
-          hint="Only a plan that qualifies for an HSA can take it; the calculator keeps it within the year's limit."
+          hint={`${HEALTH_TERMS.hsa.meaning} Only a plan that qualifies for one can take it, up to the yearly limit.`}
           onChange={(text) => edit(() => setHsa(text))}
         />
 
@@ -383,203 +363,5 @@ export function HealthPlanCard() {
     >
       {body}
     </DecisionCard>
-  );
-}
-
-interface PlanResultProps {
-  inputs: HealthPlansInput | null;
-  plans: readonly HealthPlanOption[] | null;
-  calc: CalcState<typeof CALC_PATH>;
-  usage: HealthcareUsage;
-  scenarios: Scenarios;
-  selected: number | null;
-  taxYear: number;
-}
-
-/** The result panel: every cost, saving and break-even is a field of the calculator's result. */
-function PlanResult({ inputs, plans, calc, usage, scenarios, selected, taxYear }: PlanResultProps) {
-  const result = calc.data;
-  let content: ReactNode;
-  if (inputs === null) {
-    content = (
-      <p className="m-0 text-small text-ink-3">
-        Enter your own HSA contribution, or 0, to see the comparison.
-      </p>
-    );
-  } else if (calc.isError) {
-    content = (
-      <Notice tone="warning" compact role="alert">
-        {apiErrorMessage(calc.error, 'The calculator could not run. Try again in a moment.')}
-      </Notice>
-    );
-  } else if (result && plans && result.plans.length === plans.length) {
-    content = (
-      <Comparison
-        result={result}
-        plans={plans}
-        usage={usage}
-        scenarios={scenarios}
-        selected={selected}
-        taxYear={taxYear}
-      />
-    );
-  } else {
-    content = (
-      <div className="flex flex-col gap-2.5">
-        <Skeleton className="w-3/4" />
-        <Skeleton className="w-full" />
-        <Skeleton className="w-full" />
-        <span className="sr-only">Calculating.</span>
-      </div>
-    );
-  }
-  return (
-    <Tile
-      tone="coral"
-      role="group"
-      aria-label="Calculator result"
-      aria-busy={(inputs !== null && calc.isBusy) || undefined}
-    >
-      {content}
-    </Tile>
-  );
-}
-
-interface ComparisonProps {
-  result: HealthPlansResult;
-  plans: readonly HealthPlanOption[];
-  usage: HealthcareUsage;
-  scenarios: Scenarios;
-  selected: number | null;
-  taxYear: number;
-}
-
-function Comparison({ result, plans, usage, scenarios, selected, taxYear }: ComparisonProps) {
-  const names = result.plans.map((plan) => plan.name);
-  const cell = 'border-t border-line px-2 py-1.5 text-right tabular-nums';
-  const rowHead = 'border-t border-line py-1.5 pr-2 text-left font-normal text-ink-3';
-  const money = (cents: number) => <Money cents={cents} decimals={0} />;
-  // A net cost: the API's sign, a negative one written as an amount ahead (spec 012 rule 17).
-  const cost = (cents: number) => <span className="tabular-nums">{costText(cents)}</span>;
-  const row = (label: string, values: ReactNode[], strong = false) => (
-    <tr key={label} className={cn(strong && 'font-semibold')}>
-      <th scope="row" className={cn(rowHead, strong && 'font-semibold text-ink')}>
-        {label}
-      </th>
-      {values.map((value, index) => (
-        <td key={index} className={cell}>
-          {value}
-        </td>
-      ))}
-    </tr>
-  );
-  const effects = result.plans.map((plan) => hsaEffect(plan, result)).filter(Boolean);
-  const notices = result.plans.map((plan) => hdhpNotice(plan, result, taxYear)).filter(Boolean);
-
-  return (
-    <>
-      <div className={cn('text-headline font-bold', toneText.coral)} aria-live="polite">
-        {headline(result, usage)}
-      </div>
-      <div
-        role="region"
-        aria-label="Plan comparison, scrolls sideways"
-        tabIndex={0}
-        className="-mx-1 overflow-x-auto px-1"
-      >
-        <table className="w-full min-w-[420px] border-collapse text-small">
-          <caption className="sr-only">Expected yearly cost by plan</caption>
-          <thead>
-            <tr>
-              <td />
-              {result.plans.map((plan, index) => (
-                <th key={index} scope="col" className="px-2 pb-1.5 text-right align-bottom">
-                  <span className="block font-semibold">{plan.name}</span>
-                  <span className="block text-tiny font-normal text-ink-3">
-                    {PLAN_KIND_LABELS[plan.kind]}
-                  </span>
-                  {index === result.recommended_index && (
-                    <Badge tone="coral" className="mt-1">
-                      Cheapest at {usage} use
-                    </Badge>
-                  )}
-                  {index === selected && (
-                    <Badge tone="blue" className="mt-1">
-                      Your choice
-                    </Badge>
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {row(
-              'Premium per year',
-              result.plans.map((plan) => money(plan.annual_premium_cents)),
-            )}
-            {row(
-              'Deductible',
-              plans.map((plan) => money(plan.deductible_cents)),
-            )}
-            {row(
-              'Coinsurance',
-              plans.map((plan) => formatRate(plan.coinsurance_pct)),
-            )}
-            {row(
-              'Out-of-pocket maximum',
-              plans.map((plan) => money(plan.oop_max_cents)),
-            )}
-            {row(
-              'Employer HSA money',
-              result.plans.map((plan) =>
-                plan.employer_hsa_cents === 0 ? 'None' : money(plan.employer_hsa_cents),
-              ),
-            )}
-            {row(
-              'Your HSA tax savings',
-              result.plans.map((plan) =>
-                plan.hsa_eligible ? money(plan.hsa_tax_savings_cents) : 'No HSA',
-              ),
-            )}
-            {USAGES.map((u) =>
-              row(
-                usageLabel(u, scenarios[u], { row: true }),
-                result.plans.map((plan) => cost(costAt(plan, u))),
-                u === usage,
-              ),
-            )}
-            {row(
-              'Worst case',
-              result.plans.map((plan) => cost(plan.worst_case_cents)),
-            )}
-          </tbody>
-        </table>
-      </div>
-      {result.pairs.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <h3 className="m-0 text-small font-semibold">Where the cheaper plan changes</h3>
-          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-small text-ink-2">
-            {result.pairs.map((pair) => (
-              <li key={`${pair.plan_a_index}-${pair.plan_b_index}`}>
-                <strong className="font-semibold text-ink">
-                  {names[pair.plan_a_index]} or {names[pair.plan_b_index]}.
-                </strong>{' '}
-                {pairText(pair, names)}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {effects.map((text) => (
-        <p key={text} className="m-0 text-small text-ink-2">
-          {text}
-        </p>
-      ))}
-      {notices.map((text) => (
-        <Notice key={text} tone="warning" compact>
-          {text}
-        </Notice>
-      ))}
-    </>
   );
 }

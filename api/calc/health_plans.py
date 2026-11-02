@@ -124,7 +124,7 @@ class HealthPlansInput(BaseModel):
         try:
             tax_year(value)
         except UnknownTaxYear as exc:
-            raise ValueError(f"no federal constants for tax year {value}") from exc
+            raise ValueError(f"We do not have the federal tax figures for {value} yet") from exc
         return value
 
     @model_validator(mode="after")

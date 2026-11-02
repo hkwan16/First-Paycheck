@@ -7,6 +7,7 @@ import {
   profileInput,
   readPlanDetails,
   salaryFromStub,
+  stubSchedule,
   type PlanDetailsDraft,
 } from './plan-details';
 
@@ -23,7 +24,7 @@ const draft = (overrides: Partial<PlanDetailsDraft> = {}): PlanDetailsDraft => (
 
 describe('needsPlanDetails', () => {
   it('is false once salary, filing status, pay schedule, match formula and birth year are known', () => {
-    expect(needsPlanDetails(sampleProfile, stub)).toBe(false);
+    expect(needsPlanDetails(sampleProfile)).toBe(false);
   });
 
   it.each([
@@ -31,23 +32,22 @@ describe('needsPlanDetails', () => {
     ['filing status', { filing_status: null }],
     ['match formula', { match_tiers: [] }],
     ['birth year', { birth_year: null }],
+    ['pay schedule', { pay_schedule: null }],
   ])('is true without a %s', (_, overrides) => {
-    expect(needsPlanDetails({ ...sampleProfile, ...overrides }, stub)).toBe(true);
+    expect(needsPlanDetails({ ...sampleProfile, ...overrides })).toBe(true);
   });
 
-  it('takes the pay schedule from the pay stub when the profile has none', () => {
-    const profile = { ...sampleProfile, pay_frequency: null };
-    expect(needsPlanDetails(profile, stub)).toBe(false);
-    expect(needsPlanDetails(profile, { ...stub, pay_frequency: null })).toBe(true);
+  it("reads the pay schedule the API resolved, never the profile's own entry (spec 005 rule 25a)", () => {
+    expect(needsPlanDetails({ ...sampleProfile, pay_frequency: null })).toBe(false);
   });
 });
 
 describe('draftFromProfile', () => {
-  it('starts a new profile from the stub: its pay schedule and the yearly salary the API reports for it', () => {
+  it("starts a new profile's salary from the stub, and never copies its schedule (issue 198)", () => {
     expect(draftFromProfile(emptyProfile, stub)).toEqual({
       salary: '64,999.92',
       filingStatus: null,
-      payFrequency: 'semimonthly',
+      payFrequency: null,
       tiers: [{ employerPct: '', uptoPct: '' }],
       birthYear: '',
     });
@@ -61,6 +61,24 @@ describe('draftFromProfile', () => {
 
   it("keeps the profile's own salary over the stub's", () => {
     expect(draftFromProfile(sampleProfile, stub).salary).toBe('65,000.00');
+  });
+});
+
+describe('stubSchedule', () => {
+  it("is the newest stub's schedule, and null when the form asks for one", () => {
+    expect(stubSchedule(sampleProfile)).toEqual(sampleProfile.pay_schedule);
+    expect(stubSchedule({ ...sampleProfile, pay_schedule: null })).toBeNull();
+    expect(
+      stubSchedule({
+        ...sampleProfile,
+        pay_schedule: {
+          frequency: 'biweekly',
+          periods_per_year: 26,
+          source: 'profile',
+          pay_stub_date: null,
+        },
+      }),
+    ).toBeNull();
   });
 });
 
@@ -87,7 +105,7 @@ describe('readPlanDetails', () => {
       { employerPct: '100', uptoPct: '3' },
       { employerPct: '50', uptoPct: '5.5' },
     ];
-    expect(readPlanDetails(draft({ salary: '$60,000', tiers }))).toEqual({
+    expect(readPlanDetails(draft({ salary: '$60,000', tiers }), { askSchedule: true })).toEqual({
       ok: true,
       values: {
         salary_cents: 6_000_000,
@@ -103,13 +121,16 @@ describe('readPlanDetails', () => {
   });
 
   it('says what to fix for each missing or unreadable field', () => {
-    const result = readPlanDetails({
-      salary: 'sixty',
-      filingStatus: null,
-      payFrequency: null,
-      tiers: [{ employerPct: '', uptoPct: '4' }],
-      birthYear: '',
-    });
+    const result = readPlanDetails(
+      {
+        salary: 'sixty',
+        filingStatus: null,
+        payFrequency: null,
+        tiers: [{ employerPct: '', uptoPct: '4' }],
+        birthYear: '',
+      },
+      { askSchedule: true },
+    );
     expect(result).toEqual({
       ok: false,
       errors: {
@@ -122,6 +143,12 @@ describe('readPlanDetails', () => {
     });
   });
 
+  it('leaves the schedule out when the stub states it, so the profile keeps its own', () => {
+    const read = readPlanDetails(draft({ payFrequency: null }), { askSchedule: false });
+    expect(read.ok && 'pay_frequency' in read.values).toBe(false);
+    expect(read.ok).toBe(true);
+  });
+
   it.each(['96', '1899', 'nineteen', '1996.5'])('refuses the birth year %j', (birthYear) => {
     expect(readPlanDetails(draft({ birthYear }))).toEqual({
       ok: false,
@@ -130,11 +157,11 @@ describe('readPlanDetails', () => {
   });
 
   it('refuses a birth year after the pay stub tax year', () => {
-    expect(readPlanDetails(draft({ birthYear: '2027' }), 2026)).toEqual({
+    expect(readPlanDetails(draft({ birthYear: '2027' }), { taxYear: 2026 })).toEqual({
       ok: false,
       errors: { birthYear: 'Enter a year no later than 2026.' },
     });
-    expect(readPlanDetails(draft({ birthYear: '2026' }), 2026).ok).toBe(true);
+    expect(readPlanDetails(draft({ birthYear: '2026' }), { taxYear: 2026 }).ok).toBe(true);
   });
 
   it.each(['0', '101', '4.555', '-4', 'four'])('refuses the percentage %j', (pct) => {

@@ -271,7 +271,7 @@ describe('WhyScreen for an emergency fund (spec 011 rule 18, issue 162)', () => 
       ['Already saved', '39.12% of the target'],
       ['Still to save', '$3,329.75'],
       ['Months to reach it', '12 months'],
-      ['Per paycheck, 24 a year', '$150.00'],
+      ['Per paycheck, 24 paychecks a year', '$150.00'],
     ]);
     expect(screen.getByRole('link', { name: 'Change it on its step' })).toHaveAttribute(
       'href',

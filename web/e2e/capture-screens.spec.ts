@@ -61,16 +61,16 @@ test('09, 10 and 11 the Decisions and Why screens', async ({ page }) => {
   const card = page.getByRole('region', { name: '401(k) match' });
   const slider = card.getByRole('slider', { name: /Your contribution/ });
   await expect(slider).toBeVisible({ timeout: 60_000 });
-  const save = card.getByRole('button', { name: /^Save|^Saved as v/ });
-  await expect(save).toHaveText(/^Saved as v\d+/, { timeout: 30_000 });
+  const save = card.getByRole('button', { name: /^(Save|Save changes|Saved)$/ });
+  await expect(save).toHaveText('Saved', { timeout: 30_000 });
   await shot(card, '09-decisions-v1');
 
   const value = Number(await slider.inputValue());
   await slider.fill(String(value === 4 ? 5 : 4));
-  await expect(card.getByText(/^Changed since v/)).toBeVisible({ timeout: 30_000 });
+  await expect(card.getByText('Changes not saved')).toBeVisible({ timeout: 30_000 });
   await expect(save).toBeEnabled({ timeout: 30_000 });
   await save.click();
-  await expect(save).toHaveText(/^Saved as v\d+/, { timeout: 30_000 });
+  await expect(save).toHaveText('Saved', { timeout: 30_000 });
   await shot(card, '10-decisions-v2');
 
   await card.getByRole('link', { name: 'Why this decision' }).click();

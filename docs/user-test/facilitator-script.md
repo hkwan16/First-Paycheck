@@ -113,7 +113,7 @@ your biggest category of spending was."
 "Go to your decisions. Choose how much of your pay to put into your 401(k) so you get your
 employer's full match, and save that choice."
 
-- Success: the 401(k) card says "Saved as v1" at 4% (or more), and the headline says the full match
+- Success: the 401(k) card says "Saved" at 4% (or more), and the headline says the full match
   is captured.
 - Watch for: the plan details form (salary, filing status, match, birth year; all on the persona
   card), how they move the slider, whether they read what the change costs per paycheck.

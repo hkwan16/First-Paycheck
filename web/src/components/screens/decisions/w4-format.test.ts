@@ -1,16 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { sampleDecision } from '@/test/fixtures/decisions';
-import { stub01PayStub } from '@/test/fixtures/documents';
 import { sampleHealthDecision } from '@/test/fixtures/planning';
 import { sampleW4, stub01W4Inputs } from '@/test/fixtures/w4';
 import {
   appliedEntries,
-  currentWithholdingOf,
   fromDecisions,
+  hasMoreEntries,
+  methodText,
   refundHeadline,
-  refundText,
   refundTone,
-  scheduleText,
   suggestionText,
   W4_CONTEXT_INPUTS,
 } from './w4-format';
@@ -29,7 +27,6 @@ describe('refund wording and tone', () => {
     expect(refundHeadline(overWithheld.result.projected_refund_cents)).toBe(
       'A $2,400.08 refund at tax time',
     );
-    expect(refundText(overWithheld.result.projected_refund_cents)).toBe('$2,400.08 refund');
     expect(refundTone(overWithheld.result.projected_refund_cents)).toBe('neutral');
   });
 
@@ -37,13 +34,11 @@ describe('refund wording and tone', () => {
     expect(refundHeadline(secondJob.result.projected_refund_cents)).toBe(
       '$3,449.92 due at tax time',
     );
-    expect(refundText(secondJob.result.projected_refund_cents)).toBe('$3,449.92 due');
     expect(refundTone(secondJob.result.projected_refund_cents)).toBe('off');
   });
 
   it('reads zero as even', () => {
     expect(refundHeadline(0)).toBe('Even at tax time');
-    expect(refundText(0)).toBe('Nothing due, no refund');
     expect(refundTone(0)).toBe('neutral');
   });
 });
@@ -55,19 +50,19 @@ describe('suggestionText', () => {
 
   it('raises Step 4(c) with the amount the calculator suggests', () => {
     expect(suggestionText(secondJob.result)).toBe(
-      'Enter $144.00 in Step 4(c) to withhold that much more each paycheck. That brings tax time to a $6.08 refund.',
+      'Enter $144.00 in Step 4(c) to have that much more taken out of each paycheck. You would then get a $6.08 refund at tax time.',
     );
   });
 
   it('lowers Step 4(c) to the amount the calculator suggests', () => {
     expect(suggestionText(overWithheld.result)).toBe(
-      'Lower Step 4(c) to $0.00 a paycheck. That brings tax time to a $0.08 refund.',
+      'Lower Step 4(c) to $0.00 a paycheck. You would then get a $0.08 refund at tax time.',
     );
   });
 
   it('adds to Step 4(b) and says the entry is more than the expected deductions', () => {
     expect(suggestionText(step2Alone.result)).toBe(
-      'Enter $17,522.00 in Step 4(b). That brings tax time to a $0.08 refund. The entry is larger than the deductions you expect, which stay in "Deductions you expect to claim".',
+      'Enter $17,522.00 in Step 4(b). You would then get a $0.08 refund at tax time. This is more than the deductions you expect to claim, so those go in "Deductions you expect to claim" and the estimate still uses them.',
     );
   });
 });
@@ -119,22 +114,6 @@ describe('fromDecisions', () => {
 });
 
 describe('the comparison at the stub withholding (spec 014 rule 10a)', () => {
-  it("sends the newest stub's federal withholding when the stub is on the card's schedule", () => {
-    expect(currentWithholdingOf(stub01PayStub(), 'biweekly')).toBe(27_244);
-    expect(currentWithholdingOf(stub01PayStub({ federal_withholding_cents: 0 }), 'biweekly')).toBe(
-      0,
-    );
-    // A stub with no schedule is taken to be on the card's.
-    expect(currentWithholdingOf(stub01PayStub({ pay_frequency: null }), 'semimonthly')).toBe(
-      27_244,
-    );
-  });
-
-  it('sends nothing for a stub on another schedule: its paycheck is a different length', () => {
-    expect(currentWithholdingOf(stub01PayStub(), 'semimonthly')).toBeNull();
-    expect(currentWithholdingOf(stub01PayStub(), null)).toBeNull();
-  });
-
   it("words the e2e account's balance due at its stub's withholding in the off tone", () => {
     const { result } = sampleW4(stub01W4Inputs());
     expect(refundHeadline(result.current_refund_cents!)).toBe('$3,918.70 due at tax time');
@@ -151,9 +130,36 @@ describe('the comparison at the stub withholding (spec 014 rule 10a)', () => {
   });
 });
 
-describe('scheduleText', () => {
-  it('names the Pub 15-T schedule and the rate of the row used', () => {
-    expect(scheduleText(even.result)).toBe('Standard schedule, 12% row');
-    expect(scheduleText(step2Alone.result)).toBe('Step 2 checkbox schedule, 24% row');
+describe('methodText (spec 014 rule 21)', () => {
+  it('says the withholding tables and the rate in words, with no publication name', () => {
+    expect(methodText(even.result)).toBe(
+      'The IRS withholding tables take 12% of each extra dollar of pay.',
+    );
+    expect(methodText(step2Alone.result)).toBe(
+      'The IRS withholding tables for two jobs take 24% of each extra dollar of pay.',
+    );
+  });
+});
+
+describe('hasMoreEntries (spec 014 rule 20)', () => {
+  const zero = { cents: 0, error: null };
+  const empty = { cents: null, error: null };
+  const none = { multipleJobs: false, amounts: [zero, zero], expected: empty };
+
+  it('is false with the box clear, every amount 0 and no expected deductions', () => {
+    expect(hasMoreEntries(none)).toBe(false);
+  });
+
+  it('is true for the box, an amount that is not 0, or expected deductions set', () => {
+    expect(hasMoreEntries({ ...none, multipleJobs: true })).toBe(true);
+    expect(hasMoreEntries({ ...none, amounts: [zero, { cents: 10_000, error: null }] })).toBe(true);
+    expect(hasMoreEntries({ ...none, expected: zero })).toBe(true);
+  });
+
+  it('is true for an amount that is empty or does not read, so the person sees what to fix', () => {
+    expect(hasMoreEntries({ ...none, amounts: [zero, empty] })).toBe(true);
+    const unread = { cents: null, error: 'Enter an amount, like 50.00.' };
+    expect(hasMoreEntries({ ...none, amounts: [unread, zero] })).toBe(true);
+    expect(hasMoreEntries({ ...none, expected: unread })).toBe(true);
   });
 });

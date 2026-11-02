@@ -42,11 +42,13 @@ function requests() {
 
 const TITLE = 'W-4, federal only';
 const card = () => screen.getByRole('region', { name: TITLE });
-const result = () => within(card()).getByRole('group', { name: 'Calculator result' });
+const result = () => within(card()).getByRole('group', { name: 'Your numbers' });
 const decided = () => within(card()).getByRole('group', { name: 'From your decisions' });
 const filing = () => within(card()).getByRole('group', { name: 'Filing status' });
 const suggestion = () => within(card()).queryByRole('group', { name: 'Suggestion' });
 const unchanged = () => within(result()).getByRole('group', { name: 'If you change nothing' });
+const more = () => within(card()).getByRole('group', { name: 'Anything else on your W-4?' });
+const answer = (name: 'No' | 'Yes') => within(more()).getByRole('button', { name });
 const field = (label: string) => within(card()).getByLabelText(label);
 const saveButton = () => within(card()).getByRole('button', { name: /^Save|^Saved/ });
 const settle = () => act(() => vi.advanceTimersByTimeAsync(CALC_DEBOUNCE_MS));
@@ -99,7 +101,7 @@ describe('W4Card', () => {
     await renderReady();
 
     expect(card()).toHaveTextContent(
-      'Your Oct 15 pay stub withholds $297.76 of federal income tax a paycheck.',
+      'Your Oct 15 pay stub takes $297.76 of federal income tax out of each paycheck.',
     );
     expect(decided()).toHaveTextContent('401(k) contribution4% of salary');
     expect(decided()).toHaveTextContent('Health premium per paycheck$62.50, Gold PPO');
@@ -110,23 +112,29 @@ describe('W4Card', () => {
     expect(seen.calc).toEqual([sampleW4().inputs]);
 
     expect(result()).toHaveTextContent('A $0.08 refund at tax time');
-    expect(result()).toHaveTextContent('Withheld each paycheck$213.67');
-    expect(result()).toHaveTextContent('Withheld this year, 24 paychecks$5,128.08');
-    expect(result()).toHaveTextContent('Projected 2026 federal income tax$5,128.00');
-    expect(result()).toHaveTextContent('Refund or balance due$0.08 refund');
-    expect(result()).toHaveTextContent('Taxable wages each paycheck$2,537.50');
-    expect(result()).toHaveTextContent('Standard schedule, 12% row');
+    expect(result()).toHaveTextContent('Taken out of each paycheck$213.67');
+    expect(result()).toHaveTextContent('Taken out this year, 24 paychecks$5,128.08');
+    expect(result()).toHaveTextContent('Your 2026 federal income tax$5,128.00');
+    expect(result()).toHaveTextContent('Refund or amount due at tax time$0.08 refund');
+    expect(result()).toHaveTextContent('Taxed pay in each paycheck$2,537.50');
+    expect(result()).toHaveTextContent(
+      'The IRS withholding tables take 12% of each extra dollar of pay. The tax for the year uses the 2026 tax brackets and standard deduction.',
+    );
+    expect(within(result()).getByRole('link', { name: 'IRS Publication 15-T' })).toHaveAttribute(
+      'href',
+      'https://www.irs.gov/publications/p15t',
+    );
     expect(suggestion()).toBeNull();
-    expect(saveButton()).toHaveTextContent('Save this decision');
+    expect(saveButton()).toHaveTextContent(/^Save$/);
     expect(saveButton()).toBeEnabled();
 
     // Beside it, what the stub's $297.76 a paycheck leaves at tax time (spec 014 rule 10a).
     expect(unchanged()).toHaveTextContent('If you change nothing');
     expect(unchanged()).toHaveTextContent('A $2,018.24 refund at tax time');
     expect(unchanged()).toHaveTextContent(
-      'Your Oct 15 pay stub withholds $297.76 a paycheck: $7,146.24 over 24 paychecks, if every paycheck this year withholds the same.',
+      'Your Oct 15 pay stub takes out $297.76 a paycheck, or $7,146.24 over 24 paychecks if every paycheck this year is the same.',
     );
-    expect(result()).toHaveTextContent('With the entries above');
+    expect(result()).toHaveTextContent('If you give your employer this W-4');
   });
 
   it('works without the other decisions, says they count as zero and links to their cards', async () => {
@@ -137,16 +145,14 @@ describe('W4Card', () => {
     expect(seen.calc).toEqual([sampleW4Inputs(NO_DECISIONS)]);
     expect(decided()).toHaveTextContent('401(k) contributionNot saved yet');
     expect(decided()).toHaveTextContent('Health premium per paycheckNot saved yet');
-    expect(decided()).toHaveTextContent(
-      'The projection counts a decision that is not saved yet as zero.',
-    );
+    expect(decided()).toHaveTextContent('A decision you have not saved yet counts as zero here.');
     expect(
       within(decided()).getByRole('link', { name: 'Save your 401(k) decision' }),
     ).toHaveAttribute('href', '/setup/decisions/401k');
     expect(
       within(decided()).getByRole('link', { name: 'Choose your health plan' }),
     ).toHaveAttribute('href', '/setup/decisions/health-plan');
-    expect(result()).toHaveTextContent('Withheld each paycheck$234.17');
+    expect(result()).toHaveTextContent('Taken out of each paycheck$234.17');
   });
 
   it('sends no age without a birth year', async () => {
@@ -179,7 +185,8 @@ describe('W4Card', () => {
   it('sends one request after an entry stops changing and measures the debounce', async () => {
     otherDecisionsSaved();
     const seen = requests();
-    await renderReady();
+    const { user } = await renderReady();
+    await user.click(answer('Yes'));
     type(STEP_4C, '10');
     type(STEP_4C, '100');
     const stoppedAt = Date.now();
@@ -192,15 +199,16 @@ describe('W4Card', () => {
   it('says what to fix in an amount, and calculates nothing until it reads', async () => {
     otherDecisionsSaved();
     const seen = requests();
-    await renderReady();
-    type('Step 3: dependent credits for the year', 'two');
-    expect(field('Step 3: dependent credits for the year')).toHaveAccessibleDescription(
+    const { user } = await renderReady();
+    await user.click(answer('Yes'));
+    type('Step 3: credits for dependents, for the year', 'two');
+    expect(field('Step 3: credits for dependents, for the year')).toHaveAccessibleDescription(
       'Enter an amount, like 2,200.00.',
     );
     expect(result()).toHaveTextContent('Enter each amount, or 0, to see your numbers.');
     expect(saveButton()).toBeDisabled();
 
-    type('Step 3: dependent credits for the year', '2,200');
+    type('Step 3: credits for dependents, for the year', '2,200');
     await recalculated('Even at tax time');
     expect(seen.calc.at(-1)).toEqual(sampleW4Inputs({ dependents_credit_cents: 220_000 }));
   });
@@ -219,18 +227,18 @@ describe('W4Card at the stub withholding (spec 014 rule 10a, issue 153)', () => 
 
     expect(seen.calc).toEqual([stub01W4Inputs()]);
     expect(card()).toHaveTextContent(
-      'Your Apr 10 pay stub withholds $272.44 of federal income tax a paycheck.',
+      'Your Apr 10 pay stub takes $272.44 of federal income tax out of each paycheck.',
     );
     expect(unchanged()).toHaveTextContent('$3,918.70 due at tax time');
     expect(unchanged()).toHaveTextContent(
-      'Your Apr 10 pay stub withholds $272.44 a paycheck: $7,083.44 over 26 paychecks, if every paycheck this year withholds the same.',
+      'Your Apr 10 pay stub takes out $272.44 a paycheck, or $7,083.44 over 26 paychecks if every paycheck this year is the same.',
     );
     expect(unchanged()).toHaveTextContent(
-      'It changes only when you give your employer a new Form W-4.',
+      'That changes only when you give your employer a new Form W-4.',
     );
     expect(result()).toHaveTextContent('A $0.02 refund at tax time');
-    expect(result()).toHaveTextContent('Withheld each paycheck$423.16');
-    expect(result()).toHaveTextContent('Projected 2026 federal income tax$11,002.14');
+    expect(result()).toHaveTextContent('Taken out of each paycheck$423.16');
+    expect(result()).toHaveTextContent('Your 2026 federal income tax$11,002.14');
   });
 
   it('compares a stub that withholds nothing: the whole tax is due', async () => {
@@ -246,17 +254,14 @@ describe('W4Card at the stub withholding (spec 014 rule 10a, issue 153)', () => 
     expect(unchanged()).toHaveTextContent('$11,002.14 due at tax time');
   });
 
-  it('says why there is no comparison when the stub is on another pay schedule', async () => {
+  it('compares with the stub when the profile still says every two weeks (issue 198)', async () => {
     otherDecisionsSaved();
-    db.payStubs = db.payStubs.map((stub) => ({ ...stub, pay_frequency: 'biweekly' as const }));
+    db.profile = { ...db.profile, pay_frequency: 'biweekly' };
     const seen = requests();
     await renderReady();
-    expect(seen.calc).toEqual([sampleW4Inputs({ current_withholding_per_paycheck_cents: null })]);
-    expect(within(result()).queryByRole('group', { name: 'If you change nothing' })).toBeNull();
-    expect(result()).toHaveTextContent(
-      'Your pay stub is on a different pay schedule from your plan details, so the card cannot say what it withholds over the year.',
-    );
-    expect(result()).toHaveTextContent('A $0.08 refund at tax time');
+    expect(seen.calc).toEqual([sampleW4().inputs]);
+    expect(unchanged()).toHaveTextContent('A $2,018.24 refund at tax time');
+    expect(unchanged()).toHaveTextContent('24 paychecks');
   });
 
   it('keeps a saved decision saved when a newer stub withholds what its entries do', async () => {
@@ -271,8 +276,8 @@ describe('W4Card at the stub withholding (spec 014 rule 10a, issue 153)', () => 
     await renderReady();
     expect(seen.calc).toEqual([sampleW4Inputs({ current_withholding_per_paycheck_cents: 21_367 })]);
     expect(unchanged()).toHaveTextContent('A $0.08 refund at tax time');
-    expect(saveButton()).toHaveTextContent('Saved as v1');
-    expect(within(card()).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
+    expect(saveButton()).toHaveTextContent(/^Saved$/);
+    expect(within(card()).getByText('Saved Oct 17')).toBeInTheDocument();
   });
 
   it('keeps a decision saved before the comparison saved, and saves the stub with the next one', async () => {
@@ -280,16 +285,83 @@ describe('W4Card at the stub withholding (spec 014 rule 10a, issue 153)', () => 
     const { current_withholding_per_paycheck_cents: _current, ...older } = sampleW4().inputs;
     db.decisions.push(sampleW4Decision({ inputs: { ...older } }));
     const seen = requests();
-    await renderReady();
-    expect(saveButton()).toHaveTextContent('Saved as v1');
+    const { user } = await renderReady();
+    expect(saveButton()).toHaveTextContent(/^Saved$/);
 
+    await user.click(answer('Yes'));
     type(STEP_4C, '100');
     await recalculated('A $2,400.08 refund');
     fireEvent.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
     expect(seen.save[0]).toMatchObject({
       inputs: sampleW4Inputs({ extra_withholding_cents: 10_000 }),
     });
+  });
+});
+
+describe('W4Card asks one question beyond the filing status (spec 014 rule 20, issue 203)', () => {
+  it('shows a person with one job one choice: the filing status', async () => {
+    otherDecisionsSaved();
+    await renderReady();
+    expect(answer('No')).toHaveAttribute('aria-pressed', 'true');
+    expect(more()).toHaveAccessibleDescription(
+      'Yes if you have a second job or a working spouse, claim dependents, have income with no tax taken out, or want extra tax taken out.',
+    );
+    expect(within(card()).queryByRole('checkbox')).toBeNull();
+    expect(within(card()).queryByLabelText(STEP_4C)).toBeNull();
+    expect(within(card()).queryByLabelText(EXPECTED)).toBeNull();
+    expect(within(card()).queryAllByRole('textbox')).toEqual([]);
+  });
+
+  it('shows every other entry on Yes', async () => {
+    otherDecisionsSaved();
+    const { user } = await renderReady();
+    await user.click(answer('Yes'));
+    expect(within(card()).getByRole('checkbox', { name: /Step 2\(c\)/ })).toBeInTheDocument();
+    for (const label of [
+      "Other jobs' wages a year",
+      "Other jobs' withholding a year",
+      'Step 3: credits for dependents, for the year',
+      'Step 4(a): other income for the year',
+      STEP_4B,
+      EXPECTED,
+      STEP_4C,
+    ]) {
+      expect(field(label)).toBeInTheDocument();
+    }
+  });
+
+  it('opens on Yes when a saved decision has an entry', async () => {
+    otherDecisionsSaved();
+    const saved = sampleW4({
+      multiple_jobs: true,
+      deductions_cents: 1_752_200,
+      expected_deductions_cents: 0,
+    });
+    db.decisions.push(
+      sampleW4Decision({ inputs: { ...saved.inputs }, result: { ...saved.result } }),
+    );
+    await renderReady();
+    expect(answer('Yes')).toHaveAttribute('aria-pressed', 'true');
+    expect(field(STEP_4B)).toHaveValue('17,522.00');
+  });
+
+  it('clears the entries on No, which is what No says', async () => {
+    otherDecisionsSaved();
+    const seen = requests();
+    const { user } = await renderReady();
+    await user.click(answer('Yes'));
+    type(STEP_4C, '100');
+    await recalculated('A $2,400.08 refund');
+    await user.click(answer('No'));
+    expect(within(card()).queryByLabelText(STEP_4C)).toBeNull();
+    await recalculated('A $0.08 refund at tax time');
+    expect(answer('No')).toHaveAttribute('aria-pressed', 'true');
+    // Back to the first inputs, whose result is cached: nothing is asked again.
+    expect(seen.calc).toEqual([
+      sampleW4().inputs,
+      sampleW4Inputs({ extra_withholding_cents: 10_000 }),
+    ]);
   });
 });
 
@@ -298,10 +370,11 @@ describe('W4Card suggestion', () => {
     otherDecisionsSaved();
     const seen = requests();
     const { user } = await renderReady();
+    await user.click(answer('Yes'));
     type(STEP_4C, '100');
     await recalculated('A $2,400.08 refund');
     expect(suggestion()).toHaveTextContent(
-      'Lower Step 4(c) to $0.00 a paycheck. That brings tax time to a $0.08 refund.',
+      'Lower Step 4(c) to $0.00 a paycheck. You would then get a $0.08 refund at tax time.',
     );
 
     await user.click(within(suggestion()!).getByRole('button', { name: 'Apply suggestion' }));
@@ -323,12 +396,13 @@ describe('W4Card suggestion', () => {
     otherDecisionsSaved();
     const seen = requests();
     const { user } = await renderReady();
+    await user.click(answer('Yes'));
     type("Other jobs' wages a year", '20,000');
     type("Other jobs' withholding a year", '390');
     await recalculated('$3,449.92 due at tax time');
-    expect(result()).toHaveTextContent('Refund or balance due$3,449.92 due');
+    expect(result()).toHaveTextContent('Refund or amount due at tax time$3,449.92 due');
     expect(suggestion()).toHaveTextContent(
-      'Enter $144.00 in Step 4(c) to withhold that much more each paycheck. That brings tax time to a $6.08 refund.',
+      'Enter $144.00 in Step 4(c) to have that much more taken out of each paycheck. You would then get a $6.08 refund at tax time.',
     );
 
     await user.click(within(suggestion()!).getByRole('button', { name: 'Apply suggestion' }));
@@ -347,10 +421,13 @@ describe('W4Card suggestion', () => {
     otherDecisionsSaved();
     const seen = requests();
     const { user } = await renderReady();
+    await user.click(answer('Yes'));
     expect(field(EXPECTED)).toHaveValue('');
     await user.click(within(card()).getByRole('checkbox', { name: /Step 2\(c\)/ }));
     await recalculated('A $3,854.96 refund at tax time');
-    expect(result()).toHaveTextContent('Step 2 checkbox schedule, 24% row');
+    expect(result()).toHaveTextContent(
+      'The IRS withholding tables for two jobs take 24% of each extra dollar of pay.',
+    );
     expect(suggestion()).toHaveTextContent('Enter $17,522.00 in Step 4(b).');
 
     await user.click(within(suggestion()!).getByRole('button', { name: 'Apply suggestion' }));
@@ -375,7 +452,7 @@ describe('W4Card saving', () => {
     const { user } = await renderReady();
     expect(within(card()).getByText('Not saved')).toBeInTheDocument();
     await user.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v1'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
     const { inputs, result: computed } = sampleW4();
     expect(seen.save).toEqual([
       { calculator: 'w4', inputs, result: computed, supersedes_id: null },
@@ -395,22 +472,23 @@ describe('W4Card saving', () => {
     otherDecisionsSaved();
     savedW4();
     const seen = requests();
-    await renderReady();
-    expect(saveButton()).toHaveTextContent('Saved as v1');
-    expect(within(card()).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
-    expect(field(STEP_4C)).toHaveValue('0.00');
+    const { user } = await renderReady();
+    expect(saveButton()).toHaveTextContent(/^Saved$/);
+    expect(within(card()).getByText('Saved Oct 17')).toBeInTheDocument();
+    expect(answer('No')).toHaveAttribute('aria-pressed', 'true');
     expect(
       within(card()).getByText(
         'On your calendar for Oct 31, 2026: Give your employer your updated Form W-4.',
       ),
     ).toBeInTheDocument();
 
+    await user.click(answer('Yes'));
     type(STEP_4C, '100');
     await recalculated('A $2,400.08 refund');
-    expect(saveButton()).toHaveTextContent('Save as v2');
-    expect(within(card()).getByText('Changed since v1')).toBeInTheDocument();
+    expect(saveButton()).toHaveTextContent('Save changes');
+    expect(within(card()).getByText('Changes not saved')).toBeInTheDocument();
     fireEvent.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
     expect(seen.save[0]).toMatchObject({
       calculator: 'w4',
       supersedes_id: W4_DECISION_ID,
@@ -429,7 +507,7 @@ describe('W4Card saving', () => {
       sampleW4Decision({ inputs: { ...saved.inputs }, result: { ...saved.result } }),
     );
     await renderReady();
-    expect(saveButton()).toHaveTextContent('Saved as v1');
+    expect(saveButton()).toHaveTextContent(/^Saved$/);
     expect(within(card()).getByRole('checkbox', { name: /Step 2\(c\)/ })).toBeChecked();
     expect(field(STEP_4B)).toHaveValue('17,522.00');
     expect(field(EXPECTED)).toHaveValue('0.00');
@@ -459,12 +537,12 @@ describe('W4Card saving', () => {
     const calcsBefore = seen.calc.length;
     await user.click(saveButton());
     expect(
-      await within(card()).findByText(/The calculator's numbers had changed/),
+      await within(card()).findByText(/Your numbers changed after they were shown/),
     ).toBeInTheDocument();
     await waitFor(() => expect(seen.calc.length).toBe(calcsBefore + 1));
     await waitFor(() => expect(saveButton()).toBeEnabled());
     await user.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v1'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
   });
 
   it('reloads and offers the next version when another save got there first', async () => {
@@ -478,11 +556,12 @@ describe('W4Card saving', () => {
         supersedes_id: W4_DECISION_ID,
       }),
     );
+    await user.click(answer('Yes'));
     type(STEP_4C, '100');
     await recalculated('A $2,400.08 refund');
     await user.click(saveButton());
-    expect(await within(card()).findByText(/saved somewhere else/)).toBeInTheDocument();
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v3'));
+    expect(await within(card()).findByText(/saved in another tab or window/)).toBeInTheDocument();
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
   });
 });
 
@@ -526,6 +605,6 @@ describe('W4Card before it can calculate', () => {
     db.profile = { ...db.profile, salary_cents: null };
     renderCard();
     const region = await screen.findByRole('region', { name: TITLE });
-    expect(await within(region).findByText(/needs your salary/)).toBeInTheDocument();
+    expect(await within(region).findByText(/needs your yearly salary/)).toBeInTheDocument();
   });
 });

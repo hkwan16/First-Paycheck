@@ -52,7 +52,7 @@ export function K401ResultRows({ result, employer }: K401ResultRowsProps) {
         value={<Money cents={result.per_paycheck_cost_delta_cents} />}
       />
       <KV
-        label={`Extra per paycheck, after federal tax at ${formatRate(result.marginal_rate_used)} marginal`}
+        label={`Extra per paycheck, after the ${formatRate(result.marginal_rate_used)} federal tax it saves`}
         value={<Money cents={result.per_paycheck_after_tax_cost_cents} />}
       />
     </>
@@ -73,14 +73,14 @@ export function K401Notices({ result, taxYear }: K401NoticesProps) {
         <Notice tone="warning" compact title={`Over the ${taxYear} limit.`}>
           This contribution would put in more than the{' '}
           <Money cents={result.deferral_limit_cents} decimals={0} /> the IRS allows for {taxYear},
-          so the calculator stops your contributions at the limit. A plan that matches each paycheck
-          may stop matching once you reach it.
+          so your contributions stop at the limit. A plan that matches each paycheck may stop
+          matching once you reach it.
         </Notice>
       )}
       {result.compensation_capped && (
         <Notice tone="blue" compact icon={null}>
-          Your salary is above the {taxYear} compensation limit, so the match is figured on pay up
-          to that limit.
+          Your salary is above the most pay the IRS lets a plan count for {taxYear}, so the match is
+          worked out on pay up to that amount.
         </Notice>
       )}
     </div>

@@ -9,7 +9,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Connection
 
 from app.db import user_session_for
-from app.routers.pay_stubs import newest_pay_stub, pay_stub_rate, pay_stub_withholding
+from app.routers.pay_stubs import pay_stub_rate, pay_stub_withholding
+from db.pay_stubs import newest_pay_stub
 from tests.conftest import FixtureUser
 from tests.support.factories import STUB_01, make_document, make_pay_stub
 from tests.support.pay_stub_copies import confirm_stub, replaced_late_october

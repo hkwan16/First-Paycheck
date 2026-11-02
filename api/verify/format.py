@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-__all__ = ["dollars", "net_cost", "percent"]
+__all__ = ["dollars", "net_cost", "percent", "refund"]
 
 
 def dollars(cents: int) -> str:
@@ -19,6 +19,17 @@ def net_cost(cents: int) -> str:
     negative one as the amount ahead, ``-40300`` -> ``$403.00 ahead``. The sign
     is the calculator's; this only picks the words."""
     return f"{dollars(abs(cents))} ahead" if cents < 0 else dollars(cents)
+
+
+def refund(cents: int) -> str:
+    """A refund at tax time in words (spec 014 rule 21): ``8`` -> ``$0.08 refund``, a
+    negative one as an amount due, ``-344992`` -> ``$3,449.92 due``, and zero as
+    ``Nothing due, no refund``. The sign is the calculator's; this only picks the words."""
+    if cents > 0:
+        return f"{dollars(cents)} refund"
+    if cents < 0:
+        return f"{dollars(-cents)} due"
+    return "Nothing due, no refund"
 
 
 def percent(value: Decimal) -> str:

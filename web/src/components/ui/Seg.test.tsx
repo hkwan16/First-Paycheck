@@ -55,6 +55,24 @@ describe('Seg', () => {
     expect(onChange).toHaveBeenCalledWith('medium');
   });
 
+  it('takes a description for the group, such as a hint under the question', () => {
+    render(
+      <>
+        <Seg
+          label="Anything else?"
+          options={options}
+          value="low"
+          onChange={() => {}}
+          describedBy="hint"
+        />
+        <p id="hint">Yes if there is more.</p>
+      </>,
+    );
+    expect(screen.getByRole('group', { name: 'Anything else?' })).toHaveAccessibleDescription(
+      'Yes if there is more.',
+    );
+  });
+
   it('selects on click', async () => {
     const onChange = vi.fn();
     render(<Controlled onChange={onChange} />);

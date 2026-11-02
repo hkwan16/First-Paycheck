@@ -7,14 +7,14 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Notice } from '@/components/ui/Notice';
 import { Seg } from '@/components/ui/Seg';
-import { Select } from '@/components/ui/Select';
 import { useUpdateProfile } from '@/lib/api/hooks';
 import { apiErrorMessage } from '@/lib/api/errors';
-import type { FilingStatus, PayFrequency, PayStub, Profile } from '@/lib/api/types';
+import type { FilingStatus, PayStub, Profile } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import { cancelOnEscape } from '@/lib/escape-cancel';
 import { useFocusHandoff } from '@/lib/focus-handoff';
 import { examplePlaceholder } from './decision-format';
+import { PayScheduleSelect, StubSchedule } from './PaySchedule';
 import {
   BIRTH_YEAR_EXAMPLE,
   draftFromProfile,
@@ -23,6 +23,7 @@ import {
   readPlanDetails,
   SALARY_EXAMPLE,
   salaryFromStub,
+  stubSchedule,
   type PlanDetailsDraft,
   type PlanDetailsField,
   type TierDraft,
@@ -33,13 +34,6 @@ const FILING_STATUSES = [
   { value: 'married_filing_jointly', label: 'Married filing jointly' },
   { value: 'head_of_household', label: 'Head of household' },
 ] as const satisfies readonly { value: FilingStatus; label: string }[];
-
-const PAY_FREQUENCIES: readonly { value: PayFrequency; label: string }[] = [
-  { value: 'weekly', label: 'Every week' },
-  { value: 'biweekly', label: 'Every two weeks' },
-  { value: 'semimonthly', label: 'Twice a month' },
-  { value: 'monthly', label: 'Once a month' },
-];
 
 export interface PlanDetailsFormProps {
   profile: Profile;
@@ -54,9 +48,11 @@ export interface PlanDetailsFormProps {
 
 /**
  * What the 401(k) calculator needs that the pay stub does not say: salary,
- * filing status, the employer's match formula and the birth year (and the
- * pay schedule if the stub left it out). Saved to the profile with PUT
- * /profile, which the API validates again, so each is asked for once.
+ * filing status, the employer's match formula and the birth year. The pay
+ * schedule is always shown: the newest stub's, read-only with how to change
+ * it, or asked when no stub states it (spec 005 rule 25a). Saved to the
+ * profile with PUT /profile, which the API validates again, so each is asked
+ * for once.
  */
 export function PlanDetailsForm({
   profile,
@@ -70,12 +66,12 @@ export function PlanDetailsForm({
   const focus = useFocusHandoff<`tier-${number}`>();
   const [draft, setDraft] = useState<PlanDetailsDraft>(() => draftFromProfile(profile, payStub));
   const [errors, setErrors] = useState<Partial<Record<PlanDetailsField, string>>>({});
-  const [askFrequency] = useState(() => draft.payFrequency === null);
+  const fromStub = stubSchedule(profile);
   // Where the starting salary came from, while it is still the stub's.
   const [stubSalary] = useState(() => (salaryFromStub(profile, payStub) ? draft.salary : null));
   const salaryHint =
-    payStub && stubSalary !== null && draft.salary === stubSalary
-      ? `From your pay stub of ${formatDate(payStub.pay_date)}, as a year of paychecks like it. Change it if that paycheck had overtime or a bonus.`
+    payStub && fromStub && stubSalary !== null && draft.salary === stubSalary
+      ? `Your ${formatDate(payStub.pay_date)} paycheck times ${fromStub.periods_per_year} paychecks a year. Change it if that paycheck had overtime or a bonus.`
       : null;
   const update = useUpdateProfile();
 
@@ -85,7 +81,10 @@ export function PlanDetailsForm({
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const read = readPlanDetails(draft, payStub?.tax_year);
+    const read = readPlanDetails(draft, {
+      taxYear: payStub?.tax_year,
+      askSchedule: fromStub === null,
+    });
     if (!read.ok) {
       setErrors(read.errors);
       return;
@@ -109,8 +108,7 @@ export function PlanDetailsForm({
       className="flex flex-col gap-4"
     >
       <p className="m-0 text-small text-ink-3">
-        The calculator needs your salary, filing status, how your employer matches and the year you
-        were born. Your offer letter or benefits summary says how the match works.
+        Your pay stub does not show these. Your offer letter or benefits summary explains the match.
       </p>
 
       <div>
@@ -151,40 +149,30 @@ export function PlanDetailsForm({
         <FieldError id={fieldId('filing-error')}>{errors.filingStatus}</FieldError>
       </div>
 
-      {askFrequency && (
-        <div>
-          <Label htmlFor={fieldId('frequency')}>How often you are paid</Label>
-          <Select
-            id={fieldId('frequency')}
-            value={draft.payFrequency ?? ''}
-            invalid={Boolean(errors.payFrequency)}
-            aria-describedby={errors.payFrequency ? fieldId('frequency-error') : undefined}
-            onChange={(event) =>
-              change({ payFrequency: (event.currentTarget.value || null) as PayFrequency | null })
-            }
-          >
-            <option value="">Choose one</option>
-            {PAY_FREQUENCIES.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-          <FieldError id={fieldId('frequency-error')}>{errors.payFrequency}</FieldError>
-        </div>
+      {fromStub ? (
+        <StubSchedule schedule={fromStub} />
+      ) : (
+        <PayScheduleSelect
+          id={fieldId('frequency')}
+          label="How often you are paid"
+          value={draft.payFrequency}
+          error={errors.payFrequency}
+          onChange={(payFrequency) => change({ payFrequency })}
+        />
       )}
 
       <fieldset className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0">
         <legend className="mb-1.5 p-0 text-small font-semibold text-ink-2">Employer match</legend>
         <p id={fieldId('tiers-hint')} className="m-0 text-tiny text-ink-3">
-          Tiers count up from 0% of pay. For 100% of the first 3% and 50% of the next 2%, enter 100
-          up to 3, then 50 up to 5.
+          Enter each part of the match as what your employer adds and how much of your pay it
+          covers, counted from the start of your pay. &ldquo;100% of the first 3%, then 50% of the
+          next 2%&rdquo; is two tiers: 100 up to 3, then 50 up to 5.
         </p>
         {draft.tiers.map((tier, index) => (
           <div key={index} className="flex flex-wrap items-end gap-3">
             <div className="min-w-36 flex-1">
               <Label htmlFor={fieldId(`employer-${index}`)}>
-                {tierLabel(index, 'Employer adds, % of what you put in')}
+                {tierLabel(index, 'Employer adds, as a % of what you put in')}
               </Label>
               <Input
                 ref={focus.target(`tier-${index}`)}
@@ -200,7 +188,7 @@ export function PlanDetailsForm({
             </div>
             <div className="min-w-36 flex-1">
               <Label htmlFor={fieldId(`upto-${index}`)}>
-                {tierLabel(index, 'Up to, % of your pay')}
+                {tierLabel(index, 'Up to this % of your pay')}
               </Label>
               <Input
                 id={fieldId(`upto-${index}`)}
@@ -258,7 +246,7 @@ export function PlanDetailsForm({
           className="w-44 tabular-nums"
         />
         <p id={fieldId('birth-year-hint')} className="mt-1.5 mb-0 text-tiny text-ink-3">
-          Only used for the extra amount the IRS allows at 50 and over.
+          Only used to check for the extra amount you can put in at 50 and over.
         </p>
         <FieldError id={fieldId('birth-year-error')}>{errors.birthYear}</FieldError>
       </div>

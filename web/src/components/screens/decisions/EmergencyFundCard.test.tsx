@@ -41,7 +41,7 @@ function requests() {
 }
 
 const card = () => screen.getByRole('region', { name: 'Emergency fund' });
-const result = () => within(card()).getByRole('group', { name: 'Calculator result' });
+const result = () => within(card()).getByRole('group', { name: 'Your numbers' });
 const months = () => within(card()).getByRole('slider', { name: /Months of essentials/ });
 const field = (name: string | RegExp) => within(card()).getByLabelText(name);
 const saveButton = () => within(card()).getByRole('button', { name: /^Save|^Saved/ });
@@ -118,7 +118,7 @@ describe('EmergencyFundCard before a decision', () => {
       ['Already saved', '39.12% of the target'],
       ['Still to save', '$3,329.75'],
       ['Months to reach it', '12 months'],
-      ['Per paycheck, 24 a year', '$150.00'],
+      ['Per paycheck, 24 paychecks a year', '$150.00'],
     ]);
     expect(saveButton()).toBeEnabled();
   });
@@ -214,12 +214,46 @@ describe('EmergencyFundCard before a decision', () => {
     expect(result()).toHaveTextContent('Target $10,940, reached in 30 months');
   });
 
-  it('sends a person without a pay schedule to confirm a pay stub', async () => {
-    renderCard();
+  it('asks how often you are paid when nothing says it, and saves it (issue 198)', async () => {
+    const puts: Record<string, unknown>[] = [];
+    server.events.on('request:start', async ({ request }) => {
+      if (request.method === 'PUT') puts.push(await request.clone().json());
+    });
+    const { user } = renderCard();
     const region = await screen.findByRole('region', { name: 'Emergency fund' });
-    expect(
-      await within(region).findByRole('link', { name: 'Confirm your pay stub' }),
-    ).toHaveAttribute('href', '/setup/confirm');
+    const form = await within(region).findByRole('form', { name: 'Your pay schedule' });
+    expect(within(region).queryByRole('slider')).toBeNull();
+    expect(within(form).getByRole('link', { name: 'confirm a pay stub' })).toHaveAttribute(
+      'href',
+      '/setup/confirm',
+    );
+
+    await user.click(within(form).getByRole('button', { name: 'Save pay schedule' }));
+    expect(within(form).getByLabelText('How often are you paid?')).toHaveAccessibleDescription(
+      'Choose how often you are paid.',
+    );
+    expect(puts).toEqual([]);
+
+    await user.selectOptions(
+      within(form).getByLabelText('How often are you paid?'),
+      'Twice a month',
+    );
+    await user.click(within(form).getByRole('button', { name: 'Save pay schedule' }));
+    expect(await within(region).findByRole('slider')).toBeInTheDocument();
+    expect(puts).toEqual([expect.objectContaining({ pay_frequency: 'semimonthly' })]);
+  });
+
+  it("uses the pay stub's schedule over a profile saved at every two weeks (issue 198)", async () => {
+    decisionsReady();
+    db.profile = { ...db.profile, pay_frequency: 'biweekly' };
+    const seen = requests();
+    await renderLoaded();
+    enter('Monthly transfer to savings', '300');
+    await settle();
+    await waitFor(() => expect(result()).toHaveTextContent('Target $5,470, reached in 12 months'));
+    expect(seen.calc).toEqual([sampleEmergencyFund().inputs]);
+    expect(seen.calc[0]).toMatchObject({ pay_periods_per_year: 24 });
+    expect(result()).toHaveTextContent('Per paycheck, 24 paychecks a year$150.00');
   });
 });
 
@@ -233,12 +267,12 @@ describe('EmergencyFundCard saving', () => {
     await waitFor(() => expect(saveButton()).toBeEnabled());
 
     await user.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v1'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
     const { inputs, result: computed } = sampleEmergencyFund();
     expect(seen.save).toEqual([
       { calculator: 'emergency_fund', inputs, result: computed, supersedes_id: null },
     ]);
-    expect(within(card()).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
+    expect(within(card()).getByText('Saved Oct 17')).toBeInTheDocument();
     // Explaining an emergency fund decision is not available yet (spec 011).
     expect(within(card()).queryByRole('link', { name: 'Why this decision' })).toBeNull();
 
@@ -257,15 +291,15 @@ describe('EmergencyFundCard saving', () => {
     const seen = requests();
     const { user } = await renderReady();
     expect(field('Monthly transfer to savings')).toHaveValue('300.00');
-    expect(saveButton()).toHaveTextContent('Saved as v1');
+    expect(saveButton()).toHaveTextContent(/^Saved$/);
     expect(saveButton()).toHaveAttribute('aria-pressed', 'true');
 
     enter('Monthly transfer to savings', '500');
     await settle();
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v2'));
-    expect(within(card()).getByText('Changed since v1')).toBeInTheDocument();
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
+    expect(within(card()).getByText('Changes not saved')).toBeInTheDocument();
     await user.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
     expect(seen.save[0]).toMatchObject({
       supersedes_id: EMERGENCY_DECISION_ID,
       inputs: sampleEmergencyFund({ monthly_contribution_cents: 50_000 }).inputs,
@@ -303,14 +337,14 @@ describe('EmergencyFundCard saving', () => {
 
     await user.click(saveButton());
     expect(
-      await within(card()).findByText(/The calculator's numbers had changed/),
+      await within(card()).findByText(/Your numbers changed after they were shown/),
     ).toBeInTheDocument();
     await waitFor(() => expect(seen.calc.length).toBe(calcsBefore + 1));
     expect(db.decisions).toHaveLength(1);
 
     await waitFor(() => expect(saveButton()).toBeEnabled());
     await user.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
   });
 
   it('reloads and offers the next version when another save got there first', async () => {
@@ -326,11 +360,11 @@ describe('EmergencyFundCard saving', () => {
     );
     enter('Monthly transfer to savings', '500');
     await settle();
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
 
     await user.click(saveButton());
-    expect(await within(card()).findByText(/saved somewhere else/)).toBeInTheDocument();
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v3'));
+    expect(await within(card()).findByText(/saved in another tab or window/)).toBeInTheDocument();
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
   });
 });
 
@@ -387,11 +421,11 @@ describe('EmergencyFundCard goal', () => {
     const transfer = field('Monthly transfer to savings');
     expect(transfer).toHaveValue('500.00');
     expect(transfer).toHaveAccessibleDescription(
-      'From your goal. Your saved decision, v1, has $300.00 a month.',
+      'From your goal. Your saved decision has $300.00 a month.',
     );
     await settle();
     await waitFor(() => expect(result()).toHaveTextContent('reached in 7 months'));
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
 
     // Back at the saved amount, the goal has its date again and the card is saved.
     await user.click(within(goal()).getByRole('button', { name: 'Change contribution' }));
@@ -400,7 +434,7 @@ describe('EmergencyFundCard goal', () => {
     await user.type(again, '300');
     await user.click(within(goal()).getByRole('button', { name: 'Save contribution' }));
     await waitFor(() => expect(goal()).toHaveTextContent('On pace to reach it by Sep 30, 2027.'));
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v1'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
     expect(field('Monthly transfer to savings')).toHaveValue('300.00');
   });
 
@@ -410,9 +444,9 @@ describe('EmergencyFundCard goal', () => {
     savedEmergencyFund();
     planningDb.goals[0] = { ...planningDb.goals[0]!, monthly_contribution_cents: 50_000 };
     const { user } = await renderReady();
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
     await user.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
     expect(seen.save[0]).toMatchObject({
       supersedes_id: EMERGENCY_DECISION_ID,
       inputs: sampleEmergencyFund({ monthly_contribution_cents: 50_000 }).inputs,

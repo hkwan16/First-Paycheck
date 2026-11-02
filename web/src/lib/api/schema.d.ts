@@ -2446,6 +2446,26 @@ export interface components {
      * @enum {string}
      */
     PayFrequency: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
+    /** PaySchedule */
+    PaySchedule: {
+      frequency: components['schemas']['PayFrequency'];
+      /**
+       * Pay Stub Date
+       * @description The pay date of the stub it comes from; null when it is the profile's
+       */
+      pay_stub_date: string | null;
+      /**
+       * Periods Per Year
+       * @enum {integer}
+       */
+      periods_per_year: 12 | 24 | 26 | 52;
+      /**
+       * Source
+       * @description Where the schedule comes from: the newest stub, or the profile's entry
+       * @enum {string}
+       */
+      source: 'pay_stub' | 'profile';
+    };
     /** PayStubFlow */
     PayStubFlow: {
       /** Deductions Cents */
@@ -2688,7 +2708,7 @@ export interface components {
        * Kind
        * @enum {string}
        */
-      kind: 'money' | 'net_cost' | 'percent' | 'count' | 'text';
+      kind: 'money' | 'net_cost' | 'refund' | 'percent' | 'count' | 'text';
       /** Label */
       label: string;
       /** Value */
@@ -2885,6 +2905,8 @@ export interface components {
       /** Other Jobs */
       other_jobs?: components['schemas']['OtherJob'][];
       pay_frequency?: components['schemas']['PayFrequency'] | null;
+      /** @description The pay schedule every calculator uses (spec 005 rule 25a): the newest confirmed stub's, else pay_frequency; null without either. Computed on read. */
+      pay_schedule: components['schemas']['PaySchedule'] | null;
       /** Salary Cents */
       salary_cents?: number | null;
       /** Start Date */

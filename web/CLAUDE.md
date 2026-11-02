@@ -241,9 +241,13 @@ or checked for a phone.
   `supersedes_id` set to the current version's id. A 409 `decision_conflict` (someone saved first)
   reloads the decisions; a 422 `result_mismatch` throws `ResultMismatch` (`fields` from the
   details) and invalidates that calculator's results so the card recalculates and asks to save
-  again. `decisionSaveState(current, inputs)` (`lib/decisions.ts`) drives the save button and
-  badge: unsaved, `saved` ("Saved as v2"), or `dirty` ("Save as v3"), comparing inputs
-  structurally (`lib/deep-equal.ts`, so key order and object identity do not matter). The API
+  again. `decisionSaveState(current, inputs, { ignore })` (`lib/decisions.ts`) drives the save
+  button and badge in words with no version number (spec 018 rule 5a): unsaved ("Save", "Not
+  saved"), `dirty` ("Save changes", "Changes not saved") or `saved` ("Saved", "Saved Oct 17"),
+  comparing inputs structurally (`lib/deep-equal.ts`, so key order and object identity do not
+  matter) and leaving out the `ignore` keys, inputs that are not what the person decided (the
+  W-4's `W4_CONTEXT_INPUTS`, the health plan's `HEALTH_WHAT_IF_INPUTS`). The save is a step's one
+  primary button: `stepFooter` gives every next link `primary: false` (rule 5b). The API
   names calculators `k401_match` and `health_plans`; the feature flags say `401k_match` and
   `health_plan`: convert with `calculatorIdOf`.
 - **Goals and plans**: `useGoals()` reads `GET /goals` (a saved emergency fund decision makes or
@@ -601,8 +605,9 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
 
 - **`Match401kCard`** always renders the same `DecisionCard` frame (a region named by its title)
   and swaps its body: skeleton, error, a link to Confirm when there is no confirmed pay stub,
-  `PlanDetailsForm` when the profile has no salary, match tiers or birth year (saved with
-  `PUT /profile`, so each is asked for once; the mockup has no such form), or the calculator.
+  `PlanDetailsForm` when the profile has no salary, match tiers, birth year or pay schedule
+  (`needsPlanDetails`; saved with `PUT /profile`, so each is asked for once; the mockup has no
+  such form), or the calculator.
   The form fills each field the profile already has. A new user's yearly salary starts from the
   newest confirmed stub's `annual_salary_cents` (spec 005 rule 24a: gross times pay periods,
   worked out by the API, so the Acme stub gives 64,999.92), a real value they can save without
@@ -641,8 +646,12 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
   goal gets there. There is no "Why" link: spec 011 has no explanation.
 - **`HealthPlanCard`** (spec 012): compares the newest confirmed summary's plans (up to
   `MAX_PLANS`, the API's limit), the saved decision's, or plans typed in `PlanOptionsForm`. Usage
-  low, medium or high; the comparison table marks the cheapest at that usage and the chosen plan,
-  with break-even notes, the HSA tax effect and the HDHP notice from the result. A net cost (the
+  low, medium or high is a what-if (spec 012 rule 18): it is left out of the save comparison
+  (`HEALTH_WHAT_IF_INPUTS`), and the badge compares the decided inputs whether or not the plan
+  table is open (rule 18a). The comparison table marks the cheapest at that usage and the chosen
+  plan, with break-even notes, the HSA tax effect and the HDHP notice from the result; "What these
+  terms mean", a native `<details>` above it, and the typed table's field hints explain each term
+  from `HEALTH_TERMS` (rule 19). A net cost (the
   usage rows, the worst case, the headline) can be negative when the employer's HSA money and the
   tax saved outweigh premiums and care; it reads as coming out ahead, never with a minus sign
   (spec 012 rule 17): `costText` ("$260 ahead") over `formatNetCost`/`netCost` in `lib/money.ts`,
@@ -654,21 +663,29 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
   edited one) keeps the choice when it still has the chosen plan with every term the same, in
   whatever place (`choiceAmong`, issue 168), and drops it otherwise; an enrollment deadline adds a calendar event,
   shown under the card.
-- **`W4Card`** (spec 014): salary and pay schedule from the profile and the confirmed pay stub,
-  the age from the birth year (null without one: no catch-up), and, read-only under "From your
+- **Pay schedule** (spec 005 rule 25a, issue 198): every card reads
+  `profile.pay_schedule.periods_per_year`, the schedule the API resolves (the newest stub's when it
+  prints one, else the profile's), never the profile's `pay_frequency` or the stub's on their own.
+  `PaySchedule.tsx` shows it: `StubSchedule` in the plan details form (read-only, with "add a newer
+  pay stub"), `PayScheduleSelect` where nothing states one, and `PayScheduleForm`, which the
+  emergency fund shows instead of its form until there is one. The plan details form never copies
+  the stub's schedule into the profile (`readPlanDetails(..., { askSchedule })`).
+- **`W4Card`** (spec 014): salary and pay schedule from the profile, the age from the birth year (null without one: no catch-up), and, read-only under "From your
   decisions", the saved 401(k) decision's `contribution_pct` and the saved health plan's chosen
   plan's premium per paycheck (`fromDecisions` in `w4-format.ts`). Either one not saved is sent
   as zero, the card says so, and links to that step. The person sets the filing status (from
-  the profile until changed), Step 2(c), the other jobs' wages and withholding, Steps 3 and
-  4(a)-(c) and the deductions they expect to claim (empty means the Step 4(b) entry). The result
+  the profile until changed); the other entries (Step 2(c), the other jobs' wages and
+  withholding, Steps 3 and 4(a)-(c) and the deductions they expect to claim, empty meaning the
+  Step 4(b) entry) wait behind "Anything else on your W-4?" (spec 014 rule 20): No or Yes, open
+  while `hasMoreEntries` says one holds a value, and No sets them back to none. The result
   is the calculator's: a balance due takes the `off` tone, a refund stays neutral (never
   `confirmed`). The result panel opens with "If you change nothing" (spec 014 rule 10a): the
   refund or balance due at the newest stub's withholding, `current_refund_cents`, with the
   stub's per-paycheck figure and `current_annual_withholding_cents`, and says it assumes every
-  paycheck this year withholds the same; then "With the entries above", the projection. The
-  card sends the stub's `federal_withholding_cents` as `current_withholding_per_paycheck_cents`
-  only when the stub is on the card's pay schedule (or has none; `currentWithholdingOf`), else
-  null, and says why there is no comparison. The save badge ignores that input
+  paycheck this year is the same; then "If you give your employer this W-4", the projection,
+  and the method in words (`methodText`) with IRS Publication 15-T as a source link. The card
+  always sends the stub's `federal_withholding_cents` as `current_withholding_per_paycheck_cents`:
+  the newest stub is on the user's schedule, which is its own. The save badge ignores that input
   (`decisionSaveState(..., { ignore: W4_CONTEXT_INPUTS })`, spec 014 rule 17a): it is payroll
   today, so a newer stub alone never marks the saved W-4 changed, and a decision saved before it
   existed stays saved. "Apply suggestion" copies `suggested_extra_withholding_cents` and

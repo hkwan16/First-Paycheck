@@ -15,6 +15,8 @@ export interface SegProps<T extends string> {
   /** The chosen option; null before one is chosen (none pressed, the first is the tab stop). */
   value: T | null;
   onChange: (value: T) => void;
+  /** The id of text that describes the group (a hint under its question). */
+  describedBy?: string;
   className?: string;
 }
 
@@ -30,7 +32,14 @@ const KEY_STEP: Record<string, number> = {
  * buttons. One tab stop (the pressed option); arrow keys move and select,
  * wrapping at the ends; Home and End jump.
  */
-export function Seg<T extends string>({ label, options, value, onChange, className }: SegProps<T>) {
+export function Seg<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  describedBy,
+  className,
+}: SegProps<T>) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const selected = Math.max(
     0,
@@ -59,6 +68,7 @@ export function Seg<T extends string>({ label, options, value, onChange, classNa
     <div
       role="group"
       aria-label={label}
+      aria-describedby={describedBy}
       className={cn('inline-flex flex-wrap gap-0.5 rounded-control bg-fill p-[3px]', className)}
     >
       {options.map((option, index) => (

@@ -17,9 +17,10 @@ from app.db import user_session_for
 from app.deps import get_now
 from app.routers import decisions as decisions_router
 from calc.registry import Calculator, UnknownCalculator
+from db.enums import PayFrequency
 from tests.conftest import FixtureUser
 from tests.support.factories import make_document, make_pay_stub
-from tests.support.pay_stub_copies import replaced_late_october
+from tests.support.pay_stub_copies import confirm_stub, replaced_late_october
 
 NOW = dt.datetime(2026, 10, 21, 15, 0, tzinfo=dt.UTC)
 
@@ -419,10 +420,16 @@ def test_no_decisions_lists_nothing(
 
 
 def biweekly_with_stub(client: TestClient, connection: Connection, user: FixtureUser) -> None:
-    profile = client.put("/profile", json={"salary_cents": 6_000_000, "pay_frequency": "biweekly"})
+    profile = client.put("/profile", json={"salary_cents": 6_000_000})
     assert profile.status_code == 200, profile.text
     document = make_document(connection, user.id, with_blob=False)
-    make_pay_stub(connection, user.id, document, pay_date=dt.date(2026, 10, 16))
+    make_pay_stub(
+        connection,
+        user.id,
+        document,
+        pay_date=dt.date(2026, 10, 16),
+        pay_frequency=PayFrequency.BIWEEKLY,
+    )
 
 
 def test_calendar_event_created(
@@ -454,12 +461,25 @@ def test_next_pay_date_anchor_skips_superseded_stub(
     190): the corrected 2026-10-15 gives 10-29 biweekly; the superseded 10-31 would
     give 10-31."""
     client = client_as(user_a)
-    profile = client.put("/profile", json={"salary_cents": 6_000_000, "pay_frequency": "biweekly"})
-    assert profile.status_code == 200, profile.text
-    replaced_late_october(client, db_connection, user_a)
+    replaced_late_october(client, db_connection, user_a, pay_frequency="biweekly")
     save(client)
     [event] = client.get("/calendar").json()
     assert event["due_at"] == "2026-10-29"
+
+
+def test_next_pay_date_follows_the_stubs_schedule(
+    frozen: FastAPI, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    """Spec 007 rule 16 over spec 005 rule 25a (issue 198): the profile says every two
+    weeks, the Acme stub (paid 2026-10-15) twice a month, so the check falls on the
+    month's end, 10-31, not two weeks after the stub, 10-29."""
+    client = client_as(user_a)
+    profile = client.put("/profile", json={"salary_cents": 6_000_000, "pay_frequency": "biweekly"})
+    assert profile.status_code == 200, profile.text
+    confirm_stub(client, db_connection, user_a)
+    save(client)
+    [event] = client.get("/calendar").json()
+    assert event["due_at"] == "2026-10-31"
 
 
 def test_event_falls_back_to_pay_periods_without_a_profile(
