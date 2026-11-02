@@ -124,7 +124,10 @@ def test_an_unhandled_error_logs_500_and_returns_the_request_id(
     response = client.get("/boom", headers={"X-Request-Id": "trace-me"})
     assert response.status_code == 500
     assert response.json() == {
-        "error": {"code": "internal_error", "message": "Internal server error"}
+        "error": {
+            "code": "internal_error",
+            "message": "Something went wrong on our side. Try again in a moment.",
+        }
     }
     assert response.headers["X-Request-Id"] == "trace-me"
     [line] = request_lines(caplog)

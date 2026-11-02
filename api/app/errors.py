@@ -138,7 +138,11 @@ def validation_message(errors: Sequence[Any], prefix: Sequence[str] = ()) -> str
 async def _validation_error(_: Request, error: Exception) -> JSONResponse:
     exc = cast(RequestValidationError, error)
     return JSONResponse(
-        error_body("validation_error", validation_message(exc.errors()) or "Invalid request"),
+        error_body(
+            "validation_error",
+            validation_message(exc.errors())
+            or "That request could not be read. Check what you entered and try again.",
+        ),
         status_code=422,
     )
 
@@ -155,7 +159,7 @@ async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
         extra={"request_id": request_id} if request_id else None,
     )
     return JSONResponse(
-        error_body("internal_error", "Internal server error"),
+        error_body("internal_error", "Something went wrong on our side. Try again in a moment."),
         status_code=500,
         headers={REQUEST_ID_HEADER: request_id} if request_id else None,
     )
@@ -182,7 +186,7 @@ async def _integrity_error(request: Request, error: Exception) -> JSONResponse:
     if is_missing_owner(exc):
         # Spec 017 rule 9: the client signs out instead of seeing a 500.
         return JSONResponse(
-            error_body("account_deleted", "This account has been deleted"),
+            error_body("account_deleted", "This account has been deleted."),
             status_code=401,
             headers=Unauthorized.headers,
         )

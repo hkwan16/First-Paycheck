@@ -84,10 +84,10 @@ def download_plan_export(job_id: uuid.UUID, session: UserSession) -> Response:
     """The PDF once its job succeeded; 404 before then, after 7 days and for anyone else."""
     job = session.get(Job, job_id)
     if job is None or job.kind is not JobKind.PLAN_EXPORT or job.status is not JobStatus.SUCCEEDED:
-        raise NotFound("Plan export not found")
+        raise NotFound("This PDF is not available. Try again to make a new one.")
     stored = export_store.get(session, job_id)
     if stored is None:
-        raise NotFound("Plan export not found")
+        raise NotFound("This PDF is not available. Try again to make a new one.")
     filename = f"first-paycheck-plan-{stored.created_at.astimezone(dt.UTC):%Y-%m-%d}.pdf"
     return Response(
         content=stored.data,
