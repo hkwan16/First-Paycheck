@@ -542,7 +542,18 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
   /** `count` August rows, "August shop 1" first. */
   const august = (count: number) =>
     Array.from({ length: count }, (_, i) => rowOn('2026-08-20', `August shop ${i + 1}`, i + 1));
-  const AUGUST = { limit: '50', start: '2026-08-01', end: '2026-08-31' };
+  const AUGUST = {
+    limit: '50',
+    cash_accounts_only: 'true',
+    start: '2026-08-01',
+    end: '2026-08-31',
+  };
+  const OCTOBER = {
+    limit: '50',
+    cash_accounts_only: 'true',
+    start: '2026-10-01',
+    end: '2026-10-17',
+  };
 
   /** The query of every `GET /transactions` page read (not the per-account counts). */
   function transactionReads() {
@@ -571,7 +582,7 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
     const reads = transactionReads();
     await renderSpending();
     // The API's default period is the one it answered for: October 1 to 17 here.
-    expect(reads).toEqual([{ limit: '50', start: '2026-10-01', end: '2026-10-17' }]);
+    expect(reads).toEqual([OCTOBER]);
     expect(listed()).toHaveLength(16);
     expect(screen.queryByRole('row', { name: /Corner Bookshop/ })).not.toBeInTheDocument();
   });
@@ -597,9 +608,7 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
     // default with those dates).
     await pick(user, 'October 2026 so far');
     await waitFor(() => expect(listed()).toHaveLength(16));
-    expect(reads.filter((r) => r.start === '2026-10-01')).toEqual([
-      { limit: '50', start: '2026-10-01', end: '2026-10-17' },
-    ]);
+    expect(reads.filter((r) => r.start === '2026-10-01')).toEqual([OCTOBER]);
     expect(screen.queryByRole('row', { name: /August shop/ })).not.toBeInTheDocument();
   });
 
@@ -621,6 +630,28 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
     answer.resolve();
     await waitFor(() => expect(card()).not.toHaveAttribute('aria-busy'));
     expect(listed()).toHaveLength(2);
+  });
+
+  it('leaves loan ledger rows out of the list, as the totals leave them out (issue 200)', async () => {
+    db.accounts = [
+      ...db.accounts,
+      { ...sampleCsvAccount, id: LOAN_ID, provider: 'plaid', name: 'Auto loan', kind: 'loan' },
+    ];
+    db.transactions = [
+      {
+        ...AMAZON,
+        id: '7a000000-0000-4000-8000-00000000a002',
+        account_id: LOAN_ID,
+        merchant_raw: 'Interest charged',
+        merchant_clean: 'Interest charged',
+        merchant_norm: 'interest charged',
+        posted_at: '2026-10-16',
+      },
+      ...db.transactions,
+    ];
+    await renderSpending();
+    expect(listed()).toHaveLength(16);
+    expect(screen.queryByRole('row', { name: /Interest charged/ })).not.toBeInTheDocument();
   });
 
   it('names the period when it has no transactions', async () => {
@@ -670,7 +701,7 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
     );
     const reads = transactionReads();
     await renderSpending();
-    expect(reads).toEqual([{ limit: '50' }]);
+    expect(reads).toEqual([{ limit: '50', cash_accounts_only: 'true' }]);
     expect(listed()).toHaveLength(16);
   });
 });

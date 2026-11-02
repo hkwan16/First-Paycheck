@@ -4,13 +4,7 @@ import Link from 'next/link';
 import type { FlowNode } from '@/components/sankey';
 import { Money } from '@/components/ui/Money';
 import { maskLabel } from '@/lib/accounts';
-import type {
-  AccountKind,
-  CashFlow,
-  SpendingSummary,
-  Transaction,
-  WithholdingLine,
-} from '@/lib/api/types';
+import type { CashFlow, SpendingSummary, Transaction, WithholdingLine } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import { formatNumber, formatTransactionAmount } from '@/lib/money';
 import { shareText } from './spending-format';
@@ -39,12 +33,13 @@ const Muted = ({ children }: { children: React.ReactNode }) => (
 export interface FlowDetailsProps {
   node: FlowNode;
   flow: CashFlow;
-  /** The period's transactions loaded for the table, newest first. */
+  /**
+   * The period's transactions loaded for the table, newest first: only rows
+   * on the accounts the totals read (`cash_accounts_only`, spec 003 rule 17).
+   */
   transactions: readonly Transaction[];
   /** account_id to its mask ("4821"). */
   masks: ReadonlyMap<string, string | null>;
-  /** account_id to its kind, to leave out the ledgers the API does not count. */
-  kinds: ReadonlyMap<string, AccountKind>;
 }
 
 /** A bucket's share of income in the summary; the other buckets have none. */
@@ -57,10 +52,10 @@ const BUCKET_SHARES = {
 /**
  * What a Sankey node's popover says under its name and amount. Every number
  * is one the API sent (amounts, percentages, counts); the category lines are
- * the loaded transactions of that category in the period on the accounts the
- * API counted, as the table lists them.
+ * the loaded posted transactions of that category in the period, as the
+ * table lists them.
  */
-export function FlowDetails({ node, flow, transactions, masks, kinds }: FlowDetailsProps) {
+export function FlowDetails({ node, flow, transactions, masks }: FlowDetailsProps) {
   const stubs = flow.withholding.paycheck_count;
   const stubWords = count(stubs, 'pay stub', 'pay stubs');
 
@@ -141,20 +136,14 @@ export function FlowDetails({ node, flow, transactions, masks, kinds }: FlowDeta
 
     case 'category': {
       const total = flow.spending.categories.find((c) => c.category === node.key);
-      // The rows the API counted: posted, in the period, and not on a loan,
-      // investment or retirement ledger (spec 007 rule 21a).
-      const counted = (accountId: string) => {
-        const kind = kinds.get(accountId);
-        return kind === undefined || flow.spending.account_kinds_counted.includes(kind);
-      };
+      // The rows the API counted: posted and in the period.
       const lines = transactions
         .filter(
           (t) =>
             t.category === node.key &&
             !t.pending &&
             t.posted_at >= flow.start &&
-            t.posted_at <= flow.end &&
-            counted(t.account_id),
+            t.posted_at <= flow.end,
         )
         .slice(0, POPOVER_LINES);
       return (

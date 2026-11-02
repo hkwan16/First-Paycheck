@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { PageTitle } from '@/components/chrome/PageTitle';
 import { StepFooter } from '@/components/chrome/StepFooter';
 import { CardErrorBoundary } from '@/components/ui/CardErrorBoundary';
-import { NEWEST_TRANSACTIONS, periodFilters, useCashflow, type Period } from '@/lib/api/hooks';
+import { NEWEST_SPENDING, periodFilters, useCashflow, type Period } from '@/lib/api/hooks';
 import { features } from '@/lib/features';
 import { CashFlowCard } from './CashFlowCard';
 import { PeriodPicker } from './PeriodPicker';
@@ -43,7 +43,7 @@ export function SpendingScreen({
   const transactions = listed
     ? periodFilters(listed)
     : cashflow.isError
-      ? NEWEST_TRANSACTIONS
+      ? NEWEST_SPENDING
       : null;
 
   return (
