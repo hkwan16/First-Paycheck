@@ -134,14 +134,14 @@ def test_pass_first_try(
     out = explain(client_as(user_a), decision)
     assert (out["attempt"], out["retries"], out["verified"], out["fallback"]) == (1, 0, True, False)
     assert out["decision_id"] == decision
-    assert out["prompt_version"] == "explain/v3"
+    assert out["prompt_version"] == "explain/v4"
     assert out["verification"]["numbers_unmatched"] == []
     assert out["verification"]["has_citation"] is True
     [citation] = out["citations"]
     assert citation["key"] == script.sent[0]["context"]["citations"][0]["key"]
     assert citation["url"].startswith("https://www.irs.gov/")
     assert citation["passage"]
-    assert rows(db_connection, decision) == [(1, 0, True, False, "explain/v3")]
+    assert rows(db_connection, decision) == [(1, 0, True, False, "explain/v4")]
     # The model saw the decision's facts and no feedback.
     context = script.sent[0]["context"]
     missed = {"label": "Match you miss per year at the rate you chose", "value": "$600.00"}
@@ -158,8 +158,8 @@ def test_fail_then_pass(
     out = explain(client_as(user_a), decision)
     assert (out["attempt"], out["retries"], out["verified"], out["fallback"]) == (2, 1, True, False)
     assert rows(db_connection, decision) == [
-        (1, 0, False, False, "explain/v3"),
-        (2, 1, True, False, "explain/v3"),
+        (1, 0, False, False, "explain/v4"),
+        (2, 1, True, False, "explain/v4"),
     ]
     assert "$123,456.78" in script.sent[1]["feedback"]
 
@@ -182,8 +182,8 @@ def test_fail_twice_falls_back(
         "k401.federal_brackets",
     ]
     assert rows(db_connection, decision) == [
-        (1, 0, False, False, "explain/v3"),
-        (2, 1, False, False, "explain/v3"),
+        (1, 0, False, False, "explain/v4"),
+        (2, 1, False, False, "explain/v4"),
         (3, 1, False, True, "fallback/v4"),
     ]
 
@@ -568,7 +568,7 @@ def test_w4_decision_is_explained_with_its_citations(
     ]
     facts = {fact["label"]: fact["value"] for fact in context["facts"]}
     assert facts["Projected balance due with these entries"] == "$2,360.08"
-    assert rows(db_connection, decision_id) == [(1, 0, True, False, "explain/v3")]
+    assert rows(db_connection, decision_id) == [(1, 0, True, False, "explain/v4")]
 
 
 def test_w4_fallback_is_cited(script: Script, client_as: Client, user_a: FixtureUser) -> None:
@@ -649,7 +649,7 @@ def test_w4_context_has_the_pay_stub_withholding(
     assert context["notes"][0] == W4_STUB_DIFFERS_NOTE
     # The fake's draft states the stub's $272.44, which the verifier allows.
     assert "your latest pay stub withholds per paycheck: $272.44." in out["text"]
-    assert rows(db_connection, decision_id) == [(1, 0, True, False, "explain/v3")]
+    assert rows(db_connection, decision_id) == [(1, 0, True, False, "explain/v4")]
 
 
 def test_w4_fallback_states_the_pay_stub_withholding(

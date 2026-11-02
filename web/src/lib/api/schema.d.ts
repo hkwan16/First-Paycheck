@@ -2407,7 +2407,7 @@ export interface components {
       label: string;
       /**
        * Value
-       * @description The number exactly as written in the text, e.g. $2,400.00
+       * @description The number exactly as written in the text, e.g. $2,400
        */
       value: string;
     };

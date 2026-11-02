@@ -215,7 +215,7 @@ class BenefitsSummaryExtraction(_Strict):
 class NumberClaim(_Strict):
     """A figure the explanation states, for the UI to show beside the text."""
 
-    value: str = Field(description="The number exactly as written in the text, e.g. $2,400.00")
+    value: str = Field(description="The number exactly as written in the text, e.g. $2,400")
     label: str = Field(description="What the number is, in a few words")
 
 
@@ -224,7 +224,7 @@ class ExplanationDraft(_Strict):
     ``verify/verify.py`` has checked every number and citation key."""
 
     concept: str = Field(description="One sentence naming the idea behind the decision")
-    text: str = Field(description="Two to five short paragraphs explaining the decision")
+    text: str = Field(description="Short paragraphs explaining the decision")
     numbers: list[NumberClaim] = Field(description="The key figures the text states")
     what_ifs: list[str] = Field(
         max_length=3, description="Up to three short what-if sentences using only the facts"

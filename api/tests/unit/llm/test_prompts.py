@@ -217,7 +217,51 @@ def test_explain_v3_keeps_the_entries_withholding_apart_from_the_stub() -> None:
         assert f"`{label}`" in v3, label
     assert "do not say what is withheld now" in v3
     assert "rejects" not in v3
-    assert EXPLAIN_PROMPT == ("explain", "v3")
+
+
+def _section(system: str, heading: str) -> str:
+    """A prompt's section: its heading and the list under it, to the blank line after."""
+    lines: list[str] = []
+    for line in system[system.index(heading) :].splitlines():
+        if not line and any(item.startswith("- ") for item in lines):
+            break
+        lines.append(line)
+    return "\n".join(lines)
+
+
+RATE_SECTION = "The rate chosen and the rate in effect, for a 401(k) decision:"
+WITHHOLDING_SECTION = (
+    "The withholding the entries give and the withholding in effect, for a W-4 decision:"
+)
+
+
+def test_explain_v4_is_short_in_whole_dollars_and_quotes_no_passage() -> None:
+    """Spec 008 rule 8 (issue 204): v3's drafts were long, wrote every amount with
+    cents and quoted IRS passages. v4 keeps v3's rate and withholding rules word for
+    word, asks for at most 150 words, whole dollars at $100 and over and no quoted
+    passage, and is the version the gateway sends."""
+    v3 = load_prompt("explain", "v3").system
+    v4 = load_prompt("explain", "v4").system
+    for heading in (RATE_SECTION, WITHHOLDING_SECTION):
+        assert _section(v4, heading) == _section(v3, heading), heading
+    # Every number rule but the money one is kept as it was.
+    money = "- Write money exactly as a fact gives it"
+    kept = [
+        line
+        for line in _section(v3, "Rules for numbers.").splitlines()
+        if line.startswith("- ") and not line.startswith(money)
+    ]
+    assert len(kept) == 5
+    for line in kept:
+        assert line in v4, line
+    assert money not in v4
+    assert "two or three short paragraphs, at most 150 words in all" in v4
+    assert "Write money of $100 or more as whole dollars (`$2,400`, `$3,919`)" in v4
+    assert '("no extra cost")' in v4
+    assert "Do not quote the citations or the benefits passages" in v4
+    assert "Never mention the calculator" in v4
+    assert "rejects" not in v4
+    assert EXPLAIN_PROMPT == ("explain", "v4")
 
 
 def test_judge_rate_claim() -> None:
