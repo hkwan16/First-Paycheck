@@ -14,6 +14,7 @@ from db.enums import AccountKind
 from jobs.errors import RetryLater
 from sync.plaid.client import PlaidError
 from sync.provider import (
+    NOT_READY_RETRY_SECONDS,
     ItemLoginRequired,
     PaginationMutated,
     ProviderAccount,
@@ -22,6 +23,7 @@ from sync.provider import (
     ProviderTransaction,
     RemovedTransaction,
     TransactionPage,
+    TransactionsNotReady,
 )
 
 log = logging.getLogger(__name__)
@@ -61,8 +63,6 @@ NO_INVESTMENTS = frozenset(
         "ADDITIONAL_CONSENT_REQUIRED",
     }
 )
-# How long to wait before retrying a sync whose data Plaid is still preparing.
-NOT_READY_RETRY_SECONDS = 120
 _MASK = re.compile(r"\d{2,4}")
 
 
@@ -165,11 +165,11 @@ class PlaidProvider:
             body = self._client.transactions_sync(self._token, cursor)
         except PlaidError as error:
             raise _translate(error) from None
-        if cursor is None and body.get("transactions_update_status") == "NOT_READY":
-            raise RetryLater(
-                "Plaid has not pulled this item's transactions yet",
-                after_seconds=NOT_READY_RETRY_SECONDS,
-            )
+        update_status = body.get("transactions_update_status")
+        if not body["next_cursor"]:
+            # Plaid's empty cursor: "transactions are not yet available", under
+            # any update status (spec 002 rule 9a).
+            raise TransactionsNotReady(update_status)
         return TransactionPage(
             added=[_transaction(raw) for raw in body["added"]],
             modified=[_transaction(raw) for raw in body["modified"]],
@@ -182,6 +182,7 @@ class PlaidProvider:
             ],
             next_cursor=body["next_cursor"],
             has_more=body["has_more"],
+            update_status=update_status,
         )
 
     def fetch_holdings(self) -> list[ProviderHolding]:

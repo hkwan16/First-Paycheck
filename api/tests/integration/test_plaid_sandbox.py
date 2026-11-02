@@ -8,9 +8,13 @@ returned).
 
 from __future__ import annotations
 
+import datetime as dt
+import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 from pydantic import SecretStr
@@ -33,8 +37,10 @@ pytestmark = pytest.mark.plaid_sandbox
 
 logger = logging.getLogger(__name__)
 
-READY_ATTEMPTS = 12
-READY_WAIT_SECONDS = 5.0
+# A sync every second lands in the seconds when Plaid says its pull is done
+# but has no rows or cursor yet (spec 002 rule 9a, issue #213).
+READY_ATTEMPTS = 60
+READY_WAIT_SECONDS = 1.0
 SANDBOX_LOANS = (
     "Plaid Student Loan",
     "Plaid Mortgage",
@@ -58,14 +64,17 @@ def plaid() -> PlaidClient:
     return PlaidClient.from_settings(settings)
 
 
-def sync_linked_item(
+Sync = Callable[[dt.datetime | None], SyncResult]
+
+
+def store_linked_item(
     plaid: PlaidClient,
     db_connection: Connection,
     user: FixtureUser,
     token: SecretStr,
     provider_item_id: str,
-) -> tuple[uuid.UUID, SyncResult]:
-    """Store the item for ``user`` and run its first sync, waiting for Plaid."""
+) -> tuple[uuid.UUID, Sync]:
+    """Store the item for ``user``; the callable runs one sync of it at ``now``."""
     cipher = cipher_from_settings(
         Settings(_env_file=None, plaid_token_key=SecretStr(TEST_PLAID_TOKEN_KEY))
     )
@@ -81,19 +90,46 @@ def sync_linked_item(
         assert secrets.access_token_enc is not None
         return PlaidProvider(plaid, cipher.decrypt(secrets.access_token_enc))
 
+    def sync(now: dt.datetime | None) -> SyncResult:
+        return run_sync(
+            user_id=user.id,
+            item_id=item,
+            sessions=lambda: user_session_for(user.id, bind=db_connection),
+            provider_for=provider_for,
+            now=now,
+        )
+
+    return item, sync
+
+
+def sync_linked_item(
+    plaid: PlaidClient,
+    db_connection: Connection,
+    user: FixtureUser,
+    token: SecretStr,
+    provider_item_id: str,
+) -> tuple[uuid.UUID, SyncResult]:
+    """Store the item for ``user`` and run its first sync, waiting for Plaid."""
+    item, sync = store_linked_item(plaid, db_connection, user, token, provider_item_id)
     for _ in range(READY_ATTEMPTS):
         try:
-            result = run_sync(
-                user_id=user.id,
-                item_id=item,
-                sessions=lambda: user_session_for(user.id, bind=db_connection),
-                provider_for=provider_for,
-            )
+            return item, sync(None)
         except RetryLater:
             time.sleep(READY_WAIT_SECONDS)
-        else:
-            return item, result
     pytest.fail("Plaid never finished preparing the sandbox item")
+
+
+def item_state(db_connection: Connection, user: FixtureUser, item: uuid.UUID) -> tuple[Any, ...]:
+    """The user's transaction count, then the item's cursor and link time."""
+    return tuple(
+        db_connection.execute(
+            text(
+                "SELECT (SELECT count(*) FROM transactions WHERE user_id = :u),"
+                " cursor, created_at FROM sync_items WHERE id = :item"
+            ),
+            {"u": user.id, "item": item},
+        ).one()
+    )
 
 
 def account_kinds(db_connection: Connection, user: FixtureUser) -> dict[str, str]:
@@ -158,5 +194,64 @@ def test_a_named_sandbox_user_links_its_own_data(
         logger.info("user_transactions_dynamic: accounts %s, %d transactions", kinds, transactions)
         assert {"loan", "credit"} & set(kinds.values()), kinds
         assert transactions >= 1
+    finally:
+        plaid.item_remove(token)
+
+
+def test_a_just_linked_item_never_syncs_empty(
+    plaid: PlaidClient, db_connection: Connection, user_a: FixtureUser
+) -> None:
+    """Spec 002 example 14 (issue #213): ``user_good`` has transactions, so its
+    first sync waits for them or brings them, and never succeeds with none."""
+    public_token = plaid.sandbox_public_token_create("ins_109508")
+    token, provider_item_id = plaid.item_public_token_exchange(public_token)
+    try:
+        item, result = sync_linked_item(plaid, db_connection, user_a, token, provider_item_id)
+
+        transactions, cursor, _ = item_state(db_connection, user_a, item)
+        assert (result.outcome, result.added > 0, transactions > 0) == ("synced", True, True)
+        assert cursor
+    finally:
+        plaid.item_remove(token)
+
+
+# A user_custom configuration: one checking account with no transactions.
+EMPTY_ACCOUNT = json.dumps(
+    {
+        "override_accounts": [
+            {
+                "type": "depository",
+                "subtype": "checking",
+                "starting_balance": 100,
+                "meta": {"name": "Empty Checking"},
+                "transactions": [],
+            }
+        ]
+    }
+)
+
+
+def test_an_item_with_no_transactions_syncs_its_accounts(
+    plaid: PlaidClient, db_connection: Connection, user_a: FixtureUser
+) -> None:
+    """Spec 002 rule 11a: Plaid never sends a cursor for an item with no
+    transactions, so its sync waits while the item is new, then goes on."""
+    public_token = plaid.sandbox_public_token_create(
+        "ins_109508", username="user_custom", password=SecretStr(EMPTY_ACCOUNT)
+    )
+    token, provider_item_id = plaid.item_public_token_exchange(public_token)
+    try:
+        item, sync = store_linked_item(plaid, db_connection, user_a, token, provider_item_id)
+        # Well past the seconds a sandbox item with rows takes to get them.
+        time.sleep(15)
+        with pytest.raises(RetryLater):
+            sync(None)
+
+        _, _, linked_at = item_state(db_connection, user_a, item)
+        result = sync(linked_at + dt.timedelta(minutes=5))
+
+        assert (result.outcome, result.accounts, result.added) == ("synced", 1, 0)
+        assert item_state(db_connection, user_a, item)[:2] == (0, None)
+        assert account_kinds(db_connection, user_a) == {"Empty Checking": "checking"}
     finally:
         plaid.item_remove(token)

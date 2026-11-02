@@ -624,6 +624,27 @@ Every entry has a dated heading and these fields, in this order. A field that do
 
 **Fix:** As above, in the subagent's branch. Live eval cost: 300.73 cents over five runs of the two suites (v3 before, three v4 drafts, one confirmation), each capped at 300.
 
+## 2026-11-01: a first Plaid sync could finish with no transactions (issue 213)
+
+**Task:** On PR 211's first CI run the e2e user's `sync.initial` succeeded two seconds after the link, with no retry, and every month showed no transactions, so `spending.spec.ts` failed with "No period in the picker has transactions". The alpha user's link in the same run waited out a not-ready retry and got its rows. Make the sync say what Plaid answered, reproduce against the real sandbox, and fix the root cause in the sync.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Confirm or refute the hypothesis (the first page came back empty under a status other than `NOT_READY`) against Plaid's documented semantics and the live sandbox, spec 002 first, failing tests first, and never let a genuinely empty account loop forever.
+
+**What it produced:** A probe that linked `user_good` nine times and called `/transactions/sync` every 1.5 s. Every link started `NOT_READY` with an empty cursor; 8 of 9 then answered `INITIAL_UPDATE_COMPLETE` and often `HISTORICAL_UPDATE_COMPLETE` with no rows and `next_cursor: ""` for a few seconds before the rows came. Plaid documents the empty cursor as "transactions are not yet available"; the provider looked only at `NOT_READY`, so a sync in that window stored `""` as a finished first sync. A `user_custom` item with no transactions answered `HISTORICAL_UPDATE_COMPLETE` with an empty cursor for 75 s, twice, so the empty cursor alone cannot tell "not yet" from "never". Spec 002 rules 9a (an empty cursor raises `TransactionsNotReady`, whatever the status), 11a (`run_sync` retries 120 s while the item is under 5 minutes old, then syncs its accounts without transactions and leaves the cursor null; with rule 34's delays the fourth of five attempts is past the window) and 11b (a `transactions page` log line per page with its counts and Plaid's status, and a `transactions not available yet` line). Unit tests over every status and a recorded not-ready answer, pipeline tests for both sides of the window and the log lines, two live sandbox tests (`user_good` synced every second; the empty `user_custom` item), and the same readiness check in `scripts/record_plaid_fixtures.py`.
+
+**What was wrong:**
+- The first live reproduction attempt passed four times in a row: the existing sandbox test retried every 5 s, which usually skipped over the empty window. Syncing every second made it fail (`synced` with `added=0`) in 3 of 6 runs.
+- Waiting for `HISTORICAL_UPDATE_COMPLETE` was considered and rejected: the sandbox reports it before the rows are queryable, and even with rows the first page held only the last 30 days in 5 of 6 links (the two months before arrived on the next call, sometimes under `HISTORICAL_UPDATE_COMPLETE`). The status decides nothing; it is logged.
+- Retrying on every empty cursor would have killed the job of an account with no transactions after five attempts with nothing written, accounts included; the item-age window bounds it.
+- The fixture recorder had the same bug (it waited only for `NOT_READY` to pass); its test checked file names only and passed with the bug, so it now checks the recorded cursor too.
+- The pre-commit mypy hook refuses a commit whose tests import a name that does not exist yet, so the failing tests and the fix went in one commit; the failure before the fix was run and recorded instead.
+
+**How it was caught:** The CI run's `api.log` (no retry for the e2e user) and page snapshot (eight accounts, $0.00 everywhere); the probe's JSON lines; the live sandbox test failing before the fix and passing 12 of 12 after it.
+
+**Fix:** As above, in the subagent's branch.
+
 ## 2026-11-01: the decision steps' pay schedule, save words and plain language (issues 198, 203, 206, 207, 209)
 
 **Task:** Usability fixes on the four decision steps and the plan details form: one pay schedule everywhere (the e2e account's stub said twice a month, 24 paychecks, while the plan details said every two weeks, 26), plain save words with one primary action, the W-4 behind one question, every health plan term explained, and the wording of every string the steps show, the API's calculator messages included.
