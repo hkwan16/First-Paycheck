@@ -25,14 +25,14 @@ describe('SampleScreen check-in screens', () => {
     render(<SampleScreen screen="check-in" />);
     expect(screen.getByRole('heading', { level: 1, name: 'November check-in' })).toBeVisible();
     const findings = screen.getByRole('region', { name: 'What changed' });
-    expect(within(findings).getAllByRole('button', { name: 'Done' })).toHaveLength(9);
-    expect(within(findings).getByText('0 of 9 handled')).toBeInTheDocument();
+    expect(within(findings).getAllByRole('button', { name: 'Mark as done' })).toHaveLength(7);
+    expect(within(findings).getByText('0 of 7 handled')).toBeInTheDocument();
     const nav = screen.getByRole('link', { name: 'Monthly check-in' });
     expect(nav).toHaveAttribute('aria-current', 'page');
     expect(nav).toHaveAttribute('href', `/check-in/${NOVEMBER_ID}`);
     const netWorth = screen.getByRole('region', { name: 'Net worth' });
     expect(within(netWorth).getByText('As of Nov 15, 2026')).toBeInTheDocument();
-    expect(within(netWorth).getByRole('table', { name: 'Holdings' })).toBeInTheDocument();
+    expect(within(netWorth).getByRole('table', { name: 'Investments' })).toBeInTheDocument();
     const coming = screen.getByRole('region', { name: 'Coming up' });
     expect(within(coming).getAllByRole('listitem')).toHaveLength(3);
     expect(requests).toEqual([]);
@@ -42,8 +42,8 @@ describe('SampleScreen check-in screens', () => {
     const requests = countRequests();
     render(<SampleScreen screen="check-in-complete" />);
     const findings = screen.getByRole('region', { name: 'What changed' });
-    expect(within(findings).getByText('9 of 9 handled')).toBeInTheDocument();
-    expect(within(findings).getAllByRole('button', { name: 'Undo' })).toHaveLength(9);
+    expect(within(findings).getByText('7 of 7 handled')).toBeInTheDocument();
+    expect(within(findings).getAllByRole('button', { name: 'Undo' })).toHaveLength(7);
     expect(requests).toEqual([]);
   });
 

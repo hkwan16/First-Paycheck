@@ -6,7 +6,9 @@ fixture supplies). Finders compare the cents they are handed and do the date
 arithmetic; every amount they report comes from ``calc/checkin.py``.
 
 A finding's ``key`` names the event it reports (rule 12): the engine uses it
-to update a finding it already wrote and to report an event only once.
+to update a finding it already wrote and to report an event only once. A pay
+stub finding names the paycheck (``StubFact.paycheck_id``), never the stub's
+row, so a newer copy of the same paycheck is the same event (issue 194).
 """
 
 from __future__ import annotations
@@ -37,7 +39,7 @@ __all__ = [
     "FINDERS",
     "Affects",
     "BalanceFact",
-    "DeductionChangePayload",
+    "DeductionLine",
     "ElectionMismatchPayload",
     "EventFact",
     "Facts",
@@ -54,7 +56,6 @@ __all__ = [
     "UpcomingDeadlinePayload",
     "all_findings",
     "calendar_affects",
-    "deduction_change",
     "election_mismatch",
     "goal_off_pace",
     "months_elapsed",
@@ -82,9 +83,11 @@ class _Fact(BaseModel):
 
 
 class StubFact(_Fact):
-    """A confirmed pay stub (spec 001 ``pay_stubs``)."""
+    """A current confirmed pay stub (spec 001 ``pay_stubs``)."""
 
     id: uuid.UUID
+    # The first confirmed copy of this paycheck (spec 015, Inputs): what keys name.
+    paycheck_id: uuid.UUID
     pay_date: dt.date
     period_start: dt.date
     period_end: dt.date
@@ -228,30 +231,32 @@ class RecurringPayload(_Payload):
     user_status: RecurringUserStatus | None
 
 
-class _StubPair(_Payload):
+class DeductionLine(BaseModel):
+    """One deduction line that differs between the two stubs (rule 6)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    line: LineKey
+    label: str
+    amount_cents: int
+    previous_cents: int
+    change_cents: int
+
+
+class PayChangePayload(_Payload):
+    kind: Literal["pay_change"] = "pay_change"
     pay_stub_id: uuid.UUID
     pay_date: dt.date
     previous_pay_stub_id: uuid.UUID
     previous_pay_date: dt.date
-
-
-class PayChangePayload(_StubPair):
-    kind: Literal["pay_change"] = "pay_change"
     gross_cents: int
     previous_gross_cents: int
     gross_change_cents: int
     net_cents: int
     previous_net_cents: int
     net_change_cents: int
-
-
-class DeductionChangePayload(_StubPair):
-    kind: Literal["deduction_change"] = "deduction_change"
-    line: LineKey
-    label: str
-    amount_cents: int
-    previous_cents: int
-    change_cents: int
+    # The changed lines, in rule 6's order; empty when only gross changed.
+    deductions: list[DeductionLine]
 
 
 class UpcomingDeadlinePayload(_Payload):
@@ -268,7 +273,6 @@ FindingPayload = Annotated[
     | GoalOffPacePayload
     | RecurringPayload
     | PayChangePayload
-    | DeductionChangePayload
     | UpcomingDeadlinePayload,
     Field(discriminator="kind"),
 ]
@@ -311,7 +315,7 @@ def election_mismatch(facts: Facts) -> list[Finding]:
             found.append(
                 Finding(
                     severity=FindingSeverity.ALERT,
-                    key=f"election_mismatch:k401_match:{k401.decision_id}:{stub.id}",
+                    key=f"election_mismatch:k401_match:{k401.decision_id}:{stub.paycheck_id}",
                     decision_id=k401.decision_id,
                     payload=ElectionMismatchPayload(
                         affects="k401_match",
@@ -334,7 +338,7 @@ def election_mismatch(facts: Facts) -> list[Finding]:
             found.append(
                 Finding(
                     severity=FindingSeverity.WARNING,
-                    key=f"election_mismatch:health_plans:{health.decision_id}:{stub.id}",
+                    key=f"election_mismatch:health_plans:{health.decision_id}:{stub.paycheck_id}",
                     decision_id=health.decision_id,
                     payload=ElectionMismatchPayload(
                         affects="health_plans",
@@ -466,25 +470,41 @@ def recurring_stopped(facts: Facts) -> list[Finding]:
     ]
 
 
-def _pair(facts: Facts) -> tuple[StubFact, StubFact] | None:
-    if len(facts.pay_stubs) < 2:
-        return None
-    return facts.pay_stubs[0], facts.pay_stubs[1]
+# Rule 6: the deduction lines a paycheck change compares, in order. Social
+# Security and Medicare are fixed shares of gross, which it compares already.
+DEDUCTION_LINES: tuple[LineKey, ...] = (
+    "federal_withholding",
+    "state_tax",
+    "retirement_contribution",
+    "medical_premium",
+    "other_deductions",
+)
+_LABELS = {spec.key: spec.label for spec in LINES}
 
 
 def pay_change(facts: Facts) -> list[Finding]:
-    """Rule 5: gross pay differs between the two newest stubs."""
-    pair = _pair(facts)
-    if pair is None:
+    """Rules 5-6: the newest stub against the one before it, as one finding."""
+    if len(facts.pay_stubs) < 2:
         return []
-    newest, previous = pair
+    newest, previous = facts.pay_stubs[0], facts.pay_stubs[1]
+    deductions = [
+        DeductionLine(
+            line=line,
+            label=_LABELS[line],
+            amount_cents=newest.line(line),
+            previous_cents=previous.line(line),
+            change_cents=change_cents(newest.line(line), previous.line(line)),
+        )
+        for line in DEDUCTION_LINES
+        if newest.line(line) != previous.line(line)
+    ]
     gross_change = change_cents(newest.gross_cents, previous.gross_cents)
-    if gross_change == 0:
+    if gross_change == 0 and not deductions:
         return []
     return [
         Finding(
             severity=FindingSeverity.WARNING if gross_change < 0 else FindingSeverity.INFO,
-            key=f"pay_change:{newest.id}",
+            key=f"pay_change:{newest.paycheck_id}",
             decision_id=facts.w4_decision_id,
             payload=PayChangePayload(
                 affects="w4",
@@ -498,63 +518,10 @@ def pay_change(facts: Facts) -> list[Finding]:
                 net_cents=newest.net_cents,
                 previous_net_cents=previous.net_cents,
                 net_change_cents=change_cents(newest.net_cents, previous.net_cents),
+                deductions=deductions,
             ),
         )
     ]
-
-
-# Rule 6: the lines a deduction change reports, and what each affects.
-DEDUCTION_LINES: tuple[tuple[LineKey, Affects | None], ...] = (
-    ("federal_withholding", "w4"),
-    ("state_tax", None),
-    ("retirement_contribution", "k401_match"),
-    ("medical_premium", "health_plans"),
-    ("other_deductions", None),
-)
-_LABELS = {spec.key: spec.label for spec in LINES}
-
-
-def _decision_for(facts: Facts, affects: Affects | None) -> uuid.UUID | None:
-    if affects == "k401_match":
-        return facts.k401.decision_id if facts.k401 else None
-    if affects == "health_plans":
-        return facts.health.decision_id if facts.health else None
-    if affects == "w4":
-        return facts.w4_decision_id
-    return None
-
-
-def deduction_change(facts: Facts) -> list[Finding]:
-    """Rule 6: one finding per elected or withheld line that changed."""
-    pair = _pair(facts)
-    if pair is None:
-        return []
-    newest, previous = pair
-    found: list[Finding] = []
-    for line, affects in DEDUCTION_LINES:
-        amount, before = newest.line(line), previous.line(line)
-        if amount == before:
-            continue
-        found.append(
-            Finding(
-                severity=FindingSeverity.INFO,
-                key=f"deduction_change:{newest.id}:{line}",
-                decision_id=_decision_for(facts, affects),
-                payload=DeductionChangePayload(
-                    affects=affects,
-                    pay_stub_id=newest.id,
-                    pay_date=newest.pay_date,
-                    previous_pay_stub_id=previous.id,
-                    previous_pay_date=previous.pay_date,
-                    line=line,
-                    label=_LABELS[line],
-                    amount_cents=amount,
-                    previous_cents=before,
-                    change_cents=change_cents(amount, before),
-                ),
-            )
-        )
-    return found
 
 
 def calendar_affects(kind: CalendarKind) -> Affects:
@@ -610,7 +577,6 @@ FINDERS: tuple[Finder, ...] = (
     recurring_changed,
     recurring_stopped,
     pay_change,
-    deduction_change,
     upcoming_deadline,
 )
 

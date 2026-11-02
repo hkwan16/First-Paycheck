@@ -75,7 +75,7 @@ export function CheckInScreen({ checkInId }: { checkInId: string }) {
     <>
       <PageTitle
         title={checkInTitle(data.period)}
-        lead={`Compared with your plan on ${formatDate(data.last_run_at)}. Each finding names the part of your plan it affects; mark it done once you have dealt with it.`}
+        lead={`We compared your pay stubs and spending with your plan on ${formatDate(data.last_run_at)}. Mark each finding done once you have dealt with it.`}
         aside={
           offered ? (
             <div className="flex flex-wrap gap-2">
@@ -92,7 +92,7 @@ export function CheckInScreen({ checkInId }: { checkInId: string }) {
         <FindingsCard checkIn={data} />
       </CardErrorBoundary>
       <div className="flex flex-wrap items-start gap-6">
-        <CardErrorBoundary title="Cash flow against the plan" className="flex-[1_1_440px]">
+        <CardErrorBoundary title="Cash flow against your plan" className="flex-[1_1_440px]">
           <PlanLinesCard cashFlow={data.cash_flow} className="flex-[1_1_440px]" />
         </CardErrorBoundary>
         <CardErrorBoundary title="Net worth" className="flex-[1_1_320px]">

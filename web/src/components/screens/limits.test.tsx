@@ -297,9 +297,9 @@ const SURFACES: readonly Surface[] = [
     ui: () => <CheckInScreen checkInId={NOVEMBER_ID} />,
     act: async (user) => {
       const row = await screen.findByRole('listitem', {
-        name: 'Your 401(k) contribution is 2%, not the 4% you chose.',
+        name: 'Your pay stub puts 2% in your 401(k). You chose 4%.',
       });
-      await user.click(within(row).getByRole('button', { name: 'Done' }));
+      await user.click(within(row).getByRole('button', { name: 'Mark as done' }));
     },
     lead: 'It is back to how it was.',
   },

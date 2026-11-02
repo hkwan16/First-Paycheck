@@ -5,8 +5,11 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from collections.abc import Callable
+from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import Connection, text
 
 from app.db import user_session_for
@@ -18,13 +21,40 @@ from jobs.worker import Worker
 from tests.conftest import FixtureUser
 from tests.support.checkin_jobs import check_ins, checkin_jobs, findings, job_row, run_all
 from tests.support.factories import make_check_in, make_finding, make_snapshot
-from tests.support.november import NOW, PERIOD, november
+from tests.support.november import NOW, PERIOD, S1, S2, november
+from tests.support.pay_stub_copies import (
+    confirm,
+    confirm_stub,
+    document_of,
+    proposed_document,
+    replace,
+)
+
+Client = Callable[[FixtureUser], TestClient]
 
 
 @pytest.fixture
 def empty_queue(db_connection: Connection) -> Connection:
     db_connection.execute(text("DELETE FROM jobs"))
     return db_connection
+
+
+def as_sent(stub: dict[str, Any]) -> dict[str, Any]:
+    """A November stub as the Confirm screen sends it."""
+    return {
+        name: value.isoformat() if isinstance(value, dt.date) else value
+        for name, value in stub.items()
+    }
+
+
+def mark_done(connection: Connection, finding_id: uuid.UUID) -> None:
+    connection.execute(
+        text(
+            "UPDATE check_in_findings SET user_action = 'done', user_action_at = now()"
+            " WHERE id = :id"
+        ),
+        {"id": finding_id},
+    )
 
 
 def queue_check_in(
@@ -98,7 +128,7 @@ def test_monthly_job_builds_the_check_in(empty_queue: Connection, user_a: Fixtur
     assert result["result"] == {
         "outcome": "created",
         "check_in_id": str(made[0]["id"]),
-        "inserted": 6,
+        "inserted": 4,
         "updated": 0,
         "retracted": 0,
         "dropped": 0,
@@ -106,12 +136,18 @@ def test_monthly_job_builds_the_check_in(empty_queue: Connection, user_a: Fixtur
     }
     found = findings(empty_queue, user_a)
     assert sorted((f["kind"], f["severity"]) for f in found) == [
-        ("deduction_change", "info"),
-        ("deduction_change", "info"),
-        ("deduction_change", "info"),
         ("election_mismatch", "alert"),
         ("goal_off_pace", "warning"),
+        ("pay_change", "info"),
         ("recurring_new", "warning"),
+    ]
+    # Issue 202: S2's three changed lines are one finding.
+    paycheck = next(f for f in found if f["kind"] == "pay_change")
+    assert paycheck["key"] == f"pay_change:{seeded.stubs[1]}"
+    assert [line["line"] for line in paycheck["payload"]["deductions"]] == [
+        "federal_withholding",
+        "retirement_contribution",
+        "medical_premium",
     ]
     election = next(f for f in found if f["kind"] == "election_mismatch")
     assert election["payload"]["expected_cents"] == 10_833
@@ -135,7 +171,7 @@ def test_rerunning_changes_nothing(empty_queue: Connection, user_a: FixtureUser)
 
     assert {f["id"] for f in findings(empty_queue, user_a)} == before
     result = job_row(empty_queue, again)["result"]
-    assert (result["outcome"], result["inserted"], result["updated"]) == ("refreshed", 0, 5)
+    assert (result["outcome"], result["inserted"], result["updated"]) == ("refreshed", 0, 3)
     assert len(check_ins(empty_queue, user_a)) == 1
 
 
@@ -156,13 +192,7 @@ def test_refresh_keeps_actions_and_retracts_cleared_conditions(
     queue_check_in(empty_queue, user_a)
     run_all(empty_queue)
     election = next(f for f in findings(empty_queue, user_a) if f["kind"] == "election_mismatch")
-    empty_queue.execute(
-        text(
-            "UPDATE check_in_findings SET user_action = 'done', user_action_at = now()"
-            " WHERE id = :id"
-        ),
-        {"id": election["id"]},
-    )
+    mark_done(empty_queue, election["id"])
     # The goal catches up: 290,000 on 2026-11-16 is on pace.
     make_snapshot(
         empty_queue,
@@ -180,6 +210,52 @@ def test_refresh_keeps_actions_and_retracts_cleared_conditions(
     assert after["election_mismatch"]["id"] == election["id"]
     assert after["election_mismatch"]["user_action"] == FindingAction.DONE.value
     assert "recurring_new" in after
+
+
+def test_a_newer_copy_is_the_same_paycheck(
+    empty_queue: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Spec 015 rule 12, issue 194: confirming S2 again updates its findings in place."""
+    seeded = november(empty_queue, user_a)
+    queue_check_in(empty_queue, user_a)
+    run_all(empty_queue)
+    before = findings(empty_queue, user_a)
+    paycheck = next(f for f in before if f["kind"] == "pay_change")
+    mark_done(empty_queue, paycheck["id"])
+
+    copy = confirm_stub(client_as(user_a), empty_queue, user_a, **as_sent(S2))
+    again = queue_check_in(empty_queue, user_a, trigger="sync")
+    run_all(empty_queue)
+
+    result = job_row(empty_queue, again)["result"]
+    assert (result["inserted"], result["retracted"]) == (0, 0)
+    after = {f["kind"]: f for f in findings(empty_queue, user_a)}
+    assert {f["id"] for f in after.values()} == {f["id"] for f in before}
+    assert after["pay_change"]["key"] == f"pay_change:{seeded.stubs[1]}"
+    assert after["pay_change"]["payload"]["pay_stub_id"] == str(copy)
+    assert after["pay_change"]["user_action"] == FindingAction.DONE.value
+    assert after["election_mismatch"]["key"].endswith(f":{seeded.stubs[1]}")
+    assert after["election_mismatch"]["payload"]["pay_stub_id"] == str(copy)
+
+
+def test_a_corrected_stub_retracts_the_change_it_made(
+    empty_queue: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Spec 015 rule 10.4: S2 was read wrong; its correction matches S1 line for line."""
+    seeded = november(empty_queue, user_a)
+    queue_check_in(empty_queue, user_a)
+    run_all(empty_queue)
+    assert any(f["kind"] == "pay_change" for f in findings(empty_queue, user_a))
+
+    correction = proposed_document(empty_queue, user_a)
+    replace(empty_queue, user_a, document_of(empty_queue, seeded.stubs[1]), correction)
+    lines = {name: value for name, value in S1.items() if name.endswith("_cents")}
+    confirm(client_as(user_a), correction, **as_sent({**S2, **lines}))
+    again = queue_check_in(empty_queue, user_a, trigger="sync")
+    run_all(empty_queue)
+
+    assert job_row(empty_queue, again)["result"]["retracted"] == 1
+    assert "pay_change" not in {f["kind"] for f in findings(empty_queue, user_a)}
 
 
 def test_a_finding_reported_last_month_is_not_repeated(
@@ -273,9 +349,18 @@ def test_a_finding_of_another_check_in_does_not_count_as_this_ones(
     empty_queue: Connection, user_a: FixtureUser
 ) -> None:
     """A key on last month's check-in is reported elsewhere; on this one it is updated."""
-    november(empty_queue, user_a)
+    seeded = november(empty_queue, user_a)
     current = make_check_in(empty_queue, user_a.id)
-    stale = make_finding(empty_queue, user_a.id, current, key="pay_change:stale")
+    stale = make_finding(
+        empty_queue,
+        user_a.id,
+        current,
+        key="pay_change:stale",
+        payload={
+            "pay_stub_id": str(seeded.stubs[1]),
+            "previous_pay_stub_id": str(seeded.stubs[0]),
+        },
+    )
     queue_check_in(empty_queue, user_a, trigger="sync")
     run_all(empty_queue)
     keys = {f["key"] for f in findings(empty_queue, user_a)}

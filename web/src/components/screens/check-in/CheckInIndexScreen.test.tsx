@@ -28,8 +28,8 @@ describe('CheckInIndexScreen', () => {
       'href',
       `/check-in/${NOVEMBER_ID}`,
     );
-    expect(items[0]).toHaveTextContent('9 findings');
-    expect(items[0]).toHaveTextContent('0 of 9 handled');
+    expect(items[0]).toHaveTextContent('7 findings');
+    expect(items[0]).toHaveTextContent('0 of 7 handled');
     expect(items[0]).toHaveTextContent('Open');
 
     expect(within(items[1]!).getByRole('link', { name: 'October 2026' })).toHaveAttribute(
@@ -100,7 +100,7 @@ describe('Check in now on the list', () => {
     await poll();
     await poll();
 
-    expect(await said('This month’s check-in is ready.')).toBeInTheDocument();
+    expect(await said('This month’s check-in is ready with 7 findings.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open it' })).toHaveAttribute(
       'href',
       `/check-in/${NOVEMBER_ID}`,
@@ -111,11 +111,11 @@ describe('Check in now on the list', () => {
     expect(screen.getByRole('button', { name: 'Check in now' })).not.toHaveAttribute('aria-busy');
   });
 
-  it('says this month’s open check-in is up to date after it runs again', async () => {
+  it('says what a run of this month’s open check-in found', async () => {
     const { user } = renderList();
     await screen.findByRole('list', { name: 'Check-ins' });
     await user.click(screen.getByRole('button', { name: 'Check in now' }));
-    expect(await said('This month’s check-in is up to date.')).toBeInTheDocument();
+    expect(await said('Checked this month again. No new findings.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open it' })).toHaveAttribute(
       'href',
       `/check-in/${NOVEMBER_ID}`,
@@ -128,7 +128,7 @@ describe('Check in now on the list', () => {
     await screen.findByRole('list', { name: 'Check-ins' });
     await user.click(screen.getByRole('button', { name: 'Check in now' }));
     expect(
-      await said('This month’s check-in is already complete, so nothing was changed.'),
+      await said('This month’s check-in is already complete, so nothing changed.'),
     ).toBeInTheDocument();
   });
 
@@ -141,7 +141,7 @@ describe('Check in now on the list', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Checking in did not finish. Nothing was changed.');
     await user.click(within(alert).getByRole('button', { name: 'Try again' }));
-    expect(await said('This month’s check-in is up to date.')).toBeInTheDocument();
+    expect(await said('Checked this month again. No new findings.')).toBeInTheDocument();
     expect(checkinDb.jobs).toEqual([checkInJobId(1), checkInJobId(2)]);
   });
 

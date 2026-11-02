@@ -17,7 +17,9 @@ import { server } from '@/test/msw/server';
 import { act, renderWithProviders as render, screen, waitFor, within } from '@/test/render';
 import { CheckInScreen } from './CheckInScreen';
 
-const ELECTION_TITLE = 'Your 401(k) contribution is 2%, not the 4% you chose.';
+const ELECTION_TITLE = 'Your pay stub puts 2% in your 401(k). You chose 4%.';
+const PAYCHECK_TITLE = 'Your Nov 15, 2026 paycheck changed.';
+const EQUINOX_TITLE = 'Equinox looks like a monthly charge of $185.00.';
 
 /** PATCH bodies sent to findings. */
 function patches() {
@@ -46,28 +48,45 @@ describe('CheckInScreen', () => {
     const items = within(within(findings).getByRole('list', { name: 'Findings' })).getAllByRole(
       'listitem',
     );
-    expect(items.map((item) => item.getAttribute('aria-label') ?? item.textContent)).toHaveLength(
-      9,
-    );
+    expect(items).toHaveLength(7);
     expect(within(items[0]!).getByText(ELECTION_TITLE)).toBeInTheDocument();
-    expect(within(items[0]!).getByText('Election not applied')).toBeInTheDocument();
+    expect(within(items[0]!).getByText('Differs from your plan')).toBeInTheDocument();
+    // Issue 202: one stub's changed lines are one item, with its lines inside.
+    expect(within(items[6]!).getByText(PAYCHECK_TITLE)).toBeVisible();
+    expect(within(items[6]!).getByText('Paycheck changed')).toBeVisible();
+    expect(within(items[6]!).getByRole('row', { name: /^Health premiums/ })).toHaveTextContent(
+      '-$31.25',
+    );
+    expect(handledBadge(findings)).toHaveTextContent('0 of 7 handled');
     expect(
-      within(items[8]!).getByText('Health premiums went from $62.50 to $31.25.'),
-    ).toBeVisible();
-    expect(handledBadge(findings)).toHaveTextContent('0 of 9 handled');
-    expect(screen.getByText(/Compared with your plan on Nov 16, 2026/)).toBeInTheDocument();
+      screen.getByText(/^We compared your pay stubs and spending with your plan on Nov 16, 2026\./),
+    ).toBeInTheDocument();
   });
 
   it('links each finding to the part of the plan it affects', async () => {
     await open();
     expect(
-      within(finding(ELECTION_TITLE)).getByRole('link', { name: 'Affects: 401(k) match' }),
+      within(finding(ELECTION_TITLE)).getByRole('link', { name: 'Review your 401(k)' }),
     ).toHaveAttribute('href', '/setup/decisions/401k');
     expect(
-      within(finding('Equinox, $185.00, looks monthly.')).getByRole('link', {
-        name: 'Affects: Spending map',
-      }),
+      within(finding(EQUINOX_TITLE)).getByRole('link', { name: 'See your spending' }),
     ).toHaveAttribute('href', '/setup/spending');
+    expect(
+      within(finding(PAYCHECK_TITLE)).getByRole('link', { name: 'Review your W-4' }),
+    ).toHaveAttribute('href', '/setup/decisions/w4');
+  });
+
+  it('offers Mark as done and Dismiss at full size, neither as the primary action (issue 202)', async () => {
+    const { findings } = await open();
+    const marks = within(findings).getAllByRole('button', { name: 'Mark as done' });
+    expect(marks).toHaveLength(7);
+    for (const button of [
+      ...marks,
+      ...within(findings).getAllByRole('button', { name: 'Dismiss' }),
+    ]) {
+      expect(button).toHaveClass('min-h-11');
+      expect(button).not.toHaveClass('bg-blue');
+    }
   });
 
   it('marks a finding done at once, moves focus to Undo, then undoes it', async () => {
@@ -75,26 +94,26 @@ describe('CheckInScreen', () => {
     const { user, findings } = await open();
     const row = finding(ELECTION_TITLE);
 
-    await user.click(within(row).getByRole('button', { name: 'Done' }));
+    await user.click(within(row).getByRole('button', { name: 'Mark as done' }));
     const undo = within(row).getByRole('button', { name: 'Undo' });
     expect(undo).toHaveFocus();
     expect(within(row).getByText('Done', { selector: 'span' })).toBeInTheDocument();
     expect(within(row).queryByRole('button', { name: 'Dismiss' })).toBeNull();
-    expect(handledBadge(findings)).toHaveTextContent('1 of 9 handled');
+    expect(handledBadge(findings)).toHaveTextContent('1 of 7 handled');
     expect(within(findings).getByRole('status')).toHaveTextContent(
       `Marked done: ${ELECTION_TITLE}`,
     );
 
     await user.click(undo);
-    expect(within(row).getByRole('button', { name: 'Done' })).toHaveFocus();
-    expect(handledBadge(findings)).toHaveTextContent('0 of 9 handled');
+    expect(within(row).getByRole('button', { name: 'Mark as done' })).toHaveFocus();
+    expect(handledBadge(findings)).toHaveTextContent('0 of 7 handled');
     await waitFor(() => expect(sent).toEqual([{ user_action: 'done' }, { user_action: null }]));
   });
 
   it('dismisses a finding', async () => {
     const sent = patches();
     const { user } = await open();
-    const row = finding('Equinox, $185.00, looks monthly.');
+    const row = finding(EQUINOX_TITLE);
     await user.click(within(row).getByRole('button', { name: 'Dismiss' }));
     expect(within(row).getByText('Dismissed')).toBeInTheDocument();
     await waitFor(() => expect(sent).toEqual([{ user_action: 'dismissed' }]));
@@ -113,14 +132,16 @@ describe('CheckInScreen', () => {
     );
     const { user, findings } = await open();
     const row = finding(ELECTION_TITLE);
-    await user.click(within(row).getByRole('button', { name: 'Done' }));
-    expect(handledBadge(findings)).toHaveTextContent('1 of 9 handled');
+    await user.click(within(row).getByRole('button', { name: 'Mark as done' }));
+    expect(handledBadge(findings)).toHaveTextContent('1 of 7 handled');
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       `Could not save “${ELECTION_TITLE}”. It is back to how it was. Something went wrong.`,
     );
-    await waitFor(() => expect(within(row).getByRole('button', { name: 'Done' })).toHaveFocus());
-    expect(handledBadge(findings)).toHaveTextContent('0 of 9 handled');
+    await waitFor(() =>
+      expect(within(row).getByRole('button', { name: 'Mark as done' })).toHaveFocus(),
+    );
+    expect(handledBadge(findings)).toHaveTextContent('0 of 7 handled');
   });
 
   it('completes the check-in when the last finding is handled', async () => {
@@ -130,26 +151,26 @@ describe('CheckInScreen', () => {
       ...done,
       status: 'open',
       completed_at: null,
-      handled_count: 8,
+      handled_count: 6,
       findings: done.findings.map((f) =>
         f.id === last.id ? { ...f, user_action: null, user_action_at: null } : f,
       ),
     };
     const { user, findings } = await open();
-    const row = finding('Health premiums went from $62.50 to $31.25.');
-    await user.click(within(row).getByRole('button', { name: 'Done' }));
-    expect(handledBadge(findings)).toHaveTextContent('9 of 9 handled');
-    expect(within(findings).getByText(/Every finding is handled/)).toBeInTheDocument();
+    const row = finding(PAYCHECK_TITLE);
+    await user.click(within(row).getByRole('button', { name: 'Mark as done' }));
+    expect(handledBadge(findings)).toHaveTextContent('7 of 7 handled');
+    expect(within(findings).getByText(/Everything here is handled/)).toBeInTheDocument();
   });
 
   it('shows a completed check-in with every finding handled and each one undoable', async () => {
     checkinDb.checkIns[0] = completedNovemberCheckIn();
     const { findings } = await open();
-    expect(handledBadge(findings)).toHaveTextContent('9 of 9 handled');
+    expect(handledBadge(findings)).toHaveTextContent('7 of 7 handled');
     expect(
-      within(findings).getByText(/Every finding is handled\. Completed Nov 16, 2026\./),
+      within(findings).getByText(/Everything here is handled\. Completed Nov 16, 2026\./),
     ).toBeInTheDocument();
-    expect(within(findings).getAllByRole('button', { name: 'Undo' })).toHaveLength(9);
+    expect(within(findings).getAllByRole('button', { name: 'Undo' })).toHaveLength(7);
     expect(within(findings).getAllByText('Dismissed')).toHaveLength(1);
   });
 
@@ -162,7 +183,7 @@ describe('CheckInScreen', () => {
   it('shows the month’s cash flow next to the plan, from the API’s lines', async () => {
     await open();
     const card = await screen.findByRole('region', {
-      name: 'November cash flow against the plan',
+      name: 'November cash flow against your plan',
     });
     expect(within(card).getByText('November 1 to 16 · 1 pay stub')).toBeInTheDocument();
     const row = within(card).getByRole('row', { name: /^401\(k\) from pay stubs/ });
@@ -184,7 +205,7 @@ describe('CheckInScreen', () => {
     expect(flexible).not.toHaveTextContent(/(On|Over|Under) plan/);
     expect(within(card).queryByRole('progressbar', { name: 'Flexible against plan' })).toBeNull();
     expect(within(card).getAllByRole('progressbar')).toHaveLength(4);
-    expect(within(card).getByRole('link', { name: 'Open the Spending map' })).toHaveAttribute(
+    expect(within(card).getByRole('link', { name: 'See your spending' })).toHaveAttribute(
       'href',
       '/setup/spending',
     );
@@ -204,7 +225,7 @@ describe('CheckInScreen', () => {
     checkinDb.checkIns[0] = checkIn;
     await open();
     const card = await screen.findByRole('region', {
-      name: 'November cash flow against the plan',
+      name: 'November cash flow against your plan',
     });
     expect(card).toHaveTextContent(
       'Not counted: 165 transactions on loan, investment and retirement accounts. A loan payment counts once, when it leaves checking.',
@@ -215,7 +236,7 @@ describe('CheckInScreen', () => {
   it('says nothing about ledgers when none were left out', async () => {
     await open();
     const card = await screen.findByRole('region', {
-      name: 'November cash flow against the plan',
+      name: 'November cash flow against your plan',
     });
     expect(card).not.toHaveTextContent(/Not counted/);
   });
@@ -224,7 +245,7 @@ describe('CheckInScreen', () => {
     await open();
     const card = await screen.findByRole('region', { name: 'Net worth' });
     expect(await within(card).findByText('As of Nov 15, 2026')).toBeInTheDocument();
-    expect(await within(card).findByRole('table', { name: 'Holdings' })).toBeInTheDocument();
+    expect(await within(card).findByRole('table', { name: 'Investments' })).toBeInTheDocument();
   });
 
   it('lists the dates due from the first of the month to the end of the next', async () => {
@@ -280,18 +301,16 @@ describe('Check in now on a check-in', () => {
       checkinDb.checkIns[0]!.last_run_at = '2026-11-18T09:00:00Z';
     });
     const { user } = await openAt();
-    expect(screen.getByText(/Compared with your plan on Nov 16, 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/with your plan on Nov 16, 2026/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Check in now' }));
     expect(await screen.findByRole('progressbar', { name: 'Checking in' })).toBeInTheDocument();
     await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));
     await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));
 
-    expect(
-      await screen.findByText('Checked again just now. This page is up to date.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Checked again just now. No new findings.')).toBeInTheDocument();
     // The check-in was read again: the date it was compared on is the run's.
-    expect(await screen.findByText(/Compared with your plan on Nov 18, 2026/)).toBeInTheDocument();
+    expect(await screen.findByText(/with your plan on Nov 18, 2026/)).toBeInTheDocument();
     expect(checkinDb.checkIns[0]!.updated_at).toBe(novemberCheckIn().updated_at);
     // It is this check-in, so there is nothing to open.
     expect(screen.queryByRole('link', { name: 'Open it' })).toBeNull();

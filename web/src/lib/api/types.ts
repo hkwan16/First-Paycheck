@@ -119,7 +119,7 @@ export type ElectionMismatchPayload = Schemas['ElectionMismatchPayload'];
 export type GoalOffPacePayload = Schemas['GoalOffPacePayload'];
 export type RecurringPayload = Schemas['RecurringPayload'];
 export type PayChangePayload = Schemas['PayChangePayload'];
-export type DeductionChangePayload = Schemas['DeductionChangePayload'];
+export type DeductionLine = Schemas['DeductionLine'];
 export type UpcomingDeadlinePayload = Schemas['UpcomingDeadlinePayload'];
 /** The part of the plan a finding affects (`payload.affects`). */
 export type FindingAffects = NonNullable<FindingPayload['affects']>;

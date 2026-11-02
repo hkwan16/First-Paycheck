@@ -9,6 +9,7 @@ import {
 import {
   affectsView,
   checkInMonth,
+  checkInNowMessage,
   checkInTitle,
   checkInWindow,
   findingTone,
@@ -47,7 +48,6 @@ describe('KIND_LABELS', () => {
   it('has a label for every finding kind', () => {
     expect(Object.keys(KIND_LABELS).sort()).toEqual(
       [
-        'deduction_change',
         'election_mismatch',
         'goal_off_pace',
         'pay_change',
@@ -63,23 +63,27 @@ describe('KIND_LABELS', () => {
 describe('affectsView', () => {
   it('links each decision to the calculator that re-runs it, with its hue', () => {
     expect(affectsView('k401_match')).toEqual({
-      label: '401(k) match',
+      label: 'Review your 401(k)',
       tone: 'plum',
       href: '/setup/decisions/401k',
     });
     expect(affectsView('health_plans')).toEqual({
-      label: 'Health plan',
+      label: 'Review your health plan',
       tone: 'coral',
       href: '/setup/decisions/health-plan',
     });
     expect(affectsView('emergency_fund')).toEqual({
-      label: 'Emergency fund',
+      label: 'Review your emergency fund',
       tone: 'teal',
       href: '/setup/decisions/emergency-fund',
     });
-    expect(affectsView('w4')).toEqual({ label: 'W-4', tone: 'blue', href: '/setup/decisions/w4' });
+    expect(affectsView('w4')).toEqual({
+      label: 'Review your W-4',
+      tone: 'blue',
+      href: '/setup/decisions/w4',
+    });
     expect(affectsView('spending')).toEqual({
-      label: 'Spending map',
+      label: 'See your spending',
       tone: 'blue',
       href: '/setup/spending',
     });
@@ -89,8 +93,8 @@ describe('affectsView', () => {
 
 describe('handledText', () => {
   it('reads the counts the API (or the optimistic reducer) carries', () => {
-    expect(handledText(novemberCheckIn())).toBe('0 of 9 handled');
-    expect(handledText(completedNovemberCheckIn())).toBe('9 of 9 handled');
+    expect(handledText(novemberCheckIn())).toBe('0 of 7 handled');
+    expect(handledText(completedNovemberCheckIn())).toBe('7 of 7 handled');
   });
 });
 
@@ -198,5 +202,53 @@ describe('checkInWindow', () => {
     expect(checkInWindow('2026-12-01')).toEqual({ from: '2026-12-01', to: '2027-01-31' });
     expect(checkInWindow('2027-01-01')).toEqual({ from: '2027-01-01', to: '2027-02-28' });
     expect(checkInWindow('2028-01-01')).toEqual({ from: '2028-01-01', to: '2028-02-29' });
+  });
+});
+
+describe('checkInNowMessage', () => {
+  const run = (outcome: 'created' | 'refreshed' | 'skipped', inserted = 0, retracted = 0) => ({
+    outcome,
+    checkInId: null,
+    inserted,
+    retracted,
+  });
+
+  it('says what a run on the check-in itself found, never just that it ran (issue 194)', () => {
+    expect(checkInNowMessage(run('refreshed'), 'check-in')).toBe(
+      'Checked again just now. No new findings.',
+    );
+    expect(checkInNowMessage(run('refreshed', 6), 'check-in')).toBe(
+      'Checked again just now. 6 new findings.',
+    );
+    expect(checkInNowMessage(run('refreshed', 0, 1), 'check-in')).toBe(
+      'Checked again just now. 1 finding no longer applies.',
+    );
+    expect(checkInNowMessage(run('refreshed', 1, 2), 'check-in')).toBe(
+      'Checked again just now. 1 new finding. 2 findings no longer apply.',
+    );
+  });
+
+  it('says what a run from the list made or changed', () => {
+    expect(checkInNowMessage(run('created', 7), 'list')).toBe(
+      'This month’s check-in is ready with 7 findings.',
+    );
+    expect(checkInNowMessage(run('created'), 'list')).toBe(
+      'This month’s check-in is ready. Nothing changed against your plan.',
+    );
+    expect(checkInNowMessage(run('refreshed'), 'list')).toBe(
+      'Checked this month again. No new findings.',
+    );
+    expect(checkInNowMessage(run('refreshed', 2), 'list')).toBe(
+      'Checked this month again. 2 new findings.',
+    );
+  });
+
+  it('says a completed month was left as it is, and nothing before a run ends', () => {
+    for (const from of ['list', 'check-in'] as const) {
+      expect(checkInNowMessage(run('skipped'), from)).toBe(
+        'This month’s check-in is already complete, so nothing changed.',
+      );
+      expect(checkInNowMessage(null, from)).toBe('');
+    }
   });
 });

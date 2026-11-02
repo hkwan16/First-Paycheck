@@ -308,7 +308,7 @@ test('records the alpha demo', async ({ browser }, testInfo) => {
     timeout: 30_000,
   });
   await settled(page);
-  await demo.scrollTo(page.getByRole('region', { name: /cash flow against the plan$/ }), 'start');
+  await demo.scrollTo(page.getByRole('region', { name: /cash flow against your plan$/ }), 'start');
   await demo.hold(3500);
 
   await demo.scrollTop();

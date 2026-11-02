@@ -317,7 +317,8 @@ or checked for a phone.
   holdings. `useCheckInNow()` posts `POST /check-ins` (`start()`; 202 `{ job_id, check_in_id }`,
   the waiting job again while one is queued), follows the job with `useJob`, and gives `outcome`
   (`created`, `refreshed`, `skipped`) and `checkInId` from the succeeded job's `result`
-  (`checkInRunOf`; before that, the 202's id, null for a month with no check-in yet). A dead job is
+  (`checkInRunOf`; before that, the 202's id, null for a month with no check-in yet), as `run`:
+  `{ outcome, checkInId, inserted, retracted }`. A dead job is
   `job.isFailed`; `start()` again queues a new run.
 - **The plan** (`hooks/plan.ts`, spec 016): `usePlan()` is `GET /plan`. `useExportPlan()` posts
   `POST /plan/export` (`start()`; the API returns the queued job again while one waits), follows
@@ -366,13 +367,15 @@ or checked for a phone.
   from `fixtures/cashflow.ts` and reset after every test.
 - Check-in routes (`GET /check-ins`, `GET /check-ins/{id}`, `PATCH .../findings/{fid}`,
   `POST /check-ins`, `GET /net-worth`, `GET /holdings`) live in `src/test/msw/checkin-handlers.ts`
-  over `checkinDb`, seeded from `fixtures/checkins.ts` (November open with nine findings, October
+  over `checkinDb`, seeded from `fixtures/checkins.ts` (November open with seven findings, October
   completed) and reset after every test. `GET /calendar` filters `from`/`to` over `db.calendar`.
   `POST /check-ins` works on the month of `checkinDb.now` (November); its n-th job is
   `checkInJobId(n)` in `db.jobs`, and one nothing scripted has already succeeded, having created
   the month's check-in (November's findings), refreshed an open one or skipped a completed one.
   `scriptJob(checkInJobStates(checkInJobId(1), { outcome, check_in_id }), onSucceeded)` before the
   click shows queued, running and succeeded instead (`onSucceeded` writes what the run would).
+  A succeeded job's result carries `inserted` and `retracted` (by default all of November's
+  findings for a created check-in, none otherwise), which the status line reads.
 - Plan routes (`GET /plan`, `GET /plan/calendar.ics`, `POST /plan/export`,
   `GET /plan/export/{job_id}`) live in `src/test/msw/plan-handlers.ts` over `planDb` (`plan`,
   the export job ids handed out), reset after every test. `samplePlan()` (every decision saved;
@@ -731,11 +734,15 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
 - **What changed** (`FindingsCard`, `FindingRow`): findings in the API's order. Each has a
   severity tile (`severityTone`: alert `off`, warning `warning`, info `blue`; neutral once
   handled), its kind, and its text from one small component per payload kind (`FindingText.tsx`),
-  which prints payload fields only, formatted, signs included. "Affects" links to that
-  calculator's step or the Spending map. Done and Dismiss become Undo; focus moves to the button that replaces the
-  one pressed (and back on a rollback), and a polite status line says what changed. The badge
+  which prints payload fields only, formatted, signs included. One paycheck change is one
+  finding (spec 015 rules 5-6, issue 202): `PayChangeText` puts gross pay and every deduction
+  line that moved in one table, in the API's order. The badge beside the kind links to that
+  calculator's step or the Spending map ("Review your W-4", "See your spending"). "Mark as done"
+  and Dismiss are default (not primary) buttons, so a page of findings has no primary button
+  each; they become Undo, focus moves to the button that replaces the one pressed (and back on
+  a rollback), and a polite status line says what changed. The badge
   reads `handled_count` and `finding_count`; a completed check-in shows a confirmed notice.
-- **Cash flow against the plan** (`PlanLinesCard`): `cash_flow.plan` lines as a table. Each
+- **Cash flow against your plan** (`PlanLinesCard`): `cash_flow.plan` lines as a table. Each
   line's `status` (spec 015 rule 19a: `on_plan | over | under`, null without a plan) is the API's;
   `planStatusTone` only decides whether that side matters for the line: `on_plan` is `confirmed`;
   over is a `warning` on spending lines (essentials, flexible, other) and under is `confirmed`;
@@ -746,7 +753,8 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
   actual over plan), never shown or compared. In a card under 28rem (a container query) the
   difference moves under the plan and the badge wraps under the actual.
 - **Net worth** (`NetWorthCard`) sits beside it, where the mockup puts it, and on the list of
-  check-ins, so it does not wait for the first check-in: the figure, assets and liabilities, the
+  check-ins, so it does not wait for the first check-in: the figure, what you have and what you
+  owe (the assets and liabilities), the
   change since the first month, `NetWorthChart`, a "Monthly figures" table, each account (its
   role, else its kind from `ACCOUNT_KIND_LABELS` in `lib/accounts.ts`, which the CSV import's
   account types share; a liability, `side` from the API, adds "owed"), and
@@ -767,9 +775,11 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
   and leaves a completed check-in as it is. While the job runs, `JobProgress` ("Checking in"; a
   dead job says "Nothing was changed." with Try again); a refused start says "Could not check in
   now." and `apiErrorMessage` (the 429 sentence). A polite status line, always rendered, says the
-  outcome: on the list "This month's check-in is ready." or "is up to date." with Open it, on the
-  check-in "Checked again just now. This page is up to date.", and for a completed month "already
-  complete, so nothing was changed."
+  outcome from the job's counts (`checkInNowMessage`, spec 015 rule 23.6, issue 194: never "up
+  to date" while findings were added): on the list "This month's check-in is ready with 7
+  findings." or "Checked this month again. 2 new findings." with Open it, on the check-in
+  "Checked again just now. No new findings." (or what was added and what no longer applies),
+  and for a completed month "already complete, so nothing changed."
 
 ## Plan screen
 
@@ -964,8 +974,11 @@ the saved file starts with `%PDF-`. `check-in.spec.ts` (project
 findings) presses Check in now on the list and waits for the worker's run, finds this month's
 check-in at the top of the list and opens it, runs it again from its own page, marks a finding
 done and then dismissed, undoing each (checking every step survives a reload and leaving it open),
-follows a finding's "Affects" link to its decision step, and opens a check-in that is not the
-user's. Never use a real document as a fixture.
+follows a finding's "Review your" link to its decision step, and opens a check-in that is not the
+user's. Its issue 194 test confirms an October 31 Acme stub twice (two copies of one paycheck)
+and checks the month's check-in lists that paycheck's change once and that running it again
+says "No new findings."; the capture config leaves that test out, since it changes the
+paycheck the later screens show. Never use a real document as a fixture.
 
 ### Local real-API stack
 

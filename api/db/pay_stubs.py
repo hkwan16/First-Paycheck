@@ -26,6 +26,7 @@ __all__ = [
     "latest_pay_date",
     "newest_pay_stub",
     "paid_between_count",
+    "paycheck_ids",
     "superseded_documents",
 ]
 
@@ -72,6 +73,33 @@ def newest_pay_stub(session: Session) -> PayStub | None:
     """The user's newest current confirmed stub, in ``GET /pay-stubs`` order (spec 005
     rules 22d and 24)."""
     return session.scalars(current_pay_stubs().order_by(*NEWEST_FIRST).limit(1)).first()
+
+
+def paycheck_ids(session: Session) -> dict[uuid.UUID, uuid.UUID]:
+    """Each current stub's paycheck id (spec 015, Inputs): the first copy of its
+    paycheck, the one among it and the stubs it superseded, directly or through
+    earlier copies, that superseded nothing.
+
+    A confirm that superseded two current stubs joined two paychecks; the older
+    first copy (``created_at``, then ``id``) names the one they became. A newer
+    copy never supersedes nothing, so it never changes a paycheck id.
+    """
+    rows = session.execute(
+        select(PayStub.id, PayStub.superseded_by_id).order_by(PayStub.created_at, PayStub.id)
+    ).all()
+    successor = {row.id: row.superseded_by_id for row in rows}
+    superseding = set(successor.values())
+
+    def current(stub_id: uuid.UUID) -> uuid.UUID:
+        while (newer := successor[stub_id]) is not None:
+            stub_id = newer
+        return stub_id
+
+    first: dict[uuid.UUID, uuid.UUID] = {}
+    for row in rows:
+        if row.id not in superseding:
+            first.setdefault(current(row.id), row.id)
+    return first
 
 
 def latest_pay_date(session: Session) -> dt.date | None:

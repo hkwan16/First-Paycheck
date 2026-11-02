@@ -1459,19 +1459,15 @@ export interface components {
       /** Version */
       version: number;
     };
-    /** DeductionChangePayload */
-    DeductionChangePayload: {
-      /** Affects */
-      affects: ('k401_match' | 'health_plans' | 'emergency_fund' | 'w4' | 'spending') | null;
+    /**
+     * DeductionLine
+     * @description One deduction line that differs between the two stubs (rule 6).
+     */
+    DeductionLine: {
       /** Amount Cents */
       amount_cents: number;
       /** Change Cents */
       change_cents: number;
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      kind: 'deduction_change';
       /** Label */
       label: string;
       /**
@@ -1486,28 +1482,8 @@ export interface components {
         | 'retirement_contribution'
         | 'medical_premium'
         | 'other_deductions';
-      /**
-       * Pay Date
-       * Format: date
-       */
-      pay_date: string;
-      /**
-       * Pay Stub Id
-       * Format: uuid
-       */
-      pay_stub_id: string;
       /** Previous Cents */
       previous_cents: number;
-      /**
-       * Previous Pay Date
-       * Format: date
-       */
-      previous_pay_date: string;
-      /**
-       * Previous Pay Stub Id
-       * Format: uuid
-       */
-      previous_pay_stub_id: string;
     };
     /** DocumentCreated */
     DocumentCreated: {
@@ -1798,7 +1774,6 @@ export interface components {
       | 'recurring_changed'
       | 'recurring_stopped'
       | 'pay_change'
-      | 'deduction_change'
       | 'upcoming_deadline';
     /** FindingOut */
     FindingOut: {
@@ -1828,7 +1803,6 @@ export interface components {
         | components['schemas']['GoalOffPacePayload']
         | components['schemas']['RecurringPayload']
         | components['schemas']['PayChangePayload']
-        | components['schemas']['DeductionChangePayload']
         | components['schemas']['UpcomingDeadlinePayload'];
       severity: components['schemas']['FindingSeverity'];
       /**
@@ -2427,6 +2401,8 @@ export interface components {
     PayChangePayload: {
       /** Affects */
       affects: ('k401_match' | 'health_plans' | 'emergency_fund' | 'w4' | 'spending') | null;
+      /** Deductions */
+      deductions: components['schemas']['DeductionLine'][];
       /** Gross Cents */
       gross_cents: number;
       /** Gross Change Cents */

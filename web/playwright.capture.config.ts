@@ -93,9 +93,12 @@ export default defineConfig({
       dependencies: ['authenticated-decisions'],
       use: signedIn,
     },
+    // Issue 194's test confirms two more pay stubs, which would change the
+    // paycheck every later screen shows.
     {
       name: 'authenticated-check-in',
       testMatch: 'check-in.spec.ts',
+      grepInvert: /issue 194/,
       dependencies: ['authenticated-decisions'],
       use: signedIn,
     },
