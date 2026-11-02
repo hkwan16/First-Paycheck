@@ -1,6 +1,6 @@
 # 012: Health plan comparison calculator
 
-Status: Implemented, M6. Every example is a test; the 2026 HSA and HDHP constants were verified against Rev. Proc. 2025-19 on 2026-10-21. Rule 17 (a negative net cost reads as coming out ahead) added 2026-10-30, issue 154.
+Status: Implemented, M6. Every example is a test; the 2026 HSA and HDHP constants were verified against Rev. Proc. 2025-19 on 2026-10-21. Rule 17 (a negative net cost reads as coming out ahead) added 2026-10-30, issue 154. Rules 18, 18a and 19 (the card: usage is a what-if, a steady badge, every term explained) added 2026-11-01 for issues 206 and 207.
 
 ## Goal
 
@@ -94,6 +94,15 @@ Notation: `P` pay periods, `S` salary, for plan `k`: `prem_k`, `D_k`, `c_k`, `M_
     - **The sign stays the API's.** The calculator returns signed cents and nothing re-signs, compares or recomputes them. Each surface only chooses the words from the sign the API sent, through one pure helper on each side: `web/src/lib/money.ts:formatNetCost` and `api/verify/format.py:net_cost`. The web helper starts from `formatMoney`'s own text, so a cost that rounds to $0 in whole dollars is "$0", never "$0 ahead". The words are shared because one saved decision is read on four surfaces (the health plan step, the Plan page, the Why page's fallback text and the PDF), and a person moving between them should see one number written one way.
     - **Where.** On the health plan step, the comparison table's three usage rows and its worst-case row, and the headline. The headline of a cheapest plan that costs something stays "Gold PPO costs the least at medium use: $2,025 a year"; "costs the least at low use: $403 ahead a year" reads oddly, so a cheapest plan that comes out ahead reads "Bronze HSA costs the least at low use and leaves you $403 ahead a year". Break-even notes print spending, not costs, and do not change. On the Plan page and in the PDF the expected cost and worst case are figures of kind `net_cost` (spec 016 rule 3), so the kind, not a key or a label, says which figures take these words. The fallback explanation says "costs you the least and leaves you $403.00 ahead a year" and "which leaves you $403.00 ahead a year at that use" (example 3 at low use below); the explain context writes the four cost facts the same way and its negative-cost note tells the model to keep that wording.
     - **No color.** An amount ahead keeps the cell's ink: a tone marks a state (web/CLAUDE.md, "Color means something"), and the word carries the meaning.
+
+### The card (web, `HealthPlanCard`)
+
+18. **The usage is a what-if** (issue 206). "How much care do you expect next year?" moves the comparison's highlighted row and its "Cheapest at" badge; it is how a person tries the plans at another amount of care, so it never marks the decision changed. The save state compares what the person decided (the plans compared, the plan they will enroll in, their own HSA contribution, the enrollment deadline) and leaves `expected_usage` out on both sides (`HEALTH_WHAT_IF_INPUTS`, the way the W-4 leaves out the stub's withholding, spec 014 rule 17a). A save stores the usage on screen with the rest, so the plan and the explanation name the use the person last looked at. Only the scenario's name is left out: the three scenario amounts are the decision's.
+18a. **The badge holds while the plans are edited.** Opening Edit plans shows the plan table in place of the comparison but changes nothing until Compare these plans: the save state keeps comparing the plans being compared, so the badge reads the same with the table open as without it (before issue 206 it compared nothing while the table was open and flipped to saved).
+19. **Every term is explained on the page** (issue 207). A first-time employee meets premium, deductible, coinsurance, out-of-pocket maximum, HDHP and HSA here. Each gets one plain sentence, written once (`health-plan-format.ts:HEALTH_TERMS`) and shown where the term first appears, without hover-only tooltips or a wider table:
+    - the comparison opens with a disclosure, "What these terms mean", a native `<details>` the keyboard and screen readers open, listing every term the table uses;
+    - the plan table typed by hand gives each of those fields its sentence as the field's hint, so the person reads it while typing the number;
+    - the HSA contribution field, above the comparison, says what an HSA is in its hint.
 
 ## 2026 constants
 

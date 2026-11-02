@@ -55,7 +55,7 @@ export function FundResultRows({
       <KV label="Still to save" value={<Money cents={result.shortfall_cents} />} />
       <KV label="Months to reach it" value={reachText(result)} />
       <KV
-        label={`Per paycheck, ${periods} a year`}
+        label={`Per paycheck, ${periods} paychecks a year`}
         value={<Money cents={result.per_paycheck_contribution_cents} tone="teal" />}
       />
     </KVList>

@@ -41,13 +41,14 @@ function requests() {
 }
 
 const card = () => screen.getByRole('region', { name: 'Health plan' });
-const result = () => within(card()).getByRole('group', { name: 'Calculator result' });
+const result = () => within(card()).getByRole('group', { name: 'Your numbers' });
 const usage = () => within(card()).getByRole('group', { name: 'Expected healthcare use' });
 const choice = () => within(card()).getByRole('group', { name: 'The plan you will enroll in' });
 const table = () => within(card()).getByRole('table', { name: 'Expected yearly cost by plan' });
-// "Save this decision", "Save as v2", "Saved as v1"; not the plan named "Saver HDHP".
+// "Save", "Save changes" or "Saved"; not the plan named "Saver HDHP".
 const saveButton = () =>
-  within(card()).getByRole('button', { name: /^(Save this decision|Save as v\d+|Saved as v\d+)$/ });
+  within(card()).getByRole('button', { name: /^(Save|Save changes|Saved)$/ });
+const badge = () => within(card()).getByText(/^(Not saved|Changes not saved|Saved \w+ \d+)$/);
 const settle = () => act(() => vi.advanceTimersByTimeAsync(CALC_DEBOUNCE_MS));
 
 function renderCard() {
@@ -216,7 +217,7 @@ describe('HealthPlanCard saving', () => {
     expect(within(table()).getAllByText('Your choice')).toHaveLength(1);
 
     await user.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v1'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
     const { inputs, result: computed } = sampleHealthPlans({ selected_plan_index: 0 });
     expect(seen.save).toEqual([
       { calculator: 'health_plans', inputs, result: computed, supersedes_id: null },
@@ -242,13 +243,13 @@ describe('HealthPlanCard saving', () => {
       'aria-pressed',
       'true',
     );
-    expect(saveButton()).toHaveTextContent('Saved as v1');
+    expect(saveButton()).toHaveTextContent(/^Saved$/);
 
     await user.click(within(choice()).getByRole('button', { name: 'Bronze HSA' }));
     await settle();
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
     await user.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
     expect(seen.save[0]).toMatchObject({
       supersedes_id: HEALTH_DECISION_ID,
       inputs: sampleHealthPlansInputs({ selected_plan_index: 0 }),
@@ -283,12 +284,12 @@ describe('HealthPlanCard saving', () => {
     const calcsBefore = seen.calc.length;
     await user.click(saveButton());
     expect(
-      await within(card()).findByText(/The calculator's numbers had changed/),
+      await within(card()).findByText(/Your numbers changed after they were shown/),
     ).toBeInTheDocument();
     await waitFor(() => expect(seen.calc.length).toBe(calcsBefore + 1));
     await waitFor(() => expect(saveButton()).toBeEnabled());
     await user.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v1'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
   });
 
   it('keeps the chosen plan when the benefits summary has it again (issue 168)', async () => {
@@ -304,7 +305,7 @@ describe('HealthPlanCard saving', () => {
       'true',
     );
     await settle();
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v1'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
     expect(within(card()).queryByText('Choose the plan you will enroll in to save.')).toBeNull();
   });
 
@@ -365,10 +366,103 @@ describe('HealthPlanCard saving', () => {
     );
     await user.click(within(choice()).getByRole('button', { name: 'Bronze HSA' }));
     await settle();
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
     await user.click(saveButton());
-    expect(await within(card()).findByText(/saved somewhere else/)).toBeInTheDocument();
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v3'));
+    expect(await within(card()).findByText(/saved in another tab or window/)).toBeInTheDocument();
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
+  });
+});
+
+describe('HealthPlanCard save state (spec 012 rules 18 and 18a, issue 206)', () => {
+  it('treats the usage as a what-if: trying another amount of care changes nothing saved', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const { user } = await renderReady();
+    expect(badge()).toHaveTextContent('Saved Oct 17');
+    expect(saveButton()).toHaveTextContent('Saved');
+
+    await user.click(within(usage()).getByRole('button', { name: 'High · about $10,000' }));
+    await settle();
+    await waitFor(() => expect(result()).toHaveTextContent('Gold PPO costs the least at high use'));
+    expect(badge()).toHaveTextContent('Saved Oct 17');
+    expect(saveButton()).toHaveTextContent('Saved');
+  });
+
+  it('saves the usage on screen with a change to what was decided', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const seen = requests();
+    const { user } = await renderReady();
+    await user.click(within(usage()).getByRole('button', { name: 'High · about $10,000' }));
+    await user.click(within(choice()).getByRole('button', { name: 'Bronze HSA' }));
+    await settle();
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
+    expect(badge()).toHaveTextContent('Changes not saved');
+    await user.click(saveButton());
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved'));
+    expect(seen.save[0]).toMatchObject({
+      inputs: sampleHealthPlansInputs({ selected_plan_index: 0, expected_usage: 'high' }),
+    });
+  });
+
+  it('holds the badge while the plan table is open', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const { user } = await renderReady();
+    await user.click(within(choice()).getByRole('button', { name: 'Bronze HSA' }));
+    await settle();
+    await waitFor(() => expect(badge()).toHaveTextContent('Changes not saved'));
+
+    await user.click(within(card()).getByRole('button', { name: 'Edit plans' }));
+    expect(within(card()).getByRole('form', { name: 'Your health plan options' })).toBeVisible();
+    expect(badge()).toHaveTextContent('Changes not saved');
+    await user.click(within(card()).getByRole('button', { name: 'Cancel' }));
+    expect(badge()).toHaveTextContent('Changes not saved');
+  });
+});
+
+describe('HealthPlanCard terms (spec 012 rule 19, issue 207)', () => {
+  it('explains every term the comparison uses, in a disclosure above the table', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    const { user } = await renderReady();
+    const terms = within(card()).getByRole('group', { name: 'What these terms mean' });
+    await user.click(within(terms).getByText('What these terms mean'));
+    const named = within(terms)
+      .getAllByRole('term')
+      .map((term) => [term.textContent, term.nextElementSibling?.textContent ?? '']);
+    expect(named.map(([term]) => term)).toEqual([
+      'Premium',
+      'Deductible',
+      'Coinsurance',
+      'Out-of-pocket maximum',
+      'HDHP',
+      'HSA',
+    ]);
+    for (const [, definition] of named) expect(definition).not.toBe('');
+    expect(
+      within(card()).getByLabelText('Your own HSA contribution this year'),
+    ).toHaveAccessibleDescription(/health savings account/);
+  });
+
+  it('gives each field of a typed plan its plain meaning', async () => {
+    decisionsReady();
+    renderCard();
+    const form = await within(
+      await screen.findByRole('region', { name: 'Health plan' }),
+    ).findByRole('form', { name: 'Your health plan options' });
+    const plan = within(form).getByRole('group', { name: 'Plan 1' });
+    for (const label of [
+      'Premium per paycheck',
+      'Deductible',
+      'Coinsurance, %',
+      'Out-of-pocket maximum',
+    ]) {
+      expect(within(plan).getByLabelText(label)).toHaveAccessibleDescription(/\w/);
+    }
   });
 });
 
@@ -401,7 +495,7 @@ describe('HealthPlanCard without a benefits summary', () => {
     await settle();
     await waitFor(() => expect(saveButton()).toBeEnabled());
     await user.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v1'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
   });
 
   it('says what to fix in a typed plan, and allows up to eight', async () => {
@@ -534,7 +628,7 @@ describe('HealthPlanCard before it can compare', () => {
     renderCard();
     const region = await screen.findByRole('region', { name: 'Health plan' });
     expect(
-      await within(region).findByText(/needs your salary and filing status/),
+      await within(region).findByText(/needs your yearly salary, filing status and pay schedule/),
     ).toBeInTheDocument();
   });
 });

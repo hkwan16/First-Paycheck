@@ -14,7 +14,6 @@ import {
   CALCULATOR_KINDS,
   currentDecision,
   decisionSaveState,
-  payPeriodsFor,
   percentInput,
 } from './decisions';
 import { CALCULATORS } from './features';
@@ -60,38 +59,37 @@ function decision(overrides: Partial<Decision> = {}): Decision {
   };
 }
 
-describe('decisionSaveState', () => {
-  it('is unsaved when the calculator has no decision yet', () => {
+describe('decisionSaveState (spec 018 rules 5a and 5b)', () => {
+  it('nothing saved yet', () => {
     expect(decisionSaveState(undefined, inputs)).toEqual({
       status: 'unsaved',
-      version: null,
-      action: 'Save this decision',
+      action: 'Save',
       label: 'Not saved',
     });
     expect(decisionSaveState(null, inputs).status).toBe('unsaved');
   });
 
-  it('is saved when the inputs are the current version, whatever their key order', () => {
+  it('the saved inputs, whatever their key order', () => {
     const reordered = Object.fromEntries(Object.entries(inputs).reverse());
     expect(decisionSaveState(decision({ version: 2 }), reordered)).toEqual({
       status: 'saved',
-      version: 2,
-      action: 'Saved as v2',
-      label: 'Saved v2 · Oct 20',
+      action: 'Saved',
+      label: 'Saved Oct 20',
     });
   });
 
-  it('is dirty with the next version once any input differs from the current one', () => {
+  it('other inputs: changes to save, and no version in the words', () => {
     expect(decisionSaveState(decision(), { ...inputs, contribution_pct: '5.00' })).toEqual({
       status: 'dirty',
-      version: 1,
-      action: 'Save as v2',
-      label: 'Changed since v1',
+      action: 'Save changes',
+      label: 'Changes not saved',
     });
     const tiers = [{ employee_pct_upto: '4.00', employer_pct: '50.00' }];
-    expect(decisionSaveState(decision({ version: 3 }), { ...inputs, match_tiers: tiers })).toEqual(
-      expect.objectContaining({ status: 'dirty', action: 'Save as v4' }),
-    );
+    expect(decisionSaveState(decision({ version: 3 }), { ...inputs, match_tiers: tiers })).toEqual({
+      status: 'dirty',
+      action: 'Save changes',
+      label: 'Changes not saved',
+    });
   });
 
   it('compares canonical values exactly: "4" is not the saved "4.00"', () => {
@@ -105,7 +103,7 @@ describe('decisionSaveState', () => {
     expect(decisionSaveState(undefined, null).status).toBe('unsaved');
   });
 
-  it('leaves the ignored inputs out of the comparison, on either side and absent or not', () => {
+  it('ignores what describes, not decides: on either side and absent or not', () => {
     const ignore = ['age'];
     expect(decisionSaveState(decision(), { ...inputs, age: 31 }, { ignore }).status).toBe('saved');
     const { age: _age, ...withoutAge } = inputs;
@@ -143,21 +141,6 @@ describe('currentDecision', () => {
     expect(currentDecision(list, 'k401_match')?.id).toBe('dec-2');
     expect(currentDecision(list, 'w4')).toBeUndefined();
     expect(currentDecision(undefined, 'k401_match')).toBeUndefined();
-  });
-});
-
-describe('payPeriodsFor', () => {
-  it.each([
-    ['weekly', 52],
-    ['biweekly', 26],
-    ['semimonthly', 24],
-    ['monthly', 12],
-  ] as const)('%s pay is %i paychecks a year', (frequency, periods) => {
-    expect(payPeriodsFor(frequency)).toBe(periods);
-  });
-
-  it('is unknown without a frequency', () => {
-    expect(payPeriodsFor(null)).toBeNull();
   });
 });
 

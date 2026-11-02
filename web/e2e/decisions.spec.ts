@@ -18,7 +18,8 @@ import { e2eUser, NO_E2E_USER, waitForHydration } from './support/auth';
  * step (spec 018): the old address redirects to the first, the side nav and
  * the footers move between them. The e2e user
  * keeps its decisions between runs (they cannot be deleted), so each test
- * reads which version is current instead of assuming v1.
+ * reads the version a save made from the API's answer instead of assuming v1;
+ * the step itself names no version (spec 018 rule 5a).
  */
 
 test.describe.configure({ mode: 'serial' });
@@ -26,8 +27,9 @@ test.skip(!e2eUser(), NO_E2E_USER);
 test.skip(!e2eApiUrl(), NO_E2E_API);
 
 const card = (page: Page) => page.getByRole('region', { name: '401(k) match' });
-const result = (page: Page) => card(page).getByRole('group', { name: 'Calculator result' });
-const saveButton = (page: Page) => card(page).getByRole('button', { name: /^Save|^Saved as v/ });
+const result = (page: Page) => card(page).getByRole('group', { name: 'Your numbers' });
+const SAVE = /^(Save|Save changes|Saved)$/;
+const saveButton = (page: Page) => card(page).getByRole('button', { name: SAVE });
 
 async function settled(page: Page) {
   await expect(result(page)).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
@@ -36,6 +38,22 @@ async function settled(page: Page) {
 
 async function setContribution(slider: Locator, percent: number) {
   await slider.fill(String(percent));
+}
+
+/**
+ * Press a card's save and wait for "Saved"; the version it made, from the
+ * API's answer, since the step names none (spec 018 rule 5a).
+ */
+async function saveVersion(page: Page, save: Locator) {
+  const answer = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/decisions' && response.request().method() === 'POST',
+    { timeout: 15_000 },
+  );
+  await save.click();
+  const { version } = (await (await answer).json()) as { version: number };
+  await expect(save).toHaveText('Saved', { timeout: 15_000 });
+  return version;
 }
 
 /** The side nav's link to a decision step, done or not ("401(k) match, done"). */
@@ -62,8 +80,8 @@ test('calculates, saves a version, saves the next one over it and opens why', as
   if (await form.isVisible()) {
     await form.getByLabel('Yearly salary').fill('65,000');
     await form.getByRole('button', { name: 'Single' }).click();
-    await form.getByLabel('Employer adds, % of what you put in').fill('100');
-    await form.getByLabel('Up to, % of your pay').fill('4');
+    await form.getByLabel('Employer adds, as a % of what you put in').fill('100');
+    await form.getByLabel('Up to this % of your pay').fill('4');
     await form.getByLabel('Year you were born').fill('1996');
     await form.getByRole('button', { name: 'Save plan details' }).click();
   }
@@ -77,16 +95,13 @@ test('calculates, saves a version, saves the next one over it and opens why', as
   await setContribution(slider, first);
   await settled(page);
   await expect(saveButton(page)).toBeEnabled();
-  await saveButton(page).click();
-  await expect(saveButton(page)).toHaveText(/^Saved as v(\d+)$/, { timeout: 15_000 });
-  const saved = Number(/v(\d+)/.exec((await saveButton(page).textContent()) ?? '')![1]);
+  const saved = await saveVersion(page, saveButton(page));
 
   await setContribution(slider, first === 4 ? 6 : 3);
   await settled(page);
-  await expect(saveButton(page)).toHaveText(`Save as v${saved + 1}`);
-  await expect(card(page).getByText(`Changed since v${saved}`)).toBeVisible();
-  await saveButton(page).click();
-  await expect(saveButton(page)).toHaveText(`Saved as v${saved + 1}`, { timeout: 15_000 });
+  await expect(saveButton(page)).toHaveText('Save changes');
+  await expect(card(page).getByText('Changes not saved')).toBeVisible();
+  expect(await saveVersion(page, saveButton(page))).toBe(saved + 1);
 
   await card(page).getByRole('link', { name: 'Why this decision' }).click();
   await expect(page).toHaveURL(/\/why\/[^/]+$/);
@@ -105,12 +120,6 @@ test('calculates, saves a version, saves the next one over it and opens why', as
     verified.or(fallback).or(page.getByText('Explanations are not available yet.')),
   ).toBeVisible({ timeout: 90_000 });
 });
-
-/** The save button's version after a save: "Saved as v3" is 3. */
-async function savedVersion(save: Locator) {
-  await expect(save).toHaveText(/^Saved as v\d+$/, { timeout: 15_000 });
-  return Number(/v(\d+)/.exec((await save.textContent()) ?? '')![1]);
-}
 
 test('saves an emergency fund version and pauses and resumes its goal', async ({ page }) => {
   test.setTimeout(120_000);
@@ -134,13 +143,12 @@ test('saves an emergency fund version and pauses and resumes its goal', async ({
   // Spec 011: the target is 3 x $1,800 = $5,400, the shortfall $3,400, and
   // the months to close it ceil(3,400 / 300) = 12 or ceil(3,400 / 250) = 14.
   const months = monthly === '300.00' ? 12 : 14;
-  const result = fund.getByRole('group', { name: 'Calculator result' });
+  const result = fund.getByRole('group', { name: 'Your numbers' });
   await expect(result).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
   await expect(result).toContainText(`Target $5,400, reached in ${months} months`);
-  const save = fund.getByRole('button', { name: /^Save|^Saved as v/ });
+  const save = fund.getByRole('button', { name: SAVE });
   await expect(save).toBeEnabled();
-  await save.click();
-  await savedVersion(save);
+  await saveVersion(page, save);
 
   // The goal is the saved version's: its transfer toward its target.
   const goal = fund.getByRole('group', { name: 'Your emergency fund goal' });
@@ -205,14 +213,13 @@ test('compares health plans, chooses one and saves it with its deadline', async 
 
   const deadline = `${new Date().getFullYear() + 1}-11-14`;
   await health.getByLabel('Enrollment deadline').fill(deadline);
-  const result = health.getByRole('group', { name: 'Calculator result' });
+  const result = health.getByRole('group', { name: 'Your numbers' });
   await expect(result).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
   await expect(result).toContainText('costs the least');
 
-  const save = health.getByRole('button', { name: /^Save|^Saved as v/ });
+  const save = health.getByRole('button', { name: SAVE });
   await expect(save).toBeEnabled();
-  await save.click();
-  await savedVersion(save);
+  await saveVersion(page, save);
   await expect(
     health.getByText(/^On your calendar for .+: Health plan enrollment deadline\.$/),
   ).toBeVisible({
@@ -237,7 +244,12 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
 
   const single = status.getByRole('button', { name: 'Single or married filing separately' });
   if ((await status.getByRole('button', { pressed: true }).count()) === 0) await single.click();
-  // Move away from whatever is saved, so there is a version to save.
+  // Move away from whatever is saved, so there is a version to save. Step 4(c)
+  // waits behind "Anything else on your W-4?" (spec 014 rule 20).
+  await w4
+    .getByRole('group', { name: 'Anything else on your W-4?' })
+    .getByRole('button', { name: 'Yes' })
+    .click();
   const extra = w4.getByLabel('Step 4(c): extra withholding each paycheck');
   const entry = (await extra.inputValue()) === '25.00' ? '50.00' : '25.00';
   // The calculator's answer to the new entry. Its rule 10a figures do not
@@ -249,10 +261,10 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
   );
   await extra.fill(entry);
 
-  const result = w4.getByRole('group', { name: 'Calculator result' });
+  const result = w4.getByRole('group', { name: 'Your numbers' });
   await expect(result).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
   await expect(result).toContainText(/at tax time/);
-  await expect(result).toContainText(/Withheld each paycheck\s*\$/);
+  await expect(result).toContainText(/Taken out of each paycheck\s*\$/);
 
   // Beside the entries, what the confirmed stub's withholding leaves at tax time
   // (spec 014 rule 10a, issue 153), in the calculator's own figure.
@@ -268,10 +280,9 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
         : 'Even at tax time',
   );
 
-  const save = w4.getByRole('button', { name: /^Save|^Saved as v/ });
+  const save = w4.getByRole('button', { name: SAVE });
   await expect(save).toBeEnabled();
-  await save.click();
-  await savedVersion(save);
+  await saveVersion(page, save);
   await expect(
     w4.getByText(/^On your calendar for .+: Give your employer your updated Form W-4\.$/),
   ).toBeVisible({ timeout: 15_000 });
@@ -295,6 +306,59 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
   );
   await page.getByRole('link', { name: 'See your plan' }).click();
   await expect(page).toHaveURL('/plan');
+});
+
+/**
+ * Save the e2e user's profile with another pay schedule, the way the plan
+ * details form used to copy an older stub's schedule into it (issue 198). The
+ * token is the one the app itself sends with its `GET /profile`.
+ */
+async function saveProfileSchedule(page: Page, payFrequency: string) {
+  const read = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/profile' && response.request().method() === 'GET',
+    { timeout: 30_000 },
+  );
+  await page.goto('/setup/decisions/401k');
+  const response = await read;
+  const { authorization } = await response.request().allHeaders();
+  // The profile as PUT /profile takes it: what GET adds on read stays out.
+  const {
+    updated_at: _updatedAt,
+    pay_schedule: _paySchedule,
+    ...fields
+  } = (await response.json()) as Record<string, unknown>;
+  const put = await page.request.put(`${e2eApiUrl()}/profile`, {
+    headers: { authorization: authorization! },
+    data: { ...fields, pay_frequency: payFrequency },
+  });
+  expect(put.ok(), await put.text()).toBe(true);
+}
+
+test("uses the confirmed pay stub's pay schedule on every step (issue 198)", async ({ page }) => {
+  test.setTimeout(120_000);
+  // Plan details saved while an older stub said every two weeks; the Acme stub
+  // Confirm confirmed since is paid twice a month, 24 paychecks a year.
+  await saveProfileSchedule(page, 'biweekly');
+
+  await page.goto('/setup/decisions/emergency-fund');
+  await waitForHydration(page);
+  const fund = page.getByRole('region', { name: 'Emergency fund' });
+  await expect(fund.getByLabel('Monthly transfer to savings')).toBeVisible({ timeout: 30_000 });
+  await fund.getByLabel('Essential spending per month').fill('1,800.00');
+  await fund.getByLabel('Saved so far').fill('2,000.00');
+  await fund.getByLabel('Monthly transfer to savings').fill('300.00');
+  const fundResult = fund.getByRole('group', { name: 'Your numbers' });
+  await expect(fundResult).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
+  await expect(fundResult).toContainText('Per paycheck, 24 paychecks a year');
+
+  await page.goto('/setup/decisions/w4');
+  await waitForHydration(page);
+  const w4 = page.getByRole('region', { name: 'W-4, federal only' });
+  const w4Result = w4.getByRole('group', { name: 'Your numbers' });
+  await expect(w4Result).toContainText(/at tax time/, { timeout: 30_000 });
+  await expect(w4Result.getByRole('group', { name: 'If you change nothing' })).toBeVisible();
+  await expect(w4Result).toContainText('24 paychecks');
 });
 
 /** The page as a step link's landing scrolls it to the top (`landAtTopIfRequested`). */

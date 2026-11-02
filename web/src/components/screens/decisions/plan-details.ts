@@ -2,6 +2,7 @@ import type {
   FilingStatus,
   MatchTierIn,
   PayFrequency,
+  PaySchedule,
   PayStub,
   Profile,
   ProfileIn,
@@ -12,7 +13,9 @@ import { formatMoney, parseMoney } from '@/lib/money';
  * The plan details the 401(k) card needs from the profile: salary, filing
  * status, pay schedule, the employer's match formula and the birth year (the
  * calculator's age comes from it). The API validates them again on PUT
- * /profile; these checks only say what to fix before then.
+ * /profile; these checks only say what to fix before then. The pay schedule
+ * is the one the API resolved (spec 005 rule 25a): a newest stub that states
+ * one decides it, and only otherwise is it asked and saved as the profile's.
  */
 
 export interface TierDraft {
@@ -25,6 +28,7 @@ export interface TierDraft {
 export interface PlanDetailsDraft {
   salary: string;
   filingStatus: FilingStatus | null;
+  /** The profile's own entry, asked for only when no pay stub states the schedule. */
   payFrequency: PayFrequency | null;
   tiers: TierDraft[];
   birthYear: string;
@@ -35,10 +39,11 @@ export type PlanDetailsField = 'salary' | 'filingStatus' | 'payFrequency' | 'tie
 export type PlanDetailsResult =
   | {
       ok: true;
-      values: Pick<ProfileIn, 'salary_cents' | 'filing_status' | 'pay_frequency'> & {
-        match_tiers: MatchTierIn[];
-        birth_year: number;
-      };
+      values: Pick<ProfileIn, 'salary_cents' | 'filing_status'> &
+        Partial<Pick<ProfileIn, 'pay_frequency'>> & {
+          match_tiers: MatchTierIn[];
+          birth_year: number;
+        };
     }
   | { ok: false; errors: Partial<Record<PlanDetailsField, string>> };
 
@@ -57,18 +62,44 @@ export const MIN_BIRTH_YEAR = 1900;
 export const SALARY_EXAMPLE = '65,000.00';
 export const BIRTH_YEAR_EXAMPLE = '1996';
 
-/** The pay schedule: the profile's, else the confirmed pay stub's. */
-export const payFrequencyOf = (profile: Profile, payStub: PayStub | undefined) =>
-  profile.pay_frequency ?? payStub?.pay_frequency ?? null;
+/** Each pay schedule in words, as a person would say it. */
+export const FREQUENCY_WORDS: Record<PayFrequency, string> = {
+  weekly: 'Every week',
+  biweekly: 'Every two weeks',
+  semimonthly: 'Twice a month',
+  monthly: 'Once a month',
+};
+
+export const FREQUENCIES: readonly PayFrequency[] = [
+  'weekly',
+  'biweekly',
+  'semimonthly',
+  'monthly',
+];
+
+/** "Twice a month, 24 paychecks a year": the schedule the API resolved, with its count. */
+export const scheduleText = (schedule: PaySchedule) =>
+  `${FREQUENCY_WORDS[schedule.frequency]}, ${schedule.periods_per_year} paychecks a year`;
+
+/** What to fix when no schedule is chosen. */
+export const SCHEDULE_ERROR = 'Choose how often you are paid.';
+
+/**
+ * The pay schedule the newest pay stub states, which decides it (spec 005
+ * rule 25a, issue 198), or null when the form asks for it. The form never
+ * copies a stub's schedule into the profile; that copy is what went stale.
+ */
+export const stubSchedule = (profile: Profile): PaySchedule | null =>
+  profile.pay_schedule?.source === 'pay_stub' ? profile.pay_schedule : null;
 
 /** Whether the card must ask for plan details before it can calculate. */
-export function needsPlanDetails(profile: Profile, payStub: PayStub | undefined): boolean {
+export function needsPlanDetails(profile: Profile): boolean {
   return (
     profile.salary_cents == null ||
     profile.filing_status == null ||
     (profile.match_tiers ?? []).length === 0 ||
     profile.birth_year == null ||
-    payFrequencyOf(profile, payStub) === null
+    profile.pay_schedule === null
   );
 }
 
@@ -89,7 +120,7 @@ export function draftFromProfile(profile: Profile, payStub: PayStub | undefined)
   return {
     salary: salary == null ? '' : formatMoney(salary).slice(1),
     filingStatus: profile.filing_status ?? null,
-    payFrequency: payFrequencyOf(profile, payStub),
+    payFrequency: profile.pay_frequency ?? null,
     tiers:
       tiers.length === 0
         ? [{ employerPct: '', uptoPct: '' }]
@@ -107,18 +138,25 @@ const isPercent = (text: string) => PERCENT.test(text) && Number(text) > 0 && Nu
 
 const YEAR = /^\d{4}$/;
 
-/**
- * The draft as profile fields, or what to fix. `taxYear` (the confirmed pay
- * stub's) bounds the birth year, since the calculator takes no negative age.
- */
-export function readPlanDetails(draft: PlanDetailsDraft, taxYear?: number): PlanDetailsResult {
+export interface ReadOptions {
+  /** The confirmed pay stub's tax year, which bounds the birth year (no negative age). */
+  taxYear?: number;
+  /** The form asks for the pay schedule (no `stubSchedule`); otherwise it is left out. */
+  askSchedule?: boolean;
+}
+
+/** The draft as profile fields, or what to fix. */
+export function readPlanDetails(
+  draft: PlanDetailsDraft,
+  { taxYear, askSchedule: asked = false }: ReadOptions = {},
+): PlanDetailsResult {
   const errors: Partial<Record<PlanDetailsField, string>> = {};
   const salary = parseMoney(draft.salary);
   if (salary === null || salary <= 0) {
     errors.salary = `Enter your yearly salary, like ${SALARY_EXAMPLE}.`;
   }
   if (!draft.filingStatus) errors.filingStatus = 'Choose your filing status.';
-  if (!draft.payFrequency) errors.payFrequency = 'Choose how often you are paid.';
+  if (asked && !draft.payFrequency) errors.payFrequency = SCHEDULE_ERROR;
 
   const tiers = draft.tiers.map((tier) => ({
     employerPct: tier.employerPct.trim(),
@@ -146,7 +184,7 @@ export function readPlanDetails(draft: PlanDetailsDraft, taxYear?: number): Plan
     values: {
       salary_cents: salary,
       filing_status: draft.filingStatus,
-      pay_frequency: draft.payFrequency,
+      ...(asked ? { pay_frequency: draft.payFrequency } : {}),
       match_tiers: tiers.map((tier) => ({
         employer_pct: tier.employerPct,
         employee_pct_upto: tier.uptoPct,

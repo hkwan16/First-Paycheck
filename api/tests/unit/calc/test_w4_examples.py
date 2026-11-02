@@ -526,9 +526,9 @@ def test_refund_from_other_jobs_has_no_suggestion() -> None:
 
 
 def test_premiums_and_deferral_above_salary_are_invalid() -> None:
-    with pytest.raises(ValidationError, match="exceed the salary"):
+    with pytest.raises(ValidationError, match="more than your salary"):
         run(1_000_000, 26, health_premium_per_paycheck_cents=40_000)
-    with pytest.raises(ValidationError, match="exceed the salary"):
+    with pytest.raises(ValidationError, match="more than your salary"):
         run(1_000_000, 26, k401_contribution_pct="90", health_premium_per_paycheck_cents=5_000)
 
 

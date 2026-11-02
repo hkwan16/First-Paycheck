@@ -71,11 +71,11 @@ export const amountText = (cents: number | null | undefined) =>
 /** Why a decision did not save, as a sentence, for every calculator card. */
 export function saveErrorText(error: unknown): string {
   if (error instanceof ResultMismatch) {
-    return "The calculator's numbers had changed since they were shown. They are up to date now: check them and save again.";
+    return 'Your numbers changed after they were shown. They are up to date now, so check them and save again.';
   }
   switch (apiErrorCode(error)) {
     case 'decision_conflict':
-      return 'This decision was saved somewhere else since you opened it, so the latest version is loaded. Save again to replace it with these numbers.';
+      return 'This decision was saved in another tab or window after you opened it, so that one is shown now. Save again to keep these numbers instead.';
     case 'plan_not_selected':
       return 'Choose the plan you will enroll in, then save.';
     default:

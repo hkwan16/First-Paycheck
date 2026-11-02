@@ -93,7 +93,7 @@ describe('DecisionStepScreen (spec 018)', () => {
     await waitFor(() => expect(screen.getByText(/of 4 saved/)).toHaveTextContent('4 of 4 saved'));
     expect(
       await within(screen.getByRole('region', { name: 'W-4, federal only' })).findByText(
-        'Saved v1 · Oct 17',
+        'Saved Oct 17',
       ),
     ).toBeInTheDocument();
   });
@@ -111,7 +111,8 @@ describe('DecisionStepScreen (spec 018)', () => {
   });
 
   it('leads with how to use the calculator only when there is one', () => {
-    const lead = /Move the controls to try what-ifs/;
+    const lead =
+      'Try a few choices and watch the numbers change. Save the one you want, and it goes into your plan.';
     const { unmount } = renderWithProviders(
       <DecisionStepScreen calculator="401k_match" calculators={['401k_match']} />,
     );
@@ -127,6 +128,19 @@ describe('DecisionStepScreen (spec 018)', () => {
       within(screen.getByRole('region', { name: '401(k) match' })).getByText('After alpha'),
     ).toBeInTheDocument();
     expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+  });
+
+  it('has one primary action, the save: the footer never looks like it saves (issue 206)', async () => {
+    decisionsReady();
+    const { container } = renderWithProviders(
+      <DecisionStepScreen calculator="401k_match" calculators={CALCULATORS} />,
+    );
+    const save = await screen.findByRole('button', { name: 'Save' });
+    await waitFor(() => expect(save).toBeEnabled());
+    // The primary variant's fill (components/ui/Button.tsx): the save, and nothing else.
+    expect([...container.querySelectorAll('.bg-blue')]).toEqual([save]);
+    expect(screen.getByRole('link', { name: 'Next: health plan' })).not.toHaveClass('bg-blue');
+    expect(screen.queryByText(/v\d/)).toBeNull();
   });
 
   it('goes back to Spending from the first step and on to the next', () => {

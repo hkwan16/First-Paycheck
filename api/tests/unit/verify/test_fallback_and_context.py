@@ -31,7 +31,7 @@ from retrieval.context import (
 from tests.unit.calc import test_health_plans_examples as health_examples
 from verify.allowed import AllowedNumbers
 from verify.fallback import fallback_draft
-from verify.format import dollars, net_cost, percent
+from verify.format import dollars, net_cost, percent, refund
 from verify.numbers import extract_numbers
 from verify.verify import verify_explanation
 
@@ -109,6 +109,13 @@ def test_formatting() -> None:
     assert percent(Decimal("4.50")) == "4.5%"
     assert percent(Decimal("100.00")) == "100%"
     assert percent(Decimal("0.25")) == "0.25%"
+
+
+def test_refund_says_refund_or_due() -> None:
+    """Spec 014 rule 21: a signed refund in words."""
+    assert refund(8) == "$0.08 refund"
+    assert refund(-344_992) == "$3,449.92 due"
+    assert refund(0) == "Nothing due, no refund"
 
 
 def test_net_cost_reads_as_coming_out_ahead() -> None:

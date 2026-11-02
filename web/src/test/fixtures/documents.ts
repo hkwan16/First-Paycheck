@@ -2,6 +2,8 @@ import type {
   DocumentDetail,
   DocumentStatusReason,
   DocumentSummary,
+  PayFrequency,
+  PaySchedule,
   PayStub,
   PayStubValues,
   Profile,
@@ -278,8 +280,46 @@ export const emptyProfile: Profile = {
   match_tiers: [],
   other_jobs: [],
   pay_frequency: null,
+  pay_schedule: null,
   salary_cents: null,
   start_date: null,
   updated_at: null,
   vesting_years: null,
 };
+
+const PERIODS: Record<PayFrequency, PaySchedule['periods_per_year']> = {
+  weekly: 52,
+  biweekly: 26,
+  semimonthly: 24,
+  monthly: 12,
+};
+
+/**
+ * The pay schedule the API reports with a profile (spec 005 rule 25a,
+ * `app/pay_schedule.py`): the newest stub's when it prints one, else the
+ * profile's entry. The fake API's copy of that rule, for `GET /profile`.
+ */
+export function payScheduleOf(
+  newest: Pick<PayStub, 'pay_frequency' | 'pay_date'> | undefined,
+  profile: Pick<Profile, 'pay_frequency'>,
+): PaySchedule | null {
+  if (newest?.pay_frequency) {
+    const frequency = newest.pay_frequency;
+    return {
+      frequency,
+      periods_per_year: PERIODS[frequency],
+      source: 'pay_stub',
+      pay_stub_date: newest.pay_date,
+    };
+  }
+  if (profile.pay_frequency) {
+    const frequency = profile.pay_frequency;
+    return {
+      frequency,
+      periods_per_year: PERIODS[frequency],
+      source: 'profile',
+      pay_stub_date: null,
+    };
+  }
+  return null;
+}

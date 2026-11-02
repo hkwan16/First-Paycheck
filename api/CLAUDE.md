@@ -262,7 +262,7 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   (the same arithmetic as spec 015's `actual_pct`), null without a positive
   gross, never stored. The 401(k) card starts from it when nothing is saved,
   and `POST /explain` states it beside the chosen rate (spec 008 rule 7a).
-  `app/routers/pay_stubs.py:newest_pay_stub` is the newest stub in that order.
+  `db/pay_stubs.py:newest_pay_stub` is the newest stub in that order.
 - **One current stub per paycheck** (spec 005 rules 22a-22e, issue 190, migration
   `0020`). Confirm goes through `db/pay_stubs.py:add_confirmed`, which takes a
   per-user advisory lock and marks as superseded (`superseded_by_id`) the current
@@ -336,7 +336,7 @@ explanation, `GET /calendar` shows the check it implies.
 - **The rate chosen is not the rate in effect** (spec 008 rule 7a, issue
   132). A decision's `contribution_pct` is what the person picked;
   `POST /explain` reads the newest stub in its first session
-  (`routers/pay_stubs.py:newest_pay_stub`, then `pay_stub_rate`) and passes
+  (`db/pay_stubs.py:newest_pay_stub`, then `pay_stub_rate`) and passes
   its rate as `pay_stub_pct` to `retrieval/context.py:explain_setup`, which
   builds the context (facts `Contribution rate you chose` and `401(k)
   contribution rate your latest pay stub shows`), the allowed numbers

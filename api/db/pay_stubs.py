@@ -24,6 +24,7 @@ __all__ = [
     "add_confirmed",
     "current_pay_stubs",
     "latest_pay_date",
+    "newest_pay_stub",
     "paid_between_count",
     "paycheck_ids",
     "superseded_documents",
@@ -66,6 +67,12 @@ def _supersede(stub: PayStub) -> Update:
 def current_pay_stubs() -> Select[PayStub]:
     """The user's stubs nothing superseded (rule 22c); compose filters and order on it."""
     return select(PayStub).where(PayStub.superseded_by_id.is_(None))
+
+
+def newest_pay_stub(session: Session) -> PayStub | None:
+    """The user's newest current confirmed stub, in ``GET /pay-stubs`` order (spec 005
+    rules 22d and 24)."""
+    return session.scalars(current_pay_stubs().order_by(*NEWEST_FIRST).limit(1)).first()
 
 
 def paycheck_ids(session: Session) -> dict[uuid.UUID, uuid.UUID]:

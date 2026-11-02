@@ -59,17 +59,19 @@ describe('saveErrorText', () => {
     const mismatch = new ResultMismatch({
       error: { code: 'result_mismatch', message: 'x', details: { fields: ['missed_cents'] } },
     });
-    expect(saveErrorText(mismatch)).toMatch(/^The calculator's numbers had changed/);
+    expect(saveErrorText(mismatch)).toMatch(/^Your numbers changed after they were shown/);
   });
 
   it('explains a conflict, a missing plan choice, and passes other messages on', () => {
-    expect(saveErrorText(apiError('decision_conflict'))).toMatch(/saved somewhere else/);
+    expect(saveErrorText(apiError('decision_conflict'))).toMatch(/saved in another tab or window/);
     expect(saveErrorText(apiError('plan_not_selected'))).toBe(
       'Choose the plan you will enroll in, then save.',
     );
     expect(
-      saveErrorText(apiError('validation_error', 'no federal constants for tax year 2027')),
-    ).toBe('no federal constants for tax year 2027');
+      saveErrorText(
+        apiError('validation_error', 'We do not have the federal tax figures for 2027 yet'),
+      ),
+    ).toBe('We do not have the federal tax figures for 2027 yet');
     // A field path is for developers (spec 008 rule 22a): the card's own sentence instead.
     expect(saveErrorText(apiError('validation_error', 'inputs.tax_year: Field required'))).toBe(
       'Could not save this decision. Try again.',

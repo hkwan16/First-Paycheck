@@ -28,7 +28,6 @@ import {
   asK401Inputs,
   currentDecision,
   decisionSaveState,
-  payPeriodsFor,
   percentInput,
   type DecisionSaveState,
 } from '@/lib/decisions';
@@ -38,7 +37,7 @@ import { whyRoute } from '@/lib/routes';
 import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
 import { matchHeadline, saveBadgeTone, saveErrorText, tiersText } from './decision-format';
 import { K401Notices, K401ResultRows } from './K401Result';
-import { needsPlanDetails, payFrequencyOf } from './plan-details';
+import { needsPlanDetails } from './plan-details';
 import { PlanDetailsForm } from './PlanDetailsForm';
 
 const CALC_PATH = '/calc/401k-match';
@@ -58,13 +57,12 @@ interface Ready {
 function k401Inputs(ready: Ready | null, pct: number): K401MatchInput | null {
   if (!ready) return null;
   const { profile, payStub } = ready;
-  const periods = payPeriodsFor(payFrequencyOf(profile, payStub));
   const age = ageAtYearEnd(payStub.tax_year, profile.birth_year);
-  if (age === null || periods === null || !profile.filing_status) return null;
+  if (age === null || !profile.pay_schedule || !profile.filing_status) return null;
   if (profile.salary_cents == null) return null;
   return {
     salary_cents: profile.salary_cents,
-    pay_periods_per_year: periods,
+    pay_periods_per_year: profile.pay_schedule.periods_per_year,
     match_tiers: profile.match_tiers ?? [],
     contribution_pct: percentInput(pct),
     tax_year: payStub.tax_year,
@@ -110,7 +108,7 @@ export function Match401kCard() {
 
   const loaded = profile.data !== undefined && payStubs.data !== undefined && decisions.data;
   const ready: Ready | null =
-    loaded && payStub && !editing && !needsPlanDetails(profile.data, payStub)
+    loaded && payStub && !editing && !needsPlanDetails(profile.data)
       ? { profile: profile.data, payStub }
       : null;
 
@@ -144,7 +142,7 @@ export function Match401kCard() {
     body = (
       <>
         <Notice tone="blue" compact icon={null}>
-          The calculator reads your tax year and pay schedule from a confirmed pay stub.
+          This step reads your tax year and pay schedule from a confirmed pay stub.
         </Notice>
         <div>
           <Button href="/setup/confirm" variant="primary">
@@ -154,7 +152,7 @@ export function Match401kCard() {
       </>
     );
   } else if (!ready) {
-    const complete = !needsPlanDetails(profile.data, payStub);
+    const complete = !needsPlanDetails(profile.data);
     body = (
       <PlanDetailsForm
         ref={focus.target('plan-form')}
@@ -261,7 +259,8 @@ function Calculator({
         <Money cents={profile.salary_cents ?? 0} decimals={0} /> salary. Your{' '}
         {formatDate(payStub.pay_date, 'short')} pay stub shows{' '}
         <Money cents={payStub.retirement_contribution_cents} /> a paycheck
-        {stubRate !== null && `, ${formatRate(stubRate)} of your gross pay,`} going to your 401(k).
+        {stubRate !== null && `, ${formatRate(stubRate)} of your pay before taxes,`} going to your
+        401(k).
       </p>
 
       <div ref={contributionRef}>
@@ -280,14 +279,14 @@ function Calculator({
       <Tile
         tone="plum"
         role="group"
-        aria-label="Calculator result"
+        aria-label="Your numbers"
         aria-busy={(inputs !== null && calc.isBusy) || undefined}
       >
         {inputs === null ? (
           <p className="m-0 text-small text-ink-3">Add your plan details to see your numbers.</p>
         ) : calc.isError ? (
           <Notice tone="warning" compact role="alert">
-            {apiErrorMessage(calc.error, 'The calculator could not run. Try again in a moment.')}
+            {apiErrorMessage(calc.error, 'Could not work out your numbers. Try again in a moment.')}
           </Notice>
         ) : result ? (
           <>
@@ -308,7 +307,7 @@ function Calculator({
             <Skeleton className="w-3/4" />
             <Skeleton className="w-full" />
             <Skeleton className="w-full" />
-            <span className="sr-only">Calculating.</span>
+            <span className="sr-only">Working out your numbers.</span>
           </div>
         )}
       </Tile>

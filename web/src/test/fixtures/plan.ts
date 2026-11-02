@@ -97,7 +97,7 @@ function figuresOf(decision: Decision): PlanFigure[] {
           `Projected federal tax for ${String(decision.inputs.tax_year)}`,
           'money',
         ),
-        f('result.projected_refund_cents', 'Projected refund (negative is owed)', 'money'),
+        f('result.projected_refund_cents', 'Refund or amount due at tax time', 'refund'),
       ];
       const suggestion = decision.result.suggestion;
       if (

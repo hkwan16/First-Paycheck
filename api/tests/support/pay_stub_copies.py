@@ -97,14 +97,15 @@ def document_of(connection: Connection, stub_id: uuid.UUID) -> uuid.UUID:
 
 
 def replaced_late_october(
-    client: TestClient, connection: Connection, user: FixtureUser
+    client: TestClient, connection: Connection, user: FixtureUser, **fields: Any
 ) -> tuple[uuid.UUID, uuid.UUID]:
     """LATE_OCTOBER confirmed, then replaced by an upload confirmed as ACME.
 
     Returns ``(old, new)``. The old stub has the later pay date, so before
     issue 190 it was "the newest stub" every newest-stub reader picked.
+    ``fields`` change both stubs (another pay schedule, say).
     """
-    old = confirm_stub(client, connection, user, **LATE_OCTOBER)
+    old = confirm_stub(client, connection, user, **{**LATE_OCTOBER, **fields})
     document = proposed_document(connection, user)
     replace(connection, user, document_of(connection, old), document)
-    return old, confirm(client, document)
+    return old, confirm(client, document, **fields)
