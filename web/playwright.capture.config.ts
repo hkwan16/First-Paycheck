@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 import { STORAGE_STATE } from './e2e/support/auth';
 
 /*
- * Captures the alpha document's screenshots and its 90-second demo recording
+ * Captures the alpha document's screenshots and its two-minute demo recording
  * from a deployed web app (no dev server): the real sign-in, the real API and
  * worker behind it. It signs in as the e2e user, makes the data the screens
  * need through the product (a pay stub, the decisions, a check-in), writes

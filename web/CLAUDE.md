@@ -973,7 +973,7 @@ so it works with a model (proposals), the fake model, or none (manual entry). `s
 hidden busy regions: Next keeps the previous page in the DOM, hidden, after a client-side
 navigation.
 
-`capture-demo.spec.ts` (project `capture-demo`, last) records the 90-second demo: one 1280x720
+`capture-demo.spec.ts` (project `capture-demo`, last) records the two-minute demo: one 1280x720
 `recordVideo` window from the saved session (no email or password typed), a caption per scene
 and an animated pointer through Playwright's screencast overlays (`support/demo.ts`), smooth
 scrolls and holds. Off camera, in a second window, it uploads the stub and waits for its read, and
