@@ -58,7 +58,7 @@ Every feature on the path above is functional in production. The table lists wha
 
 The backlog is a GitHub Project: <https://github.com/users/hkwan16/projects/1>, with the issues at <https://github.com/hkwan16/First-Paycheck/issues>. Each issue has a title, a description that ends with its definition of done, a status (To Do, In Progress, or Done), a priority (High, Medium, or Low), a milestone, and area labels. Every issue is assigned to me, since this is a solo project. The source of truth is [`docs/backlog.yaml`](../backlog.yaml), which `scripts/sync_backlog.py` syncs to GitHub, so the board follows the repo.
 
-The backlog holds 163 issues: 156 done, 3 in progress, and 4 to do (56 High, 91 Medium, and 16 Low). Milestones M0 to M10 are ordered by dependency, and each one ends with a deployed product. Since October 22, 32 issues have been added, most of them bugs found by testing production end to end. Six of the seven open issues need something from outside the repo. The seventh is a bug found while recording the demo:
+The backlog holds 163 issues: 157 done, 3 in progress, and 3 to do (56 High, 91 Medium, and 16 Low). Milestones M0 to M10 are ordered by dependency, and each one ends with a deployed product. Since October 22, 32 issues have been added, most of them bugs found by testing production end to end. The last was found while recording the demo: a pay stub confirmed twice counted its pay twice (#190), fixed the same day. The six open issues are the ones that need something from outside the repo:
 
 | Issue | Status | What it waits on |
 |---|---|---|
@@ -68,9 +68,8 @@ The backlog holds 163 issues: 156 done, 3 in progress, and 4 to do (56 High, 91 
 | #103 User test with 5 to 8 people | To do | Participants |
 | #104 Plaid production application | To do | An application to Plaid (stretch) |
 | #145 Nightly LLM evals | To do | The API key as a GitHub secret, about $1.30 a day |
-| #190 A second confirmed copy of the same pay stub counts its pay twice | To do | A decision in the spec on what the second copy means, then the fix |
 
-![The GitHub Project board on November 1: 4 to do, 3 in progress, and 156 done](screenshots/backlog.jpg)
+![The GitHub Project board on November 1: 3 to do, 3 in progress, and 157 done](screenshots/backlog.jpg)
 
 ## Brief reflection on AI tool integration
 
