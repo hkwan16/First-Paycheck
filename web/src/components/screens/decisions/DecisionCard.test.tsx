@@ -33,7 +33,7 @@ describe('PlaceholderCard', () => {
     render(<PlaceholderCard calculator="w4" />);
     const card = screen.getByRole('region', { name: 'W-4, federal only' });
     expect(within(card).getByText('After alpha')).toBeInTheDocument();
-    expect(card).toHaveTextContent('This calculator arrives after the alpha.');
+    expect(card).toHaveTextContent('This step arrives after the alpha.');
     expect(within(card).queryByRole('button')).not.toBeInTheDocument();
   });
 
@@ -53,7 +53,7 @@ describe('SaveButton', () => {
     const { rerender } = render(
       <SaveButton state={decisionSaveState(undefined, null)} canSave={false} onSave={onSave} />,
     );
-    expect(screen.getByRole('button', { name: 'Save this decision' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 
     rerender(
       <SaveButton
@@ -62,7 +62,7 @@ describe('SaveButton', () => {
         onSave={onSave}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Save as v2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(onSave).toHaveBeenCalledTimes(1);
 
     rerender(
@@ -72,19 +72,13 @@ describe('SaveButton', () => {
         onSave={onSave}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Saved as v1' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(screen.getByRole('button', { name: 'Saved' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('is busy while saving', () => {
     render(
       <SaveButton state={decisionSaveState(undefined, null)} canSave saving onSave={() => {}} />,
     );
-    expect(screen.getByRole('button', { name: 'Save this decision' })).toHaveAttribute(
-      'aria-busy',
-      'true',
-    );
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-busy', 'true');
   });
 });

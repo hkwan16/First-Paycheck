@@ -7,7 +7,6 @@ import type {
   HealthPlansInput,
   K401MatchInput,
   K401MatchResult,
-  PayFrequency,
   W4Input,
 } from './api/types';
 import { formatDate } from './dates';
@@ -51,19 +50,6 @@ export function currentDecision(
   return list?.items.find((item) => item.calculator === calculator)?.current;
 }
 
-type PayPeriods = K401MatchInput['pay_periods_per_year'];
-
-const PAY_PERIODS: Record<PayFrequency, PayPeriods> = {
-  weekly: 52,
-  biweekly: 26,
-  semimonthly: 24,
-  monthly: 12,
-};
-
-/** Paychecks a year for a pay frequency (the calculator's `pay_periods_per_year`). */
-export const payPeriodsFor = (frequency: PayFrequency | null | undefined): PayPeriods | null =>
-  frequency ? PAY_PERIODS[frequency] : null;
-
 /**
  * The age the 401(k) calculator asks for: the age reached by December 31 of
  * the tax year (spec 006), which is the tax year less the birth year. A
@@ -85,8 +71,6 @@ export const percentInput = (whole: number): string => whole.toFixed(2);
 export interface DecisionSaveState {
   /** unsaved: no decision yet. dirty: the inputs differ from the current version. */
   status: 'unsaved' | 'dirty' | 'saved';
-  /** The current version, or null before the first save. */
-  version: number | null;
   /** The save button's words. */
   action: string;
   /** The card badge's words. */
@@ -94,23 +78,22 @@ export interface DecisionSaveState {
 }
 
 /**
- * Whether the inputs on a card are the calculator's current decision. The
- * comparison is structural and exact: the API stores canonical inputs
- * (integer cents, two-place percentage strings) and the cards send them in
- * that form, so equal means the same decision. `ignore` names inputs that
- * describe the person's situation today rather than what they decided (the
- * W-4's stub withholding, spec 014 rule 17a): they are left out on both sides,
- * present or not.
+ * Whether the inputs on a card are the calculator's current decision, in the
+ * words a step shows (spec 018 rule 5a): no version number, because a step is
+ * about what is saved, not how many times. The comparison is structural and
+ * exact: the API stores canonical inputs (integer cents, two-place percentage
+ * strings) and the cards send them in that form, so equal means the same
+ * decision. `ignore` names inputs that are not what the person decided: the
+ * W-4's stub withholding describes payroll today (spec 014 rule 17a), and the
+ * health plan's usage is a what-if (spec 012 rule 18). They are left out on
+ * both sides, present or not.
  */
 export function decisionSaveState(
   current: Decision | null | undefined,
   inputs: unknown,
   { ignore = [] }: { ignore?: readonly string[] } = {},
 ): DecisionSaveState {
-  if (!current) {
-    return { status: 'unsaved', version: null, action: 'Save this decision', label: 'Not saved' };
-  }
-  const { version } = current;
+  if (!current) return { status: 'unsaved', action: 'Save', label: 'Not saved' };
   const without = (value: unknown) =>
     isRecord(value) && ignore.length > 0
       ? Object.fromEntries(Object.entries(value).filter(([key]) => !ignore.includes(key)))
@@ -118,17 +101,11 @@ export function decisionSaveState(
   if (inputs !== null && deepEqual(without(current.inputs), without(inputs))) {
     return {
       status: 'saved',
-      version,
-      action: `Saved as v${version}`,
-      label: `Saved v${version} · ${formatDate(current.created_at, 'short')}`,
+      action: 'Saved',
+      label: `Saved ${formatDate(current.created_at, 'short')}`,
     };
   }
-  return {
-    status: 'dirty',
-    version,
-    action: `Save as v${version + 1}`,
-    label: `Changed since v${version}`,
-  };
+  return { status: 'dirty', action: 'Save changes', label: 'Changes not saved' };
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

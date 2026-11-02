@@ -2,6 +2,7 @@ import type {
   BenefitsPlan,
   HealthcareUsage,
   HealthPlanOption,
+  HealthPlansInput,
   HealthPlansResult,
   PlanCost,
   PlanKind,
@@ -43,6 +44,64 @@ export const PLAN_KIND_LABELS: Record<PlanKind, string> = {
 };
 
 const dollars = (cents: number) => formatMoney(cents, { decimals: 0 });
+
+/**
+ * Inputs that only change how the comparison is shown: the usage moves the
+ * highlighted row and the "Cheapest at" badge, so trying another amount of
+ * care never marks a saved decision changed (spec 012 rule 18).
+ */
+export const HEALTH_WHAT_IF_INPUTS = [
+  'expected_usage',
+] as const satisfies readonly (keyof HealthPlansInput)[];
+
+export type HealthTerm = 'premium' | 'deductible' | 'coinsurance' | 'oop_max' | 'hdhp' | 'hsa';
+
+/**
+ * Every plan term the card uses, each in plain words written once (spec 012
+ * rule 19): the disclosure above the comparison lists them in
+ * `HEALTH_TERM_ORDER`, and the typed plan table gives each field its sentence.
+ */
+export const HEALTH_TERMS: Record<HealthTerm, { term: string; meaning: string }> = {
+  premium: {
+    term: 'Premium',
+    meaning:
+      'What the plan itself costs. It comes out of every paycheck, whether or not you see a doctor.',
+  },
+  deductible: {
+    term: 'Deductible',
+    meaning: 'What you pay for care each year before the plan starts to pay its share.',
+  },
+  coinsurance: {
+    term: 'Coinsurance',
+    meaning:
+      'Your share of each bill once the deductible is paid. At 20%, you pay $20 of a $100 bill.',
+  },
+  oop_max: {
+    term: 'Out-of-pocket maximum',
+    meaning:
+      'The most you pay for care in a year, deductible and coinsurance included. The plan pays the rest.',
+  },
+  hdhp: {
+    term: 'HDHP',
+    meaning:
+      'A high-deductible health plan, with a lower premium and a higher deductible. One that meets the IRS rules lets you save in an HSA.',
+  },
+  hsa: {
+    term: 'HSA',
+    meaning:
+      'A health savings account. What you put in is not taxed, and you can spend it on care now or keep it for later years.',
+  },
+};
+
+/** The order the comparison's rows meet the terms in. */
+export const HEALTH_TERM_ORDER: readonly HealthTerm[] = [
+  'premium',
+  'deductible',
+  'coinsurance',
+  'oop_max',
+  'hdhp',
+  'hsa',
+];
 
 /**
  * "Medium · about $3,000": a usage scenario with its yearly medical spending.

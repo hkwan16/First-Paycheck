@@ -2,6 +2,7 @@ import { act, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { emptyProfile, samplePayStub } from '@/test/fixtures/documents';
 import { db } from '@/test/msw/db';
+import { profileOut } from '@/test/msw/handlers';
 import { renderHookWithClient } from '@/test/render';
 import { queryKeys } from '../keys';
 import { usePayStubs, useProfile, useUpdateProfile } from './profile';
@@ -43,6 +44,6 @@ describe('useUpdateProfile', () => {
       match_tiers: [{ employee_pct_upto: '4.00', employer_pct: '100.00' }],
       updated_at: expect.any(String),
     });
-    expect(queryClient.getQueryData(queryKeys.profile())).toEqual(db.profile);
+    expect(queryClient.getQueryData(queryKeys.profile())).toEqual(profileOut());
   });
 });

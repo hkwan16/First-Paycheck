@@ -17,6 +17,9 @@ import {
   costText,
   draftFromOption,
   EMPTY_PLAN_DRAFT,
+  HEALTH_TERM_ORDER,
+  HEALTH_TERMS,
+  HEALTH_WHAT_IF_INPUTS,
   hdhpNotice,
   headline,
   hsaEffect,
@@ -301,5 +304,26 @@ describe('choiceAmong (issue 168)', () => {
     expect(choiceAmong(plans, null, plans)).toBeNull();
     expect(choiceAmong(null, null, plans)).toBeNull();
     expect(choiceAmong(plans, 1, [])).toBeNull();
+  });
+});
+
+describe("the card's plain words (spec 012 rules 18 and 19)", () => {
+  it('leaves only the usage out of the save comparison: it is a what-if', () => {
+    expect(HEALTH_WHAT_IF_INPUTS).toEqual(['expected_usage']);
+  });
+
+  it('explains each term the comparison uses once, in one plain sentence or two', () => {
+    expect(HEALTH_TERM_ORDER.map((key) => HEALTH_TERMS[key].term)).toEqual([
+      'Premium',
+      'Deductible',
+      'Coinsurance',
+      'Out-of-pocket maximum',
+      'HDHP',
+      'HSA',
+    ]);
+    for (const { meaning } of Object.values(HEALTH_TERMS)) {
+      expect(meaning).toMatch(/^[A-Z].*\.$/);
+      expect(meaning.split('. ').length).toBeLessThanOrEqual(2);
+    }
   });
 });

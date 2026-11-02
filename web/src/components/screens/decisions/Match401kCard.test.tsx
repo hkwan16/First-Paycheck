@@ -44,7 +44,7 @@ function requests() {
 }
 
 const card = () => screen.getByRole('region', { name: '401(k) match' });
-const result = () => within(card()).getByRole('group', { name: 'Calculator result' });
+const result = () => within(card()).getByRole('group', { name: 'Your numbers' });
 const slider = () => within(card()).getByRole('slider', { name: /Your contribution/ });
 const saveButton = () => within(card()).getByRole('button', { name: /^Save|^Saved/ });
 const settle = () => act(() => vi.advanceTimersByTimeAsync(CALC_DEBOUNCE_MS));
@@ -95,11 +95,11 @@ describe('Match401kCard with a saved decision', () => {
       ['Acme Corp adds at the full match', '$2,600'],
       ['Match you miss per year', '$0'],
       ['Extra per paycheck for the full match, before tax', '$0.00'],
-      ['Extra per paycheck, after federal tax at 12% marginal', '$0.00'],
+      ['Extra per paycheck, after the 12% federal tax it saves', '$0.00'],
     ]);
 
-    expect(within(card()).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
-    expect(saveButton()).toHaveTextContent('Saved as v1');
+    expect(within(card()).getByText('Saved Oct 17')).toBeInTheDocument();
+    expect(saveButton()).toHaveTextContent(/^Saved$/);
     expect(saveButton()).toHaveAttribute('aria-pressed', 'true');
     expect(within(card()).getByRole('link', { name: 'Why this decision' })).toHaveAttribute(
       'href',
@@ -112,12 +112,13 @@ describe('Match401kCard with a saved decision', () => {
     db.profile = {
       ...db.profile,
       salary_cents: cappedK401.inputs.salary_cents,
-      pay_frequency: 'biweekly',
       match_tiers: [
         { employee_pct_upto: '3.00', employer_pct: '100.00' },
         { employee_pct_upto: '5.00', employer_pct: '50.00' },
       ],
     };
+    // Paid every two weeks: the stub's schedule is the one the card uses (spec 005 rule 25a).
+    db.payStubs = db.payStubs.map((stub) => ({ ...stub, pay_frequency: 'biweekly' as const }));
     db.decisions = [
       sampleDecision({ inputs: { ...cappedK401.inputs }, result: { ...cappedK401.result } }),
     ];
@@ -126,7 +127,7 @@ describe('Match401kCard with a saved decision', () => {
     expect(result()).toHaveTextContent('At 6% you would capture the full $14,400 match');
     expect(within(card()).getByText(/Over the 2026 limit/)).toBeInTheDocument();
     expect(card()).toHaveTextContent('more than the $24,500 the IRS allows for 2026');
-    expect(card()).toHaveTextContent('above the 2026 compensation limit');
+    expect(card()).toHaveTextContent('above the most pay the IRS lets a plan count for 2026');
   });
 });
 
@@ -145,7 +146,7 @@ describe('Match401kCard calculating', () => {
     // Born in 1996, so 30 by the end of 2026.
     expect(seen.calc.map((body) => body.contribution_pct)).toEqual(['0.00']);
     expect(seen.calc[0]).toEqual(sampleK401(0).inputs);
-    expect(saveButton()).toHaveTextContent('Save this decision');
+    expect(saveButton()).toHaveTextContent(/^Save$/);
     expect(saveButton()).toBeEnabled();
   });
 
@@ -173,8 +174,8 @@ describe('Match401kCard calculating', () => {
     expect(seen.calcAt[1]! - stoppedAt).toBeGreaterThanOrEqual(CALC_DEBOUNCE_MS);
     expect(result()).toHaveTextContent('At 3% you would leave $650 of match behind');
     expect(within(result()).getByText('$27.08')).toBeInTheDocument();
-    expect(within(card()).getByText('Changed since v1')).toBeInTheDocument();
-    expect(saveButton()).toHaveTextContent('Save as v2');
+    expect(within(card()).getByText('Changes not saved')).toBeInTheDocument();
+    expect(saveButton()).toHaveTextContent('Save changes');
   });
 });
 
@@ -185,7 +186,7 @@ describe('Match401kCard and the rate the pay stub shows (spec 006 rule 14, issue
     const seen = requests();
     await renderReady();
     expect(card()).toHaveTextContent(
-      'Your Apr 10 pay stub shows $109.62 a paycheck, 3% of your gross pay, going to your 401(k).',
+      'Your Apr 10 pay stub shows $109.62 a paycheck, 3% of your pay before taxes, going to your 401(k).',
     );
     expect(slider()).toHaveValue('3');
     expect(slider()).toHaveAttribute('aria-valuetext', '3% of salary');
@@ -214,7 +215,7 @@ describe('Match401kCard and the rate the pay stub shows (spec 006 rule 14, issue
     await renderReady();
     expect(slider()).toHaveValue('5');
     expect(result()).toHaveTextContent('At 5% you would capture the full $3,800 match');
-    expect(saveButton()).toHaveTextContent('Saved as v1');
+    expect(saveButton()).toHaveTextContent(/^Saved$/);
   });
 
   it('says the whole match is left behind only at the rate the stub shows', async () => {
@@ -250,7 +251,7 @@ describe('Match401kCard saving', () => {
     await waitFor(() => expect(saveButton()).toBeEnabled());
 
     await user.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v1'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
     expect(seen.save).toEqual([
       {
         calculator: 'k401_match',
@@ -259,7 +260,7 @@ describe('Match401kCard saving', () => {
         supersedes_id: null,
       },
     ]);
-    expect(within(card()).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
+    expect(within(card()).getByText('Saved Oct 17')).toBeInTheDocument();
     const v1 = db.decisions[0]!.id;
     expect(within(card()).getByRole('link', { name: 'Why this decision' })).toHaveAttribute(
       'href',
@@ -268,11 +269,11 @@ describe('Match401kCard saving', () => {
 
     drag(6);
     await settle();
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
     await user.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
     expect(seen.save[1]).toMatchObject({ supersedes_id: v1, inputs: sampleK401(6).inputs });
-    expect(within(card()).getByText('Saved v2 · Oct 17')).toBeInTheDocument();
+    expect(within(card()).getByText('Saved Oct 17')).toBeInTheDocument();
   });
 
   it('recalculates and asks to save again when the server finds the result out of date', async () => {
@@ -303,16 +304,16 @@ describe('Match401kCard saving', () => {
 
     await user.click(saveButton());
     expect(
-      await within(card()).findByText(/The calculator's numbers had changed/),
+      await within(card()).findByText(/Your numbers changed after they were shown/),
     ).toBeInTheDocument();
     await waitFor(() => expect(seen.calc.length).toBe(calcsBefore + 1));
     expect(db.decisions).toHaveLength(1);
 
     await waitFor(() => expect(saveButton()).toBeEnabled());
     await user.click(saveButton());
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Saved as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
     expect(
-      within(card()).queryByText(/The calculator's numbers had changed/),
+      within(card()).queryByText(/Your numbers changed after they were shown/),
     ).not.toBeInTheDocument();
   });
 
@@ -330,12 +331,12 @@ describe('Match401kCard saving', () => {
     );
     drag(6);
     await settle();
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
 
     await user.click(saveButton());
-    expect(await within(card()).findByText(/saved somewhere else/)).toBeInTheDocument();
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v3'));
-    expect(within(card()).getByText('Changed since v2')).toBeInTheDocument();
+    expect(await within(card()).findByText(/saved in another tab or window/)).toBeInTheDocument();
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
+    expect(within(card()).getByText('Changes not saved')).toBeInTheDocument();
   });
 });
 
@@ -357,8 +358,8 @@ describe('Match401kCard plan details', () => {
     await user.clear(within(form).getByLabelText('Yearly salary'));
     await user.type(within(form).getByLabelText('Yearly salary'), '65,000');
     await user.click(within(form).getByRole('button', { name: 'Single' }));
-    await user.type(within(form).getByLabelText('Employer adds, % of what you put in'), '100');
-    await user.type(within(form).getByLabelText('Up to, % of your pay'), '4');
+    await user.type(within(form).getByLabelText('Employer adds, as a % of what you put in'), '100');
+    await user.type(within(form).getByLabelText('Up to this % of your pay'), '4');
     await user.type(within(form).getByLabelText('Year you were born'), '1996');
     await user.click(within(form).getByRole('button', { name: 'Save plan details' }));
 
@@ -371,7 +372,8 @@ describe('Match401kCard plan details', () => {
         filing_status: 'single',
         match_tiers: [{ employer_pct: '100', employee_pct_upto: '4' }],
         other_jobs: [],
-        pay_frequency: 'semimonthly',
+        // The stub's schedule is the schedule; it is never copied (issue 198).
+        pay_frequency: null,
         salary_cents: 6_500_000,
         start_date: null,
         vesting_years: null,
@@ -380,6 +382,55 @@ describe('Match401kCard plan details', () => {
     expect(card()).toHaveTextContent(
       'Acme Corp matches 100% of the first 4% of your $65,000 salary.',
     );
+  });
+
+  it("shows the pay stub's schedule where it is set, with how to change it (issue 198)", async () => {
+    decisionsReady();
+    db.profile = { ...emptyProfile };
+    renderCard();
+    const form = await within(
+      await screen.findByRole('region', { name: '401(k) match' }),
+    ).findByRole('form', { name: 'Your plan details' });
+    const schedule = within(form).getByRole('group', { name: 'How often you are paid' });
+    expect(schedule).toHaveTextContent('Twice a month, 24 paychecks a year');
+    expect(schedule).toHaveTextContent('From your pay stub of Oct 15, 2026.');
+    expect(within(schedule).getByRole('link', { name: 'add a newer pay stub' })).toHaveAttribute(
+      'href',
+      '/setup/link',
+    );
+    expect(within(form).queryByRole('combobox')).toBeNull();
+  });
+
+  it('calculates on the stub schedule when the profile still says every two weeks (issue 198)', async () => {
+    decisionsReady();
+    db.profile = { ...db.profile, pay_frequency: 'biweekly' };
+    const seen = requests();
+    const bodies: { pay_periods_per_year?: number }[] = [];
+    server.events.on('request:start', async ({ request }) => {
+      if (new URL(request.url).pathname === '/calc/401k-match') {
+        bodies.push(await request.clone().json());
+      }
+    });
+    await renderReady();
+    expect(seen.calc.length).toBeGreaterThan(0);
+    expect(bodies.map((body) => body.pay_periods_per_year)).toEqual(bodies.map(() => 24));
+  });
+
+  it('asks how often you are paid when the stub prints no schedule, and saves the answer', async () => {
+    decisionsReady();
+    db.payStubs = [samplePayStub({ pay_frequency: null, annual_salary_cents: null })];
+    db.profile = { ...db.profile, pay_frequency: null };
+    const { user } = renderCard();
+    const form = await within(
+      await screen.findByRole('region', { name: '401(k) match' }),
+    ).findByRole('form', { name: 'Your plan details' });
+    await user.selectOptions(
+      within(form).getByLabelText('How often you are paid'),
+      'Twice a month',
+    );
+    await user.click(within(form).getByRole('button', { name: 'Save plan details' }));
+    await within(card()).findByRole('slider');
+    expect(db.profile.pay_frequency).toBe('semimonthly');
   });
 
   it('asks once for the birth year a profile saved before it existed, keeping the rest', async () => {
@@ -415,15 +466,15 @@ describe('Match401kCard plan details', () => {
     const salary = within(form).getByLabelText('Yearly salary');
     expect(salary).toHaveValue('64,999.92');
     expect(salary).toHaveAccessibleDescription(
-      'From your pay stub of Oct 15, 2026, as a year of paychecks like it. Change it if that paycheck had overtime or a bonus.',
+      'Your Oct 15, 2026 paycheck times 24 paychecks a year. Change it if that paycheck had overtime or a bonus.',
     );
     const birthYear = within(form).getByLabelText('Year you were born');
     expect(birthYear).toHaveValue('');
     expect(birthYear).toHaveAttribute('placeholder', 'for example 1996');
 
     await user.click(within(form).getByRole('button', { name: 'Single' }));
-    await user.type(within(form).getByLabelText('Employer adds, % of what you put in'), '100');
-    await user.type(within(form).getByLabelText('Up to, % of your pay'), '4');
+    await user.type(within(form).getByLabelText('Employer adds, as a % of what you put in'), '100');
+    await user.type(within(form).getByLabelText('Up to this % of your pay'), '4');
     await user.type(birthYear, '1996');
     await user.click(within(form).getByRole('button', { name: 'Save plan details' }));
 
@@ -544,11 +595,11 @@ describe('Match401kCard focus (issue 167)', () => {
     await user.click(changePlan());
     await user.click(within(form()).getByRole('button', { name: 'Add a tier' }));
     expect(
-      within(form()).getByLabelText('Tier 2: Employer adds, % of what you put in'),
+      within(form()).getByLabelText('Tier 2: Employer adds, as a % of what you put in'),
     ).toHaveFocus();
 
     await user.click(within(form()).getByRole('button', { name: 'Remove tier 2' }));
-    expect(within(form()).getByLabelText('Employer adds, % of what you put in')).toHaveFocus();
+    expect(within(form()).getByLabelText('Employer adds, as a % of what you put in')).toHaveFocus();
   });
 });
 
@@ -568,7 +619,10 @@ describe('Match401kCard before it can calculate', () => {
       http.post(apiUrl('/calc/401k-match'), () =>
         HttpResponse.json(
           {
-            error: { code: 'validation_error', message: 'no federal constants for tax year 2026' },
+            error: {
+              code: 'validation_error',
+              message: 'We do not have the federal tax figures for 2026 yet',
+            },
           },
           { status: 422 },
         ),
@@ -576,12 +630,12 @@ describe('Match401kCard before it can calculate', () => {
     );
     renderCard();
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'no federal constants for tax year 2026',
+      'We do not have the federal tax figures for 2026 yet',
     );
     expect(result()).not.toHaveTextContent('You capture');
     drag(6);
     await settle();
-    await waitFor(() => expect(saveButton()).toHaveTextContent('Save as v2'));
+    await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
     expect(saveButton()).toBeDisabled();
   });
 });

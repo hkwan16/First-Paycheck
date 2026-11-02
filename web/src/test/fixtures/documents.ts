@@ -313,7 +313,12 @@ export function payScheduleOf(
   }
   if (profile.pay_frequency) {
     const frequency = profile.pay_frequency;
-    return { frequency, periods_per_year: PERIODS[frequency], source: 'profile', pay_stub_date: null };
+    return {
+      frequency,
+      periods_per_year: PERIODS[frequency],
+      source: 'profile',
+      pay_stub_date: null,
+    };
   }
   return null;
 }

@@ -5,7 +5,8 @@ import { decisionStepRoute } from '@/lib/routes';
 
 export interface StepFooterLinks {
   back: { href: Route; label?: string };
-  next: { label: string; href: Route };
+  /** Never primary: the card's save is the step's one primary action (spec 018 rule 5b). */
+  next: { label: string; href: Route; primary: false };
 }
 
 /**
@@ -22,7 +23,7 @@ export function stepFooter(
       ? { href: decisionStepRoute(previous), label: `Back to ${STEP_TEXT[previous].name}` }
       : { href: '/setup/spending' },
     next: next
-      ? { label: `Next: ${STEP_TEXT[next].name}`, href: decisionStepRoute(next) }
-      : { label: 'See your plan', href: '/plan' },
+      ? { label: `Next: ${STEP_TEXT[next].name}`, href: decisionStepRoute(next), primary: false }
+      : { label: 'See your plan', href: '/plan', primary: false },
   };
 }

@@ -1,7 +1,8 @@
-import type { Decision, PayFrequency, PayStub, W4Input, W4Result } from '@/lib/api/types';
+import type { Decision, W4Input, W4Result } from '@/lib/api/types';
 import { asHealthPlansInputs, asK401Inputs } from '@/lib/decisions';
 import type { Tone } from '@/lib/design/tone';
 import { formatMoney, formatRate } from '@/lib/money';
+import type { ReadAmount } from './decision-format';
 
 /*
  * The W-4 card's words. Every amount here is a field the calculator returned
@@ -32,27 +33,15 @@ export function refundHeadline(cents: number): string {
   }
 }
 
-/** A refund or balance due as a row value: "$0.08 refund", "$3,449.92 due". */
-export function refundText(cents: number): string {
-  switch (outcome(cents)) {
-    case 'refund':
-      return `${magnitude(cents)} refund`;
-    case 'due':
-      return `${magnitude(cents)} due`;
-    default:
-      return 'Nothing due, no refund';
-  }
-}
-
-/** The phrase after "That brings tax time to": "a $6.08 refund", "$0.10 due". */
+/** What the person would get or owe after the suggestion: "get a $6.08 refund", "owe $0.10". */
 function landing(cents: number): string {
   switch (outcome(cents)) {
     case 'refund':
-      return `a ${magnitude(cents)} refund`;
+      return `get a ${magnitude(cents)} refund`;
     case 'due':
-      return `${magnitude(cents)} due`;
+      return `owe ${magnitude(cents)}`;
     default:
-      return 'nothing due and no refund';
+      return 'owe nothing and get no refund';
   }
 }
 
@@ -64,14 +53,14 @@ export const refundTone = (cents: number): Tone => (outcome(cents) === 'due' ? '
 
 /** The calculator's suggestion in words, or null when it suggests nothing (spec 014 rule 14). */
 export function suggestionText(result: W4Result): string | null {
-  const after = `That brings tax time to ${landing(result.suggested_refund_cents)}.`;
+  const after = `You would then ${landing(result.suggested_refund_cents)} at tax time.`;
   switch (result.suggestion) {
     case 'increase_extra_withholding':
-      return `Enter ${formatMoney(result.suggested_extra_withholding_cents)} in Step 4(c) to withhold that much more each paycheck. ${after}`;
+      return `Enter ${formatMoney(result.suggested_extra_withholding_cents)} in Step 4(c) to have that much more taken out of each paycheck. ${after}`;
     case 'decrease_extra_withholding':
       return `Lower Step 4(c) to ${formatMoney(result.suggested_extra_withholding_cents)} a paycheck. ${after}`;
     case 'increase_deductions':
-      return `Enter ${formatMoney(result.suggested_deductions_cents)} in Step 4(b). ${after} The entry is larger than the deductions you expect, which stay in "Deductions you expect to claim".`;
+      return `Enter ${formatMoney(result.suggested_deductions_cents)} in Step 4(b). ${after} This is more than the deductions you expect to claim, so those go in "Deductions you expect to claim" and the estimate still uses them.`;
     default:
       return null;
   }
@@ -124,21 +113,6 @@ export function fromDecisions(
 }
 
 /**
- * What the newest confirmed stub withholds each paycheck, for the comparison
- * at current withholding (spec 014 rule 10a), or null when its paycheck is
- * not the card's: a stub on another pay schedule. A stub with no schedule is
- * taken to be on the card's. A copy of the stub's figure, never worked out.
- */
-export function currentWithholdingOf(
-  payStub: PayStub,
-  frequency: PayFrequency | null,
-): number | null {
-  const onSchedule =
-    frequency !== null && (payStub.pay_frequency === null || payStub.pay_frequency === frequency);
-  return onSchedule ? payStub.federal_withholding_cents : null;
-}
-
-/**
  * Inputs that describe payroll today, not an entry on the form: a saved
  * decision stays saved when only these differ (spec 014 rule 17a), so a newer
  * stub alone never makes the W-4 look changed.
@@ -147,11 +121,43 @@ export const W4_CONTEXT_INPUTS = [
   'current_withholding_per_paycheck_cents',
 ] as const satisfies readonly (keyof W4Input)[];
 
-const SCHEDULES: Record<W4Result['withholding_schedule'], string> = {
-  standard: 'Standard schedule',
-  step2_checkbox: 'Step 2 checkbox schedule',
+const TABLES: Record<W4Result['withholding_schedule'], string> = {
+  standard: 'The IRS withholding tables',
+  step2_checkbox: 'The IRS withholding tables for two jobs',
 };
 
-/** The Pub 15-T schedule and the rate of the row the withholding used. */
-export const scheduleText = (result: W4Result) =>
-  `${SCHEDULES[result.withholding_schedule]}, ${formatRate(result.withholding_rate_pct)} row`;
+/**
+ * How the paycheck's withholding was worked out, in words (spec 014 rule 21):
+ * the schedule the calculator used and the rate of its row. The publication
+ * is a source link beside it, never part of the sentence.
+ */
+export const methodText = (result: W4Result) =>
+  `${TABLES[result.withholding_schedule]} take ${formatRate(result.withholding_rate_pct)} of each extra dollar of pay.`;
+
+/** Pub 15-T, the withholding tables the calculator follows. */
+export const WITHHOLDING_TABLES_SOURCE = 'https://www.irs.gov/publications/p15t';
+
+export interface W4Entries {
+  /** Step 2(c)'s box. */
+  multipleJobs: boolean;
+  /** The readings of Steps 2 to 4's amounts. */
+  amounts: readonly ReadAmount[];
+  /** The reading of "Deductions you expect to claim" (empty means the Step 4(b) entry). */
+  expected: ReadAmount;
+}
+
+/**
+ * Whether the entries behind "Anything else on your W-4?" hold anything
+ * (spec 014 rule 20): the box checked, an amount that is not 0 (an empty one
+ * or one that does not read included, so its field shows), or expected
+ * deductions set. A comparison with zero to decide what to show, never an
+ * amount worked out.
+ */
+export function hasMoreEntries({ multipleJobs, amounts, expected }: W4Entries): boolean {
+  return (
+    multipleJobs ||
+    amounts.some((read) => read.cents !== 0) ||
+    expected.cents !== null ||
+    expected.error !== null
+  );
+}

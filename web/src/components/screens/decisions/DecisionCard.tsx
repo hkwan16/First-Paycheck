@@ -102,9 +102,7 @@ export function PlaceholderCard({ calculator }: PlaceholderCardProps) {
       muted
       badge={<Badge>After alpha</Badge>}
     >
-      <p className="m-0 text-small text-ink-3">
-        {summary} This calculator arrives after the alpha.
-      </p>
+      <p className="m-0 text-small text-ink-3">{summary} This step arrives after the alpha.</p>
     </DecisionCard>
   );
 }
@@ -118,8 +116,10 @@ export interface SaveButtonProps {
 }
 
 /**
- * A card's save action: "Save this decision", "Save as v3", or the pressed
- * "Saved as v2" once what is on screen is the current version.
+ * A card's save action, the step's one primary button (spec 018 rules 5a and
+ * 5b): "Save", "Save changes", or the pressed "Saved" once what is on screen
+ * is what is saved. No version number: those belong to the Why pages and the
+ * Plan.
  */
 export function SaveButton({ state, canSave, saving = false, onSave }: SaveButtonProps) {
   return state.status === 'saved' ? (

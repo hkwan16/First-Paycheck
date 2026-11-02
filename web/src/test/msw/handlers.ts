@@ -33,12 +33,7 @@ import {
   sampleExplanation,
   sampleFallbackExplanation,
 } from '../fixtures/decisions';
-import {
-  canReadAgain,
-  payScheduleOf,
-  samplePayStub,
-  sampleValues,
-} from '../fixtures/documents';
+import { canReadAgain, payScheduleOf, samplePayStub, sampleValues } from '../fixtures/documents';
 import { sampleJob, SAMPLE_NOW, SAMPLE_SYNCED_AT } from '../fixtures/sample';
 import { checkinHandlers } from './checkin-handlers';
 import { db, emptyDb } from './db';
@@ -445,13 +440,13 @@ async function explain(request: Request) {
   return HttpResponse.json(run.at(-1));
 }
 
-/** Default handlers: the happy path for every route the web app calls. */
 /** `GET /profile` and `PUT /profile`: the saved profile with the pay schedule read now (rule 25a). */
-const profileOut = (): Profile => ({
+export const profileOut = (): Profile => ({
   ...db.profile,
   pay_schedule: payScheduleOf(db.payStubs[0], db.profile),
 });
 
+/** Default handlers: the happy path for every route the web app calls. */
 export const handlers = [
   // First: its benefits confirm handler passes pay stubs on to the one below.
   ...planningHandlers,

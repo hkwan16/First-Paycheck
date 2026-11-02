@@ -115,10 +115,10 @@ describe('SampleScreen after Confirm', () => {
     const requests = countRequests();
     render(<SampleScreen screen="decisions-401k" />);
     const card = await screen.findByRole('region', { name: '401(k) match' });
-    expect(within(card).getByRole('group', { name: 'Calculator result' })).toHaveTextContent(
+    expect(within(card).getByRole('group', { name: 'Your numbers' })).toHaveTextContent(
       'At 4% you would capture the full $2,600 match',
     );
-    expect(within(card).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
+    expect(within(card).getByText('Saved Oct 17')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Emergency fund' })).toBeNull();
     expect(screen.getByText(/of 4 saved/)).toHaveTextContent('4 of 4 saved');
     expect(screen.getByRole('link', { name: '401(k) match, done' })).toHaveAttribute(
@@ -136,7 +136,7 @@ describe('SampleScreen after Confirm', () => {
     const requests = countRequests();
     render(<SampleScreen screen="decisions-emergency-fund" />);
     const fund = await screen.findByRole('region', { name: 'Emergency fund' });
-    expect(within(fund).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
+    expect(within(fund).getByText('Saved Oct 17')).toBeInTheDocument();
     expect(
       within(fund).getByRole('group', { name: 'Your emergency fund goal' }),
     ).toBeInTheDocument();
@@ -152,7 +152,7 @@ describe('SampleScreen after Confirm', () => {
     const requests = countRequests();
     render(<SampleScreen screen="decisions-health-plan" />);
     const health = await screen.findByRole('region', { name: 'Health plan' });
-    expect(within(health).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
+    expect(within(health).getByText('Saved Oct 17')).toBeInTheDocument();
     expect(
       within(health).getByRole('table', { name: 'Expected yearly cost by plan' }),
     ).toBeInTheDocument();
@@ -164,11 +164,11 @@ describe('SampleScreen after Confirm', () => {
     const requests = countRequests();
     render(<SampleScreen screen="decisions-w4" />);
     const w4 = await screen.findByRole('region', { name: 'W-4, federal only' });
-    expect(within(w4).getByText('Saved v1 · Oct 17')).toBeInTheDocument();
+    expect(within(w4).getByText('Saved Oct 17')).toBeInTheDocument();
     expect(within(w4).getByRole('group', { name: 'From your decisions' })).toHaveTextContent(
       '$62.50, Gold PPO',
     );
-    expect(within(w4).getByRole('group', { name: 'Calculator result' })).toHaveTextContent(
+    expect(within(w4).getByRole('group', { name: 'Your numbers' })).toHaveTextContent(
       'A $0.08 refund at tax time',
     );
     expect(w4).toHaveTextContent(

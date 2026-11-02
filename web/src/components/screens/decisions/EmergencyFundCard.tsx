@@ -3,9 +3,6 @@
 import { useId, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { Bar } from '@/components/ui/Bar';
-import { Button } from '@/components/ui/Button';
-import { KV, KVList } from '@/components/ui/KV';
-import { Money } from '@/components/ui/Money';
 import { Notice } from '@/components/ui/Notice';
 import { Range } from '@/components/ui/Range';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -25,12 +22,7 @@ import {
 import type { EmergencyFundInput, SpendingSummary } from '@/lib/api/types';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/dates';
-import {
-  asEmergencyFundInputs,
-  currentDecision,
-  decisionSaveState,
-  payPeriodsFor,
-} from '@/lib/decisions';
+import { asEmergencyFundInputs, currentDecision, decisionSaveState } from '@/lib/decisions';
 import { toneText } from '@/lib/design/tone';
 import { formatMoney, formatRate } from '@/lib/money';
 import { AmountField } from './AmountField';
@@ -53,7 +45,8 @@ import {
   monthsText,
 } from './emergency-fund-format';
 import { EmergencyGoal } from './EmergencyGoal';
-import { payFrequencyOf } from './plan-details';
+import { FundResultRows } from './FundResultRows';
+import { PayScheduleForm } from './PaySchedule';
 
 const CALC_PATH = '/calc/emergency-fund';
 /** The target slider's range: the product suggests 3 to 6 months; the calculator takes up to 12. */
@@ -117,7 +110,7 @@ export function EmergencyFundCard() {
     !accounts.isPending &&
     !summary.isPending &&
     !goals.isPending;
-  const periods = loaded ? payPeriodsFor(payFrequencyOf(profile.data, payStubs.data[0])) : null;
+  const periods = profile.data?.pay_schedule?.periods_per_year ?? null;
 
   let missing: string | null = null;
   if (essentialsRead.cents === null) missing = 'Enter your essential spending';
@@ -163,19 +156,7 @@ export function EmergencyFundCard() {
       </div>
     );
   } else if (periods === null) {
-    body = (
-      <>
-        <Notice tone="blue" compact icon={null}>
-          The calculator spreads your monthly transfer over your paychecks, so it needs your pay
-          schedule from a confirmed pay stub.
-        </Notice>
-        <div>
-          <Button href="/setup/confirm" variant="primary">
-            Confirm your pay stub
-          </Button>
-        </div>
-      </>
-    );
+    body = <PayScheduleForm profile={profile.data} />;
   } else {
     body = (
       <>
@@ -217,7 +198,7 @@ export function EmergencyFundCard() {
           error={contributionRead.error}
           hint={
             contribution === null && goalContribution !== null && current && saved
-              ? `From your goal. Your saved decision, v${current.version}, has ${formatMoney(saved.monthly_contribution_cents)} a month.`
+              ? `From your goal. Your saved decision has ${formatMoney(saved.monthly_contribution_cents)} a month.`
               : 'What you will move into savings each month.'
           }
           placeholder={examplePlaceholder(CONTRIBUTION_EXAMPLE)}
@@ -300,15 +281,10 @@ function FundResult({ inputs, missing, calc, periods, monthsValue }: FundResultP
   } else if (calc.isError) {
     content = (
       <Notice tone="warning" compact role="alert">
-        {apiErrorMessage(calc.error, 'The calculator could not run. Try again in a moment.')}
+        {apiErrorMessage(calc.error, 'Could not work out your numbers. Try again in a moment.')}
       </Notice>
     );
   } else if (result) {
-    const reach = result.funded
-      ? 'Already there'
-      : result.months_to_target === null
-        ? `Not within ${monthsText(result.horizon_months, { years: true })}`
-        : monthsText(result.months_to_target);
     content = (
       <>
         <div className={cn('text-headline font-bold', toneText.teal)} aria-live="polite">
@@ -320,28 +296,13 @@ function FundResult({ inputs, missing, calc, periods, monthsValue }: FundResultP
           label="Emergency fund progress"
           valueText={`${formatRate(result.funded_pct)} of the target`}
         />
-        <KVList rules="all" spacing="panel">
-          <KV
-            label={`Target, ${monthsText(calc.inputs?.target_months ?? monthsValue)} of essentials`}
-            value={<Money cents={result.target_cents} className="font-semibold" />}
-          />
-          <KV
-            label="Suggested range, 3 to 6 months"
-            value={
-              <>
-                <Money cents={result.three_month_target_cents} /> to{' '}
-                <Money cents={result.six_month_target_cents} />
-              </>
-            }
-          />
-          <KV label="Already saved" value={`${formatRate(result.funded_pct)} of the target`} />
-          <KV label="Still to save" value={<Money cents={result.shortfall_cents} />} />
-          <KV label="Months to reach it" value={reach} />
-          <KV
-            label={`Per paycheck, ${periods} a year`}
-            value={<Money cents={result.per_paycheck_contribution_cents} tone="teal" />}
-          />
-        </KVList>
+        <FundResultRows
+          result={result}
+          targetMonths={calc.inputs?.target_months ?? monthsValue}
+          periods={periods}
+          rules="all"
+          spacing="panel"
+        />
       </>
     );
   } else {
@@ -350,7 +311,7 @@ function FundResult({ inputs, missing, calc, periods, monthsValue }: FundResultP
         <Skeleton className="w-3/4" />
         <Skeleton className="w-full" />
         <Skeleton className="w-full" />
-        <span className="sr-only">Calculating.</span>
+        <span className="sr-only">Working out your numbers.</span>
       </div>
     );
   }
@@ -358,7 +319,7 @@ function FundResult({ inputs, missing, calc, periods, monthsValue }: FundResultP
     <Tile
       tone="teal"
       role="group"
-      aria-label="Calculator result"
+      aria-label="Your numbers"
       aria-busy={(inputs !== null && calc.isBusy) || undefined}
     >
       {content}
