@@ -777,7 +777,8 @@ for the amounts over one SVG of cubic bands. Not d3-sankey and not a chart libra
 
 - **Layout** (`layoutCashFlow(flow, containerWidth)`) is pure geometry: four columns (gross pay;
   withholding lines and take-home; buckets; categories), node heights from a scale fixed by a
-  400 px target for the tallest node: gross pay (income when there is no confirmed stub), or a
+  240 px target for the tallest node (every column stacked from the top, so the diagram is as tall
+  as its tallest column, issue 201): gross pay (income when there is no confirmed stub), or a
   bucket or category when spending outran that income (the Plaid sandbox deposits $4.22 in a
   month that spends $1,689.63). No scale, and no badge, without pay or income to draw from. The
   "1 px is about $N" badge is computed, not hand-tuned. Amounts are placed, never added or

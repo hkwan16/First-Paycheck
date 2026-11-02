@@ -10,6 +10,7 @@ import {
   NODE_GAP,
   NODE_W,
   TARGET_GROSS_PX,
+  TOP,
   type FlowLayout,
 } from './layout';
 
@@ -94,8 +95,8 @@ describe('layoutCashFlow', () => {
   it('derives the scale from a target gross height, for the "1 px is about" badge', () => {
     expect(layout.scale).not.toBeNull();
     expect(layout.scale!.pxPerCent).toBeCloseTo(TARGET_GROSS_PX / 541_666, 12);
-    // 541,666 cents over 400 px is 1,354.165 cents a pixel.
-    expect(layout.scale!.centsPerPx).toBe(1_354);
+    // 541,666 cents over 240 px is 2,256.94 cents a pixel.
+    expect(layout.scale!.centsPerPx).toBe(2_257);
     expect(node(layout, 'gross').valuePx).toBeCloseTo(TARGET_GROSS_PX, 6);
   });
 
@@ -163,9 +164,12 @@ describe('layoutCashFlow', () => {
     expect(layout.hostH).toBeGreaterThan(bottom);
   });
 
-  it('starts the buckets level with take-home and the categories level with the first bucket', () => {
-    expect(node(layout, 'bucket:essentials').y).toBe(node(layout, 'take-home').y);
-    expect(node(layout, 'category:housing').y).toBe(node(layout, 'bucket:essentials').y);
+  it('starts every column at the top, so it is as tall as its tallest column (issue 201)', () => {
+    expect(layout.columns.map((column) => column[0]!.y)).toEqual([TOP, TOP, TOP, TOP]);
+    const bottom = Math.max(...layout.nodes.map((n) => n.y + n.h));
+    expect(layout.hostH).toBe(Math.ceil(bottom) + 12);
+    // Two pay stubs, seven withholding lines and nine categories, in under one screen.
+    expect(layout.hostH).toBe(525);
   });
 
   it('spreads four columns over the container, never narrower than the minimum', () => {
@@ -195,7 +199,7 @@ describe('layoutCashFlow', () => {
     expect(node(noStubs, 'take-home')).toMatchObject({ name: 'Income deposited', cents: 399_208 });
     expect(outOf(noStubs, 'gross')).toEqual([]);
     // The scale now comes from the income.
-    expect(noStubs.scale!.centsPerPx).toBe(998);
+    expect(noStubs.scale!.centsPerPx).toBe(1_663);
   });
 
   it('draws the sandbox month as the API gives it: a little income, spending far beyond it', () => {
@@ -208,11 +212,11 @@ describe('layoutCashFlow', () => {
       cents: -168_541,
       zero: true,
     });
-    // Scaled to 400 px for 4.22, savings alone would be about 94,800 px tall.
-    // The tallest node sets the scale instead: savings, 1,000.00, at 400 px.
+    // Scaled to 240 px for 4.22, savings alone would be about 56,900 px tall.
+    // The tallest node sets the scale instead: savings, 1,000.00, at 240 px.
     expect(node(sandbox, 'bucket:savings').valuePx).toBeCloseTo(TARGET_GROSS_PX, 6);
     expect(Math.max(...sandbox.nodes.map((n) => n.valuePx))).toBeCloseTo(TARGET_GROSS_PX, 6);
-    expect(sandbox.scale!.centsPerPx).toBe(250);
+    expect(sandbox.scale!.centsPerPx).toBe(417);
   });
 
   it('draws spending beyond income as a dashed node with no band', () => {

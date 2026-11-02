@@ -32,8 +32,12 @@ export const NODE_GAP = 8;
 /** Space above the first node for the column headings. */
 export const TOP = 28;
 const BOTTOM = 12;
-/** How tall gross pay is drawn; the scale follows from it. */
-export const TARGET_GROSS_PX = 400;
+/**
+ * How tall the tallest node is drawn; the scale follows from it. Small enough
+ * that the diagram, its seven withholding lines and a dozen categories fit in
+ * about one screen (issue 201).
+ */
+export const TARGET_GROSS_PX = 240;
 /** The thinnest band drawn, so a few dollars still show. */
 export const MIN_BAND_PX = 1.5;
 
@@ -383,10 +387,9 @@ export function layoutCashFlow(flow: CashFlow, containerWidth: number): FlowLayo
     bucketNodes,
     categoryNodes,
   ];
-  stack(columns[0], TOP);
-  stack(columns[1], TOP);
-  stack(columns[2], takeHome.y);
-  stack(columns[3], bucketNodes[0]?.y ?? TOP);
+  // Every column from the top, so the diagram is as tall as its tallest
+  // column; the bands curve up to the buckets (spec 010 rule 5, issue 201).
+  for (const column of columns) stack(column, TOP);
 
   const links: FlowLink[] = [];
   for (const parent of nodes) {

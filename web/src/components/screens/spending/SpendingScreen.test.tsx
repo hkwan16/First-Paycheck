@@ -219,7 +219,7 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
     expect(
       await screen.findByRole('heading', { name: 'Where each dollar of October pay went' }),
     ).toBeInTheDocument();
-    expect(within(card()).getByText('Scale: 1 px is about $14')).toBeInTheDocument();
+    expect(within(card()).getByText('Scale: 1 px is about $23')).toBeInTheDocument();
     expect(node('Gross pay, 2 stubs $5,416.66')).toBeInTheDocument();
     expect(node('Take-home $3,992.08')).toBeInTheDocument();
     expect(within(card()).getByText('Pay stubs, October')).toBeInTheDocument();
@@ -354,9 +354,9 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
     expect(node('Income deposited $4.22')).toBeInTheDocument();
     expect(node('Spent beyond income -$1,685.41')).toBeInTheDocument();
     expect(tile('Income')).toHaveTextContent('$4.22');
-    // Savings, the tallest node, is drawn 400 px tall: $1,000.00 / 400 is $2.50,
+    // Savings, the tallest node, is drawn 240 px tall: $1,000.00 / 240 is $4.17,
     // shown in whole dollars. (Scaled by the $4.22 of income, it read "$0.01".)
-    expect(within(card()).getByText('Scale: 1 px is about $3')).toBeInTheDocument();
+    expect(within(card()).getByText('Scale: 1 px is about $4')).toBeInTheDocument();
   });
 
   it('says there is nothing to draw for an empty period', async () => {
