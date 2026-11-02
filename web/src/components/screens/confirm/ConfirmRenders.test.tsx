@@ -45,7 +45,7 @@ describe('Confirm review renders', () => {
   it('renders only the pay stub row being typed in', async () => {
     db.documents = [sampleDocument({ status: 'manual_entry_required', status_reason: 'refused' })];
     db.proposals.set(PAY_STUB_DOC_ID, structuredClone(manualEntryProposal));
-    await typeOneKey(PAY_STUB_DOC_ID, 'Pay stub fields', 'Gross pay');
+    await typeOneKey(PAY_STUB_DOC_ID, 'Pay stub details', 'Gross pay');
     expect(confidenceBadge).toHaveBeenCalledOnce();
     expect(splitSourceLine).not.toHaveBeenCalled();
   });

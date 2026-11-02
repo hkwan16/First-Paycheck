@@ -33,6 +33,7 @@ ACME_STUB_LINES = [
     "Medicare 39.27",
     "CA State Tax 98.14",
     "CA SDI 32.50",
+    "401(k) -",
     "Medical Pretax 62.50",
     "Dental/Vision 14.20",
     "Net Pay 1,996.04",

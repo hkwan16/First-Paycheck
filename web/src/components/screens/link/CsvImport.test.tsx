@@ -100,7 +100,7 @@ describe('CsvImport', () => {
     );
     expect(imported.closest('[role="status"]')).not.toBeNull();
     expect(
-      within(region()).getByRole('progressbar', { name: 'Labeling categories' }),
+      within(region()).getByRole('progressbar', { name: 'Sorting into categories' }),
     ).toBeInTheDocument();
     expect(
       within(region()).getByRole('progressbar', { name: 'Finding recurring charges' }),
@@ -172,7 +172,7 @@ describe('CsvImport', () => {
     );
     const alert = await within(region()).findByRole('alert');
     expect(alert).toHaveTextContent(
-      'Another import into this account finished first. Try again: rows already imported are not added twice.',
+      'Another import into this account finished first. Try again. Transactions already imported are not added twice.',
     );
     await user.click(within(alert).getByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(xhr.requests).toHaveLength(2));

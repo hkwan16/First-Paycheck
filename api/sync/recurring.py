@@ -20,6 +20,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from calc.recurring import median_cents, moved_more_than, within_pct
+from db.accounts import SPENDING_ACCOUNT_KINDS, active_account_of, transaction_account
 from db.enums import RecurringCadence, RecurringStatus
 from db.models import Account, RecurringCharge, Transaction
 
@@ -229,13 +230,11 @@ def _read_charges(session: Session) -> list[Charge]:
             Transaction.posted_at,
             Transaction.amount_cents,
         )
-        .join(
-            Account,
-            (Account.id == Transaction.account_id) & (Account.user_id == Transaction.user_id),
-        )
+        .join(Account, transaction_account())
         .where(
             Transaction.pending.is_(False),
-            Account.is_active.is_(True),
+            # Rule 1a: a loan's or investment's own ledger is no bill.
+            active_account_of(SPENDING_ACCOUNT_KINDS),
             Transaction.amount_cents > 0,
             Transaction.merchant_norm != "",
         )

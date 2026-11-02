@@ -36,8 +36,8 @@ Read a benefits summary the user uploads (document type `benefits`) into a propo
 
 7. Every proposal carries `kind`, `pay_stub` or `benefits`. A proposal stored before M6 has none; `Proposal.stored(data, document_type)` fills it from the document's type when it is read.
 8. A benefits proposal has, besides spec 005 rule 19's `plans`:
-   - `match_tiers`: one `TierProposal` per extracted tier, each with two fields of kind `percent` and role `info`. `employer_pct` is the tier's share with the model's confidence. `employee_pct_upto` is computed by `calc/k401.py:cumulative_bounds` (which `tiers_from_bands` also uses): the sum of this band and every band before it, so 3 then 2 become bounds 3 and 5. Its confidence is the lowest band confidence that went into it, and for every tier after the first its note is `Cumulative: <band>% added to the tiers before it`. When any band up to a tier is null, that tier's bound is null with the note `Not found on the document`, and so is every later one.
-   - `vesting_years`: a field of kind `number` and role `info`, or the note `Not found on the document` when null.
+   - `match_tiers`: one `TierProposal` per extracted tier, each with two fields of kind `percent` and role `info`. `employer_pct` is the tier's share with the model's confidence. `employee_pct_upto` is computed by `calc/k401.py:cumulative_bounds` (which `tiers_from_bands` also uses): the sum of this band and every band before it, so 3 then 2 become bounds 3 and 5. Its confidence is the lowest band confidence that went into it, and for every tier after the first its note is `Cumulative: <band>% added to the tiers before it`. When any band up to a tier is null, that tier's bound is null with the note `Type it if the document shows it.`, and so is every later one.
+   - `vesting_years`: a field of kind `number` and role `info`, or the note `Type it if the document shows it.` when null.
    - A manual-entry benefits proposal has no plans, no tiers and an empty `vesting_years` field.
 9. Percent values are two-place strings (`"5.00"`), as spec 005.
 
@@ -75,7 +75,7 @@ Example 3: `1.5 + 2.25 = 3.75`, exact in `Decimal`; the result is two-place perc
 
 `test_benefits_proposal_computes_cumulative_tiers`: the fake fixture's tiers (band 3 at confidence 0.9 with share 100, band 2 at confidence 0.8 with share 50) give `employee_pct_upto` values `"3.00"` (confidence 0.9, no note) and `"5.00"` (confidence 0.8, note `Cumulative: 2.00% added to the tiers before it`), shares `"100.00"` and `"50.00"`, and `vesting_years` 3.
 
-`test_benefits_proposal_with_a_missing_band`: bands 3 then null give bounds `"3.00"` then null with the note `Not found on the document`.
+`test_benefits_proposal_with_a_missing_band`: bands 3 then null give bounds `"3.00"` then null with the note `Type it if the document shows it.`.
 
 ### Confirm (`api/tests/integration/test_benefits.py`)
 

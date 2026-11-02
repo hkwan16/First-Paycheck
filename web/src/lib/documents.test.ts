@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  documentBadge,
   documentStatusBadge,
   documentTypeLabel,
-  linesSentToAi,
+  hiddenText,
   statusReasonText,
 } from './documents';
 
@@ -28,40 +29,67 @@ describe('documentStatusBadge', () => {
   });
 });
 
+describe('documentBadge', () => {
+  it('is the status badge, unless a newer copy of the paycheck counts instead (issue 199)', () => {
+    expect(documentBadge({ status: 'confirmed', superseded: false })).toEqual({
+      label: 'Confirmed',
+      tone: 'confirmed',
+    });
+    expect(documentBadge({ status: 'confirmed', superseded: true })).toEqual({
+      label: 'Replaced by a newer copy',
+      tone: 'neutral',
+    });
+  });
+});
+
+describe('hiddenText', () => {
+  it('counts the numbers hidden before reading, in words', () => {
+    expect(hiddenText(0)).toBe('No numbers hidden');
+    expect(hiddenText(1)).toBe('1 number hidden');
+    expect(hiddenText(1200)).toBe('1,200 numbers hidden');
+  });
+});
+
 describe('statusReasonText', () => {
   it('explains each reason in a sentence, and nothing without one', () => {
     expect(statusReasonText(null)).toBeNull();
-    expect(statusReasonText('refused')).toMatch(/type the fields yourself/);
-    expect(statusReasonText('no_readable_page')).toMatch(/redacted safely/);
+    expect(statusReasonText('refused')).toMatch(/Type the amounts yourself/);
+    expect(statusReasonText('no_readable_page')).toMatch(/could not hide the private numbers/);
     expect(statusReasonText('budget')).toMatch(/limit/);
-    expect(statusReasonText('extraction_failed')).toMatch(/type the fields yourself/);
+    expect(statusReasonText('extraction_failed')).toMatch(/type the amounts yourself/);
     expect(statusReasonText('unreadable_file')).toMatch(/could not be opened/);
     expect(statusReasonText('expired')).toMatch(/Upload it again/);
+  });
+
+  it('never names the machinery behind the reading (issue 209)', () => {
+    const reasons = [
+      'refused',
+      'no_readable_page',
+      'budget',
+      'extraction_failed',
+      'no_model',
+      'unreadable_file',
+      'expired',
+    ] as const;
+    for (const reason of reasons) {
+      expect(statusReasonText(reason)).not.toMatch(/\bAI\b|model|redact|OCR|fields/);
+    }
   });
 });
 
 describe('reasons as past events (spec 004 rule 37, issue 163)', () => {
   it('says what happened when the document was read, never what is true now', () => {
     expect(statusReasonText('no_model')).toBe(
-      'The AI was not available when this was read, so nothing was filled in. Read it again, or type the fields from the lines shown.',
+      'Automatic reading was not available then, so nothing was filled in. Read it again, or type the amounts yourself.',
     );
     expect(statusReasonText('budget')).toBe(
-      'The daily reading limit was used up when this was read, so nothing was filled in. Read it again tomorrow, or type the fields yourself.',
+      'We had reached the daily reading limit, so nothing was filled in. Read it again tomorrow, or type the amounts yourself.',
     );
     expect(statusReasonText('extraction_failed')).toBe(
-      'Reading did not finish after several tries, so nothing was filled in. Read it again, or type the fields yourself.',
+      'Reading did not finish, so nothing was filled in. Read it again, or type the amounts yourself.',
     );
     for (const reason of ['no_model', 'budget', 'extraction_failed'] as const) {
       expect(statusReasonText(reason)).not.toMatch(/right now|is used up|is off/);
     }
-  });
-
-  it('knows which lines were sent to the AI', () => {
-    expect(linesSentToAi(null)).toBe(true);
-    expect(linesSentToAi('refused')).toBe(true);
-    expect(linesSentToAi('extraction_failed')).toBe(true);
-    expect(linesSentToAi('no_model')).toBe(false);
-    expect(linesSentToAi('budget')).toBe(false);
-    expect(linesSentToAi('no_readable_page')).toBe(false);
   });
 });

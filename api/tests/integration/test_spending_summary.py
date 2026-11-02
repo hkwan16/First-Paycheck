@@ -176,14 +176,21 @@ def test_loan_and_investment_ledgers_are_skipped(
             {"category": "debt_payment", "bucket": "other", "total_cents": 40_000, "count": 1},
         ],
     }
-    # Only the money math skips the ledgers: the list still shows every row.
+    # The full list still shows every row; the Spending screen's list asks for
+    # the cash accounts only (spec 003 rule 17), the rows the totals read.
+    ledgers = {"Monthly payment", "Interest charged", "Dividend"}
     listed = client.get("/transactions", params=SEPTEMBER).json()["items"]
     assert len(listed) == 9
-    assert {row["merchant_raw"] for row in listed} >= {
-        "Monthly payment",
-        "Interest charged",
-        "Dividend",
-    }
+    assert {row["merchant_raw"] for row in listed} >= ledgers
+    cash = {**SEPTEMBER, "cash_accounts_only": "true"}
+    counted = client.get("/transactions", params=cash).json()["items"]
+    assert len(counted) == body["transaction_count"] == 6
+    assert not {row["merchant_raw"] for row in counted} & ledgers
+    # A hidden account is in no total, so it is not listed either.
+    card = next(row["account_id"] for row in counted if row["amount_cents"] == -20_000)
+    with user_session_for(user_a.id, bind=db_connection) as session:
+        session.get_one(Account, uuid.UUID(card)).is_active = False
+    assert len(client.get("/transactions", params=cash).json()["items"]) == 4
 
 
 def test_an_inactive_ledger_is_not_reported(
@@ -263,6 +270,13 @@ def test_the_dynamic_sandbox_october_skips_the_loans(
     by_kind = Counter(kinds[row["account_id"]] for row in listed)
     # Every October row: 165 posted and 12 pending on the loans, 83 on the rest.
     assert (by_kind["loan"], len(listed)) == (177, 260)
+    # The Spending screen's list (spec 003 rule 17a): no loan row.
+    page = client.get(
+        "/transactions", params={**OCTOBER, "limit": 200, "cash_accounts_only": "true"}
+    ).json()
+    assert page["next_cursor"] is None
+    assert {kinds[row["account_id"]] for row in page["items"]} == {"checking", "credit"}
+    assert len(page["items"]) == 83
 
 
 def test_defaults_to_the_last_complete_month(

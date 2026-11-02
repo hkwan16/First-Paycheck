@@ -120,7 +120,7 @@ test('records the alpha demo', async ({ browser }, testInfo) => {
     '2. Confirm the pay stub',
     'Each value the AI read is only a proposal. Select one to see its line on the redacted stub.',
   );
-  const card = page.getByRole('region', { name: /^(Extracted fields|Pay stub fields)$/ });
+  const card = page.getByRole('region', { name: /^(What we read|Pay stub details)$/ });
   await expect(card).toBeVisible({ timeout: 30_000 });
   await demo.hold(2500);
   const gross = card.getByRole('group', { name: 'Gross pay', exact: true }).getByRole('button');

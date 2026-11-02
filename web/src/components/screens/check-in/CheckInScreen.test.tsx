@@ -228,7 +228,7 @@ describe('CheckInScreen', () => {
       name: 'November cash flow against your plan',
     });
     expect(card).toHaveTextContent(
-      "165 rows on loan, investment and retirement accounts are left out: they are those accounts' own ledgers, not money you spent or received.",
+      'Not counted: 165 transactions on loan, investment and retirement accounts. A loan payment counts once, when it leaves checking.',
     );
     expect(card).not.toHaveTextContent('%');
   });
@@ -238,7 +238,7 @@ describe('CheckInScreen', () => {
     const card = await screen.findByRole('region', {
       name: 'November cash flow against your plan',
     });
-    expect(card).not.toHaveTextContent(/left out/);
+    expect(card).not.toHaveTextContent(/Not counted/);
   });
 
   it('shows net worth and holdings beside the cash flow, as the mockup places them', async () => {

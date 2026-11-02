@@ -17,19 +17,29 @@ import type { Period } from './spending';
 /** Rows per page of a transactions list; the same size shares the same cached list. */
 export const TRANSACTIONS_PAGE_SIZE = 50;
 
+/** The newest rows, whatever their dates and accounts. */
+export const NEWEST_TRANSACTIONS: TransactionFilters = { limit: TRANSACTIONS_PAGE_SIZE };
+
 /**
- * The Spending screen's list for a period (spec 003 rule 17a): its dates and
- * one page size, so the Transactions card and the diagram's popovers share
- * one read.
+ * The newest rows on the accounts the spending totals read (spec 003 rule 17,
+ * spec 007 rule 21a): a loan's, investment's or retirement account's own
+ * rows are in no total, so the Spending screen does not list them either.
+ */
+export const NEWEST_SPENDING: TransactionFilters = {
+  ...NEWEST_TRANSACTIONS,
+  cash_accounts_only: true,
+};
+
+/**
+ * The Spending screen's list for a period (spec 003 rule 17a): its dates on
+ * the accounts the totals read, one page size, so the Transactions card and
+ * the diagram's popovers share one read.
  */
 export const periodFilters = ({ start, end }: Period): TransactionFilters => ({
-  limit: TRANSACTIONS_PAGE_SIZE,
+  ...NEWEST_SPENDING,
   start,
   end,
 });
-
-/** The newest rows, whatever their dates. */
-export const NEWEST_TRANSACTIONS: TransactionFilters = { limit: TRANSACTIONS_PAGE_SIZE };
 
 /**
  * `GET /transactions` page by page (newest first), following `next_cursor`

@@ -623,4 +623,46 @@ Every entry has a dated heading and these fields, in this order. A field that do
 
 **Fix:** As above, in the subagent's branch.
 
+## 2026-11-01: Link and Confirm usability fixes (issues 195, 196, 199, 205, 208, 209)
+
+**Task:** From the usability pass: the Acme stub's "401(k) -" reached Confirm as "None, Not found on the document" with "$?" in the math notice and an error under the empty field before anything was typed (195); Link said "No documents yet" while the list loaded (196); every confirmed copy of a stub was badged "Confirmed" (199); the unlink confirmation made "Yes, unlink" primary and "Keep" grey (205); Sync now's result and a new upload's row showed far from the control pressed (208); Link and Confirm talked about pipelines, the AI, redaction and confidence scores, and a confirmed stub's page still read as a review (209).
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree (Package B of the usability pass), orchestrated from the main session.
+
+**Prompt or skill:** The shared usability brief: spec first, failing tests first, each bug reproduced end to end on the local real-API stack and kept as a regression test, a released prompt never edited (a new version with a capped live eval run), and the no-ai-slop wording rules for every string on both screens.
+
+**What it produced:** Spec 005 rule 1a (a dash, `--`, `0.00` or `$0` printed where a line's amount goes is 0 with that line as its source, not null) and prompt `extract_pay_stub/v2`; four new eval stubs (31-34) that print a deduction as a dash or 0.00; `DocumentOut.superseded` (spec 005 rule 22f, from `db/pay_stubs.py:superseded_documents`) and the Link badge "Replaced by a newer copy"; loading rows and read errors on the documents card, the Link footer and `/setup/confirm`; Sync now's outcome inside its institution's group and the upload control above the list; a `destructive` Button variant with Keep as the primary; and new words on both screens (the source pane is "Your pay stub" and counts hidden numbers, the badge reads "Check this" or "Read clearly", a confirmed stub is titled "Your pay stub is confirmed"). E2E regressions in `confirm.spec.ts` (Confirm all remaining alone, the 401(k) row at $0.00 with its line highlighted, the superseded copy on Link, the documents card while the list is held) and `link.spec.ts` (Sync now's status in the bank's group).
+
+**What was wrong:**
+- The dash was lost in the prompt, not in text extraction: v1 said "a dash or a blank where an amount would be is null", so the model obeyed it. A live run of v1 over the 34 stubs scored `document_accuracy` 0.9118 (stubs 31, 33 and 34 null; the `0.00` stub was already read as 0); v2 scored 1.0 in two runs, about 63 cents each, about 190 cents in all under the 300-cent cap.
+- The FakeGateway fixture the e2e stack reads had the same null for the 401(k), so the fixture had to say what the real model now says, or the e2e test would have passed for the wrong reason.
+- An empty field opened from Confirm showed "Enter an amount" at once because the reducer's toggle validated the empty draft; it now opens with no error and validates on save.
+- The unit test for Keep's variant first compared full class strings and failed on tailwind-merge dropping a shared class; it compares only the classes a variant adds.
+- `startSync` was referenced before its declaration in a render-time closure after moving the sync status; ESLint's react-hooks rule caught it.
+
+**How it was caught:** Playwright on the local stack before the fix (the 401(k) row "None Not found on the document", "Check · 74%", the gate "...so the difference is $?."); the live eval run of v1; unit tests written first for each change.
+
+**Fix:** As above, in the subagent's branch `fix/usability-link-confirm`.
+
+## 2026-11-01: Spending showed two incomes, loan rows and loan interest, and ran eight screens (issues 200, 201, 209)
+
+**Task:** From the November 1 usability pass on production (Plaid's dynamic sandbox user plus the Acme stub): the Income tile read $3,240.12 beside a diagram starting from $2,708.33 gross pay with nothing saying why; the transaction list held loan ledger rows the totals leave out, unmarked; a loan's "Interest" was a recurring charge beside Netflix; the page was 7.9 screens, 2,337 words and 66 controls; category names were cut off in their selects; and the copy spoke of rules, the AI and confidence scores.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree (package C of five), orchestrated from the main session.
+
+**Prompt or skill:** The shared usability brief: reproduce end to end on the local stack first, spec, failing tests, then code; the no-ai-slop skill for every string on the screen.
+
+**What it produced:** `api/db/accounts.py` holds `SPENDING_ACCOUNT_KINDS` and `LEDGER_ACCOUNT_KINDS` (moved from the spending router) with the join and predicate helpers, and three readers share it: the summary, recurring detection (spec 009 rule 1a, so a loan's monthly interest is no bill) and `GET /transactions?cash_accounts_only=true` (spec 003 rule 17), which the Spending list and the diagram's popovers now ask for; the popovers' client-side kind filter is gone. The diagram stacks every column from the top at a 240 px scale (spec 010 rule 5): 1,129 px became 707 px for the same month. The list opens on its newest 10 rows with a "Show all transactions" toggle, and its category column fits "Transfer between accounts". The income tile is "Income deposited" ("Pay and other income into your accounts"), and the diagram's lead says gross pay to take-home comes from the pay stub and spending from the deposits, with their amount. Source badges read "Known merchant", "Our guess", "Guess, check it" and "You"; a fix says "Saved. Wawa will be Dining from now on."; the three explainer paragraphs and the label counts are gone. Measured on the local stack with the same data: 7.26 screens, 2,339 words and 51 controls before; 3.24 screens, 704 words and 11 controls after, with the summary, diagram and recurring charges ending at 2.1 screens.
+
+**What was wrong:**
+- Reconciling the two incomes in the API (a "deposits without a stub" node worked out in `calc/cashflow.py`) was considered and left out: neither figure is wrong, since deposits can include paychecks with no confirmed stub and gross pay is before taxes, so the fix names them.
+- Filtering loan rows in the client would have broken paging (165 of the dynamic user's 245 October rows are on loans), so the API filters them.
+- The first try at splitting two commits staged both sets after a pre-commit reformat failed the first; the combined commit was reset and redone as two.
+- The worktree's shell refuses `source`, `NODE_PATH` and compound commands, so the measurement script requires Playwright by absolute path and the stack's credentials went inline.
+- Docker Desktop's engine did not start on this machine, so the Linux baselines were not regenerated.
+
+**How it was caught:** A Playwright measurement of `/setup/spending` at 1456x802 on the local stack after linking `user_transactions_dynamic` and confirming the Acme stub (rows on the loans' masks ··3000 to ··7000, "Interest $111.47" under Recurring charges, a 1,378 px diagram card); the new `spending.spec.ts` test failing against the old API with "Expected value: ··5000"; a failing integration test per API rule.
+
+**Fix:** As above, on `fix/usability-spending`.
+
 **Time saved or lost:** Not measured.

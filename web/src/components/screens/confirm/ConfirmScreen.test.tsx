@@ -38,9 +38,9 @@ function renderConfirm(documentId = PAY_STUB_DOC_ID) {
   });
 }
 
-const FIELDS = /^(Extracted fields|Pay stub fields)$/;
+const FIELDS = /^(What we read|Pay stub details)$/;
 const fieldsCard = () => screen.getByRole('region', { name: FIELDS });
-const sourcePane = () => screen.getByRole('complementary', { name: 'Source, as the AI saw it' });
+const sourcePane = () => screen.getByRole('complementary', { name: 'Your pay stub' });
 const row = (label: string) => within(fieldsCard()).getByRole('group', { name: label });
 const continueButton = () => screen.getByRole('button', { name: /Confirm and continue/ });
 const highlighted = () =>
@@ -73,11 +73,11 @@ describe('ConfirmScreen review', () => {
     expect(fieldsCard()).toHaveTextContent('0 of 14 confirmed');
 
     expect(row('Gross pay')).toHaveTextContent('$2,708.33');
-    expect(within(row('Gross pay')).getByText('Read · 99%')).toBeInTheDocument();
-    expect(within(row('401(k) contribution')).getByText('Check · 74%')).toBeInTheDocument();
+    expect(within(row('Gross pay')).getByText('Read clearly')).toBeInTheDocument();
+    expect(within(row('401(k) contribution')).getByText('Check this')).toBeInTheDocument();
     expect(row('Pay date')).toHaveTextContent('Oct 15, 2026');
     expect(row('Pay frequency')).toHaveTextContent('Twice a month');
-    expect(row('Other deductions')).toHaveTextContent('Sum of: CA SDI, DENTAL/VIS');
+    expect(row('Other deductions')).toHaveTextContent('From CA SDI and DENTAL/VIS');
     expect(within(row('Other deductions')).getByText('Added up')).toBeInTheDocument();
 
     const bar = within(fieldsCard()).getByRole('progressbar', { name: 'Fields confirmed' });
@@ -87,23 +87,23 @@ describe('ConfirmScreen review', () => {
     expect(screen.getByText('14 left to confirm')).toBeInTheDocument();
   });
 
-  it('shows the redacted source with the selected field highlighted', async () => {
+  it('shows the source, private numbers hidden, with the selected field highlighted', async () => {
     const { user } = await renderLoaded();
     const pane = sourcePane();
-    expect(within(pane).getByText('2 items redacted')).toBeInTheDocument();
-    expect(within(pane).getAllByRole('img', { name: 'Redacted' })).toHaveLength(2);
+    expect(within(pane).getByText('2 numbers hidden')).toBeInTheDocument();
+    expect(within(pane).getAllByRole('img', { name: 'Hidden number' })).toHaveLength(2);
     expect(pane).not.toHaveTextContent('[REDACTED]');
     expect(highlighted()).toHaveLength(1);
     expect(highlighted()[0]).toHaveTextContent('GROSS PAY2,708.33');
-    expect(pane).toHaveTextContent('Highlighted line: Gross pay.');
+    expect(pane).toHaveTextContent('Gross pay is highlighted.');
 
     await user.click(within(row('Net pay')).getByRole('button', { name: /^Net pay/ }));
     expect(highlighted()[0]).toHaveTextContent('NET PAY1,996.04');
-    expect(pane).toHaveTextContent('Highlighted line: Net pay.');
+    expect(pane).toHaveTextContent('Net pay is highlighted.');
 
     await user.click(within(row('Period end')).getByRole('button', { name: /^Period end/ }));
     expect(highlighted()).toHaveLength(0);
-    expect(pane).toHaveTextContent('Period end has no line of its own in the source.');
+    expect(pane).toHaveTextContent('Period end is not on a line of its own.');
   });
 
   it('still goes to Spending when the confirmed document renders before the other reads return', async () => {
@@ -142,7 +142,7 @@ describe('ConfirmScreen review', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm all remaining' }));
     await user.click(continueButton());
 
-    await screen.findByText('This pay stub is confirmed.');
+    await screen.findByRole('heading', { level: 1, name: 'Your pay stub is confirmed' });
     releasePayStubs();
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/setup/spending'));
   });
@@ -191,7 +191,7 @@ describe('ConfirmScreen review', () => {
     await user.type(input, '1,996.06');
     const gate = within(fieldsCard()).getByText("These don't add up.").closest('div')!;
     expect(gate).toHaveTextContent(
-      'Gross minus deductions is off from net pay by $0.02. Check the edited field.',
+      'Gross pay minus deductions is $0.02 away from net pay. Check each amount against your pay stub.',
     );
 
     await user.type(input, '{Enter}');
@@ -207,18 +207,55 @@ describe('ConfirmScreen review', () => {
     expect(bodies).toEqual([]);
   });
 
-  it('shows "?" while a draft is not an amount, and says why on save', async () => {
+  it('says which amount is not an amount yet, never "$?", and why on save', async () => {
     const { user } = await renderLoaded();
     await user.click(within(row('Gross pay')).getByRole('button', { name: 'Edit Gross pay' }));
     const input = within(row('Gross pay')).getByRole('textbox', { name: 'Gross pay' });
     await user.clear(input);
     await user.type(input, '2,708.3x');
     expect(fieldsCard()).toHaveTextContent(
-      "Can't check the math yet. Gross pay is not an amount yet, so the difference is $?.",
+      "Can't check the math yet. Gross pay is not an amount yet.",
     );
+    expect(fieldsCard()).not.toHaveTextContent('$?');
     await user.type(input, '{Enter}');
     expect(input).toHaveAccessibleDescription('Enter an amount, like 1,234.56');
     expect(input).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('opens an amount the stub does not show to type, with no error until it is saved empty', async () => {
+    // Issue 195: before the dash was read as $0.00, the 401(k) line came back null.
+    const proposal = structuredClone(sampleProposal);
+    const k401 = proposal.fields!.find((f) => f.key === 'retirement_contribution_cents')!;
+    Object.assign(k401, { value: null, note: 'Type it if the document shows it.' });
+    db.proposals.set(PAY_STUB_DOC_ID, proposal);
+    const { user } = await renderLoaded();
+    expect(row('401(k) contribution')).toHaveTextContent('Not found');
+    await user.click(screen.getByRole('button', { name: 'Confirm all remaining' }));
+    expect(fieldsCard()).toHaveTextContent(
+      "Can't check the math yet. 401(k) contribution is missing.",
+    );
+    expect(fieldsCard()).not.toHaveTextContent('$?');
+
+    await user.click(
+      within(row('401(k) contribution')).getByRole('button', {
+        name: 'Confirm 401(k) contribution',
+      }),
+    );
+    const input = within(row('401(k) contribution')).getByRole('textbox', {
+      name: '401(k) contribution',
+    });
+    expect(input).toHaveFocus();
+    expect(input).not.toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAccessibleDescription('Type it if the document shows it.');
+
+    await user.type(input, '{Enter}');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAccessibleDescription(
+      'Enter an amount, like 1,234.56 Type it if the document shows it.',
+    );
+    await user.type(input, '0{Enter}');
+    expect(within(fieldsCard()).getByText('The math checks out.')).toBeInTheDocument();
+    expect(continueButton()).toBeEnabled();
   });
 
   it('Escape cancels the draft and puts the value back', async () => {
@@ -294,7 +331,7 @@ describe('ConfirmScreen review', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm all remaining' }));
     await user.click(continueButton());
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent("The server found that these don't add up.");
+    expect(alert).toHaveTextContent("These don't add up, so nothing was saved.");
     const diff = within(alert).getByRole('list');
     expect(diff).toHaveTextContent('Gross pay$2,708.33');
     expect(diff).toHaveTextContent('Deductions$712.29');
@@ -331,24 +368,23 @@ describe('ConfirmScreen review', () => {
   });
 });
 
-describe('ConfirmScreen after the AI was unavailable', () => {
+describe('ConfirmScreen after automatic reading was unavailable', () => {
   // Issue 163 and spec 004 rules 32-37.
   beforeEach(() => {
     db.documents = [sampleDocument({ status: 'manual_entry_required', status_reason: 'no_model' })];
     db.proposals.set(PAY_STUB_DOC_ID, structuredClone(manualEntryProposal));
   });
 
-  it('says what happened then, and that the AI never saw the lines', async () => {
+  it('says what happened then, without claiming the lines were read', async () => {
     await renderLoaded();
     expect(
-      screen.getByText(/^The AI was not available when this was read, so nothing was filled in\./),
+      screen.getByText(/^Automatic reading was not available then, so nothing was filled in\./),
     ).toBeInTheDocument();
     expect(screen.queryByText(/right now/)).toBeNull();
-    expect(screen.queryByRole('complementary', { name: 'Source, as the AI saw it' })).toBeNull();
-    const pane = screen.getByRole('complementary', { name: 'Source, redacted' });
-    expect(pane).toHaveTextContent('These lines were redacted but not sent to the AI.');
-    expect(pane).not.toHaveTextContent('Redaction ran before extraction.');
-    expect(within(pane).getAllByRole('img', { name: 'Redacted' })).toHaveLength(2);
+    const pane = sourcePane();
+    expect(pane).toHaveTextContent('Private numbers are hidden.');
+    expect(pane).not.toHaveTextContent(/\bAI\b|redact|extract/i);
+    expect(within(pane).getAllByRole('img', { name: 'Hidden number' })).toHaveLength(2);
   });
 
   it('reads it again, then shows what was read', async () => {
@@ -362,7 +398,7 @@ describe('ConfirmScreen after the AI was unavailable', () => {
     Object.assign(db.documents[0]!, { status: 'proposed', status_reason: null });
     db.proposals.set(PAY_STUB_DOC_ID, structuredClone(sampleProposal));
     await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));
-    expect(await screen.findByRole('region', { name: 'Extracted fields' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'What we read' })).toBeInTheDocument();
     expect(sourcePane()).toBeInTheDocument();
   });
 
@@ -394,17 +430,15 @@ describe('ConfirmScreen manual entry', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Enter what your pay stub says',
     );
-    expect(screen.getByText(/The AI declined to read this document/)).toBeInTheDocument();
+    expect(screen.getByText(/We could not read this document automatically/)).toBeInTheDocument();
     const inputs = within(fieldsCard()).getAllByRole('textbox');
     expect(inputs.length).toBe(10);
     expect(inputs.every((input) => (input as HTMLInputElement).value === '')).toBe(true);
     expect(within(fieldsCard()).getByRole('combobox', { name: 'Pay frequency' })).toHaveValue('');
-    expect(within(fieldsCard()).queryByText(/Read ·|Check ·/)).not.toBeInTheDocument();
-    expect(fieldsCard()).toHaveTextContent(
-      "Can't check the math yet. Gross pay is missing, so the difference is $?.",
-    );
-    expect(within(sourcePane()).getAllByRole('img', { name: 'Redacted' })).toHaveLength(2);
-    expect(sourcePane()).toHaveTextContent('Type each field from these lines.');
+    expect(within(fieldsCard()).queryByText(/Read clearly|Check this/)).not.toBeInTheDocument();
+    expect(fieldsCard()).toHaveTextContent("Can't check the math yet. Gross pay is missing.");
+    expect(within(sourcePane()).getAllByRole('img', { name: 'Hidden number' })).toHaveLength(2);
+    expect(sourcePane()).toHaveTextContent('Type each amount from these lines.');
     // The AI read it and declined: nothing to read again (spec 004 rule 35).
     expect(screen.queryByRole('button', { name: 'Read again' })).toBeNull();
     expect(within(row('Gross pay')).queryByRole('button', { name: /^Cancel/ })).toBeNull();
@@ -456,7 +490,7 @@ describe('ConfirmScreen document states', () => {
   it('shows a loading state, then the review', async () => {
     renderConfirm();
     expect(screen.getByText('Loading the document')).toBeInTheDocument();
-    expect(await screen.findByRole('region', { name: 'Extracted fields' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'What we read' })).toBeInTheDocument();
   });
 
   it('follows a document still being read until it can be reviewed', async () => {
@@ -467,16 +501,34 @@ describe('ConfirmScreen document states', () => {
     ).toBeInTheDocument();
     db.documents = [sampleDocument()];
     await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));
-    expect(await screen.findByRole('region', { name: 'Extracted fields' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'What we read' })).toBeInTheDocument();
   });
 
-  it('says a confirmed document is done and points on to Spending', async () => {
+  it('says a confirmed document is done, with nothing to check, and points on to Spending', async () => {
     db.documents = [sampleDocument({ status: 'confirmed' })];
     renderConfirm();
-    expect(await screen.findByText(/This pay stub is confirmed/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Your pay stub is confirmed' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Your plan now uses the amounts you checked/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Continue to spending/ })).toHaveAttribute(
       'href',
       '/setup/spending',
+    );
+  });
+
+  it('says a newer copy of the paycheck replaced a superseded one (issue 199)', async () => {
+    db.documents = [sampleDocument({ status: 'confirmed', superseded: true })];
+    renderConfirm();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'A newer copy replaced this pay stub' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('You confirmed this paycheck again, so the newer copy counts.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to documents' })).toHaveAttribute(
+      'href',
+      '/setup/link',
     );
   });
 
@@ -524,7 +576,9 @@ describe('ConfirmScreen document states', () => {
   it('says offer letters are kept but not read', async () => {
     db.documents = [{ ...sampleBenefitsDocument, type: 'offer_letter' }];
     renderConfirm(BENEFITS_DOC_ID);
-    expect(await screen.findByText(/Offer letters are kept but not read yet/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/We keep offer letters but do not read them yet/),
+    ).toBeInTheDocument();
     expect(document.title).toBe('Confirm offer letter | First Paycheck');
   });
 
@@ -572,7 +626,7 @@ describe('ConfirmScreen benefits summary', () => {
     expect(benefitsRow('Plan 1: Plan type')).toHaveTextContent('High deductible (HDHP)');
     expect(benefitsRow('Plan 1: Deductible')).toHaveTextContent('$1,800.00');
     expect(benefitsRow('Plan 2: Coinsurance')).toHaveTextContent('10%');
-    expect(within(benefitsRow('Plan 2: Coinsurance')).getByText('Check · 82%')).toBeInTheDocument();
+    expect(within(benefitsRow('Plan 2: Coinsurance')).getByText('Check this')).toBeInTheDocument();
     expect(benefitsRow('Plan 2: Enrollment deadline')).toHaveTextContent('Nov 14, 2026');
     expect(benefitsRow('Tier 1: Employer match')).toHaveTextContent('100%');
     expect(benefitsRow('Tier 2: Matched up to (% of pay)')).toHaveTextContent(
@@ -580,14 +634,16 @@ describe('ConfirmScreen benefits summary', () => {
     );
     expect(benefitsRow('Years to full vesting')).toHaveTextContent('3 years');
 
-    const pane = sourcePane();
-    expect(
-      within(pane).getByRole('list', { name: 'Redacted benefits summary' }),
-    ).toBeInTheDocument();
-    expect(within(pane).getByText('0 items redacted')).toBeInTheDocument();
+    const pane = screen.getByRole('complementary', { name: 'Your benefits summary' });
+    expect(within(pane).getByRole('list', { name: 'Benefits summary text' })).toBeInTheDocument();
+    expect(within(pane).getByText('No numbers hidden')).toBeInTheDocument();
     expect(within(pane).getByText('ACME CORP 2027 BENEFITS SUMMARY')).toBeInTheDocument();
     expect(pane).toHaveTextContent('Find each value in these lines');
-    expect(highlighted()).toHaveLength(0);
+    expect(
+      within(pane)
+        .getAllByRole('listitem')
+        .filter((li) => li.getAttribute('aria-current') === 'true'),
+    ).toHaveLength(0);
   });
 
   it('edits a field, confirms the rest and sends the plans and the match', async () => {
@@ -622,7 +678,9 @@ describe('ConfirmScreen benefits summary', () => {
     expect(benefitsCard()).toHaveTextContent('29 of 29 confirmed');
     await user.click(continueButton());
 
-    expect(await screen.findByText('Your benefits summary is confirmed.')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Your benefits summary is confirmed' }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(/401\(k\) match and vesting now come from this summary/),
     ).toBeInTheDocument();
@@ -658,11 +716,13 @@ describe('ConfirmScreen benefits summary', () => {
         name: 'Confirm Plan 2: Plan name',
       }),
     );
+    const name = within(benefitsRow('Plan 2: Plan name')).getByLabelText('Plan 2: Plan name');
+    expect(name).toHaveFocus();
+    // Nothing is wrong before the person types or saves (issue 195).
+    expect(within(benefitsRow('Plan 2: Plan name')).queryByText('Enter a value')).toBeNull();
+    await user.type(name, '{Enter}');
     expect(within(benefitsRow('Plan 2: Plan name')).getByText('Enter a value')).toBeInTheDocument();
-    await user.type(
-      within(benefitsRow('Plan 2: Plan name')).getByLabelText('Plan 2: Plan name'),
-      'Gold PPO{Enter}',
-    );
+    await user.type(name, 'Gold PPO{Enter}');
     expect(continueButton()).toBeEnabled();
   });
 
@@ -698,7 +758,9 @@ describe('ConfirmScreen benefits summary', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Confirm all remaining' }));
     await user.click(continueButton());
-    expect(await screen.findByText('Your benefits summary is confirmed.')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Your benefits summary is confirmed' }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/401\(k\) match and vesting now come/)).toBeNull();
     expect(bodies).toEqual([{ benefits: { plans: sampleBenefitsValues.plans, retirement: null } }]);
   });
@@ -707,7 +769,7 @@ describe('ConfirmScreen benefits summary', () => {
     db.documents = [{ ...sampleBenefitsDocument, status: 'manual_entry_required' }];
     renderConfirm(BENEFITS_DOC_ID);
     expect(
-      await screen.findByText(/Enter your health plans on the health plan card/),
+      await screen.findByText(/Enter your health plans on the health plan step/),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Go to decisions/ })).toHaveAttribute(
       'href',
@@ -718,7 +780,9 @@ describe('ConfirmScreen benefits summary', () => {
   it('says a confirmed summary is done and points on to Decisions', async () => {
     db.documents = [{ ...sampleBenefitsDocument, status: 'confirmed' }];
     renderConfirm(BENEFITS_DOC_ID);
-    expect(await screen.findByText('This benefits summary is confirmed.')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Your benefits summary is confirmed' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Continue to decisions/ })).toHaveAttribute(
       'href',
       '/setup/decisions/health-plan',
@@ -728,7 +792,10 @@ describe('ConfirmScreen benefits summary', () => {
   it.each([
     ['proposed', () => screen.findByRole('region', { name: BENEFITS_FIELDS })],
     ['extracting', () => screen.findByRole('progressbar', { name: 'Reading benefits summary' })],
-    ['confirmed', () => screen.findByText('This benefits summary is confirmed.')],
+    [
+      'confirmed',
+      () => screen.findByRole('heading', { name: 'Your benefits summary is confirmed' }),
+    ],
     ['manual_entry_required', () => screen.findByText(/Enter your health plans/)],
   ] as const)('names the browser tab after the benefits summary when %s', async (status, shown) => {
     if (status !== 'proposed') db.documents = [{ ...sampleBenefitsDocument, status }];

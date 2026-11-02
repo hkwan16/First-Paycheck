@@ -13,30 +13,14 @@ import { e2eUser, NO_E2E_USER, waitForHydration } from './support/auth';
 const FIXTURE = path.join(__dirname, 'fixtures', 'acme-paystub.pdf');
 
 /**
- * Confirm every field the Confirm screen shows and continue. A field the stub
- * does not print (the 401(k) line is a dash) stays open; type what the stub
- * says for each one left.
+ * Confirm every field with "Confirm all remaining" alone and continue. Every
+ * line the Acme stub prints is read, its 401(k) dash as $0.00 (issue 195), so
+ * nothing is left to type.
  */
 async function confirmEveryField(page: Page, fields: Locator) {
   await page.getByRole('button', { name: 'Confirm all remaining' }).click();
 
-  const unconfirmed = fields.getByRole('button', { name: /^Confirm (?!all)/ });
-  while ((await unconfirmed.count()) > 0) {
-    const label = ((await unconfirmed.first().getAttribute('aria-label')) ?? '').replace(
-      /^Confirm /,
-      '',
-    );
-    await fields.getByRole('button', { name: `Edit ${label}`, exact: true }).click();
-    const input = fields
-      .getByRole('group', { name: label, exact: true })
-      .getByLabel(label, { exact: true });
-    if ((await input.inputValue()) === '') await input.fill('0');
-    await input.press('Enter');
-    await expect(
-      fields.getByRole('button', { name: `Confirmed ${label}`, exact: true }),
-    ).toBeVisible();
-  }
-
+  await expect(fields.getByRole('button', { name: /^Confirm (?!all)/ })).toHaveCount(0);
   await expect(fields.getByText('The math checks out.')).toBeVisible();
   await page.getByRole('button', { name: /Confirm and continue/ }).click();
 }
@@ -44,6 +28,30 @@ async function confirmEveryField(page: Page, fields: Locator) {
 test.describe.configure({ mode: 'serial' });
 test.skip(!e2eUser(), NO_E2E_USER);
 test.skip(!e2eApiUrl(), NO_E2E_API);
+
+test('the documents card says it is loading until the list arrives (issue 196)', async ({
+  page,
+}) => {
+  // Hold the first read of the list, as a slow API would.
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(
+    (url) => url.pathname === '/docs',
+    async (route) => {
+      if (route.request().method() === 'GET') await held;
+      await route.continue();
+    },
+  );
+  await page.goto('/setup/link');
+  await waitForHydration(page);
+  const docs = page.getByRole('region', { name: 'Documents' });
+  await expect(docs.getByText('Loading your documents')).toBeAttached();
+  await expect(docs.getByText(/^No documents yet/)).toHaveCount(0);
+
+  release();
+  await expect(docs.getByText('Loading your documents')).toHaveCount(0, { timeout: 60_000 });
+  await page.unrouteAll({ behavior: 'wait' });
+});
 
 test('uploads a pay stub, replaces it, reviews every field and continues to Spending', async ({
   page,
@@ -71,19 +79,26 @@ test('uploads a pay stub, replaces it, reviews every field and continues to Spen
     'href',
     replaced!,
   );
-  await expect(row.getByText(/^[1-9]\d* items? redacted$/)).toBeVisible();
+  await expect(row.getByText(/^[1-9]\d* numbers? hidden$/)).toBeVisible();
 
   await row.getByRole('link', { name: 'Review pay stub' }).click();
   await expect(page).toHaveURL(/\/setup\/confirm\/[^/]+$/);
   await waitForHydration(page);
-  const fields = page.getByRole('region', { name: 'Extracted fields' });
+  const fields = page.getByRole('region', { name: 'What we read' });
   await expect(fields).toBeVisible();
   await expect(page).toHaveTitle('Confirm pay stub | First Paycheck');
   await expect(
-    page.getByRole('complementary', { name: 'Source, as the AI saw it' }).getByRole('img', {
-      name: 'Redacted',
+    page.getByRole('complementary', { name: 'Your pay stub' }).getByRole('img', {
+      name: 'Hidden number',
     }),
   ).not.toHaveCount(0);
+
+  // The stub prints "401(k) -": a dash on a deduction line is $0.00, read from
+  // that line (issue 195), so selecting the field marks it in the source.
+  const k401 = fields.getByRole('group', { name: '401(k) contribution', exact: true });
+  await expect(k401.getByText('$0.00', { exact: true })).toBeVisible();
+  await k401.getByRole('button', { name: /^401\(k\) contribution/ }).click();
+  await expect(page.locator('li[aria-current="true"]')).toHaveText(/^401\(k\)\s*-$/);
 
   await confirmEveryField(page, fields);
   await expect(page).toHaveURL('/setup/spending', { timeout: 30_000 });
@@ -111,7 +126,7 @@ test('confirming the same pay stub again counts it once on Spending (issue 190)'
   await expect(row.getByText('Review needed')).toBeVisible({ timeout: 180_000 });
   await row.getByRole('link', { name: 'Review pay stub' }).click();
   await waitForHydration(page);
-  await confirmEveryField(page, page.getByRole('region', { name: 'Extracted fields' }));
+  await confirmEveryField(page, page.getByRole('region', { name: 'What we read' }));
   await expect(page).toHaveURL('/setup/spending', { timeout: 30_000 });
   await waitForHydration(page);
 
@@ -131,4 +146,18 @@ test('confirming the same pay stub again counts it once on Spending (issue 190)'
   });
   await expect(page.getByRole('button', { name: 'Gross pay, 1 stub $2,708.33' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Federal tax $297.76' })).toBeVisible();
+
+  // On Link the newest copy is the confirmed one; the copy it replaced says
+  // so and offers nothing to do again (issue 199).
+  await openLink(page);
+  const stubs = page
+    .getByRole('region', { name: 'Documents' })
+    .getByRole('group', { name: /^Pay stub/ });
+  await expect(stubs.first().getByText('Confirmed', { exact: true })).toBeVisible({
+    timeout: 60_000,
+  });
+  const older = stubs.filter({ hasText: 'Replaced by a newer copy' }).first();
+  await expect(older).toContainText('You confirmed this paycheck again, so the newer copy counts.');
+  await expect(older.getByText('Confirmed', { exact: true })).toHaveCount(0);
+  await expect(older.getByRole('button', { name: 'Replace pay stub' })).toHaveCount(0);
 });

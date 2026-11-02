@@ -16,6 +16,13 @@ describe('Button', () => {
     expect(screen.getByRole('button')).toHaveClass('bg-blue', 'text-white');
   });
 
+  it('renders the destructive variant in red on its tint, a step below primary', () => {
+    render(<Button variant="destructive">Yes, unlink Chase</Button>);
+    const button = screen.getByRole('button');
+    expect(button).toHaveClass('bg-red-tint', 'text-red-text');
+    expect(button).not.toHaveClass('bg-blue');
+  });
+
   it('renders the small size at 36px', () => {
     render(<Button size="sm">Replace</Button>);
     expect(screen.getByRole('button')).toHaveClass('min-h-9', 'text-small');
