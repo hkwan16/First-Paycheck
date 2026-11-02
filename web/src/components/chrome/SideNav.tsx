@@ -33,7 +33,7 @@ const SETUP: readonly NavItem[] = [
 ];
 
 const PLAN: readonly NavItem[] = [
-  { key: 'why', label: 'Why this decision', step: <QuestionIcon />, href: '/why' },
+  { key: 'why', label: 'Why each decision', step: <QuestionIcon />, href: '/why' },
   { key: 'plan', label: 'Plan and calendar', step: <PlanIcon />, href: '/plan' },
   { key: 'checkIn', label: 'Monthly check-in', step: <TrendIcon /> },
 ];
