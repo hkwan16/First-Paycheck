@@ -46,7 +46,7 @@ export function SpendingScreen({
     <>
       <PageTitle
         title={title}
-        lead="Known merchants are labeled by rules. Only unknown ones went to the AI, with a confidence score. Fix any label and it becomes a rule for next time."
+        lead="What came into and went out of your linked accounts. Change a transaction's category and the rest from that merchant follow."
       />
       <CardErrorBoundary title="Spending summary">
         <SummaryCard

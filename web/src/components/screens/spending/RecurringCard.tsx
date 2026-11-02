@@ -131,8 +131,7 @@ export function RecurringCard() {
   } else if (charges.length === 0) {
     body = (
       <p className="m-0 text-small text-ink-3">
-        Nothing recurring yet. A charge shows up here once it repeats on a weekly, monthly or yearly
-        rhythm.
+        Nothing repeats yet. A charge shows up here once it comes weekly, monthly or yearly.
       </p>
     );
   } else {
@@ -161,7 +160,8 @@ export function RecurringCard() {
                   <span className="truncate font-semibold">{charge.merchant_clean}</span>
                 )}
                 <span className="text-tiny text-ink-3">
-                  {cadenceLabel(charge.cadence)} · last {formatDate(charge.last_seen, 'short')}
+                  {cadenceLabel(charge.cadence)} · last charged{' '}
+                  {formatDate(charge.last_seen, 'short')}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -213,8 +213,7 @@ export function RecurringCard() {
             Recurring charges
           </h2>
           <p className="m-0 text-small text-ink-3">
-            Bills and subscriptions that repeat at a steady amount. Mark anything that is not one,
-            or give it a clearer name.
+            Bills and subscriptions that repeat at about the same amount.
           </p>
         </div>
         {charges.length > 0 && <Badge>{formatNumber(charges.length)} found</Badge>}

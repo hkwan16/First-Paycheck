@@ -13,7 +13,7 @@ import { formatTransactionAmount, transactionFlow } from '@/lib/money';
 import { sourceBadge } from './spending-format';
 
 /*
- * From the mockup's `.trow`: date, merchant and account, who labeled it, the
+ * From the mockup's `.trow`: date, merchant and account, where its category came from, the
  * category select with its bucket swatch, and the signed amount. A grid of
  * ARIA table rows, so the five columns can stack into three lines when the
  * card is narrow (a container query, since the card's width, not the
@@ -67,7 +67,7 @@ export function TransactionTable({
             Merchant
           </span>
           <span role="columnheader" className="[grid-area:source]">
-            Labeled by
+            Category from
           </span>
           <span role="columnheader" className="[grid-area:category]">
             Category

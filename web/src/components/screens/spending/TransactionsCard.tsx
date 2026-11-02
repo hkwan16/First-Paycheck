@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useId, useMemo, useState } from 'react';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Notice } from '@/components/ui/Notice';
@@ -13,11 +12,11 @@ import type { TransactionFilters } from '@/lib/api/keys';
 import type { Category, Transaction } from '@/lib/api/types';
 import { categoryInfo } from '@/lib/categories';
 import { formatNumber } from '@/lib/money';
-import { countSources, periodText } from './spending-format';
+import { periodText } from './spending-format';
 import { TransactionTable } from './TransactionTable';
 
 type FixResult =
-  | { kind: 'saved'; merchant: string; relabeled: number }
+  | { kind: 'saved'; merchant: string; category: string; relabeled: number }
   | { kind: 'failed'; merchant: string; previous: string; message: string };
 
 function FixNotice({ result }: { result: FixResult }) {
@@ -29,15 +28,15 @@ function FixNotice({ result }: { result: FixResult }) {
       </Notice>
     );
   }
-  const others =
+  const earlier =
     result.relabeled === 0
       ? ''
-      : ` ${formatNumber(result.relabeled)} other ${
-          result.relabeled === 1 ? 'transaction was' : 'transactions were'
-        } relabeled.`;
+      : `, and ${formatNumber(result.relabeled)} earlier ${
+          result.relabeled === 1 ? 'transaction' : 'transactions'
+        } changed too`;
   return (
     <Notice tone="confirmed" compact role="status">
-      Saved as a rule. {result.merchant} will never go back to the AI for you.{others}
+      Saved. {result.merchant} will be {result.category} from now on{earlier}.
     </Notice>
   );
 }
@@ -66,9 +65,10 @@ export interface TransactionsCardProps {
 }
 
 /**
- * The mockup's transactions card: who labeled what, the period's table, and
- * the category fix. A fix shows at once (useFixCategory is optimistic); the
- * notice says the server saved it as a rule, or that it went back. While
+ * The mockup's transactions card: the period's table, where each category
+ * came from, and the category fix. A fix shows at once (useFixCategory is
+ * optimistic); the notice says it was saved for the merchant from now on, or
+ * that it went back. While
  * another period loads, the last rows stay on screen and the card is busy.
  */
 export function TransactionsCard({ filters }: TransactionsCardProps) {
@@ -83,7 +83,6 @@ export function TransactionsCard({ filters }: TransactionsCardProps) {
     () => new Map((accounts ?? []).map((a) => [a.id, a.mask] as const)),
     [accounts],
   );
-  const counts = countSources(list.transactions);
 
   const onCategoryChange = (txn: Transaction, category: Category) => {
     const merchant = txn.merchant_clean ?? txn.merchant_raw;
@@ -93,7 +92,16 @@ export function TransactionsCard({ filters }: TransactionsCardProps) {
       { transactionId: txn.id, category },
       {
         onSuccess: (saved) =>
-          setResult(saved.rule ? { kind: 'saved', merchant, relabeled: saved.relabeled } : null),
+          setResult(
+            saved.rule
+              ? {
+                  kind: 'saved',
+                  merchant,
+                  category: categoryInfo(category).label,
+                  relabeled: saved.relabeled,
+                }
+              : null,
+          ),
         onError: (error) =>
           setResult({
             kind: 'failed',
@@ -130,8 +138,8 @@ export function TransactionsCard({ filters }: TransactionsCardProps) {
         </p>
       ) : (
         <p className="m-0 text-small text-ink-3">
-          No transactions yet. <Link href="/setup/link">Link a bank</Link> on the first step and
-          they appear here once the sync finishes.
+          No transactions yet. <Link href="/setup/link">Link a bank</Link> and they show up here
+          once it syncs.
         </p>
       );
   } else {
@@ -156,13 +164,10 @@ export function TransactionsCard({ filters }: TransactionsCardProps) {
           </div>
         )}
         {expanded && list.hasNextPage && (
-          <div className="flex flex-wrap items-center gap-3">
+          <div>
             <Button onClick={() => void list.fetchNextPage()} loading={list.isFetchingNextPage}>
               Load more transactions
             </Button>
-            <span className="text-small text-ink-3">
-              Counts cover the {formatNumber(list.transactions.length)} transactions loaded so far.
-            </span>
           </div>
         )}
       </>
@@ -171,25 +176,11 @@ export function TransactionsCard({ filters }: TransactionsCardProps) {
 
   return (
     <Card aria-labelledby="txn-title" gap={12} aria-busy={list.isPlaceholderData || undefined}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="txn-title" className="m-0">
-          Transactions
-        </h2>
-        {list.transactions.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3">
-            <Badge>{formatNumber(counts.rule)} by rule</Badge>
-            <Badge tone="blue">{formatNumber(counts.llm)} by AI</Badge>
-            <Badge tone="confirmed">{formatNumber(counts.user)} fixed by you</Badge>
-          </div>
-        )}
-      </div>
+      <h2 id="txn-title" className="m-0">
+        Transactions
+      </h2>
       {result && <FixNotice result={result} />}
       {body}
-      <p className="m-0 text-tiny text-ink-3">
-        Category groups: essentials are housing, groceries, utilities, phone, transport, insurance
-        and healthcare. Flexible is dining, shopping, subscriptions, entertainment and travel.
-        Savings is any transfer into savings or investments.
-      </p>
     </Card>
   );
 }

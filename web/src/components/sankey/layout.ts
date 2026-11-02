@@ -9,7 +9,7 @@ import { isQuietFlow, type FlowColor } from '@/lib/design/tone';
  *
  *   0  gross pay            (the period's confirmed pay stubs)
  *   1  withholding lines, then take-home
- *   2  buckets: essentials, flexible, savings, other, not yet spent
+ *   2  buckets: essentials, flexible, savings, other, left over
  *   3  each bucket's categories
  *
  * Every amount is the API's (`GET /cashflow`), carried in cents and shown
@@ -151,7 +151,7 @@ const BUCKETS: readonly BucketSpec[] = [
   },
   {
     bucket: 'left_over',
-    name: 'Not yet spent',
+    name: 'Left over',
     color: 'flow-idle',
     categoryColor: 'flow-idle',
     cents: (f) => f.spending.left_over_cents,

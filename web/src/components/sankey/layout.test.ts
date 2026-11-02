@@ -67,7 +67,7 @@ describe('layoutCashFlow', () => {
     });
     expect(node(layout, 'take-home')).toMatchObject({ name: 'Take-home', cents: 399_208 });
     expect(node(layout, 'bucket:left_over')).toMatchObject({
-      name: 'Not yet spent',
+      name: 'Left over',
       cents: 161_894,
     });
     expect(node(layout, 'category:phone_internet')).toMatchObject({
@@ -130,7 +130,7 @@ describe('layoutCashFlow', () => {
       'category:subscriptions',
       'category:shopping',
     ]);
-    // Not yet spent stays put: no category of its own.
+    // Left over stays put: no category of its own.
     expect(outOf(layout, 'bucket:left_over')).toEqual([]);
   });
 
