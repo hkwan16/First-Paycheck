@@ -27,6 +27,11 @@ async function renderSpending(props: Parameters<typeof SpendingScreen>[0] = {}) 
 
 afterEach(() => server.events.removeAllListeners());
 
+/** Opens the Transactions card's whole list (it shows the newest 10 rows first). */
+async function showAll(user: Awaited<ReturnType<typeof renderSpending>>['user']) {
+  await user.click(screen.getByRole('button', { name: 'Show all transactions' }));
+}
+
 const summaryRegion = () => screen.getByRole('region', { name: /pay stubs?$|Your month so far/ });
 const tile = (label: string) => within(summaryRegion()).getByText(label).parentElement!;
 const LOAN_ID = '1a2b3c4d-0000-4000-8000-00000000a070';
@@ -372,11 +377,11 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
 });
 
 describe('SpendingScreen transactions', () => {
-  it('lists every transaction newest first with date, merchant, account, source, category and amount', async () => {
+  it('lists the newest transactions first with date, merchant, account, source, category and amount', async () => {
     await renderSpending();
     const table = screen.getByRole('table', { name: 'Transactions' });
     const rows = within(table).getAllByRole('row').slice(1);
-    expect(rows).toHaveLength(16);
+    expect(rows).toHaveLength(10);
 
     const [latest] = rows;
     expect(within(latest!).getByText('Oct 17')).toBeInTheDocument();
@@ -390,6 +395,31 @@ describe('SpendingScreen transactions', () => {
     expect(within(row('Sweetgreen')).getByText('AI · 91%')).toHaveClass('bg-blue-tint');
     expect(within(row('Costco Wholesale')).getByText('AI · 62%')).toBeInTheDocument();
     expect(within(row('Blue Bottle Coffee')).getByText('You')).toBeInTheDocument();
+  });
+
+  it('opens on the newest 10 rows and shows every loaded row on request (issue 201)', async () => {
+    const { user } = await renderSpending();
+    const table = screen.getByRole('table', { name: 'Transactions' });
+    const toggle = screen.getByRole('button', { name: 'Show all transactions' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls', table.id);
+    expect(screen.queryByRole('row', { name: /Parkline Apartments/ })).not.toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(within(table).getAllByRole('row').slice(1)).toHaveLength(16);
+    expect(screen.getByRole('row', { name: /Parkline Apartments/ })).toBeInTheDocument();
+    expect(toggle).toHaveAccessibleName('Show fewer');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveFocus();
+
+    await user.click(toggle);
+    expect(within(table).getAllByRole('row').slice(1)).toHaveLength(10);
+  });
+
+  it('offers no toggle when every row already shows', async () => {
+    db.transactions = db.transactions.slice(0, 10);
+    await renderSpending();
+    expect(screen.queryByRole('button', { name: 'Show all transactions' })).not.toBeInTheDocument();
   });
 
   it('counts the labels by source', async () => {
@@ -435,6 +465,7 @@ describe('SpendingScreen transactions', () => {
 
   it("relabels the merchant's other rows too and says how many", async () => {
     const { user } = await renderSpending();
+    await showAll(user);
     await user.selectOptions(categoryOf("Trader Joe's", 0), ['Dining']);
     await waitFor(() => expect(categoryOf("Trader Joe's", 1)).toHaveValue('dining'));
     expect(within(row("Trader Joe's", 1)).getByText('Rule')).toBeInTheDocument();
@@ -480,6 +511,11 @@ describe('SpendingScreen transactions', () => {
     }));
     const { user } = await renderSpending();
     const table = screen.getByRole('table', { name: 'Transactions' });
+    expect(within(table).getAllByRole('row')).toHaveLength(11);
+    expect(
+      screen.queryByRole('button', { name: 'Load more transactions' }),
+    ).not.toBeInTheDocument();
+    await showAll(user);
     expect(within(table).getAllByRole('row')).toHaveLength(51);
     expect(screen.getByText('Counts cover the 50 transactions loaded so far.')).toBeInTheDocument();
 
@@ -583,7 +619,7 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
     await renderSpending();
     // The API's default period is the one it answered for: October 1 to 17 here.
     expect(reads).toEqual([OCTOBER]);
-    expect(listed()).toHaveLength(16);
+    expect(listed()).toHaveLength(10);
     expect(screen.queryByRole('row', { name: /Corner Bookshop/ })).not.toBeInTheDocument();
   });
 
@@ -594,6 +630,8 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
 
     await pick(user, 'August 2026');
     expect(await screen.findByRole('row', { name: /August shop 1\b/ })).toBeInTheDocument();
+    expect(listed()).toHaveLength(10);
+    await showAll(user);
     expect(listed()).toHaveLength(50);
     expect(screen.queryByRole('row', { name: /Sweetgreen/ })).not.toBeInTheDocument();
     expect(reads.at(-1)).toEqual(AUGUST);
@@ -624,7 +662,7 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
     await pick(user, 'August 2026');
 
     await waitFor(() => expect(card()).toHaveAttribute('aria-busy', 'true'));
-    expect(listed()).toHaveLength(16);
+    expect(listed()).toHaveLength(10);
     expect(within(card()).queryByText(/Loading your transactions/)).not.toBeInTheDocument();
 
     answer.resolve();
@@ -649,7 +687,8 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
       },
       ...db.transactions,
     ];
-    await renderSpending();
+    const { user } = await renderSpending();
+    await showAll(user);
     expect(listed()).toHaveLength(16);
     expect(screen.queryByRole('row', { name: /Interest charged/ })).not.toBeInTheDocument();
   });
@@ -702,6 +741,6 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
     const reads = transactionReads();
     await renderSpending();
     expect(reads).toEqual([{ limit: '50', cash_accounts_only: 'true' }]);
-    expect(listed()).toHaveLength(16);
+    expect(listed()).toHaveLength(10);
   });
 });

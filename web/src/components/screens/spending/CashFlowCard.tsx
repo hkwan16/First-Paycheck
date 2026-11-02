@@ -99,12 +99,7 @@ export function CashFlowCard({ flow, updating }: CashFlowCardProps) {
         width={width}
         headings={headings}
         renderDetails={(node: FlowNode) => (
-          <FlowDetails
-            node={node}
-            flow={flow}
-            transactions={transactions}
-            masks={masks}
-          />
+          <FlowDetails node={node} flow={flow} transactions={transactions} masks={masks} />
         )}
       />
     );

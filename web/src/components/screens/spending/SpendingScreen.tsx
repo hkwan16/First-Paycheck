@@ -40,11 +40,7 @@ export function SpendingScreen({
   // its way (the last period's flow may still be on screen), and the newest
   // rows when the cash flow cannot be read.
   const listed = period ?? (flow && !cashflow.isPlaceholderData ? flow : null);
-  const transactions = listed
-    ? periodFilters(listed)
-    : cashflow.isError
-      ? NEWEST_SPENDING
-      : null;
+  const transactions = listed ? periodFilters(listed) : cashflow.isError ? NEWEST_SPENDING : null;
 
   return (
     <>

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -42,6 +42,9 @@ function FixNotice({ result }: { result: FixResult }) {
   );
 }
 
+/** How many rows the card shows before "Show all transactions" (issue 201). */
+export const PREVIEW_ROWS = 10;
+
 function LoadingRows() {
   return (
     <div aria-busy="true" className="flex flex-col gap-4 py-2">
@@ -73,6 +76,8 @@ export function TransactionsCard({ filters }: TransactionsCardProps) {
   const accounts = useAccounts().data;
   const fix = useFixCategory();
   const [result, setResult] = useState<FixResult | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const tableId = useId();
 
   const masks = useMemo(
     () => new Map((accounts ?? []).map((a) => [a.id, a.mask] as const)),
@@ -130,14 +135,27 @@ export function TransactionsCard({ filters }: TransactionsCardProps) {
         </p>
       );
   } else {
+    const more = list.transactions.length > PREVIEW_ROWS || list.hasNextPage;
     body = (
       <>
         <TransactionTable
-          transactions={list.transactions}
+          id={tableId}
+          transactions={expanded ? list.transactions : list.transactions.slice(0, PREVIEW_ROWS)}
           masks={masks}
           onCategoryChange={onCategoryChange}
         />
-        {list.hasNextPage && (
+        {more && (
+          <div>
+            <Button
+              aria-expanded={expanded}
+              aria-controls={tableId}
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? 'Show fewer' : 'Show all transactions'}
+            </Button>
+          </div>
+        )}
+        {expanded && list.hasNextPage && (
           <div className="flex flex-wrap items-center gap-3">
             <Button onClick={() => void list.fetchNextPage()} loading={list.isFetchingNextPage}>
               Load more transactions

@@ -22,7 +22,8 @@ import { sourceBadge } from './spending-format';
 const ROW = cn(
   'grid items-center gap-x-3 gap-y-1.5 border-t border-line py-2.5',
   'grid-cols-[minmax(0,1fr)_auto] [grid-template-areas:"merchant_amount"_"date_source"_"category_category"]',
-  '@min-[42rem]:grid-cols-[64px_minmax(180px,1fr)_110px_190px_96px] @min-[42rem]:[grid-template-areas:"date_merchant_source_category_amount"]',
+  // The category column fits the longest name, "Transfer between accounts", whole (issue 201).
+  '@min-[48rem]:grid-cols-[64px_minmax(180px,1fr)_128px_248px_96px] @min-[48rem]:[grid-template-areas:"date_merchant_source_category_amount"]',
 );
 
 const GROUPS = categoryGroups();
@@ -33,15 +34,22 @@ export function SourceBadge({ transaction }: { transaction: Transaction }) {
 }
 
 export interface TransactionTableProps {
+  /** For the card's "Show all transactions" toggle (`aria-controls`). */
+  id?: string;
   transactions: readonly Transaction[];
   /** account_id to mask, for the "··4821" under each merchant. */
   masks: ReadonlyMap<string, string | null>;
   onCategoryChange: (transaction: Transaction, category: Category) => void;
 }
 
-export function TransactionTable({ transactions, masks, onCategoryChange }: TransactionTableProps) {
+export function TransactionTable({
+  id,
+  transactions,
+  masks,
+  onCategoryChange,
+}: TransactionTableProps) {
   return (
-    <div role="table" aria-label="Transactions" className="@container">
+    <div id={id} role="table" aria-label="Transactions" className="@container">
       <div role="rowgroup">
         <div
           role="row"
@@ -49,7 +57,7 @@ export function TransactionTable({ transactions, masks, onCategoryChange }: Tran
             ROW,
             'border-t-0 pt-0 pb-1.5 text-tiny font-semibold tracking-[0.03em] text-ink-3 uppercase',
             // Narrow cards stack each row, so the header row is for screen readers only.
-            '@max-[42rem]:sr-only',
+            '@max-[48rem]:sr-only',
           )}
         >
           <span role="columnheader" className="[grid-area:date]">
@@ -108,7 +116,7 @@ function TransactionRow({
       </span>
       <span
         role="cell"
-        className="justify-self-end [grid-area:source] @min-[42rem]:justify-self-start"
+        className="justify-self-end [grid-area:source] @min-[48rem]:justify-self-start"
       >
         <SourceBadge transaction={txn} />
       </span>
