@@ -111,7 +111,8 @@ Rules:
   validated by `llm/prompts/__init__.py`. A released prompt file is never
   edited; a change is a new version.
 - One public method per prompt: `categorize` (`categorize/v3`),
-  `extract_pay_stub` (`extract_pay_stub/v1`), `extract_benefits`
+  `extract_pay_stub` (`extract_pay_stub/v2`: a dash or `0.00` printed on a line is 0
+  tied to that line, not null; spec 005 rule 1a, issue 195), `extract_benefits`
   (`extract_benefits/v2`), `explain` (`explain/v3`), `judge_rate_claim`
   (`judge_rate_claim/v1`, schema `RateClaimVerdict`; spec 008 rule 24a), the
   explain eval's judge of whether a final explanation calls the chosen 401(k)
@@ -268,7 +269,8 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   stub of the same paycheck (same `employer_key`, pay date and period) and any
   current stub of a document the confirmed one replaced, along the replace chain.
   Read pay stubs only through `db/pay_stubs.py` (`current_pay_stubs()`,
-  `NEWEST_FIRST`, `latest_pay_date`, `paid_between_count`): `test_boundaries`
+  `NEWEST_FIRST`, `latest_pay_date`, `paid_between_count`, `superseded_documents`, which
+  gives `DocumentOut.superseded` for Link, rule 22f): `test_boundaries`
   fails on a `select`/`select_from`/`get` of `PayStub` or SQL naming `pay_stubs`
   anywhere else. `uq_pay_stubs_current_paycheck` (partial unique index) is the
   backstop; `superseded_by_id` is a deferred same-user self reference, and the
