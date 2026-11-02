@@ -128,29 +128,29 @@ e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, sp
 Each `components/ui` component is derived from a mockup class; the class is named in its doc
 comment.
 
-| Component                                       | Mockup                                            | Notes                                                                                                                                                                                                                               |
-| ----------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Button`                                        | `.btn`, `-primary`, `-confirmed`, `-sm`, `-block` | `variant` default, primary, confirmed (requires `pressed`); `size` md 44px, sm 36px; `href` renders a Next `Link`; `loading` keeps the label and width, sets `aria-busy`, ignores clicks; press scale 0.97 off under reduced motion |
-| `Badge`                                         | `.badge`, `badge-*`                               | `tone`, `solid`, `icon`, `href`                                                                                                                                                                                                     |
-| `Chip`                                          | `.chip`                                           | header context                                                                                                                                                                                                                      |
-| `Card`                                          | `.card`, `.fallback`                              | `as`, `padding` 20 or 24, `gap`, `tint` confirmed or warning, `inset`                                                                                                                                                               |
-| `Tile`                                          | `.result`, `.tile`                                | recessed panel, `tone` washes it in a hue                                                                                                                                                                                           |
-| `StatTile`                                      | `.tile .k .v`, `.stat`                            | `label`, `value`, `sub`, `tone`, `size` md or sm; `loading` shows skeletons and sets `aria-busy`                                                                                                                                    |
-| `IconTile`                                      | `.ico`, `.sev`                                    | `tone`, `label` (initials), `muted`                                                                                                                                                                                                 |
-| `Bar`                                           | `.bar`, `.track`                                  | progressbar; `value` clamped 0-100; `tone` required; `height` 8 or 6; `indeterminate` slides a segment and drops `aria-valuenow`                                                                                                    |
-| `JobProgress`                                   | `.bar` with a label row                           | a background job from `useJob`: label, status words in a polite live region, percent, blue bar (indeterminate until the job reports progress); dead or unreadable becomes a warning with Try again                                  |
-| `Skeleton`                                      | none                                              | decorative placeholder for a value on its way; pulses, still under reduced motion; the region around it carries `aria-busy`                                                                                                         |
-| `RelativeTime`                                  | none                                              | "4 minutes ago" in a `<time>`, kept current; server and hydration render the plain date, so the HTML never depends on the clock                                                                                                     |
-| `KV`, `KVList`                                  | `.kv`                                             | a `<dl>`; `verified` adds the "=" mark; `spacing` compact, comfortable, panel; `rules`                                                                                                                                              |
-| `Seg`                                           | `.seg`                                            | generic options; role group of `aria-pressed` buttons; one tab stop; arrows, Home, End; `value` may be `null` (nothing chosen yet)                                                                                                  |
-| `Input`, `Select`, `Label`, `Range`, `Checkbox` | `.input`, `.label`, `.range`, `.check`            | `Range` shows the two-sided label row and speaks `valueLabel`                                                                                                                                                                       |
-| `FieldError`                                    | none (follows the input's invalid border)         | inline message under an invalid field; `id` for `aria-describedby`; renders nothing when empty                                                                                                                                      |
-| `Notice`                                        | `.notice` and inline result rows                  | `tone` blue, confirmed, warning; `compact`; forwards `ref` (focus a notice that replaced the control pressed)                                                                                                                       |
-| `CardErrorBoundary`                             | `.card` (fallback only)                           | class component; `title`, `className` (the card's layout classes, kept by the fallback); see "Error boundaries"                                                                                                                     |
-| `Swatch`                                        | `.sw`                                             | token `color` or `dashed` (a $0 node)                                                                                                                                                                                               |
-| `ListRows`                                      | `.list`                                           | hairline-separated rows                                                                                                                                                                                                             |
-| `DropZone`                                      | `.drop`                                           | a real file input, keyboard operable; filters by `accept` (drops too)                                                                                                                                                               |
-| `Money`, `Num`                                  | `.num`                                            | format only: cents in, tabular numerals, `decimals` 0 or 2, `signed`, `tone`                                                                                                                                                        |
+| Component                                       | Mockup                                            | Notes                                                                                                                                                                                                                                                                |
+| ----------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Button`                                        | `.btn`, `-primary`, `-confirmed`, `-sm`, `-block` | `variant` default, primary, confirmed (requires `pressed`), destructive (deletes something); `size` md 44px, sm 36px; `href` renders a Next `Link`; `loading` keeps the label and width, sets `aria-busy`, ignores clicks; press scale 0.97 off under reduced motion |
+| `Badge`                                         | `.badge`, `badge-*`                               | `tone`, `solid`, `icon`, `href`                                                                                                                                                                                                                                      |
+| `Chip`                                          | `.chip`                                           | header context                                                                                                                                                                                                                                                       |
+| `Card`                                          | `.card`, `.fallback`                              | `as`, `padding` 20 or 24, `gap`, `tint` confirmed or warning, `inset`                                                                                                                                                                                                |
+| `Tile`                                          | `.result`, `.tile`                                | recessed panel, `tone` washes it in a hue                                                                                                                                                                                                                            |
+| `StatTile`                                      | `.tile .k .v`, `.stat`                            | `label`, `value`, `sub`, `tone`, `size` md or sm; `loading` shows skeletons and sets `aria-busy`                                                                                                                                                                     |
+| `IconTile`                                      | `.ico`, `.sev`                                    | `tone`, `label` (initials), `muted`                                                                                                                                                                                                                                  |
+| `Bar`                                           | `.bar`, `.track`                                  | progressbar; `value` clamped 0-100; `tone` required; `height` 8 or 6; `indeterminate` slides a segment and drops `aria-valuenow`                                                                                                                                     |
+| `JobProgress`                                   | `.bar` with a label row                           | a background job from `useJob`: label, status words in a polite live region, percent, blue bar (indeterminate until the job reports progress); dead or unreadable becomes a warning with Try again                                                                   |
+| `Skeleton`                                      | none                                              | decorative placeholder for a value on its way; pulses, still under reduced motion; the region around it carries `aria-busy`                                                                                                                                          |
+| `RelativeTime`                                  | none                                              | "4 minutes ago" in a `<time>`, kept current; server and hydration render the plain date, so the HTML never depends on the clock                                                                                                                                      |
+| `KV`, `KVList`                                  | `.kv`                                             | a `<dl>`; `spacing` compact, comfortable, panel; `rules`                                                                                                                                                                                                             |
+| `Seg`                                           | `.seg`                                            | generic options; role group of `aria-pressed` buttons; one tab stop; arrows, Home, End; `value` may be `null` (nothing chosen yet)                                                                                                                                   |
+| `Input`, `Select`, `Label`, `Range`, `Checkbox` | `.input`, `.label`, `.range`, `.check`            | `Range` shows the two-sided label row and speaks `valueLabel`                                                                                                                                                                                                        |
+| `FieldError`                                    | none (follows the input's invalid border)         | inline message under an invalid field; `id` for `aria-describedby`; renders nothing when empty                                                                                                                                                                       |
+| `Notice`                                        | `.notice` and inline result rows                  | `tone` blue, confirmed, warning; `compact`; forwards `ref` (focus a notice that replaced the control pressed)                                                                                                                                                        |
+| `CardErrorBoundary`                             | `.card` (fallback only)                           | class component; `title`, `className` (the card's layout classes, kept by the fallback); see "Error boundaries"                                                                                                                                                      |
+| `Swatch`                                        | `.sw`                                             | token `color` or `dashed` (a $0 node)                                                                                                                                                                                                                                |
+| `ListRows`                                      | `.list`                                           | hairline-separated rows                                                                                                                                                                                                                                              |
+| `DropZone`                                      | `.drop`                                           | a real file input, keyboard operable; filters by `accept` (drops too)                                                                                                                                                                                                |
+| `Money`, `Num`                                  | `.num`                                            | format only: cents in, tabular numerals, `decimals` 0 or 2, `signed`, `tone`                                                                                                                                                                                         |
 
 Chrome (`components/chrome`): `Wordmark`, `Header` (`chips`, `account` slot, `minimal`),
 `HeaderAccount` (server: "Sample data" chip and `UserMenu` from the Supabase user), `UserMenu` (the
@@ -451,7 +451,8 @@ or checked for a phone.
 
 ## Deleting the account
 
-The header's account menu (`UserMenu`) has Delete account under Sign out. It swaps the panel for
+The header's account menu (`UserMenu`) has Delete account under Sign out, behind a hairline and in
+the `destructive` Button style (issue 205). It swaps the panel for
 `DeleteAccountConfirm`: what goes, a field labeled "Type delete to confirm" (focused; capitals and
 spaces around the word do not matter; Enter submits only once it says delete), Delete my account
 and Keep my account (which returns focus to Delete account). Closing the menu (Escape, a click
@@ -670,26 +671,29 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
 - **Never explained** (spec 011 rule 18, issue 162): `isExplained(calculator)`
   (`lib/explanations.ts`, mirroring the API's `BENEFITS_QUERIES`) is false for an emergency
   fund. Its Why page offers no explanation: a "No written explanation" card says why (no tax rule
-  applies) and `CalculatorResultCard` shows the saved result (`FundResultRows`, with
-  `fallback={false}`: no "Fallback" badge) with "Change it on its step". The index's lead does
-  not claim every decision has an explanation, and the emergency fund's row says "Calculator
-  result, no written explanation". The Plan page's `explanationView` uses the same helper.
+  applies) and `CalculatorResultCard` ("Your saved numbers") shows the saved result
+  (`FundResultRows`) with "Change this decision". The index's lead does not claim every
+  decision has an explanation, and the emergency fund's row says "No written explanation". The Plan page's `explanationView` uses the same helper.
   Sample: `/dev/screens/why/emergency-fund`.
 
-- **Verified**: status checks (numbers checked, citations, retries), the concept, "Your numbers"
-  with the verifier's "=" marks, what would change the answer, sources (IRS citations as outbound
-  links in a new tab, with the quoted passage) and next steps from the calendar.
-- **Fallback**: the plain calculator result (`CalculatorResultCard`) with a notice and "Try
-  again", which calls `useExplain` with `force: true`.
+- **One note** (spec 008 rule 19b, issue 204): the state of the explanation is one compact
+  notice under the title, a region named "About this explanation" (`ExplanationViews.tsx`), in
+  plain words with no internals (no prompt version, no retries, no "calculator"): `CheckedNote`,
+  `StaleNote` or `NotWrittenNote`, each with at most one action.
+- **Verified**: the checked note, "What this means", "Your numbers", what would change the
+  answer, sources (IRS citations as outbound links in a new tab, the quoted passage behind "What
+  it says") and next steps from the calendar.
+- **Fallback**: the not-written note with "Try again" (`useExplain` with `force: true`), then
+  the saved numbers (`CalculatorResultCard`) and the sources.
 - **None yet** (404): offers "Write the explanation". A 503 `llm_unavailable` is a calm blue
   notice, with the calculator result still shown. An unknown decision is "Decision not found"
   with a link back to `/why`.
 - **Out of date** (`explanation.stale`, spec 008 rules 19a and 19b, issue 161): the API compares
   what the row was written from with what the decision would be explained from now. A stale
-  verified row keeps its text but its status is `StaleStatus`, a warning "Out of date" (never
-  "Verified") with "Write it again", which posts without `force`: the API runs again only when
-  its stored row is stale, so a second tab gets the row the first wrote. A stale fallback adds a
-  sentence to `FallbackStatus`. Confirming a stub or summary invalidates every explanation read
+  verified row keeps its text and its note becomes `StaleNote`, a calm blue "Written <date>.
+  Some of what it was written from has changed since..." with "Write it again", which posts
+  without `force`: the API runs again only when its stored row is stale, so a second tab gets the
+  row the first wrote. A stale fallback adds a sentence to `NotWrittenNote`. Confirming a stub or summary invalidates every explanation read
   (`invalidateAfterConfirm`). Sample: `/dev/screens/why/stale`.
 
 ## Check-in screen
@@ -751,12 +755,14 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
   two lists; `confirmed` when nothing is missing) and "Still to decide" linking each missing
   calculator to its step (`decisionKindRoute`).
 - **Decisions** (`DecisionSummary`): one `DecisionCard` per saved decision in the API's order,
-  with "v{n} · Saved {date}", the API's `figures` by their labels (`figureText` formats by
-  `kind`: money, a net cost (negative reads "$260.00 ahead"), a percentage as stored, a count,
+  with "Saved {date}", the API's `figures` by their labels (`figureText` formats by
+  `kind`: money, a net cost (negative reads "$260.00 ahead"), a refund ("$0.08 refund",
+  "$3,918.70 due"), a percentage as stored, a count,
   text; a null `months_to_target` reads "Not within 10 years"; a value of the wrong type throws rather than guessing), and the explanation:
-  a `confirmed` "Verified explanation" badge linking to Why, "Explanation out of date. Write it
-  again" (a warning) for a stale verified one (`explanationView` gives `stale`), a warning notice
-  for a fallback, or "Explanation not written yet. Write it". An emergency fund is never explained (spec 011), so
+  a `confirmed` "Read the explanation" badge linking to Why, "Written before some of your
+  information changed. Update the explanation" for a stale verified one (`explanationView` gives
+  `stale`), "We could not write this explanation. Try again on its page" for a fallback, or "No
+  explanation yet. Write the explanation" (spec 008 rule 19b). An emergency fund is never explained (spec 011), so
   it shows none (`explanationView`).
 - **Your paycheck** (`PaycheckCard`): the newest confirmed stub's gross and take-home tiles and
   its deductions, or a link to Confirm. **Goals** (`GoalsCard`): status badge, contribution,
@@ -765,7 +771,7 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
 - **Export** (`ExportCard`): Download PDF starts `useExportPlan`, shows `JobProgress` while the
   job runs, downloads once it succeeds (once per job), then says "Downloaded {name}." with
   Download again. A dead job offers Try again (a new export); a failed download offers Try
-  again (a 404, an export past 7 days, makes a new export). Add to calendar (.ics) downloads at
+  again (a 404, an export past 7 days, makes a new export). Add to calendar downloads the .ics at
   once. One polite status line, always rendered, says what was saved.
 - Nothing saved yet: a card linking to Decisions, and no export.
 
@@ -958,8 +964,8 @@ or `plan.spec.ts`'s export waits out its budget while the job fails with "cannot
 stack makes per run; against a hosted API, a fresh confirmed user): it signs in through the form,
 links the sandbox bank and fixes a category, uploads and confirms the Acme stub, reads the
 Spending tiles, goes on to Decisions (the emergency fund step) and through its footer to the 401(k),
-saves it at 4% as v1 and a change as v2, and expects "Verified against
-calculator" with an irs.gov source (what the fake model produces).
+saves it at 4% as v1 and a change as v2, and expects the note "We checked every
+number here..." with an irs.gov source (what the fake model produces).
 
 ### Alpha capture and demo recording
 
