@@ -33,9 +33,9 @@ import { STORAGE_STATE } from './e2e/support/auth';
  * --project=capture-screens --no-deps (these need E2E_API_URL too).
  *
  * A saved session lasts as long as Supabase keeps its refresh token (the app
- * refreshes the access token itself). When it has expired, the run lands on
- * /sign-in and fails waiting for the first screen; save a new one by signing
- * in once through the form, then run the command above again:
+ * refreshes the access token itself). When it has expired, the demo fails at
+ * once and says so; save a new one by signing in once through the form, then
+ * run the command above again:
  *
  *   E2E_WEB_URL=https://first-paycheck-silk.vercel.app \
  *     pnpm exec playwright test -c playwright.capture.config.ts --project=setup
@@ -44,7 +44,8 @@ import { STORAGE_STATE } from './e2e/support/auth';
  * iframe is not driven by automation), so there is no shot of the sync itself.
  * The recording uploads and confirms one Acme stub, saves one 401(k) version
  * and writes its explanation; a rerun over that state, or over any earlier
- * run's, works the same.
+ * run's, works the same, except that each confirmed copy of the stub counts in
+ * October's cash flow again until that bug is fixed (docs/backlog.yaml).
  */
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 
