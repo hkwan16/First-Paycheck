@@ -20,6 +20,12 @@ from sqlalchemy.orm import Session
 from app.deps import Now, UserSession
 from app.errors import AppError, error_responses
 from calc.spending import Bucket, CategorySum, CategoryTotal, summarize
+from db.accounts import (
+    LEDGER_ACCOUNT_KINDS,
+    SPENDING_ACCOUNT_KINDS,
+    active_account_of,
+    transaction_account,
+)
 from db.enums import AccountKind
 from db.models import Account, Transaction
 from db.pay_stubs import paid_between_count
@@ -29,22 +35,6 @@ router = APIRouter(prefix="/spending", tags=["spending"])
 
 MAX_SPAN_DAYS = 366
 _CATEGORY_ORDER = {category: index for index, category in enumerate(CATEGORIES)}
-
-# Spec 007 rule 21a, in ``AccountKind`` order. The summary reads the accounts
-# money is spent from and saved in; a loan, investment or retirement account's
-# rows are that account's own bookkeeping (a loan books the payment that left
-# checking as money in, and accrued interest as money out), so they are
-# skipped and reported as ``ledger_rows_skipped``. Every kind is in one set.
-SPENDING_ACCOUNT_KINDS: tuple[AccountKind, ...] = (
-    AccountKind.CHECKING,
-    AccountKind.SAVINGS,
-    AccountKind.CREDIT,
-)
-LEDGER_ACCOUNT_KINDS: tuple[AccountKind, ...] = (
-    AccountKind.LOAN,
-    AccountKind.INVESTMENT,
-    AccountKind.RETIREMENT,
-)
 
 
 class LedgerRowsSkipped(BaseModel):
@@ -110,16 +100,11 @@ def period(start: dt.date | None, end: dt.date | None, today: dt.date) -> tuple[
     return start, end
 
 
-def _account_join() -> ColumnElement[bool]:
-    return (Account.id == Transaction.account_id) & (Account.user_id == Transaction.user_id)
-
-
 def _posted_in(start: dt.date, end: dt.date, kinds: tuple[AccountKind, ...]) -> ColumnElement[bool]:
     """Posted rows in the period on the user's active accounts of ``kinds``."""
     return (
         Transaction.pending.is_(False)
-        & Account.is_active.is_(True)
-        & Account.kind.in_(kinds)
+        & active_account_of(kinds)
         & Transaction.posted_at.between(start, end)
     )
 
@@ -135,7 +120,7 @@ def _category_sums(session: Session, start: dt.date, end: dt.date) -> list[Categ
             func.count(),
             func.count().filter(money_out),
         )
-        .join(Account, _account_join())
+        .join(Account, transaction_account())
         .where(_posted_in(start, end, SPENDING_ACCOUNT_KINDS))
         .group_by(Transaction.category)
         .order_by(case(_CATEGORY_ORDER, value=Transaction.category, else_=len(_CATEGORY_ORDER)))
@@ -155,7 +140,7 @@ def _category_sums(session: Session, start: dt.date, end: dt.date) -> list[Categ
 def _ledger_rows(session: Session, start: dt.date, end: dt.date) -> LedgerRowsSkipped:
     count, net_cents = session.execute(
         select(func.count(), func.coalesce(func.sum(Transaction.amount_cents), 0))
-        .join(Account, _account_join())
+        .join(Account, transaction_account())
         .where(_posted_in(start, end, LEDGER_ACCOUNT_KINDS))
     ).one()
     return LedgerRowsSkipped(count=int(count), net_cents=int(net_cents))
