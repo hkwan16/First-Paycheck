@@ -9,13 +9,14 @@ import { apiErrorMessage } from '@/lib/api/errors';
 import type { CheckInNowState } from '@/lib/api/hooks';
 import { cn } from '@/lib/cn';
 import { checkInRoute } from '@/lib/routes';
+import { checkInNowMessage } from './checkin-format';
 
 const PROGRESS_LABEL = 'Checking in';
 
 /** The run is queued or under way: the button keeps its place and waits. */
 const isBusy = (state: CheckInNowState) =>
   state.isStarting ||
-  (state.jobId !== null && state.outcome === null && !state.job.isFailed && !state.job.isTerminal);
+  (state.jobId !== null && state.run === null && !state.job.isFailed && !state.job.isTerminal);
 
 /**
  * The mockup's "Run again now" (CheckIn.dc.html's title row): starts this
@@ -46,25 +47,15 @@ export function CheckInNowStatus({
   state: CheckInNowState;
   from: 'list' | 'check-in';
 }) {
-  const { outcome, checkInId } = state;
+  const { run, checkInId } = state;
   const link =
-    from === 'list' && checkInId !== null && outcome !== 'skipped' ? (
+    from === 'list' && checkInId !== null && run !== null && run.outcome !== 'skipped' ? (
       <>
         {' '}
         <Link href={checkInRoute(checkInId)}>Open it</Link>
       </>
     ) : null;
-
-  let message = '';
-  if (outcome === 'skipped') {
-    message = 'This month’s check-in is already complete, so nothing was changed.';
-  } else if (outcome !== null && from === 'check-in') {
-    message = 'Checked again just now. This page is up to date.';
-  } else if (outcome === 'created') {
-    message = 'This month’s check-in is ready.';
-  } else if (outcome === 'refreshed') {
-    message = 'This month’s check-in is up to date.';
-  }
+  const message = checkInNowMessage(run, from);
 
   return (
     <>
@@ -74,7 +65,7 @@ export function CheckInNowStatus({
           {apiErrorMessage(state.startError, 'The server could not be reached. Try again.')}
         </Notice>
       )}
-      {state.jobId !== null && outcome === null && (
+      {state.jobId !== null && run === null && (
         <JobProgress
           label={PROGRESS_LABEL}
           job={state.job.data}

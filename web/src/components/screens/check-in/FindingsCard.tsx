@@ -14,12 +14,12 @@ import { FindingRow } from './FindingRow';
 const ANNOUNCE: Record<UpdateFindingVariables['type'], string> = {
   done: 'Marked done',
   dismiss: 'Dismissed',
-  undo: 'Back to open',
+  undo: 'Reopened',
 };
 
 /**
- * "What changed": the check-in's findings in the API's order. Done, Dismiss
- * and Undo show at once (`useUpdateFinding` is optimistic), focus stays on
+ * "What changed": the check-in's findings in the API's order. Mark as done,
+ * Dismiss and Undo show at once (`useUpdateFinding` is optimistic), focus stays on
  * the row's action button as it swaps, and a refused change goes back with a
  * notice saying so.
  */
@@ -30,7 +30,8 @@ export function FindingsCard({ checkIn }: { checkIn: CheckInDetail }) {
   const [announcement, setAnnouncement] = useState('');
   /**
    * The row whose action button takes focus once it renders in the given
-   * state: Undo after Done or Dismiss, Done after Undo or a rollback.
+   * state: Undo after Mark as done or Dismiss, Mark as done after Undo or a
+   * rollback.
    */
   const focusAfter = useRef<{ findingId: string; handled: boolean } | null>(null);
   const completed = checkIn.status === 'completed';
@@ -67,13 +68,13 @@ export function FindingsCard({ checkIn }: { checkIn: CheckInDetail }) {
       </div>
       {completed && checkIn.completed_at && (
         <Notice tone="confirmed" compact>
-          Every finding is handled. Completed {formatDate(checkIn.completed_at)}.
+          Everything here is handled. Completed {formatDate(checkIn.completed_at)}.
         </Notice>
       )}
       {checkIn.findings.length === 0 ? (
         <p className="m-0 text-small text-ink-3">
-          Nothing changed against your plan this month. The check-in looks again whenever new pay
-          stubs or transactions arrive.
+          Nothing changed against your plan this month. We check again when a new pay stub or new
+          transactions come in.
         </p>
       ) : (
         <ul aria-label="Findings" className="m-0 flex list-none flex-col p-0">

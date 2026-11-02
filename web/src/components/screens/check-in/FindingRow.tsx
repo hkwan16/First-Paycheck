@@ -9,7 +9,6 @@ import {
   ClockIcon,
   CloseIcon,
   GrowthIcon,
-  LinesIcon,
   WarningCircleIcon,
 } from '@/components/icons';
 import { Badge } from '@/components/ui/Badge';
@@ -27,7 +26,6 @@ const KIND_ICONS: Record<FindingKind, ReactNode> = {
   recurring_changed: <ClockIcon />,
   recurring_stopped: <ClockIcon />,
   pay_change: <GrowthIcon size={18} />,
-  deduction_change: <LinesIcon size={18} />,
   upcoming_deadline: <CalendarSmallIcon />,
 };
 
@@ -41,14 +39,16 @@ export interface FindingRowProps {
   finding: Finding;
   /** Mark it done or dismissed, or undo that; `title` is the row's title as shown. */
   onAction: (variables: UpdateFindingVariables, title: string) => void;
-  /** Called with this row's action button (Done, or Undo once handled) and which it is. */
+  /** Called with this row's action button (Mark as done, or Undo once handled) and which it is. */
   actionRef: (element: HTMLButtonElement | null, handled: boolean) => void;
 }
 
 /**
  * One finding, from the mockup's `.finding`: a severity tile, the kind and
- * what it means for the plan, the part of the plan it affects, and Done and
- * Dismiss, which become Undo once handled.
+ * what it means for the plan, a link to the part of the plan it affects, and
+ * Mark as done and Dismiss, which become Undo once handled. They are secondary
+ * buttons at full size: a page can hold several findings, and none of their
+ * buttons is the page's one primary action (issue 202).
  */
 export function FindingRow({ finding, onAction, actionRef }: FindingRowProps) {
   const titleId = useId();
@@ -85,28 +85,21 @@ export function FindingRow({ finding, onAction, actionRef }: FindingRowProps) {
         <div className="mt-1 flex flex-wrap items-center gap-2">
           {affects && (
             <Badge tone={affects.tone} href={affects.href}>
-              Affects: {affects.label}
+              {affects.label}
               <ArrowSmallIcon />
             </Badge>
           )}
           <div className="flex gap-2">
             {handled ? (
-              <Button size="sm" ref={(el) => actionRef(el, true)} onClick={() => act('undo')}>
+              <Button ref={(el) => actionRef(el, true)} onClick={() => act('undo')}>
                 Undo
               </Button>
             ) : (
               <>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  ref={(el) => actionRef(el, false)}
-                  onClick={() => act('done')}
-                >
-                  Done
+                <Button ref={(el) => actionRef(el, false)} onClick={() => act('done')}>
+                  Mark as done
                 </Button>
-                <Button size="sm" onClick={() => act('dismiss')}>
-                  Dismiss
-                </Button>
+                <Button onClick={() => act('dismiss')}>Dismiss</Button>
               </>
             )}
           </div>

@@ -1,4 +1,5 @@
 import type { Route } from 'next';
+import type { CheckInRun } from '@/lib/api/hooks';
 import type {
   CheckInDetail,
   Finding,
@@ -45,17 +46,17 @@ export const findingTone = (finding: Finding): Tone =>
   finding.user_action === null ? severityTone(finding.severity) : 'neutral';
 
 export const KIND_LABELS: Record<FindingKind, string> = {
-  election_mismatch: 'Election not applied',
-  goal_off_pace: 'Goal behind pace',
+  election_mismatch: 'Differs from your plan',
+  goal_off_pace: 'Savings behind',
   recurring_new: 'New recurring charge',
   recurring_changed: 'Price changed',
   recurring_stopped: 'Charge stopped',
-  pay_change: 'Pay change',
-  deduction_change: 'Deduction changed',
-  upcoming_deadline: 'Upcoming date',
+  pay_change: 'Paycheck changed',
+  upcoming_deadline: 'Coming up',
 };
 
 export interface AffectsView {
+  /** What following the link does: "Review your 401(k)". */
   label: string;
   tone: Hue;
   /** Where the person acts on it: the calculators, or the Spending map. */
@@ -63,20 +64,63 @@ export interface AffectsView {
 }
 
 const AFFECTS: Record<FindingAffects, AffectsView> = {
-  k401_match: { label: '401(k) match', tone: 'plum', href: decisionKindRoute('k401_match') },
-  health_plans: { label: 'Health plan', tone: 'coral', href: decisionKindRoute('health_plans') },
+  k401_match: {
+    label: 'Review your 401(k)',
+    tone: 'plum',
+    href: decisionKindRoute('k401_match'),
+  },
+  health_plans: {
+    label: 'Review your health plan',
+    tone: 'coral',
+    href: decisionKindRoute('health_plans'),
+  },
   emergency_fund: {
-    label: 'Emergency fund',
+    label: 'Review your emergency fund',
     tone: 'teal',
     href: decisionKindRoute('emergency_fund'),
   },
-  w4: { label: 'W-4', tone: 'blue', href: decisionKindRoute('w4') },
-  spending: { label: 'Spending map', tone: 'blue', href: '/setup/spending' },
+  w4: { label: 'Review your W-4', tone: 'blue', href: decisionKindRoute('w4') },
+  spending: { label: 'See your spending', tone: 'blue', href: '/setup/spending' },
 };
 
 /** The part of the plan a finding affects (`payload.affects`), or null when none. */
 export const affectsView = (affects: FindingAffects | null): AffectsView | null =>
   affects === null ? null : AFFECTS[affects];
+
+/** "1 new finding", "2 new findings". */
+const counted = (count: number, one: string, many: string) =>
+  `${formatNumber(count)} ${count === 1 ? one : many}`;
+
+/**
+ * What a run's findings did, from its counts: "2 new findings. 1 finding no
+ * longer applies.", or "No new findings." when it added and took back none.
+ */
+function changesText({ inserted, retracted }: CheckInRun): string {
+  const added = inserted > 0 ? `${counted(inserted, 'new finding', 'new findings')}.` : '';
+  const gone =
+    retracted > 0
+      ? `${counted(retracted, 'finding no longer applies', 'findings no longer apply')}.`
+      : '';
+  return [added, gone].filter((part) => part !== '').join(' ') || 'No new findings.';
+}
+
+/**
+ * The status line after "Check in now" (spec 015 rule 23.6): what the run
+ * found, from the job's counts, never only that it ran (issue 194). On the
+ * list it names the month's check-in; on the check-in the page was just read
+ * again. Empty until the run ends.
+ */
+export function checkInNowMessage(run: CheckInRun | null, from: 'list' | 'check-in'): string {
+  if (run === null) return '';
+  if (run.outcome === 'skipped') {
+    return 'This month’s check-in is already complete, so nothing changed.';
+  }
+  if (from === 'check-in') return `Checked again just now. ${changesText(run)}`;
+  if (run.outcome === 'refreshed') return `Checked this month again. ${changesText(run)}`;
+  return run.inserted > 0
+    ? `This month’s check-in is ready with ${counted(run.inserted, 'finding', 'findings')}.`
+    : 'This month’s check-in is ready. Nothing changed against your plan.';
+}
 
 /** "3 of 9 handled", from the check-in's own counts. */
 export const handledText = ({

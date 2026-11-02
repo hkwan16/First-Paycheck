@@ -80,7 +80,7 @@ export function PlanLinesCard({
     <Card aria-labelledby="plan-lines-title" gap={14} className={cn('@container', className)}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h2 id="plan-lines-title" className="m-0">
-          {monthName(flow.start)} cash flow against the plan
+          {monthName(flow.start)} cash flow against your plan
         </h2>
         <span className="text-tiny text-ink-3">
           {periodText(flow.start, flow.end)} · {payStubsText(flow.withholding.paycheck_count)}
@@ -110,9 +110,8 @@ export function PlanLinesCard({
         </tbody>
       </table>
       <p className="m-0 text-tiny text-ink-3">
-        Targets come from your saved decisions; a line without one has no decision behind it yet. A
-        month still under way is counted to date.{' '}
-        <Link href="/setup/spending">Open the Spending map</Link>
+        Targets come from the choices you saved. This month counts up to today.{' '}
+        <Link href="/setup/spending">See your spending</Link>
       </p>
       {ledgers && <p className="m-0 text-tiny text-ink-3">{ledgers}</p>}
     </Card>

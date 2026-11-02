@@ -45,10 +45,10 @@ function MonthlyTable({ netWorth }: { netWorth: NetWorth }) {
               Month
             </th>
             <th scope="col" className="pb-1 pl-3 text-right font-semibold">
-              Assets
+              What you have
             </th>
             <th scope="col" className="pb-1 pl-3 text-right font-semibold">
-              Liabilities
+              What you owe
             </th>
             <th scope="col" className="pb-1 pl-3 text-right font-semibold">
               Net worth
@@ -85,21 +85,20 @@ function Holdings() {
   if (holdings.isError) {
     body = (
       <Notice tone="warning" compact role="alert">
-        {apiErrorMessage(holdings.error, 'Could not load your holdings. Reload to try again.')}
+        {apiErrorMessage(holdings.error, 'Could not load your investments. Reload to try again.')}
       </Notice>
     );
   } else if (!data) {
     body = (
       <div aria-busy="true">
-        <span className="sr-only">Loading your holdings</span>
+        <span className="sr-only">Loading your investments</span>
         <Skeleton block className="h-6 w-full" />
       </div>
     );
   } else if (data.accounts.length === 0) {
     body = (
       <p className="m-0 text-small text-ink-3">
-        No investment holdings reported. Positions show here once a linked investment or retirement
-        account sends them.
+        No investments yet. They show here once you link an investment or retirement account.
       </p>
     );
   } else {
@@ -111,7 +110,7 @@ function Holdings() {
       className="flex flex-col gap-2 rounded-control bg-tile px-3.5 py-3"
     >
       <h3 id="holdings-title" className="m-0 text-small font-semibold">
-        Investment holdings
+        Investments
       </h3>
       {body}
     </section>
@@ -161,13 +160,13 @@ export function NetWorthCard({ className }: { className?: string }) {
           </div>
           <dl className="m-0 flex gap-4 text-small">
             <div>
-              <dt className="text-tiny text-ink-3">Assets</dt>
+              <dt className="text-tiny text-ink-3">What you have</dt>
               <dd className="m-0 font-semibold">
                 <Money cents={data.assets_cents} />
               </dd>
             </div>
             <div>
-              <dt className="text-tiny text-ink-3">Liabilities</dt>
+              <dt className="text-tiny text-ink-3">What you owe</dt>
               <dd className="m-0 font-semibold">
                 <Money cents={data.liabilities_cents} />
               </dd>
@@ -202,9 +201,14 @@ export function NetWorthCard({ className }: { className?: string }) {
   return (
     <Card aria-labelledby="nw-title" gap={14} className={className}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="nw-title" className="m-0">
-          Net worth
-        </h2>
+        <div>
+          <h2 id="nw-title" className="m-0">
+            Net worth
+          </h2>
+          <p className="m-0 text-tiny text-ink-3">
+            What you have in your accounts minus what you owe.
+          </p>
+        </div>
         {data && first && data.change_cents !== null && (
           <Badge>
             <span className="tabular-nums">
