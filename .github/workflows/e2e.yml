@@ -3,9 +3,11 @@ name: e2e
 # The web's real-API Playwright specs (alpha.spec.ts and the authenticated-*
 # projects) against the API and worker built from this commit, through the
 # same harness as `make e2e-full` (scripts/e2e_stack.py): a Postgres service,
-# a local stand-in for Supabase Auth with its own JWKS, LLM_FAKE=true. No
-# Plaid secrets here, so the link steps skip and say so. The smoke and visual
-# checks run in web.yml.
+# a local stand-in for Supabase Auth with its own JWKS, LLM_FAKE=true. The
+# Plaid sandbox keys come from the repository's secrets, so the link steps,
+# the sync and Spending run too (the harness always sets PLAID_ENV=sandbox).
+# A pull request from a fork gets no secrets and skips those steps. The smoke
+# and visual checks run in web.yml.
 
 on:
   pull_request:
@@ -61,7 +63,22 @@ jobs:
       - run: pnpm --dir web install --frozen-lockfile
       - name: Install Chromium (already in the image; verifies the version)
         run: pnpm --dir web exec playwright install chromium
+      # Without this, missing keys would only skip the link steps, and the run
+      # would pass without testing the bank link.
+      - name: Plaid sandbox keys are set
+        if: github.event.pull_request.head.repo.fork != true
+        env:
+          PLAID_CLIENT_ID: ${{ secrets.PLAID_CLIENT_ID }}
+          PLAID_SECRET: ${{ secrets.PLAID_SECRET }}
+        run: |
+          if [ -z "$PLAID_CLIENT_ID" ] || [ -z "$PLAID_SECRET" ]; then
+            echo "::error::Set the PLAID_CLIENT_ID and PLAID_SECRET repository secrets (Plaid sandbox keys)."
+            exit 1
+          fi
       - name: real-API specs
+        env:
+          PLAID_CLIENT_ID: ${{ secrets.PLAID_CLIENT_ID }}
+          PLAID_SECRET: ${{ secrets.PLAID_SECRET }}
         run: >-
           uv run python -m scripts.e2e_stack run --
           pnpm --dir web exec playwright test --project=alpha --project='authenticated*'
