@@ -152,6 +152,10 @@ comment.
 | `DropZone`                                      | `.drop`                                           | a real file input, keyboard operable; filters by `accept` (drops too)                                                                                                                                                               |
 | `Money`, `Num`                                  | `.num`                                            | format only: cents in, tabular numerals, `decimals` 0 or 2, `signed`, `tone`                                                                                                                                                        |
 
+`Button` also has a `destructive` variant: a red tint for the act that deletes (Yes, unlink), set
+beside a safe choice that is primary (Keep), so the safe choice is never the weaker one (issue
+205).
+
 Chrome (`components/chrome`): `Wordmark`, `Header` (`chips`, `account` slot, `minimal`),
 `HeaderAccount` (server: "Sample data" chip and `UserMenu` from the Supabase user), `UserMenu` (the
 user chip as a disclosure button with "Sign out" and "Delete account"; see "Deleting the account"),
@@ -339,7 +343,9 @@ or checked for a phone.
   keeps an account as the one to import into, only while the account list has that account
   (`useImportCsv` adds the imported account to the list at once), so removing the account clears
   both (issue 173). `lib/documents.ts` maps a
-  document's status to its badge and reason text; `isReviewable`/`newestReviewable` pick what
+  document's status to its badge and reason text (`documentBadge`: a confirmed pay stub that a
+  newer confirm of the same paycheck superseded, `superseded` from the API, reads "Replaced by a
+  newer copy" and offers no Replace, issue 199); `isReviewable`/`newestReviewable` pick what
   Confirm opens: a pay stub first, else a benefits summary that was read.
 - **Money** is formatted only. Transactions keep Plaid's sign (positive is money out):
   `formatTransactionAmount` and `transactionFlow` in `lib/money.ts` turn that into "-$84.12" and
@@ -527,15 +533,21 @@ offer letter states).
   server checks again: a 422 `pay_stub_unbalanced` becomes `PayStubUnbalanced` from
   `useConfirmDocument`, and the screen renders its diff (`MathNotice`).
 - **Manual entry**: a proposal with `manual_entry_required` starts every field empty and in edit;
-  the source pane shows the redacted lines to type from, Confirm all is off, and each row saves on
+  the source pane shows the lines to type from, Confirm all is off, and each row saves on
   its own. The notice says why in the past tense (`statusReasonText`: what happened when it was
   read, never "right now"), and when the API says `can_read_again` (the AI was unavailable: no
   model, a spent budget, failed attempts; spec 004 rules 32-37) it offers Read again (`ReadAgain`,
   also under a benefits summary nothing was read from; the Link row has its own Read again).
-- **Source pane**: the redacted lines the AI saw, with redactions drawn as labeled bars
-  (`role="img"`, "Redacted") and the selected field's line marked `aria-current`. Titled "Source, as
-  the AI saw it" only when the lines were sent (`linesSentToAi`); otherwise "Source, redacted",
-  saying they were not sent to the AI.
+- **Source pane**: the document's lines with private numbers hidden, drawn as labeled bars
+  (`role="img"`, "Hidden number"), and the selected field's line marked `aria-current`. It is titled
+  after the document ("Your pay stub", "Your benefits summary"), never with how it was read, so it
+  is true whether or not the lines were sent to the model (spec 004 rule 37). The badge counts
+  hidden numbers (`hiddenText`). Screen words never name internals (the AI, a pipeline, a
+  confidence score): the confidence badge reads "Check this" or "Read clearly" (issue 209).
+- **Nothing to check**: a confirmed pay stub, a confirmed benefits summary, an offer letter and
+  `/setup/confirm` with every stub confirmed are titled by their state ("Your pay stub is
+  confirmed"), with the next step, never as a review (issue 209). A field opened to type starts
+  without an error; what to fix shows once it is saved (issue 195).
 - **Benefits summary** (`BenefitsReview`, spec 013): `initBenefitsState` (`benefits-fields.ts`)
   lays the proposal's plans, match tiers and vesting out as reducer fields keyed
   `plans.1.deductible_cents`, `match_tiers.0.employer_pct`, `vesting_years`, each with a `group`

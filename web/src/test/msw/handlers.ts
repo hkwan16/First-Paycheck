@@ -148,6 +148,7 @@ export function createDocument(type: DocumentType): DocumentSummary {
     deleted_at: null,
     replaced_by_id: null,
     can_read_again: false,
+    superseded: false,
   };
   db.documents.unshift(document);
   return document;

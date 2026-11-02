@@ -84,14 +84,28 @@ def test_other_deductions_sum_unassigned_lines() -> None:
     ]
     assert other.value == 4_670
     assert other.confidence is None
-    assert other.note == "Sum of: CA SDI, DENTAL/VIS"
+    assert other.note == "From CA SDI and DENTAL/VIS"
 
 
 def test_fixture_other_deductions() -> None:
     other = by_key(pay_stub_proposal(STUB, PAGES, withheld_pages=[]).fields)[
         "other_deductions_cents"
     ]
-    assert (other.value, other.note) == (4_670, "Sum of: CA SDI, Dental/Vision")
+    assert (other.value, other.note) == (4_670, "From CA SDI and Dental/Vision")
+
+
+def test_other_deductions_note_lists_every_label() -> None:
+    items = [
+        LineItem(label=label, amount_cents=100, kind="post_tax_deduction", field=None)
+        for label in ("Dental", "Vision", "Union dues")
+    ]
+    one, three = (
+        by_key(pay_stub_proposal(STUB.model_copy(update={"line_items": chosen}), PAGES, []).fields)[
+            "other_deductions_cents"
+        ].note
+        for chosen in (items[:1], items)
+    )
+    assert (one, three) == ("From Dental", "From Dental, Vision and Union dues")
 
 
 def test_line_items_are_kept_for_review() -> None:
@@ -111,10 +125,30 @@ def test_no_unassigned_lines_means_zero_other_deductions() -> None:
     assert (other.value, other.note) == (0, "No other deductions listed")
 
 
+def test_a_dash_is_zero_tied_to_its_line() -> None:
+    """Spec 005 rule 1a (issue 195): the Acme stub prints "401(k) -", which is $0.00."""
+    proposal = pay_stub_proposal(STUB, PAGES, withheld_pages=[])
+    k401 = by_key(proposal.fields)["retirement_contribution_cents"]
+    assert (k401.value, k401.note) == (0, None)
+    [line] = [line for line in proposal.source_lines if line.text == "401(k) -"]
+    assert line.field_key == "retirement_contribution_cents"
+
+
 def test_missing_values_say_so() -> None:
-    fields = by_key(pay_stub_proposal(STUB, PAGES, withheld_pages=[]).fields)
+    """A stub that prints no 401(k) line at all: null, with the note."""
+    unprinted = STUB.model_copy(
+        update={
+            "retirement_contribution_cents": STUB.retirement_contribution_cents.model_copy(
+                update={"value": None, "source_text": None}
+            ),
+            "line_items": [
+                item for item in STUB.line_items if item.field != "retirement_contribution_cents"
+            ],
+        }
+    )
+    fields = by_key(pay_stub_proposal(unprinted, PAGES, withheld_pages=[]).fields)
     assert fields["retirement_contribution_cents"].value is None
-    assert fields["retirement_contribution_cents"].note == "Not found on the document"
+    assert fields["retirement_contribution_cents"].note == "Type it if the document shows it."
     assert fields["gross_cents"].note is None
 
 
@@ -145,6 +179,7 @@ def test_source_lines_link_fields_and_flag_redactions() -> None:
         "Social Security 167.92": "social_security_cents",
         "Medicare 39.27": "medicare_cents",
         "CA State Tax 98.14": "state_tax_cents",
+        "401(k) -": "retirement_contribution_cents",
         "Medical Pretax 62.50": "medical_premium_cents",
         "Net Pay 1,996.04": "net_cents",
     }
@@ -168,7 +203,7 @@ def test_amount_fallback_matches_whole_amounts_only() -> None:
     zero = STUB.model_copy(
         update={
             "retirement_contribution_cents": STUB.retirement_contribution_cents.model_copy(
-                update={"value": 0}
+                update={"value": 0, "source_text": None}
             )
         }
     )
@@ -214,7 +249,7 @@ def test_benefits_proposal_has_one_entry_per_plan() -> None:
     assert gold["kind"].value == "ppo"
     assert gold["coinsurance_pct"].value == "10.00"
     assert gold["coinsurance_pct"].kind == "percent"
-    assert gold["employer_hsa_cents"].note == "Not found on the document"
+    assert gold["employer_hsa_cents"].note == "Type it if the document shows it."
     assert {f.role for plan in proposal.plans for f in plan.fields} == {"info"}
 
 
@@ -259,8 +294,8 @@ def test_benefits_proposal_with_a_missing_band() -> None:
     )
     tiers = [by_key(t.fields) for t in benefits_proposal(extraction, PAGES, []).match_tiers]
     assert [t["employee_pct_upto"].value for t in tiers] == ["3.00", None, None]
-    assert tiers[1]["employee_pct_upto"].note == "Not found on the document"
-    assert tiers[2]["employee_pct_upto"].note == "Not found on the document"
+    assert tiers[1]["employee_pct_upto"].note == "Type it if the document shows it."
+    assert tiers[2]["employee_pct_upto"].note == "Type it if the document shows it."
 
 
 def test_manual_entry_benefits_proposal_has_an_empty_retirement_part() -> None:

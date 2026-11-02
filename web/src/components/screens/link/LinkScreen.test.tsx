@@ -426,9 +426,7 @@ describe('LinkScreen linking a bank', () => {
       await screen.findByRole('group', { name: 'Plaid Checking' }, { timeout: 3000 }),
     ).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Plaid Saving' })).toBeInTheDocument();
-    expect(
-      screen.getByText(/Linked First Platypus Bank\. 12 new transactions synced\./),
-    ).toBeVisible();
+    expect(screen.getByText(/Linked First Platypus Bank\. 12 new transactions\./)).toBeVisible();
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Continue to spending/ })).toBeInTheDocument();
   });
@@ -682,7 +680,7 @@ describe('LinkScreen documents', () => {
 
     expect(proposed).toHaveTextContent('Review needed');
     expect(proposed).toHaveTextContent('1 page · uploaded 2 minutes ago');
-    expect(within(proposed).getByText('2 items redacted')).toBeInTheDocument();
+    expect(within(proposed).getByText('2 numbers hidden')).toBeInTheDocument();
     expect(within(proposed).getByRole('link', { name: 'Review pay stub' })).toHaveAttribute(
       'href',
       `/setup/confirm/${PAY_STUB_DOC_ID}`,
@@ -692,22 +690,22 @@ describe('LinkScreen documents', () => {
     expect(
       within(reading).getByRole('progressbar', { name: 'Reading pay stub' }),
     ).toBeInTheDocument();
-    expect(within(reading).queryByText(/redacted/)).not.toBeInTheDocument();
+    expect(within(reading).queryByText(/hidden/)).not.toBeInTheDocument();
     expect(within(reading).getByRole('button', { name: 'Replace pay stub' })).toBeDisabled();
 
     expect(uploaded).toHaveTextContent('Uploaded');
     expect(within(uploaded).getByRole('button', { name: 'Read pay stub' })).toBeEnabled();
 
     expect(manual).toHaveTextContent('Manual entry needed');
-    expect(manual).toHaveTextContent('The AI declined to read this document');
-    expect(within(manual).getByText('1 item redacted')).toBeInTheDocument();
+    expect(manual).toHaveTextContent('We could not read this document automatically');
+    expect(within(manual).getByText('1 number hidden')).toBeInTheDocument();
     expect(within(manual).getByRole('link', { name: 'Enter pay stub fields' })).toHaveAttribute(
       'href',
       '/setup/confirm/doc-manual',
     );
 
     expect(confirmed).toHaveTextContent('Confirmed');
-    expect(within(confirmed).getByText('0 items redacted')).toBeInTheDocument();
+    expect(within(confirmed).getByText('No numbers hidden')).toBeInTheDocument();
     expect(within(confirmed).queryByRole('link')).not.toBeInTheDocument();
 
     expect(failedRow).toHaveTextContent('Failed');
@@ -721,7 +719,7 @@ describe('LinkScreen documents', () => {
       `/setup/confirm/${BENEFITS_DOC_ID}`,
     );
 
-    expect(screen.getByRole('link', { name: /Review extracted fields/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Check what we read/ })).toHaveAttribute(
       'href',
       `/setup/confirm/${PAY_STUB_DOC_ID}`,
     );
@@ -734,7 +732,7 @@ describe('LinkScreen documents', () => {
     renderLink();
     const benefits = await within(docsCard()).findByRole('group', { name: /^Benefits summary/ });
     expect(benefits).toHaveTextContent(
-      'Enter its plans on the health plan card and its match in your 401(k) plan details.',
+      'Enter its plans on the health plan step and its match in your 401(k) plan details.',
     );
     expect(within(benefits).getByRole('link', { name: 'Go to decisions' })).toHaveAttribute(
       'href',
@@ -747,7 +745,7 @@ describe('LinkScreen documents', () => {
     renderLink();
     expect(await within(docsCard()).findByText(/No documents yet/)).toBeInTheDocument();
     expect(docsCard()).toHaveTextContent(
-      'Before any AI sees a page, SSNs and account numbers are blacked out.',
+      'We hide your Social Security and account numbers before we read a page.',
     );
     expect(dropZone()).toBeEnabled();
   });
@@ -788,8 +786,8 @@ describe('LinkScreen documents', () => {
     await poll();
     const [row] = await firstStubRow();
     await waitFor(() => expect(row).toHaveTextContent('Review needed'));
-    expect(within(row!).getByText('2 items redacted')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Review extracted fields/ })).toHaveAttribute(
+    expect(within(row!).getByText('2 numbers hidden')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Check what we read/ })).toHaveAttribute(
       'href',
       `/setup/confirm/${created.id}`,
     );
@@ -870,7 +868,7 @@ describe('LinkScreen documents', () => {
     const extracts = requests('POST', `/docs/${PAY_STUB_DOC_ID}/extract`);
     const { user } = renderLink();
     const row = await within(docsCard()).findByRole('group', { name: /^Pay stub/ });
-    expect(row).toHaveTextContent('The AI was not available when this was read');
+    expect(row).toHaveTextContent('Automatic reading was not available then');
     expect(row).not.toHaveTextContent(/right now/);
 
     await user.click(within(row).getByRole('button', { name: 'Read pay stub again' }));

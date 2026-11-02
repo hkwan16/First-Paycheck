@@ -38,7 +38,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 /**
  * Review of one benefits summary (spec 013 rule 8), in the pay stub review's
  * frame: each plan, each 401(k) match tier and the vesting schedule as rows
- * to confirm or edit, beside the redacted lines the AI read. Only confirmed
+ * to confirm or edit, beside the summary's lines. Only confirmed
  * values are sent; there is no arithmetic to check, so Continue needs only
  * every field confirmed. The server validates the plans (a deductible above
  * the out-of-pocket maximum is a 422) and has the final word.
@@ -93,7 +93,7 @@ export function BenefitsReview({ document, proposal, onConfirmed }: BenefitsRevi
     <>
       <PageTitle
         title="Check what we read from your benefits summary"
-        lead="Each plan and the 401(k) match is a proposal until you confirm it. The health plan comparison and the 401(k) card only ever read confirmed values."
+        lead="Check each plan and your 401(k) match against the summary, then confirm them. Your plan uses only what you confirm."
       />
 
       <div className="flex flex-wrap items-start gap-6">
@@ -153,6 +153,7 @@ export function BenefitsReview({ document, proposal, onConfirmed }: BenefitsRevi
 
         <SourcePane
           id={sourceId}
+          type={document.type}
           className="min-w-0 flex-[1_1_320px]"
           lines={proposal.source_lines}
           redactionCount={document.redaction_count}
@@ -160,7 +161,6 @@ export function BenefitsReview({ document, proposal, onConfirmed }: BenefitsRevi
           selectedKey={state.selected}
           selectedLabel={selected?.label ?? null}
           linked={false}
-          documentLabel="Redacted benefits summary"
         />
       </div>
 

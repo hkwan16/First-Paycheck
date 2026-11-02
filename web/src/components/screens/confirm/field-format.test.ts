@@ -29,17 +29,18 @@ describe('fieldDisplay', () => {
   });
 
   it('says a value is missing in the words of each mode', () => {
-    expect(fieldDisplay({ kind: 'text', value: null }, false)).toBe('None');
+    // Not "None", which reads as zero (issue 195).
+    expect(fieldDisplay({ kind: 'text', value: null }, false)).toBe('Not found');
     expect(fieldDisplay({ kind: 'money', value: null }, true)).toBe('Not entered yet');
   });
 });
 
 describe('confidenceBadge', () => {
-  it('asks for a check below 0.9 and says "Read" otherwise', () => {
-    expect(confidenceBadge(0.74, false)).toEqual({ label: 'Check · 74%', tone: 'warning' });
-    expect(confidenceBadge(0.899, false)).toEqual({ label: 'Check · 90%', tone: 'warning' });
-    expect(confidenceBadge(0.9, false)).toEqual({ label: 'Read · 90%', tone: 'blue' });
-    expect(confidenceBadge(0.99, false)).toEqual({ label: 'Read · 99%', tone: 'blue' });
+  it('asks for a check below 0.9 and says it read clearly otherwise, with no score', () => {
+    expect(confidenceBadge(0.74, false)).toEqual({ label: 'Check this', tone: 'warning' });
+    expect(confidenceBadge(0.899, false)).toEqual({ label: 'Check this', tone: 'warning' });
+    expect(confidenceBadge(0.9, false)).toEqual({ label: 'Read clearly', tone: 'blue' });
+    expect(confidenceBadge(0.99, false)).toEqual({ label: 'Read clearly', tone: 'blue' });
   });
 
   it('marks a computed field, and shows nothing for typed fields', () => {

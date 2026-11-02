@@ -28,7 +28,7 @@ async function openImport(page: Page) {
 
 /** Both follow-up jobs (categorizing, finding recurring charges) report Done. */
 async function expectJobsDone(panel: Locator) {
-  for (const label of ['Labeling categories', 'Finding recurring charges']) {
+  for (const label of ['Sorting into categories', 'Finding recurring charges']) {
     await expect(panel.getByRole('progressbar', { name: label })).toBeVisible();
   }
   await expect(panel.getByText('Done', { exact: true })).toHaveCount(2, { timeout: 90_000 });
@@ -104,7 +104,7 @@ test('removing the account an import made clears what the panel said about it', 
   await expect(page.getByRole('group', { name: account })).toHaveCount(0, { timeout: 30_000 });
 
   await expect(panel.getByText(/^Imported \d+ transactions? into /)).toHaveCount(0);
-  await expect(panel.getByRole('progressbar', { name: 'Labeling categories' })).toHaveCount(0);
+  await expect(panel.getByRole('progressbar', { name: 'Sorting into categories' })).toHaveCount(0);
   await expect(panel.getByLabel('Import into')).toHaveValue('');
 });
 

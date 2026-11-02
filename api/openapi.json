@@ -1530,6 +1530,10 @@
               }
             ]
           },
+          "superseded": {
+            "title": "Superseded",
+            "type": "boolean"
+          },
           "type": {
             "$ref": "#/components/schemas/DocumentType"
           },
@@ -1551,6 +1555,7 @@
           "deleted_at",
           "replaced_by_id",
           "can_read_again",
+          "superseded",
           "proposal"
         ],
         "title": "DocumentDetail",
@@ -1631,6 +1636,10 @@
               }
             ]
           },
+          "superseded": {
+            "title": "Superseded",
+            "type": "boolean"
+          },
           "type": {
             "$ref": "#/components/schemas/DocumentType"
           },
@@ -1651,7 +1660,8 @@
           "confirmed_at",
           "deleted_at",
           "replaced_by_id",
-          "can_read_again"
+          "can_read_again",
+          "superseded"
         ],
         "title": "DocumentOut",
         "type": "object"

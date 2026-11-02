@@ -16,8 +16,10 @@ const TITLE = 'Check what we read from your pay stub';
 
 /**
  * `/setup/confirm` without a document (the side nav's Confirm step): goes to
- * the newest pay stub waiting for review or manual entry, or says there is
- * none and where to add one.
+ * the newest pay stub waiting for review or manual entry; otherwise, once
+ * both lists have loaded (issue 196), says the pay stub is confirmed and what
+ * comes next, or that there is none yet and where to add one. Neither of
+ * those is titled as a review: there is nothing to check (issue 209).
  */
 export function ConfirmIndexScreen() {
   const router = useRouter();
@@ -29,19 +31,19 @@ export function ConfirmIndexScreen() {
     if (target) router.replace(confirmRoute(target.id));
   }, [target, router]);
 
-  if (documents.isError) {
+  const failed = documents.error ?? payStubs.error;
+  if (failed) {
     return (
       <>
         <PageTitle title={TITLE} />
         <Notice tone="warning" compact role="alert">
-          Could not load your documents.{' '}
-          {apiErrorMessage(documents.error, 'Check your connection.')}
+          Could not load your documents. {apiErrorMessage(failed, 'Check your connection.')}
         </Notice>
       </>
     );
   }
 
-  if (documents.isPending || target) {
+  if (documents.isPending || target || payStubs.isPending) {
     return (
       <>
         <PageTitle title={TITLE} />
@@ -57,10 +59,10 @@ export function ConfirmIndexScreen() {
   if ((payStubs.data?.length ?? 0) > 0) {
     return (
       <>
-        <PageTitle title={TITLE} />
-        <Notice tone="confirmed" title="Your pay stub is confirmed.">
-          Calculators read the values you checked. Upload a newer pay stub on the first step when
-          your pay changes.
+        <PageTitle title="Your pay stub is confirmed" />
+        <Notice tone="confirmed">
+          Your plan uses the amounts you checked. When your pay changes, add your newest pay stub on
+          the first step.
         </Notice>
         <div>
           <Button href="/setup/spending" variant="primary">
@@ -74,11 +76,11 @@ export function ConfirmIndexScreen() {
 
   return (
     <>
-      <PageTitle title={TITLE} />
+      <PageTitle title="No pay stub to check yet" />
       <Card gap={12}>
         <p className="m-0">
-          No pay stub is waiting for review. Upload your latest pay stub and it is read here, field
-          by field, before anything uses it.
+          Add your latest pay stub on the first step. We read it and show you each amount to check
+          here.
         </p>
         <div>
           <Button href="/setup/link" variant="primary">

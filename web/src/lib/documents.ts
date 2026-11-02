@@ -1,5 +1,11 @@
-import type { DocumentStatus, DocumentStatusReason, DocumentType } from '@/lib/api/types';
+import type {
+  DocumentStatus,
+  DocumentStatusReason,
+  DocumentSummary,
+  DocumentType,
+} from '@/lib/api/types';
 import type { Tone } from '@/lib/design/tone';
+import { formatNumber } from '@/lib/money';
 
 /*
  * Words and tones for documents, shared by the Link and Confirm screens and
@@ -27,47 +33,43 @@ const STATUS_BADGE: Record<DocumentStatus, { label: string; tone: Tone }> = {
 
 export const documentStatusBadge = (status: DocumentStatus) => STATUS_BADGE[status];
 
+/** A confirmed copy a newer confirm of the same paycheck took the place of (spec 005 rule 22f). */
+const SUPERSEDED_BADGE = { label: 'Replaced by a newer copy', tone: 'neutral' } as const;
+
+/** What a document's row says it is: its status, unless a newer copy counts instead. */
+export const documentBadge = (document: Pick<DocumentSummary, 'status' | 'superseded'>) =>
+  document.superseded ? SUPERSEDED_BADGE : STATUS_BADGE[document.status];
+
+/** The sentence under a superseded copy's row and on its Confirm page. */
+export const SUPERSEDED_TEXT = 'You confirmed this paycheck again, so the newer copy counts.';
+
+/** "2 numbers hidden": what redaction blacked out before the document was read. */
+export function hiddenText(count: number): string {
+  if (count === 0) return 'No numbers hidden';
+  return `${formatNumber(count)} ${count === 1 ? 'number' : 'numbers'} hidden`;
+}
+
 /*
  * Each reason is something that happened when the document was read (spec 004
- * rule 37), so it is said in the past: "was not available", never "is off
- * right now", which stops being true once the model is back. The reasons that
- * were about the reading, not the document, offer Read again; the API says
- * when it applies (`can_read_again`).
+ * rule 37), so it is said in the past: "was not available then", never "is
+ * off right now", which stops being true once reading is back. The reasons
+ * that were about the reading, not the document, offer Read again; the API
+ * says when it applies (`can_read_again`).
  */
 const REASON: Record<DocumentStatusReason, string> = {
-  refused: 'The AI declined to read this document, so type the fields yourself.',
+  refused: 'We could not read this document automatically. Type the amounts yourself.',
   no_readable_page:
-    'No page could be redacted safely, so none was sent to the AI. Type the fields yourself.',
+    'We could not hide the private numbers on any page, so we did not read it. Type the amounts yourself.',
   budget:
-    'The daily reading limit was used up when this was read, so nothing was filled in. Read it again tomorrow, or type the fields yourself.',
+    'We had reached the daily reading limit, so nothing was filled in. Read it again tomorrow, or type the amounts yourself.',
   extraction_failed:
-    'Reading did not finish after several tries, so nothing was filled in. Read it again, or type the fields yourself.',
+    'Reading did not finish, so nothing was filled in. Read it again, or type the amounts yourself.',
   no_model:
-    'The AI was not available when this was read, so nothing was filled in. Read it again, or type the fields from the lines shown.',
+    'Automatic reading was not available then, so nothing was filled in. Read it again, or type the amounts yourself.',
   unreadable_file: 'This file could not be opened. Upload it again as a PDF, PNG or JPEG.',
-  expired: 'The file was deleted because it was not confirmed within a week. Upload it again.',
+  expired: 'We deleted the file because it was not confirmed within a week. Upload it again.',
 };
 
 /** Why a document needs manual entry or failed, as a sentence; null without a reason. */
 export const statusReasonText = (reason: DocumentStatusReason | null) =>
   reason === null ? null : REASON[reason];
-
-/**
- * Whether the redacted lines were sent to the model. Without a model or with
- * the budget spent the call never left (no gateway, or refused before any
- * HTTP), and with no readable page nothing was sent; a refusal and failed
- * attempts did send them.
- */
-const SENT: Record<DocumentStatusReason, boolean> = {
-  refused: true,
-  extraction_failed: true,
-  no_model: false,
-  budget: false,
-  no_readable_page: false,
-  unreadable_file: false,
-  expired: false,
-};
-
-/** True when the source lines are what the AI saw (a proposal has no reason). */
-export const linesSentToAi = (reason: DocumentStatusReason | null) =>
-  reason === null || SENT[reason];

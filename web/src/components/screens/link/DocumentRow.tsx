@@ -12,7 +12,14 @@ import { isReviewable, useJob } from '@/lib/api/hooks';
 import type { DocumentSummary, DocumentType } from '@/lib/api/types';
 import { formatNumber } from '@/lib/money';
 import { confirmRoute, decisionRouteFor } from '@/lib/routes';
-import { documentStatusBadge, documentTypeLabel, statusReasonText } from '@/lib/documents';
+import {
+  documentBadge,
+  documentStatusBadge,
+  documentTypeLabel,
+  hiddenText,
+  statusReasonText,
+  SUPERSEDED_TEXT,
+} from '@/lib/documents';
 
 /** The upload types the API can read today; an offer letter is stored only. */
 export const READABLE_TYPES: ReadonlySet<DocumentType> = new Set(['pay_stub', 'benefits']);
@@ -71,14 +78,16 @@ export interface DocumentRowProps {
 
 /**
  * One row of the mockup's documents list: what the document is, where it is
- * in the pipeline, how much was redacted, and what to do next.
+ * in being read and checked, how many numbers were hidden, and what to do
+ * next. A confirmed copy a newer confirm of the same paycheck replaced says
+ * so and offers nothing: the newer copy is the one that counts.
  */
 export function DocumentRow({ doc, jobId, starting, onRead, onReplace }: DocumentRowProps) {
   const titleId = useId();
   const fileInput = useRef<HTMLInputElement>(null);
   const label = documentTypeLabel(doc.type);
   const lower = label.toLowerCase();
-  const badge = documentStatusBadge(doc.status);
+  const badge = documentBadge(doc);
   const reason = statusReasonText(doc.status_reason);
   const reading = doc.status === 'extracting' || starting;
   const read = doc.page_count !== null;
@@ -118,9 +127,10 @@ export function DocumentRow({ doc, jobId, starting, onRead, onReplace }: Documen
               <RelativeTime value={doc.uploaded_at} />
             </div>
             {reason && <p className="m-0 text-small text-ink-2">{reason}</p>}
+            {doc.superseded && <p className="m-0 text-small text-ink-2">{SUPERSEDED_TEXT}</p>}
             {unreadBenefits && (
               <p className="m-0 text-small text-ink-2">
-                Enter its plans on the health plan card and its match in your 401(k) plan details.
+                Enter its plans on the health plan step and its match in your 401(k) plan details.
               </p>
             )}
           </div>
@@ -131,8 +141,7 @@ export function DocumentRow({ doc, jobId, starting, onRead, onReplace }: Documen
               tone={doc.redaction_count > 0 ? 'coral' : 'neutral'}
               icon={doc.redaction_count > 0 ? <CheckIcon /> : undefined}
             >
-              {formatNumber(doc.redaction_count)} {doc.redaction_count === 1 ? 'item' : 'items'}{' '}
-              redacted
+              {hiddenText(doc.redaction_count)}
             </Badge>
           )}
           {!reading && doc.can_read_again && (
@@ -159,23 +168,27 @@ export function DocumentRow({ doc, jobId, starting, onRead, onReplace }: Documen
               Read
             </Button>
           )}
-          <Button
-            size="sm"
-            disabled={reading}
-            onClick={() => fileInput.current?.click()}
-            aria-label={`Replace ${lower}`}
-          >
-            Replace
-          </Button>
-          <input
-            ref={fileInput}
-            type="file"
-            accept={DOCUMENT_ACCEPT}
-            hidden
-            tabIndex={-1}
-            aria-label={`New ${lower} file`}
-            onChange={onFile}
-          />
+          {!doc.superseded && (
+            <>
+              <Button
+                size="sm"
+                disabled={reading}
+                onClick={() => fileInput.current?.click()}
+                aria-label={`Replace ${lower}`}
+              >
+                Replace
+              </Button>
+              <input
+                ref={fileInput}
+                type="file"
+                accept={DOCUMENT_ACCEPT}
+                hidden
+                tabIndex={-1}
+                aria-label={`New ${lower} file`}
+                onChange={onFile}
+              />
+            </>
+          )}
         </div>
       </div>
       {reading && (

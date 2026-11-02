@@ -157,7 +157,7 @@ export async function confirmAcmeFields(
   fields: ProposedField[],
   pace: ConfirmPace = { pause: 0, typingDelay: 0 },
 ) {
-  const card = page.getByRole('region', { name: /^(Extracted fields|Pay stub fields)$/ });
+  const card = page.getByRole('region', { name: /^(What we read|Pay stub details)$/ });
   await expect(card).toBeVisible({ timeout: 30_000 });
   const wrong = fields.filter((field) => {
     const expected = ACME[field.key];
