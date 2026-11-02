@@ -16,11 +16,11 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.routers.pay_stubs import newest_pay_stub
 from calc.pay_dates import PERIODS, frequency_named
 from calc.types import PayPeriods
 from db.enums import PayFrequency
 from db.models import PayStub, Profile
+from db.pay_stubs import newest_pay_stub
 
 __all__ = ["PaySchedule", "pay_schedule", "resolve_pay_schedule"]
 

@@ -24,10 +24,11 @@ from app import ratelimit
 from app.auth import CurrentUser
 from app.deps import LlmGateway, Now, UserSession, UserSessions
 from app.errors import AppError, NotFound, error_responses
-from app.routers.pay_stubs import newest_pay_stub, pay_stub_rate, pay_stub_withholding
+from app.routers.pay_stubs import pay_stub_rate, pay_stub_withholding
 from app.types import UtcDateTime
 from db.enums import CalculatorKind
 from db.models import Decision, Explanation
+from db.pay_stubs import newest_pay_stub
 from llm.gateway import EXPLAIN_PROMPT
 from llm.prompts import load_prompt
 from llm.schemas import NumberClaim
