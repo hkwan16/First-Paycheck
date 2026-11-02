@@ -28,8 +28,12 @@ describe('NetWorthCard', () => {
     const { card } = await open();
     expect(within(card).getByText('+$977.54 since Sep 2026')).toBeInTheDocument();
     const term = (name: string) => within(card).getByText(name, { selector: 'dt' });
-    expect(term('Assets').nextElementSibling).toHaveTextContent('$6,077.54');
-    expect(term('Liabilities').nextElementSibling).toHaveTextContent('$600.00');
+    expect(term('What you have').nextElementSibling).toHaveTextContent('$6,077.54');
+    expect(term('What you owe').nextElementSibling).toHaveTextContent('$600.00');
+    // Net worth is explained where it first appears (issue 209).
+    expect(
+      within(card).getByText('What you have in your accounts minus what you owe.'),
+    ).toBeInTheDocument();
     expect(asked).toEqual(['?months=12']);
   });
 
@@ -71,7 +75,7 @@ describe('NetWorthCard', () => {
       within(legend)
         .getAllByRole('listitem')
         .map((i) => i.textContent),
-    ).toEqual(['Net worth', 'Assets', 'Liabilities']);
+    ).toEqual(['Net worth', 'What you have', 'What you owe']);
     expect(chart.querySelectorAll('.recharts-line')).toHaveLength(3);
 
     await user.click(within(card).getByText('Monthly figures'));
@@ -86,7 +90,7 @@ describe('NetWorthCard', () => {
 
   it('shows the investment holdings', async () => {
     const { card } = await open();
-    expect(await within(card).findByRole('table', { name: 'Holdings' })).toHaveTextContent(
+    expect(await within(card).findByRole('table', { name: 'Investments' })).toHaveTextContent(
       'Vanguard Target Retirement 2070 Fund',
     );
   });
@@ -100,8 +104,8 @@ describe('NetWorthCard', () => {
       gain_cents: 0,
     };
     const { card } = await open();
-    expect(await within(card).findByText(/No investment holdings reported/)).toBeInTheDocument();
-    expect(within(card).queryByRole('table', { name: 'Holdings' })).toBeNull();
+    expect(await within(card).findByText(/No investments yet/)).toBeInTheDocument();
+    expect(within(card).queryByRole('table', { name: 'Investments' })).toBeNull();
   });
 
   it('explains an empty net worth instead of drawing zeros', async () => {

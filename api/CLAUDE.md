@@ -199,8 +199,8 @@ Rules:
   `0013_plan_export_job`, `0014_delete_account_fn`, `0015_loan_account_kind`,
   `0016_rule_match_contains`, `0017_document_replaced_by`,
   `0018_check_in_last_run_at`, `0019_explanation_context_digest`,
-  `0020_pay_stub_superseded_by` (each revises the one before it); the head is
-  `0020_pay_stub_superseded_by`.
+  `0020_pay_stub_superseded_by`, `0021_paycheck_change` (each revises the one
+  before it); the head is `0021_paycheck_change`.
 - Adding an enum label is `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with
   `AFTER` when the order means something, as `by_kind` does for
   `account_kind`); the downgrade maps the rows that use it and rebuilds the
@@ -582,8 +582,12 @@ adds `check_in_findings.key` (`UNIQUE (check_in_id, key)`, index `(user_id,
 key)`) and rebuilds `finding_action` as `done`, `dismissed`. No new table or
 function. `0018_check_in_last_run_at` adds `check_ins.last_run_at` (rule 9a):
 every run that creates or refreshes a check-in sets it to the job's clock, also
-when nothing changed, and the screen's "Compared with your plan on" reads it,
-never `updated_at`, which moves only when the row itself changes (issue #171).
+when nothing changed, and the screen's "We compared your pay stubs and spending
+with your plan on" reads it, never `updated_at`, which moves only when the row
+itself changes (issue #171). `0021_paycheck_change` folds the stored
+`deduction_change` findings into their paycheck's `pay_change`, merges the
+duplicates a newer copy of a stub made, and drops the label (rule 13a, issues
+194 and 202).
 
 - **Finders** (`checkin/findings.py`) are pure, one per `finding_kind`,
   `f(Facts) -> list[Finding]`; `all_findings` runs them in rule order. Facts
@@ -597,7 +601,12 @@ never `updated_at`, which moves only when the row itself changes (issue #171).
   in place (the user's action stays), a condition (`election_mismatch`,
   `goal_off_pace`, `upcoming_deadline`) nobody produces any more is retracted
   unless handled, events are kept unless their subject is gone (a recurring
-  finding whose charge an unlink removed). Surfacing sets `new`/`changed` recurring
+  finding whose charge an unlink removed, a `pay_change` about a stub that is no
+  longer current). Pay stub keys name the paycheck, not the row: `paycheck_id`
+  is the first copy of a paycheck (`db/pay_stubs.py:paycheck_ids`), so a newer
+  copy updates the same finding in place (issue 194). One `pay_change` per
+  paycheck carries gross pay and every deduction line that moved
+  (`deductions`, issue 202). Surfacing sets `new`/`changed` recurring
   charges `active`; the engine holds `checkin:{user}` then
   `recurring.detect:{user}` advisory locks so it never interleaves with
   detection.

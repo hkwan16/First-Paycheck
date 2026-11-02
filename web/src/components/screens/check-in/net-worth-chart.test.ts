@@ -44,8 +44,8 @@ describe('NET_WORTH_SERIES', () => {
   it('draws net worth, assets and liabilities in fixed hues, never a status', () => {
     expect(NET_WORTH_SERIES.map((s) => [s.key, s.label, s.tone])).toEqual([
       ['netWorth', 'Net worth', 'blue'],
-      ['assets', 'Assets', 'teal'],
-      ['liabilities', 'Liabilities', 'coral'],
+      ['assets', 'What you have', 'teal'],
+      ['liabilities', 'What you owe', 'coral'],
     ]);
   });
 });

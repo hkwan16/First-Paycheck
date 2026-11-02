@@ -12,7 +12,7 @@ describe('findingsReducer', () => {
     const next = findingsReducer(state, { type: 'done', findingId: id, at: AT });
     expect(next.findings[0]).toMatchObject({ user_action: 'done', user_action_at: AT });
     expect(next.handled_count).toBe(1);
-    expect(next.finding_count).toBe(9);
+    expect(next.finding_count).toBe(7);
     expect(next.status).toBe('open');
     expect(next.completed_at).toBeNull();
     // Pure: the state passed in is untouched.
@@ -47,7 +47,7 @@ describe('findingsReducer', () => {
     const id = state.findings[0]!.id;
     const next = findingsReducer(state, { type: 'dismiss', findingId: id, at: LATER });
     expect(next.findings[0]).toMatchObject({ user_action: 'dismissed', user_action_at: LATER });
-    expect(next.handled_count).toBe(9);
+    expect(next.handled_count).toBe(7);
   });
 
   it('completes the check-in when the last finding is handled (rule 13)', () => {
@@ -56,12 +56,12 @@ describe('findingsReducer', () => {
     const open = findingsReducer(done, { type: 'undo', findingId: last.id, at: AT });
     expect(open.status).toBe('open');
     expect(open.completed_at).toBeNull();
-    expect(open.handled_count).toBe(8);
+    expect(open.handled_count).toBe(6);
 
     const closed = findingsReducer(open, { type: 'done', findingId: last.id, at: LATER });
     expect(closed.status).toBe('completed');
     expect(closed.completed_at).toBe(LATER);
-    expect(closed.handled_count).toBe(9);
+    expect(closed.handled_count).toBe(7);
   });
 
   it('keeps completed_at while a completed check-in stays completed', () => {

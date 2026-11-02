@@ -68,7 +68,7 @@ describe('useCheckIns', () => {
     expect(
       result.current.data?.map((c) => [c.period, c.status, c.handled_count, c.finding_count]),
     ).toEqual([
-      ['2026-11-01', 'open', 0, 9],
+      ['2026-11-01', 'open', 0, 7],
       ['2026-10-01', 'completed', 2, 2],
     ]);
   });
@@ -282,7 +282,7 @@ describe('useCheckInNow', () => {
     const seen = requests();
     await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS * 2));
     expect(result.current.jobId).toBeNull();
-    expect(result.current.outcome).toBeNull();
+    expect(result.current.run).toBeNull();
     expect(seen).toEqual([]);
   });
 
@@ -299,14 +299,21 @@ describe('useCheckInNow', () => {
     // The 202 names the month's check-in when it already exists.
     expect(result.current.now.checkInId).toBe(NOVEMBER_ID);
     await waitFor(() => expect(result.current.now.job.data?.status).toBe('queued'));
-    expect(result.current.now.outcome).toBeNull();
+    expect(result.current.now.run).toBeNull();
 
     await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));
     await waitFor(() => expect(result.current.now.job.data?.status).toBe('running'));
     expect(seen).not.toContain('GET /check-ins');
 
     await act(() => vi.advanceTimersByTimeAsync(JOB_POLL_MS));
-    await waitFor(() => expect(result.current.now.outcome).toBe('refreshed'));
+    await waitFor(() => expect(result.current.now.run?.outcome).toBe('refreshed'));
+    // What the run changed, from the job's counts (spec 015 rule 23.6).
+    expect(result.current.now.run).toEqual({
+      outcome: 'refreshed',
+      checkInId: NOVEMBER_ID,
+      inserted: 0,
+      retracted: 0,
+    });
     expect(result.current.now.checkInId).toBe(NOVEMBER_ID);
     await waitFor(() => expect(seen).toContain('GET /check-ins'));
     await waitFor(() => expect(seen).toContain(`GET /check-ins/${NOVEMBER_ID}`));
@@ -317,7 +324,8 @@ describe('useCheckInNow', () => {
     checkinDb.checkIns = [];
     const { result } = setupNow();
     act(() => result.current.now.start());
-    await waitFor(() => expect(result.current.now.outcome).toBe('created'));
+    await waitFor(() => expect(result.current.now.run?.outcome).toBe('created'));
+    expect(result.current.now.run?.inserted).toBe(7);
     expect(result.current.now.checkInId).toBe(NOVEMBER_ID);
     await waitFor(() => expect(result.current.list.data?.map((c) => c.id)).toEqual([NOVEMBER_ID]));
   });
@@ -328,11 +336,11 @@ describe('useCheckInNow', () => {
 
     act(() => result.current.start());
     await waitFor(() => expect(result.current.job.isFailed).toBe(true));
-    expect(result.current.outcome).toBeNull();
+    expect(result.current.run).toBeNull();
 
     act(() => result.current.start());
     await waitFor(() => expect(result.current.jobId).toBe(checkInJobId(2)));
-    await waitFor(() => expect(result.current.outcome).toBe('refreshed'));
+    await waitFor(() => expect(result.current.run?.outcome).toBe('refreshed'));
     expect(result.current.job.isFailed).toBe(false);
   });
 

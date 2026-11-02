@@ -43,7 +43,9 @@ export const ACME_STUB = path.join(__dirname, '..', 'fixtures', 'acme-paystub.pd
  * types it. Its 401(k) line is a dash, which is 0; other deductions are its
  * CA SDI and dental lines, which the API adds up.
  */
-const ACME: Record<string, { value: number | string; typed: string }> = {
+export type AcmeStub = Record<string, { value: number | string; typed: string }>;
+
+const ACME: AcmeStub = {
   employer_name: { value: 'Acme Corp', typed: 'Acme Corp' },
   pay_date: { value: '2026-10-15', typed: '2026-10-15' },
   period_start: { value: '2026-10-01', typed: '2026-10-01' },
@@ -58,6 +60,21 @@ const ACME: Record<string, { value: number | string; typed: string }> = {
   medical_premium_cents: { value: 6250, typed: '62.50' },
   other_deductions_cents: { value: 4670, typed: '46.70' },
   net_cents: { value: 199604, typed: '1,996.04' },
+};
+
+/**
+ * Acme's next paycheck, typed over the Acme stub's reading: paid October 31
+ * for October 16-31, with 4% of gross ($108.33) to the 401(k), so take-home
+ * is that much lower. A second, different paycheck for the check-in to
+ * compare (spec 015 rule 5).
+ */
+export const ACME_OCTOBER_31: AcmeStub = {
+  ...ACME,
+  pay_date: { value: '2026-10-31', typed: '2026-10-31' },
+  period_start: { value: '2026-10-16', typed: '2026-10-16' },
+  period_end: { value: '2026-10-31', typed: '2026-10-31' },
+  retirement_contribution_cents: { value: 10833, typed: '108.33' },
+  net_cents: { value: 188771, typed: '1,887.71' },
 };
 
 const documentsCard = (page: Page) => page.getByRole('region', { name: 'Documents' });
@@ -147,7 +164,8 @@ export interface ConfirmPace {
 
 /**
  * On the Confirm screen, check every proposed value against what the Acme
- * stub prints, as a careful person would: confirm the values that match all
+ * stub prints (or `stub`, another paycheck typed over its reading), as a
+ * careful person would: confirm the values that match all
  * at once, and type each one that is missing (its 401(k) line is a dash) or
  * was read wrong. With no model the screen is in manual entry and every field
  * is typed. Ends when the math checks out; does not continue.
@@ -156,11 +174,12 @@ export async function confirmAcmeFields(
   page: Page,
   fields: ProposedField[],
   pace: ConfirmPace = { pause: 0, typingDelay: 0 },
+  stub: AcmeStub = ACME,
 ) {
   const card = page.getByRole('region', { name: /^(What we read|Pay stub details)$/ });
   await expect(card).toBeVisible({ timeout: 30_000 });
   const wrong = fields.filter((field) => {
-    const expected = ACME[field.key];
+    const expected = stub[field.key];
     return expected !== undefined && field.value !== expected.value;
   });
   const confirmAll = page.getByRole('button', { name: 'Confirm all remaining' });
@@ -169,7 +188,7 @@ export async function confirmAcmeFields(
     // A wrong value is corrected before the rest are confirmed together.
     for (const field of wrong) {
       const edit = card.getByRole('button', { name: `Edit ${field.label}`, exact: true });
-      if (await edit.isVisible()) await typeField(page, card, field, pace);
+      if (await edit.isVisible()) await typeField(page, card, field, stub[field.key], pace);
     }
     await confirmAll.click();
     await page.waitForTimeout(pace.pause);
@@ -178,13 +197,18 @@ export async function confirmAcmeFields(
   for (const field of fields) {
     const confirmed = card.getByRole('button', { name: `Confirmed ${field.label}`, exact: true });
     if (await confirmed.isVisible()) continue;
-    await typeField(page, card, field, pace);
+    await typeField(page, card, field, stub[field.key], pace);
   }
   await expect(card.getByText('The math checks out.')).toBeVisible();
 }
 
-async function typeField(page: Page, card: Locator, field: ProposedField, pace: ConfirmPace) {
-  const expected = ACME[field.key];
+async function typeField(
+  page: Page,
+  card: Locator,
+  field: ProposedField,
+  expected: AcmeStub[string] | undefined,
+  pace: ConfirmPace,
+) {
   if (!expected) throw new Error(`The Acme stub has no value for ${field.label} (${field.key})`);
   const edit = card.getByRole('button', { name: `Edit ${field.label}`, exact: true });
   if (await edit.isVisible()) await edit.click();

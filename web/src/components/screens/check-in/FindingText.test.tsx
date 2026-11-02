@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { Finding, FindingPayload } from '@/lib/api/types';
 import {
   deadlineFinding,
-  deductionFindings,
   electionFinding,
   equinoxFinding,
   goalFinding,
@@ -10,9 +9,10 @@ import {
   huluFinding,
   netflixFinding,
   payChangeFinding,
+  paycheckFinding,
   payCutFinding,
 } from '@/test/fixtures/checkins';
-import { render, screen } from '@/test/render';
+import { render, screen, within } from '@/test/render';
 import { FindingText } from './FindingText';
 
 /** The title and body a finding renders; each call renders on its own. */
@@ -32,8 +32,8 @@ function withPayload(finding: Finding, changes: Record<string, unknown>): Findin
 describe('FindingText', () => {
   it('election_mismatch (401(k)): the elected and withheld rates and amounts', () => {
     expect(show(electionFinding())).toEqual({
-      title: 'Your 401(k) contribution is 2%, not the 4% you chose.',
-      body: 'Your Nov 15, 2026 pay stub withheld $54.17. Your election works out to $108.33 a paycheck: a difference of -$54.16.',
+      title: 'Your pay stub puts 2% in your 401(k). You chose 4%.',
+      body: 'Your Nov 15, 2026 pay stub put $54.17 in your 401(k). At the rate you chose it would be $108.33 a paycheck, a difference of -$54.16. Ask payroll to update it.',
     });
   });
 
@@ -42,32 +42,32 @@ describe('FindingText', () => {
       elected_pct: null,
       actual_pct: null,
     });
-    expect(show(finding).title).toBe('Your 401(k) contribution does not match your election.');
+    expect(show(finding).title).toBe('Your pay stub’s 401(k) amount differs from what you chose.');
   });
 
   it('election_mismatch (health plan): the plan named, the premium against the stub', () => {
     expect(show(healthElectionFinding())).toEqual({
-      title: 'Your health premium does not match the HDHP + HSA plan.',
-      body: 'Your Nov 15, 2026 pay stub took $62.50 for medical coverage. The plan you chose costs $31.25 a paycheck: a difference of +$31.25.',
+      title: 'Your health premium differs from the HDHP + HSA plan.',
+      body: 'Your Nov 15, 2026 pay stub took $62.50 for health coverage. The plan you chose costs $31.25 a paycheck, a difference of +$31.25. Check your enrollment with HR.',
     });
     const unnamed = withPayload(healthElectionFinding(), { plan_name: null });
-    expect(show(unnamed).title).toBe('Your health premium does not match the plan you chose.');
+    expect(show(unnamed).title).toBe('Your health premium differs from the plan you chose.');
   });
 
   it('goal_off_pace: what was expected by now and what is there', () => {
     expect(show(goalFinding())).toEqual({
-      title: 'Your emergency fund is $160.00 behind pace.',
-      body: 'On pace it would hold $2,900.00 by now: $2,000.00 on Aug 1, 2026 plus $300.00 a month for 3 months. It held $2,740.00 on Nov 15, 2026, toward a $5,470.00 target.',
+      title: 'Your emergency fund is $160.00 behind.',
+      body: 'To be on track it would hold $2,900.00 by now, $2,000.00 on Aug 1, 2026 plus $300.00 a month for 3 months. It held $2,740.00 on Nov 15, 2026, toward your $5,470.00 goal.',
     });
     const other = withPayload(goalFinding(), { affects: null, months_elapsed: 1 });
-    expect(show(other).title).toBe('Your savings goal is $160.00 behind pace.');
+    expect(show(other).title).toBe('Your savings goal is $160.00 behind.');
     expect(show(other).body).toContain('a month for 1 month.');
   });
 
   it('recurring_new: the merchant, amount and cadence, and when it was seen', () => {
     expect(show(equinoxFinding())).toEqual({
-      title: 'Equinox, $185.00, looks monthly.',
-      body: 'First seen Sep 3, 2026, last charged Nov 3, 2026.',
+      title: 'Equinox looks like a monthly charge of $185.00.',
+      body: 'First charged Sep 3, 2026, most recently Nov 3, 2026.',
     });
   });
 
@@ -80,7 +80,7 @@ describe('FindingText', () => {
       previous_amount_cents: null,
       change_cents: null,
     });
-    expect(show(unknown).body).toBe('The earlier price is not on record.');
+    expect(show(unknown).body).toBe('We have no earlier price for it.');
   });
 
   it('recurring_stopped: the last charge, and a cancellation the person marked', () => {
@@ -92,20 +92,35 @@ describe('FindingText', () => {
     expect(show(quiet).body).toBe('Last charged $17.99 on Sep 9, 2026.');
   });
 
-  it('pay_change: gross and take-home, before and after, with the API signs', () => {
-    expect(show(payChangeFinding())).toEqual({
-      title: 'Your gross pay changed by +$208.34 a paycheck.',
-      body: '$2,916.67 on Nov 15, 2026, from $2,708.33 on Oct 31, 2026. Take-home went from $1,996.04 to $2,188.45 (+$192.41).',
+  it('pay_change: take-home before and after, then each line that moved (issue 202)', () => {
+    expect(show(paycheckFinding())).toEqual({
+      title: 'Your Nov 15, 2026 paycheck changed.',
+      body: 'Take-home pay went from $1,996.04 to $2,058.92 (+$62.88) since your Oct 31, 2026 pay stub.',
     });
-    expect(show(payCutFinding()).title).toBe('Your gross pay changed by -$208.34 a paycheck.');
+    render(<FindingText finding={paycheckFinding()} titleId="t" />);
+    const table = screen.getByRole('table', {
+      name: 'Your Oct 31, 2026 and Nov 15, 2026 pay stubs',
+    });
+    const rows = within(table)
+      .getAllByRole('row')
+      .map((row) => Array.from(row.children, (cell) => cell.textContent));
+    expect(rows).toEqual([
+      ['Line', 'Oct 31', 'Nov 15', 'Change'],
+      ['Gross pay', '$2,708.33', '$2,708.33', '$0.00'],
+      ['Federal tax', '$297.76', '$211.96', '-$85.80'],
+      ['401(k)', '$0.00', '$54.17', '+$54.17'],
+      ['Health premiums', '$62.50', '$31.25', '-$31.25'],
+    ]);
   });
 
-  it('deduction_change: the line, before and after, between the two stubs', () => {
-    const [federal] = deductionFindings();
-    expect(show(federal!)).toEqual({
-      title: 'Federal tax went from $297.76 to $211.96.',
-      body: 'A change of -$85.80 between the Oct 31, 2026 and Nov 15, 2026 pay stubs.',
-    });
+  it('pay_change: a raise with no deduction line that moved, and a cut', () => {
+    expect(show(payChangeFinding()).body).toBe(
+      'Take-home pay went from $1,996.04 to $2,188.45 (+$192.41) since your Oct 31, 2026 pay stub.',
+    );
+    render(<FindingText finding={payChangeFinding()} titleId="raise" />);
+    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(2);
+    expect(screen.getByRole('row', { name: /^Gross pay/ })).toHaveTextContent('+$208.34');
+    expect(show(payCutFinding()).body).toContain('(-$192.41)');
   });
 
   it('upcoming_deadline: the event title and when it is due', () => {

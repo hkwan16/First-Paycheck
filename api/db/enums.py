@@ -224,7 +224,6 @@ class FindingKind(StrEnum):
     RECURRING_CHANGED = "recurring_changed"
     RECURRING_STOPPED = "recurring_stopped"
     PAY_CHANGE = "pay_change"
-    DEDUCTION_CHANGE = "deduction_change"
     UPCOMING_DEADLINE = "upcoming_deadline"
 
 

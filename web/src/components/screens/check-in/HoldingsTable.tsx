@@ -48,20 +48,20 @@ function Amounts({
  */
 export function HoldingsTable({ holdings }: { holdings: Holdings }) {
   return (
-    <table aria-label="Holdings" className="w-full border-collapse text-small tabular-nums">
+    <table aria-label="Investments" className="w-full border-collapse text-small tabular-nums">
       <thead>
         <tr className="text-tiny font-semibold text-ink-3">
           <th scope="col" className="pb-1 text-left font-semibold">
-            Holding
+            Investment
           </th>
           <th scope="col" className="pb-1 pl-3 text-right font-semibold">
             Value
           </th>
           <th scope="col" className="pb-1 pl-3 text-right font-semibold">
-            Cost basis
+            You paid
           </th>
           <th scope="col" className="pb-1 pl-3 text-right font-semibold">
-            Gain
+            Gain or loss
           </th>
         </tr>
       </thead>

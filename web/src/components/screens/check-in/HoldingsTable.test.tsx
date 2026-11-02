@@ -8,8 +8,9 @@ const row = (name: RegExp) => screen.getByRole('row', { name });
 describe('HoldingsTable', () => {
   it('shows each position with its value, cost basis and gain as the API returns them', () => {
     render(<HoldingsTable holdings={sampleHoldings()} />);
-    const table = screen.getByRole('table', { name: 'Holdings' });
-    expect(within(table).getByRole('columnheader', { name: 'Cost basis' })).toBeInTheDocument();
+    const table = screen.getByRole('table', { name: 'Investments' });
+    expect(within(table).getByRole('columnheader', { name: 'You paid' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Gain or loss' })).toBeInTheDocument();
     expect(within(table).getByText('Acme 401(k) · as of Nov 15, 2026')).toBeInTheDocument();
     const fund = row(/^Vanguard Target Retirement 2070 Fund/);
     expect(fund).toHaveTextContent('VSVNX');
