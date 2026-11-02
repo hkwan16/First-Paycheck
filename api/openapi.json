@@ -1530,6 +1530,10 @@
               }
             ]
           },
+          "superseded": {
+            "title": "Superseded",
+            "type": "boolean"
+          },
           "type": {
             "$ref": "#/components/schemas/DocumentType"
           },
@@ -1551,6 +1555,7 @@
           "deleted_at",
           "replaced_by_id",
           "can_read_again",
+          "superseded",
           "proposal"
         ],
         "title": "DocumentDetail",
@@ -1631,6 +1636,10 @@
               }
             ]
           },
+          "superseded": {
+            "title": "Superseded",
+            "type": "boolean"
+          },
           "type": {
             "$ref": "#/components/schemas/DocumentType"
           },
@@ -1651,7 +1660,8 @@
           "confirmed_at",
           "deleted_at",
           "replaced_by_id",
-          "can_read_again"
+          "can_read_again",
+          "superseded"
         ],
         "title": "DocumentOut",
         "type": "object"
@@ -9610,6 +9620,18 @@
               ],
               "description": "Rule and user labels count as 1; uncategorized excluded",
               "title": "Min Confidence"
+            }
+          },
+          {
+            "description": "Only rows on active checking, savings and credit accounts, the ones the spending summary reads",
+            "in": "query",
+            "name": "cash_accounts_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Only rows on active checking, savings and credit accounts, the ones the spending summary reads",
+              "title": "Cash Accounts Only",
+              "type": "boolean"
             }
           },
           {

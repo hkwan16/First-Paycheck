@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { PageTitle } from '@/components/chrome/PageTitle';
 import { StepFooter } from '@/components/chrome/StepFooter';
 import { CardErrorBoundary } from '@/components/ui/CardErrorBoundary';
-import { NEWEST_TRANSACTIONS, periodFilters, useCashflow, type Period } from '@/lib/api/hooks';
+import { NEWEST_SPENDING, periodFilters, useCashflow, type Period } from '@/lib/api/hooks';
 import { features } from '@/lib/features';
 import { CashFlowCard } from './CashFlowCard';
 import { PeriodPicker } from './PeriodPicker';
@@ -40,17 +40,13 @@ export function SpendingScreen({
   // its way (the last period's flow may still be on screen), and the newest
   // rows when the cash flow cannot be read.
   const listed = period ?? (flow && !cashflow.isPlaceholderData ? flow : null);
-  const transactions = listed
-    ? periodFilters(listed)
-    : cashflow.isError
-      ? NEWEST_TRANSACTIONS
-      : null;
+  const transactions = listed ? periodFilters(listed) : cashflow.isError ? NEWEST_SPENDING : null;
 
   return (
     <>
       <PageTitle
         title={title}
-        lead="Known merchants are labeled by rules. Only unknown ones went to the AI, with a confidence score. Fix any label and it becomes a rule for next time."
+        lead="What came into and went out of your linked accounts. Change a transaction's category and the rest from that merchant follow."
       />
       <CardErrorBoundary title="Spending summary">
         <SummaryCard

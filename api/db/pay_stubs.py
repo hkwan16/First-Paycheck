@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from collections.abc import Collection
 
 from sqlalchemy import Select, Text, Update, and_, func, literal, or_, select, text, update
 from sqlalchemy.orm import Session, aliased
@@ -25,6 +26,7 @@ __all__ = [
     "latest_pay_date",
     "newest_pay_stub",
     "paid_between_count",
+    "superseded_documents",
 ]
 
 # GET /pay-stubs order (spec 005 rule 24); id breaks a tie inside one transaction.
@@ -89,6 +91,21 @@ def paid_between_count(session: Session, first: dt.date, last: dt.date) -> int:
         .with_only_columns(func.count(), maintain_column_froms=True)
     )
     return int(count or 0)
+
+
+def superseded_documents(
+    session: Session, document_ids: Collection[uuid.UUID]
+) -> frozenset[uuid.UUID]:
+    """Which of ``document_ids`` were confirmed into a stub a newer confirm has
+    since superseded (rule 22f): what Link shows instead of "Confirmed"."""
+    if not document_ids:
+        return frozenset()
+    rows = session.scalars(
+        select(PayStub.document_id).where(
+            PayStub.superseded_by_id.is_not(None), PayStub.document_id.in_(document_ids)
+        )
+    )
+    return frozenset(rows)
 
 
 def add_confirmed(session: Session, stub: PayStub) -> None:

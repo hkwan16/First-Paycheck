@@ -77,7 +77,7 @@ describe('confirmReducer', () => {
     expect(field(state, 'employer_name')).toMatchObject({ confirmed: true, value: null });
   });
 
-  it('opens the editor instead of confirming an empty amount or date', () => {
+  it('opens the editor instead of confirming an empty amount or date, with no error yet', () => {
     const empty = initConfirmState(
       sampleFields.map((f) =>
         f.key === 'gross_cents' || f.key === 'pay_date' ? { ...f, value: null } : f,
@@ -89,16 +89,17 @@ describe('confirmReducer', () => {
       { type: 'toggle', key: 'gross_cents' },
       { type: 'toggle', key: 'pay_date' },
     );
-    expect(field(state, 'gross_cents')).toMatchObject({
-      confirmed: false,
-      draft: '',
-      error: 'Enter an amount, like 1,234.56',
-    });
-    expect(field(state, 'pay_date')).toMatchObject({
-      confirmed: false,
-      draft: '',
-      error: 'Enter a date',
-    });
+    // Nothing typed or submitted yet, so nothing to correct (issue 195).
+    expect(field(state, 'gross_cents')).toMatchObject({ confirmed: false, draft: '', error: null });
+    expect(field(state, 'pay_date')).toMatchObject({ confirmed: false, draft: '', error: null });
+
+    const saved = run(
+      state,
+      { type: 'save', key: 'gross_cents' },
+      { type: 'save', key: 'pay_date' },
+    );
+    expect(field(saved, 'gross_cents').error).toBe('Enter an amount, like 1,234.56');
+    expect(field(saved, 'pay_date').error).toBe('Enter a date');
   });
 
   it('edit opens a draft from the current value and selects the field', () => {
@@ -372,15 +373,14 @@ describe('fields that set whether they are required', () => {
   it('opens the editor for a required text or percentage with nothing in it', () => {
     const text = benefitsLike({ key: 'name', kind: 'text', value: null });
     text.fields[0]!.required = true;
-    expect(run(text, { type: 'toggle', key: 'name' }).fields[0]).toMatchObject({
-      confirmed: false,
-      error: 'Enter a value',
-    });
+    const opened = run(text, { type: 'toggle', key: 'name' });
+    expect(opened.fields[0]).toMatchObject({ confirmed: false, draft: '', error: null });
+    expect(run(opened, { type: 'save', key: 'name' }).fields[0]!.error).toBe('Enter a value');
     const percent = benefitsLike({ key: 'pct', kind: 'percent', value: null });
     percent.fields[0]!.required = true;
-    expect(run(percent, { type: 'toggle', key: 'pct' }).fields[0]).toMatchObject({
-      error: 'Enter a percentage, like 20 or 12.5',
-    });
+    expect(
+      run(percent, { type: 'toggle', key: 'pct' }, { type: 'save', key: 'pct' }).fields[0],
+    ).toMatchObject({ error: 'Enter a percentage, like 20 or 12.5' });
   });
 
   it('confirms an optional date left empty', () => {

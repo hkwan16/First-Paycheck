@@ -73,13 +73,15 @@ test('a new user goes from sign-in to a verified 401(k) explanation', async ({ p
       // rows may all be in the month so far.
       const table = await showPeriodWithTransactions(page);
       expect(await table.getByRole('row').count()).toBeGreaterThan(2);
-      await expect(table.getByText(/^(Rule|You|AI( · \d+%)?|Not labeled)$/).first()).toBeVisible();
+      await expect(
+        table.getByText(/^(Known merchant|You|Our guess|Guess, check it|No category)$/).first(),
+      ).toBeVisible();
 
       const select = table.getByRole('combobox').first();
       const target = (await select.inputValue()) === 'entertainment' ? 'Dining' : 'Entertainment';
       await select.selectOption(target);
       await expect(select).toHaveValue(target.toLowerCase());
-      await expect(page.getByText(/^Saved as a rule\./)).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText(/^Saved\./)).toBeVisible({ timeout: 15_000 });
     });
   } else {
     test.info().annotations.push({ type: 'skipped steps', description: NO_PLAID_SANDBOX });
@@ -93,40 +95,25 @@ test('a new user goes from sign-in to a verified 401(k) explanation', async ({ p
 
     const row = docs.getByRole('group', { name: /^Pay stub/ }).first();
     await expect(row.getByText('Review needed')).toBeVisible({ timeout: 180_000 });
-    await expect(row.getByText(/^[1-9]\d* items? redacted$/)).toBeVisible();
+    await expect(row.getByText(/^[1-9]\d* numbers? hidden$/)).toBeVisible();
     await row.getByRole('link', { name: 'Review pay stub' }).click();
   });
 
   await test.step('confirm every field with the math checking out', async () => {
     await expect(page).toHaveURL(/\/setup\/confirm\/[^/]+$/);
     await waitForHydration(page);
-    const fields = page.getByRole('region', { name: 'Extracted fields' });
+    const fields = page.getByRole('region', { name: 'What we read' });
     await expect(fields).toBeVisible();
     await expect(
-      page.getByRole('complementary', { name: 'Source, as the AI saw it' }).getByRole('img', {
-        name: 'Redacted',
+      page.getByRole('complementary', { name: 'Your pay stub' }).getByRole('img', {
+        name: 'Hidden number',
       }),
     ).not.toHaveCount(0);
 
+    // Every line the stub prints is read, its 401(k) dash as $0.00 (issue
+    // 195), so Confirm all remaining leaves nothing to type.
     await page.getByRole('button', { name: 'Confirm all remaining' }).click();
-    // A field the stub does not print (its 401(k) line is a dash) stays open:
-    // type what the stub says, which is nothing.
-    const unconfirmed = fields.getByRole('button', { name: /^Confirm (?!all)/ });
-    while ((await unconfirmed.count()) > 0) {
-      const label = ((await unconfirmed.first().getAttribute('aria-label')) ?? '').replace(
-        /^Confirm /,
-        '',
-      );
-      await fields.getByRole('button', { name: `Edit ${label}`, exact: true }).click();
-      const input = fields
-        .getByRole('group', { name: label, exact: true })
-        .getByLabel(label, { exact: true });
-      if ((await input.inputValue()) === '') await input.fill('0');
-      await input.press('Enter');
-      await expect(
-        fields.getByRole('button', { name: `Confirmed ${label}`, exact: true }),
-      ).toBeVisible();
-    }
+    await expect(fields.getByRole('button', { name: /^Confirm (?!all)/ })).toHaveCount(0);
 
     await expect(fields.getByText('The math checks out.')).toBeVisible();
     await page.getByRole('button', { name: /Confirm and continue/ }).click();
@@ -137,7 +124,7 @@ test('a new user goes from sign-in to a verified 401(k) explanation', async ({ p
     await waitForHydration(page);
     const summary = page.getByRole('region', { name: /Your month so far|pay stubs?$/ });
     await expect(summary).toBeVisible();
-    for (const tile of ['Income', 'Essentials', 'Flexible', 'Savings']) {
+    for (const tile of ['Income deposited', 'Essentials', 'Flexible', 'Savings']) {
       await expect(summary.getByText(tile, { exact: true })).toBeVisible();
     }
   });

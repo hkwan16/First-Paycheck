@@ -485,4 +485,5 @@ def test_list_is_newest_first(
         "deleted_at",
         "replaced_by_id",
         "can_read_again",
+        "superseded",
     }

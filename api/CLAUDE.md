@@ -111,7 +111,8 @@ Rules:
   validated by `llm/prompts/__init__.py`. A released prompt file is never
   edited; a change is a new version.
 - One public method per prompt: `categorize` (`categorize/v3`),
-  `extract_pay_stub` (`extract_pay_stub/v1`), `extract_benefits`
+  `extract_pay_stub` (`extract_pay_stub/v2`: a dash or `0.00` printed on a line is 0
+  tied to that line, not null; spec 005 rule 1a, issue 195), `extract_benefits`
   (`extract_benefits/v2`), `explain` (`explain/v3`), `judge_rate_claim`
   (`judge_rate_claim/v1`, schema `RateClaimVerdict`; spec 008 rule 24a), the
   explain eval's judge of whether a final explanation calls the chosen 401(k)
@@ -268,7 +269,8 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   stub of the same paycheck (same `employer_key`, pay date and period) and any
   current stub of a document the confirmed one replaced, along the replace chain.
   Read pay stubs only through `db/pay_stubs.py` (`current_pay_stubs()`,
-  `NEWEST_FIRST`, `latest_pay_date`, `paid_between_count`): `test_boundaries`
+  `NEWEST_FIRST`, `latest_pay_date`, `paid_between_count`, `superseded_documents`, which
+  gives `DocumentOut.superseded` for Link, rule 22f): `test_boundaries`
   fails on a `select`/`select_from`/`get` of `PayStub` or SQL naming `pay_stubs`
   anywhere else. `uq_pay_stubs_current_paycheck` (partial unique index) is the
   backstop; `superseded_by_id` is a deferred same-user self reference, and the
@@ -400,10 +402,14 @@ explanation, `GET /calendar` shows the check it implies.
   of every total and reported as `income_outflows_ignored_cents`, so
   `income_cents` is never negative. Spending buckets still net refunds.
   Only `checking`, `savings` and `credit` rows are read (rule 21a,
-  `SPENDING_ACCOUNT_KINDS`): a loan's, investment's or retirement account's
-  own ledger (a loan books the payment that left checking as money in, and
-  interest as money out) is in no total and reported as `ledger_rows_skipped`
-  (`count`, `net_cents`); a new `AccountKind` must join one of the two sets.
+  `SPENDING_ACCOUNT_KINDS` in `db/accounts.py`, with the join and predicate
+  helpers `transaction_account()` and `active_account_of(kinds)`): a loan's,
+  investment's or retirement account's own ledger (a loan books the payment
+  that left checking as money in, and interest as money out) is in no total
+  and reported as `ledger_rows_skipped` (`count`, `net_cents`); a new
+  `AccountKind` must join one of the two sets. Recurring detection (spec 009
+  rule 1a) and `GET /transactions?cash_accounts_only=true` (the Spending
+  screen's list, spec 003 rule 17) read the same accounts.
   A share of income is null with no income or when its size would exceed
   1,000.0 (`calc.spending.MAX_SHARE_PCT`, rule 25).
   `tests/support/sandbox_history.py:link_sandbox` runs a recorded sandbox
@@ -446,7 +452,8 @@ Specs 009 and 010. Migration `0005_checkins` adds `recurring_charges`,
 (no ON DELETE action) and `explanations.finding_id`.
 
 - **Recurring detection** (`sync/recurring.py`): `detect(charges, today)` is
-  pure: money-out transactions grouped by `merchant_norm`, the series is the
+  pure: money-out transactions (posted, on active cash accounts: rule 1a, so a
+  loan's monthly interest is no bill) grouped by `merchant_norm`, the series is the
   charges within 15% of the group median, a cadence band (weekly 6-8 d,
   monthly 27-33 d, yearly 350-380 d) must hold three quarters of the gaps, and
   each cadence has a minimum length (4, 3, 2). Amount arithmetic is

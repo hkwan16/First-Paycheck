@@ -42,16 +42,16 @@ test('04, 05, 07 and 08 the Spending screen', async ({ page }) => {
   const transactions = page.getByRole('region', { name: 'Transactions' });
   await shot(transactions, '04-spending-transactions');
 
-  // A fix is a rule for its merchant, which never goes back to the AI. Fix a
+  // A fix holds for its merchant from then on, and no guess replaces it. Fix a
   // merchant an earlier run fixed ("You") when there is one, so reruns do not
-  // take the AI's labels away one merchant at a time; it toggles between two
+  // take the guesses away one merchant at a time; it toggles between two
   // categories, as spending.spec.ts does.
   const rows = table.getByRole('row');
   const yours = rows.filter({ has: page.getByText('You', { exact: true }) });
   const select = ((await yours.count()) > 0 ? yours : rows.nth(1)).getByRole('combobox').first();
   const target = (await select.inputValue()) === 'entertainment' ? 'Dining' : 'Entertainment';
   await select.selectOption(target);
-  await expect(page.getByText(/^Saved as a rule\./)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/^Saved\./)).toBeVisible({ timeout: 15_000 });
   await shot(transactions, '05-spending-rule-notice');
 });
 

@@ -62,7 +62,7 @@ function SyncOutcome({ job, active }: { job: Job; active: ActiveSync }) {
   const synced =
     added === null
       ? ''
-      : ` ${formatNumber(added)} new ${added === 1 ? 'transaction' : 'transactions'} synced.`;
+      : ` ${formatNumber(added)} new ${added === 1 ? 'transaction' : 'transactions'}.`;
   return (
     <Notice tone="confirmed" compact role="status">
       {active.kind === 'link' ? `Linked ${active.institution}.` : `Synced ${active.institution}.`}
@@ -94,7 +94,9 @@ export interface AccountsCardProps {
 
 /**
  * The mockup's "Bank accounts" card: linked accounts grouped by institution,
- * the active sync's progress, and the ways to link another bank.
+ * the active sync's progress, and the ways to link another bank. A sync shows
+ * next to the control that started it (issue 208): Sync now's under its
+ * institution's name, a new link's beside the link buttons.
  */
 export function AccountsCard({ showSandboxLink }: AccountsCardProps) {
   const accounts = useAccounts();
@@ -149,6 +151,23 @@ export function AccountsCard({ showSandboxLink }: AccountsCardProps) {
     });
   };
 
+  const syncStatus =
+    shown &&
+    (job.isTerminal && job.data && !job.isFailed ? (
+      <SyncOutcome job={job.data} active={shown} />
+    ) : (
+      <JobProgress
+        label={`Syncing ${shown.institution}`}
+        job={job.data}
+        failed={job.isFailed}
+        failedMessage="Anything already synced is kept."
+        onRetry={() => startSync(shown.itemId, shown.institution, shown.kind)}
+        retrying={trigger.isPending}
+      />
+    ));
+  // Where the person pressed: an institution's Sync now, or a link button.
+  const syncedHere = (itemId: string) => shown?.kind === 'sync' && shown.itemId === itemId;
+
   const linkSandbox = () => {
     setLinkError(null);
     sandbox.mutate(undefined, {
@@ -193,6 +212,7 @@ export function AccountsCard({ showSandboxLink }: AccountsCardProps) {
         onUnlink={() => startUnlink(group)}
         unlinkPending={unlink.isPending && unlink.variables === group.itemId}
         unlinkError={unlink.isError && unlink.variables === group.itemId ? unlink.error : null}
+        syncStatus={syncedHere(group.itemId) && syncStatus}
       />
     ));
   }
@@ -219,19 +239,7 @@ export function AccountsCard({ showSandboxLink }: AccountsCardProps) {
         </Notice>
       )}
 
-      {shown &&
-        (job.isTerminal && job.data && !job.isFailed ? (
-          <SyncOutcome job={job.data} active={shown} />
-        ) : (
-          <JobProgress
-            label={`Syncing ${shown.institution}`}
-            job={job.data}
-            failed={job.isFailed}
-            failedMessage="Anything already synced is kept."
-            onRetry={() => startSync(shown.itemId, shown.institution, shown.kind)}
-            retrying={trigger.isPending}
-          />
-        ))}
+      {shown?.kind === 'link' && syncStatus}
 
       {linkError && (
         <Notice tone="warning" compact role="alert">
@@ -259,7 +267,7 @@ export function AccountsCard({ showSandboxLink }: AccountsCardProps) {
           Import a CSV
         </Button>
         <span className="text-small text-ink-3">
-          A CSV goes through the same pipeline as a linked account.
+          Rather not link your bank? Import the CSV file it lets you download.
         </span>
       </div>
       {csvOpen && <CsvImport id={csvPanelId} />}

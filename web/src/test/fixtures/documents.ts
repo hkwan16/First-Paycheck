@@ -57,7 +57,7 @@ const ROWS: readonly Row[] = [
     'deduction',
     4_670,
     null,
-    'Sum of: CA SDI, DENTAL/VIS',
+    'From CA SDI and DENTAL/VIS',
   ],
   ['net_cents', 'Net pay', 'money', 'net', 199_604, 0.99],
 ];
@@ -174,6 +174,7 @@ export function sampleDocument(overrides: Partial<DocumentSummary> = {}): Docume
     confirmed_at: null,
     deleted_at: null,
     replaced_by_id: null,
+    superseded: false,
     ...overrides,
   };
   return { ...document, can_read_again: overrides.can_read_again ?? canReadAgain(document) };

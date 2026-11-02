@@ -1539,6 +1539,8 @@ export interface components {
       replaced_by_id: string | null;
       status: components['schemas']['DocumentStatus'];
       status_reason: components['schemas']['DocumentStatusReason'] | null;
+      /** Superseded */
+      superseded: boolean;
       type: components['schemas']['DocumentType'];
       /**
        * Uploaded At
@@ -1567,6 +1569,8 @@ export interface components {
       replaced_by_id: string | null;
       status: components['schemas']['DocumentStatus'];
       status_reason: components['schemas']['DocumentStatusReason'] | null;
+      /** Superseded */
+      superseded: boolean;
       type: components['schemas']['DocumentType'];
       /**
        * Uploaded At
@@ -5665,6 +5669,8 @@ export interface operations {
           | null;
         /** @description Rule and user labels count as 1; uncategorized excluded */
         min_confidence?: number | null;
+        /** @description Only rows on active checking, savings and credit accounts, the ones the spending summary reads */
+        cash_accounts_only?: boolean;
         limit?: number;
         cursor?: string | null;
       };
