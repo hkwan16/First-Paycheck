@@ -555,10 +555,8 @@ issues:
     labels: ["area:web", "area:infra"]
     milestone: M4
     priority: High
-    status: in_progress
-    # alpha.spec.ts passes in the e2e workflow, but Actions has no Plaid
-    # secrets, so the stack sets E2E_PLAID_SANDBOX=0 and the link steps are
-    # skipped in CI. The whole path runs locally with make e2e-full.
+    status: done
+    # Fixed November 1: the e2e workflow passes the Plaid sandbox keys from the repository's secrets, so the link steps, the sync and Spending run in CI (36 passed, none skipped).
   - title: "Visual and axe checks for the alpha screens at 1280 and 390"
     body: >-
       Add screens.visual.spec.ts with animations disabled and dates masked, and
@@ -600,10 +598,11 @@ issues:
     labels: ["area:infra"]
     milestone: M4
     priority: Medium
-    status: in_progress
-    # JSON logs with request ids, worker health and env-gated Sentry are built
-    # and tested. A Render log drain, SENTRY_DSN in production and a forced
-    # production error reaching Sentry are not verified.
+    status: todo
+    # Deferred on November 1 by the product owner, to do later. JSON logs with
+    # request ids, worker health and env-gated Sentry are built and tested. A
+    # Render log drain, SENTRY_DSN in production and a forced production error
+    # reaching Sentry are not done.
   - title: "Alpha release document"
     body: >-
       Complete docs/alpha/README.md with the demo description, the functional vs

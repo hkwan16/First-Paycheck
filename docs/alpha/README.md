@@ -50,26 +50,24 @@ Every feature on the path above is functional in production. The table lists wha
 | Bank data | Plaid's sandbox only. Production access to real banks (#104) is a stretch goal and has not started. |
 | Screen size | Desktop only, since November 1. The layout still adapts to a narrow window, but nothing is designed or tested for a phone. |
 | LLM evals | Every LLM suite has a measured baseline from live runs. The nightly workflow runs only the free suites, because the API key is not yet a GitHub secret (#145). |
-| Alpha end-to-end spec in CI (#45) | It runs on every pull request, but skips the bank-linking steps because CI has no Plaid keys. |
-| Error reporting (#49) | JSON logs and the Sentry hooks are in the code. A forced production error has not yet been traced to Sentry. |
+| Error reporting (#49) | JSON logs and the Sentry hooks are in the code, but Sentry is not turned on in production. That is deferred until after the alpha. |
 | User test with 5 to 8 people (#103) | The kit is written (`docs/user-test/`), but the sessions have not run. |
 
 ## Documented backlog
 
 The backlog is a GitHub Project: <https://github.com/users/hkwan16/projects/1>, with the issues at <https://github.com/hkwan16/First-Paycheck/issues>. Each issue has a title, a description that ends with its definition of done, a status (To Do, In Progress, or Done), a priority (High, Medium, or Low), a milestone, and area labels. Every issue is assigned to me, since this is a solo project. The source of truth is [`docs/backlog.yaml`](../backlog.yaml), which `scripts/sync_backlog.py` syncs to GitHub, so the board follows the repo.
 
-The backlog holds 163 issues: 157 done, 3 in progress, and 3 to do (56 High, 91 Medium, and 16 Low). Milestones M0 to M10 are ordered by dependency, and each one ends with a deployed product. Since October 22, 32 issues have been added, most of them bugs found by testing production end to end. The last was found while recording the demo: a pay stub confirmed twice counted its pay twice (#190), fixed the same day. The six open issues are the ones that need something from outside the repo:
+The backlog holds 163 issues: 158 done, 1 in progress, and 4 to do (56 High, 91 Medium, and 16 Low). Milestones M0 to M10 are ordered by dependency, and each one ends with a deployed product. Since October 22, 32 issues have been added, most of them bugs found by testing production end to end. The last was found while recording the demo: a pay stub confirmed twice counted its pay twice (#190), fixed the same day. The five open issues are the ones that need something from outside the repo or are deferred:
 
 | Issue | Status | What it waits on |
 |---|---|---|
 | #33 Tesseract pinned in Docker and the ingest tests required in CI | In progress | Marking the `ingest-in-docker` job as a required check |
-| #45 Full alpha end-to-end spec green in CI | In progress | Plaid sandbox keys as GitHub secrets |
-| #49 JSON logs, a Render log drain, and Sentry | In progress | The Sentry DSN and log drain in Render, and a forced error to trace |
+| #49 JSON logs, a Render log drain, and Sentry | To do | Deferred: the Sentry DSN and log drain in Render, and a forced error to trace |
 | #103 User test with 5 to 8 people | To do | Participants |
 | #104 Plaid production application | To do | An application to Plaid (stretch) |
 | #145 Nightly LLM evals | To do | The API key as a GitHub secret, about $1.30 a day |
 
-![The GitHub Project board on November 1: 3 to do, 3 in progress, and 157 done](screenshots/backlog.jpg)
+![The GitHub Project board on November 1: 4 to do, 1 in progress, and 158 done](screenshots/backlog.jpg)
 
 ## Brief reflection on AI tool integration
 
@@ -93,4 +91,4 @@ The rules for the AI live in the repo's `CLAUDE.md` files: money math only in `a
 - **A test can pass without testing anything.** When the product became desktop only, the test for issue 172 (a step link should land at the top of the next page) passed at desktop size even with the fix removed. It now runs in a window where the bug appears and fails if that window stops showing it.
 - **Parallel agents need a shared map.** Two agents' migrations kept revising the same parent until the briefs named the current head. Merges conflicted in shared files, and `tsc` in the merge gate caught two wrong resolutions.
 
-The next steps are the user test with 5 to 8 people, the nightly LLM evals, and finishing the three in-progress issues above before the final release.
+The next steps are the user test with 5 to 8 people, the nightly LLM evals, and making the `ingest-in-docker` job a required check (#33) before the final release.
