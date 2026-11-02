@@ -613,10 +613,8 @@ issues:
     labels: ["area:docs"]
     milestone: M4
     priority: High
-    status: in_progress
-    # docs/alpha/README.md has every section of the brief, but the production
-    # URL, screenshots, recording and board screenshot are placeholders, and its
-    # feature table predates M5 to M10.
+    status: done
+    # Fixed November 1: every section of the brief, production screenshots taken with Claude in Chrome, and a two-minute recording from production.
   - title: "Groom M5-M10 issues with priorities on the board"
     body: >-
       Review every post-alpha issue, set its priority and order on the Project,
@@ -1945,3 +1943,20 @@ issues:
     priority: Medium
     status: done
     # Fixed November 1: spec 018 rules 11-17 removed; the side nav is the plain list at every width.
+  - title: "A second confirmed copy of the same pay stub counts its pay twice"
+    body: >-
+      Uploading and confirming the same pay stub again adds a second confirmed
+      stub, and every reader of confirmed stubs counts both. On production on
+      November 1, two confirmed copies of the Acme stub (pay date Oct 15)
+      made October's Spending read "2 pay stubs" and its cash flow "Gross pay,
+      2 stubs" at $5,416.66, twice the stub's $2,708.33, with federal tax
+      doubled to $595.52. The check-in's cash flow reads the same stubs.
+      Decide in the spec what a second confirmed stub for the same employer
+      and pay period means (it replaces the first, or the confirm is refused),
+      then reproduce it end to end and write the failing test first. Done
+      when a re-uploaded stub counts once everywhere the confirmed stubs are
+      read.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: High
+    status: todo
