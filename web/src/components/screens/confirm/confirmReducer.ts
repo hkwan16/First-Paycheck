@@ -197,8 +197,9 @@ export function confirmReducer(state: ConfirmState, action: ConfirmAction): Conf
     case 'toggle':
       return patch(state, action.key, (f) => {
         if (f.confirmed) return { ...f, confirmed: false };
-        // Nothing to confirm yet: open the editor and say what is missing.
-        if (!hasWhatItNeeds(f)) return { ...f, draft: '', error: requiredError(f) };
+        // Nothing to confirm yet: open the editor. What to type is said only
+        // once the person saves it empty, never before they have typed (issue 195).
+        if (!hasWhatItNeeds(f)) return { ...f, draft: '', error: null };
         return { ...f, confirmed: true, draft: null, error: null };
       });
 

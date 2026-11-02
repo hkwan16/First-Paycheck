@@ -3,17 +3,17 @@
 import { Fragment, memo, useId } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
-import type { SourceLine } from '@/lib/api/types';
+import type { DocumentType, SourceLine } from '@/lib/api/types';
 import { cn } from '@/lib/cn';
-import { formatNumber } from '@/lib/money';
+import { documentTypeLabel, hiddenText } from '@/lib/documents';
 import { redactionParts, splitSourceLine } from './field-format';
 
-/** A redaction drawn as a black bar; it says "Redacted" to a screen reader. */
+/** A hidden number drawn as a black bar; a screen reader hears "Hidden number". */
 function Redacted() {
   return (
     <span
       role="img"
-      aria-label="Redacted"
+      aria-label="Hidden number"
       className="inline-block rounded-xs bg-ink text-transparent select-none"
     >
       XXXXXXXX
@@ -33,6 +33,8 @@ function Text({ text }: { text: string }) {
 
 export interface SourcePaneProps {
   id: string;
+  /** What the document is: the pane is titled "Your pay stub". */
+  type: DocumentType;
   /** The redacted lines, as the proposal has them (none when it has none). */
   lines?: readonly SourceLine[];
   redactionCount: number;
@@ -43,43 +45,35 @@ export interface SourcePaneProps {
   /** Manual entry: no field was read from a line, so nothing is highlighted. */
   manual?: boolean;
   /**
-   * Whether these lines were sent to the AI. Without a model, with the budget
-   * spent or with no readable page they were not (spec 004 rule 37), and the
-   * pane does not claim the AI saw them.
-   */
-  sentToAi?: boolean;
-  /**
    * Whether the document's lines name the field read from them. A benefits
    * summary's do not (spec 013), so nothing is highlighted and the pane says so.
    */
   linked?: boolean;
-  /** The list's accessible name. */
-  documentLabel?: string;
   className?: string;
 }
 
 /**
- * From the mockup's source card: the redacted lines the AI read (or, when it
- * never got them, the lines it would have read), as a mono
- * paper panel, with the selected field's line highlighted. Redactions are
- * black bars; the original file is never shown. Memoized: a keystroke in a
- * field changes none of its props, so the pane renders again only when the
- * selection moves.
+ * From the mockup's source card: the document's lines with private numbers
+ * hidden, as a mono paper panel, with the selected field's line highlighted.
+ * It is titled after the document ("Your pay stub"), so it never claims the
+ * lines were read (spec 004 rule 37). Hidden numbers are black bars; the
+ * original file is never shown. Memoized: a keystroke in a field changes
+ * none of its props, so the pane renders again only when the selection moves.
  */
 export const SourcePane = memo(function SourcePane({
   id,
+  type,
   lines = [],
   redactionCount,
   withheldPages = [],
   selectedKey,
   selectedLabel,
   manual = false,
-  sentToAi = true,
   linked = true,
-  documentLabel = 'Redacted pay stub',
   className,
 }: SourcePaneProps) {
   const titleId = useId();
+  const noun = documentTypeLabel(type);
   const multiPage = new Set(lines.map((l) => l.page)).size > 1;
   const hasLine = selectedKey !== null && lines.some((l) => l.field_key === selectedKey);
 
@@ -87,19 +81,17 @@ export const SourcePane = memo(function SourcePane({
     <Card as="aside" id={id} aria-labelledby={titleId} gap={12} className={className}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id={titleId} className="m-0">
-          {sentToAi ? 'Source, as the AI saw it' : 'Source, redacted'}
+          Your {noun.toLowerCase()}
         </h2>
-        <Badge tone={redactionCount > 0 ? 'coral' : 'neutral'}>
-          {formatNumber(redactionCount)} {redactionCount === 1 ? 'item' : 'items'} redacted
-        </Badge>
+        <Badge tone={redactionCount > 0 ? 'coral' : 'neutral'}>{hiddenText(redactionCount)}</Badge>
       </div>
       {lines.length === 0 ? (
         <p className="m-0 text-small text-ink-3">
-          No page could be read safely, so there are no lines to show.
+          We could not read any page safely, so there is no text to show.
         </p>
       ) : (
         <ol
-          aria-label={documentLabel}
+          aria-label={`${noun} text`}
           className="m-0 list-none rounded-seg border border-ink/12 bg-paper p-4 font-mono text-code text-ink"
         >
           {lines.map((line, index) => {
@@ -137,28 +129,25 @@ export const SourcePane = memo(function SourcePane({
       )}
       {withheldPages.length > 0 && (
         <p className="m-0 text-small text-ink-2">
-          {withheldPages.length === 1 ? 'Page' : 'Pages'} {withheldPages.join(', ')}{' '}
-          {withheldPages.length === 1 ? 'was' : 'were'} not sent to the AI because it could not be
-          redacted safely. Type those fields yourself.
+          {withheldPages.length === 1
+            ? `We could not hide the private numbers on page ${withheldPages[0]}, so we did not read it. Type what it shows yourself.`
+            : `We could not hide the private numbers on pages ${withheldPages.join(', ')}, so we did not read them. Type what they show yourself.`}
         </p>
       )}
       <p className="m-0 text-tiny text-ink-3" aria-live="polite">
         {manual
-          ? 'Type each field from these lines. '
+          ? 'Type each amount from these lines. '
           : !linked
             ? 'Find each value in these lines. '
             : selectedLabel !== null &&
               (hasLine ? (
                 <>
-                  Highlighted line: <strong>{selectedLabel}</strong>.{' '}
+                  <strong>{selectedLabel}</strong> is highlighted.{' '}
                 </>
               ) : (
-                <>{selectedLabel} has no line of its own in the source. </>
+                <>{selectedLabel} is not on a line of its own. </>
               ))}
-        {sentToAi
-          ? 'Redaction ran before extraction.'
-          : 'These lines were redacted but not sent to the AI.'}{' '}
-        The original file is deleted when you continue.
+        Private numbers are hidden. We delete the file when you continue.
       </p>
     </Card>
   );

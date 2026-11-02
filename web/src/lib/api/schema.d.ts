@@ -1539,6 +1539,8 @@ export interface components {
       replaced_by_id: string | null;
       status: components['schemas']['DocumentStatus'];
       status_reason: components['schemas']['DocumentStatusReason'] | null;
+      /** Superseded */
+      superseded: boolean;
       type: components['schemas']['DocumentType'];
       /**
        * Uploaded At
@@ -1567,6 +1569,8 @@ export interface components {
       replaced_by_id: string | null;
       status: components['schemas']['DocumentStatus'];
       status_reason: components['schemas']['DocumentStatusReason'] | null;
+      /** Superseded */
+      superseded: boolean;
       type: components['schemas']['DocumentType'];
       /**
        * Uploaded At
