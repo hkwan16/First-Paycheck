@@ -281,15 +281,16 @@ or checked for a phone.
   `useToday()` (null on the server, so nothing reads the clock while rendering).
   The Transactions card and the diagram's category popovers list the period the summary shows
   (spec 003 rule 17a): `useTransactions(periodFilters(period))`, the chosen period or the dates
-  `GET /cashflow` answered its default with (nothing until then; `NEWEST_TRANSACTIONS`, no dates,
-  if the cash flow fails). `SpendingScreen` picks the filters and hands them to the card, whose
+  `GET /cashflow` answered its default with (nothing until then; `NEWEST_SPENDING`, no dates,
+  if the cash flow fails). Both ask `cash_accounts_only=true`, so the list holds only rows on the
+  accounts the totals read (issue 200: loan ledgers sat unmarked under totals that left them out). `SpendingScreen` picks the filters and hands them to the card, whose
   `null` means not known yet, as the hook's does. Both build the same filters, so they share one
   cached list; setup progress reads `NEWEST_TRANSACTIONS`.
   `useRecurring()` lists recurring charges; `useUpdateRecurring()` PATCHes `user_status` or
   `name` optimistically, with rollback.
   The summary reads only the account kinds in `account_kinds_counted` (checking, savings,
-  credit; spec 007 rule 21a): the summary card names only those accounts, a category's popover
-  lists only their rows, and `ledgerNote` says how many loan, investment and retirement rows
+  credit; spec 007 rule 21a): the summary card names only those accounts, the list and a
+  category's popover hold only their rows (the API filters them), and `ledgerNote` says how many loan, investment and retirement rows
   `ledger_rows_skipped` left out (on Spending and the check-in's cash flow). A share of income the
   API sends as null (no income, or one over 1,000%: rule 25) reads `NO_SHARE`, "n/a, income too
   small to compare", through `shareText` (`spending-format.ts`); never work one out.
@@ -776,7 +777,8 @@ for the amounts over one SVG of cubic bands. Not d3-sankey and not a chart libra
 
 - **Layout** (`layoutCashFlow(flow, containerWidth)`) is pure geometry: four columns (gross pay;
   withholding lines and take-home; buckets; categories), node heights from a scale fixed by a
-  400 px target for the tallest node: gross pay (income when there is no confirmed stub), or a
+  240 px target for the tallest node (every column stacked from the top, so the diagram is as tall
+  as its tallest column, issue 201): gross pay (income when there is no confirmed stub), or a
   bucket or category when spending outran that income (the Plaid sandbox deposits $4.22 in a
   month that spends $1,689.63). No scale, and no badge, without pay or income to draw from. The
   "1 px is about $N" badge is computed, not hand-tuned. Amounts are placed, never added or

@@ -72,13 +72,15 @@ test('a new user goes from sign-in to a verified 401(k) explanation', async ({ p
       // rows may all be in the month so far.
       const table = await showPeriodWithTransactions(page);
       expect(await table.getByRole('row').count()).toBeGreaterThan(2);
-      await expect(table.getByText(/^(Rule|You|AI( · \d+%)?|Not labeled)$/).first()).toBeVisible();
+      await expect(
+        table.getByText(/^(Known merchant|You|Our guess|Guess, check it|No category)$/).first(),
+      ).toBeVisible();
 
       const select = table.getByRole('combobox').first();
       const target = (await select.inputValue()) === 'entertainment' ? 'Dining' : 'Entertainment';
       await select.selectOption(target);
       await expect(select).toHaveValue(target.toLowerCase());
-      await expect(page.getByText(/^Saved as a rule\./)).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText(/^Saved\./)).toBeVisible({ timeout: 15_000 });
     });
   } else {
     test.info().annotations.push({ type: 'skipped steps', description: NO_PLAID_SANDBOX });
@@ -136,7 +138,7 @@ test('a new user goes from sign-in to a verified 401(k) explanation', async ({ p
     await waitForHydration(page);
     const summary = page.getByRole('region', { name: /Your month so far|pay stubs?$/ });
     await expect(summary).toBeVisible();
-    for (const tile of ['Income', 'Essentials', 'Flexible', 'Savings']) {
+    for (const tile of ['Income deposited', 'Essentials', 'Flexible', 'Savings']) {
       await expect(summary.getByText(tile, { exact: true })).toBeVisible();
     }
   });

@@ -32,7 +32,7 @@ describe('CashFlowSankey', () => {
     expect(node('Federal tax $595.52')).toBeInTheDocument();
     expect(node('Take-home $3,992.08')).toBeInTheDocument();
     expect(node('Essentials $1,823.25')).toBeInTheDocument();
-    expect(node('Not yet spent $1,618.94')).toBeInTheDocument();
+    expect(node('Left over $1,618.94')).toBeInTheDocument();
     expect(node('Phone and internet $70.00')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /\$/ })).toHaveLength(22);
   });
@@ -55,12 +55,7 @@ describe('CashFlowSankey', () => {
 
   it('heads the columns', () => {
     renderSankey();
-    for (const heading of [
-      'Pay stubs',
-      'Withheld and deducted',
-      'Take-home buckets',
-      'Categories',
-    ]) {
+    for (const heading of ['Pay stubs', 'Taken out of pay', 'Spent and saved', 'Categories']) {
       expect(screen.getByText(heading)).toBeInTheDocument();
     }
   });

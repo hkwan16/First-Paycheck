@@ -31,7 +31,7 @@ function accountsText(accounts: readonly Account[], kinds?: readonly AccountKind
   return list.format([...byInstitution].map(([name, masks]) => `${name} ${list.format(masks)}`));
 }
 
-/** "Not yet spent: $1,618.94 ..." or, when spending ran past income, by how much. */
+/** "Left over: $1,618.94, still in your accounts.", or that spending ran past income. */
 function LeftOver({ cents }: { cents: number }) {
   const amount = (
     <strong className="text-ink">
@@ -39,9 +39,9 @@ function LeftOver({ cents }: { cents: number }) {
     </strong>
   );
   return cents < 0 ? (
-    <>Spent more than came in: {amount} from your accounts.</>
+    <>Left over: {amount}. You spent more than came in.</>
   ) : (
-    <>Not yet spent: {amount} is still in your accounts.</>
+    <>Left over: {amount}, still in your accounts.</>
   );
 }
 
@@ -96,10 +96,10 @@ export function SummaryCard({ summary, updating, error, onRetry, picker }: Summa
       <div className="grid grid-cols-4 gap-3 max-wide:grid-cols-2">
         <StatTile
           tone="plum"
-          label="Income"
+          label="Income deposited"
           loading={loading}
           value={summary && <Money cents={summary.income_cents} />}
-          sub={summary && 'Deposits labeled income'}
+          sub={summary && 'Pay and other income into your accounts'}
         />
         <StatTile
           tone="blue"

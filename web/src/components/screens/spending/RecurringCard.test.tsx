@@ -49,7 +49,7 @@ describe('RecurringCard', () => {
         .getAllByRole('listitem')
         .map((li) => li.getAttribute('aria-label')),
     ).toEqual(['Hulu', 'Lemonade Renters', 'Parkline Apartments', 'Spotify', 'Verizon Wireless']);
-    expect(row('Spotify')).toHaveTextContent('Monthly · last Oct 5');
+    expect(row('Spotify')).toHaveTextContent('Monthly · last charged Oct 5');
     expect(row('Spotify')).toHaveTextContent('$11.99');
     expect(row('Spotify')).toHaveTextContent('Active');
     expect(row('Lemonade Renters')).toHaveTextContent('New');
@@ -161,7 +161,7 @@ describe('RecurringCard', () => {
     renderWithProviders(<RecurringCard />);
     expect(
       await within(card()).findByText(
-        'Nothing recurring yet. A charge shows up here once it repeats on a weekly, monthly or yearly rhythm.',
+        'Nothing repeats yet. A charge shows up here once it comes weekly, monthly or yearly.',
       ),
     ).toBeInTheDocument();
   });

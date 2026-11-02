@@ -12,13 +12,14 @@ import {
 } from '@/components/sankey';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
+import { Money } from '@/components/ui/Money';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Swatch, type SwatchColor } from '@/components/ui/Swatch';
 import { periodFilters, useAccounts, useTransactions } from '@/lib/api/hooks';
 import type { CashFlow } from '@/lib/api/types';
 import { formatMoney } from '@/lib/money';
 import { FlowDetails } from './FlowDetails';
-import { monthName, periodText } from './spending-format';
+import { monthName, payStubsText, periodText } from './spending-format';
 
 const LEGEND: readonly [SwatchColor, string][] = [
   ['plum', 'Gross pay and 401(k)'],
@@ -27,8 +28,29 @@ const LEGEND: readonly [SwatchColor, string][] = [
   ['ink-2', 'Take-home'],
   ['blue', 'Essentials'],
   ['teal', 'Savings'],
-  ['flow-idle', 'Not yet spent'],
+  ['flow-idle', 'Left over'],
 ];
+
+/**
+ * Where each half of the diagram comes from (spec 010 rule 5a, issue 200):
+ * the pay stubs give gross pay to take-home, the deposits give the spending,
+ * so the summary's income and the diagram's gross pay read as two things.
+ */
+function Sources({ flow }: { flow: CashFlow }) {
+  const deposits = <Money cents={flow.spending.income_cents} />;
+  return flow.withholding.paycheck_count > 0 ? (
+    <>
+      Gross pay to take-home comes from {payStubsText(flow.withholding.paycheck_count)}. Spending
+      comes from the {deposits} deposited in your accounts, which can include pay with no confirmed
+      stub.
+    </>
+  ) : (
+    <>
+      Spending comes from the {deposits} of income deposited in your accounts. Confirm a pay stub to
+      see what comes out of your pay before payday.
+    </>
+  );
+}
 
 /** Nothing to draw: no confirmed pay stub and no transaction in the period. */
 const isEmpty = (flow: CashFlow) =>
@@ -58,10 +80,6 @@ export function CashFlowCard({ flow, updating }: CashFlowCardProps) {
   const accounts = useAccounts().data;
   const masks = useMemo(
     () => new Map((accounts ?? []).map((a) => [a.id, a.mask] as const)),
-    [accounts],
-  );
-  const kinds = useMemo(
-    () => new Map((accounts ?? []).map((a) => [a.id, a.kind] as const)),
     [accounts],
   );
 
@@ -103,13 +121,7 @@ export function CashFlowCard({ flow, updating }: CashFlowCardProps) {
         width={width}
         headings={headings}
         renderDetails={(node: FlowNode) => (
-          <FlowDetails
-            node={node}
-            flow={flow}
-            transactions={transactions}
-            masks={masks}
-            kinds={kinds}
-          />
+          <FlowDetails node={node} flow={flow} transactions={transactions} masks={masks} />
         )}
       />
     );
@@ -122,30 +134,24 @@ export function CashFlowCard({ flow, updating }: CashFlowCardProps) {
           <h2 id="flow-title" className="m-0">
             {month ? `Where each dollar of ${month} pay went` : 'Where each dollar of pay went'}
           </h2>
-          <p className="m-0 text-small text-ink-3">
-            Gross pay to take-home, take-home to buckets, buckets to categories. Band thickness is
-            proportional to dollars; the categories follow the fixes you make below.
-          </p>
+          {flow && !isEmpty(flow) && (
+            <p className="m-0 text-small text-ink-3">
+              <Sources flow={flow} />
+            </p>
+          )}
         </div>
         {scale && <Badge>Scale: 1 px is about {scaleText(scale.centsPerPx)}</Badge>}
       </div>
       <div ref={ref}>{body}</div>
       {flow && !isEmpty(flow) && (
-        <>
-          <ul aria-label="Legend" className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1.5 p-0">
-            {LEGEND.map(([color, label]) => (
-              <li key={label} className="inline-flex items-center gap-1.5 text-small text-ink-2">
-                <Swatch color={color} />
-                {label}
-              </li>
-            ))}
-          </ul>
-          <p className="m-0 text-tiny text-ink-3">
-            Categories are lighter shades of their bucket&apos;s color. Withholding comes from your
-            confirmed pay stubs; buckets and categories come from the transactions below. Every
-            amount is also in the summary and the table.
-          </p>
-        </>
+        <ul aria-label="Legend" className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1.5 p-0">
+          {LEGEND.map(([color, label]) => (
+            <li key={label} className="inline-flex items-center gap-1.5 text-small text-ink-2">
+              <Swatch color={color} />
+              {label}
+            </li>
+          ))}
+        </ul>
       )}
     </Card>
   );

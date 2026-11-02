@@ -32,6 +32,7 @@ import {
   sampleExplanation,
   sampleFallbackExplanation,
 } from '../fixtures/decisions';
+import { ACCOUNT_KINDS_COUNTED } from '../fixtures/cashflow';
 import { canReadAgain, samplePayStub, sampleValues } from '../fixtures/documents';
 import { sampleJob, SAMPLE_NOW, SAMPLE_SYNCED_AT } from '../fixtures/sample';
 import { checkinHandlers } from './checkin-handlers';
@@ -255,6 +256,12 @@ export function platypusAccounts(itemId: string): Account[] {
 const encodeCursor = (offset: number) => btoa(String(offset));
 const decodeCursor = (cursor: string) => Number(atob(cursor));
 
+/** On an active account the spending summary reads (`cash_accounts_only`, spec 003 rule 17). */
+function onCashAccount(txn: Transaction): boolean {
+  const account = db.accounts.find((a) => a.id === txn.account_id);
+  return account !== undefined && account.is_active && ACCOUNT_KINDS_COUNTED.includes(account.kind);
+}
+
 function listTransactions(url: URL) {
   const q = url.searchParams;
   const limit = Number(q.get('limit') ?? 50);
@@ -264,7 +271,8 @@ function listTransactions(url: URL) {
       (!q.get('account_id') || t.account_id === q.get('account_id')) &&
       (!q.get('category') || t.category === q.get('category')) &&
       (!q.get('start') || t.posted_at >= q.get('start')!) &&
-      (!q.get('end') || t.posted_at <= q.get('end')!),
+      (!q.get('end') || t.posted_at <= q.get('end')!) &&
+      (q.get('cash_accounts_only') !== 'true' || onCashAccount(t)),
   );
   const items = rows.slice(offset, offset + limit);
   const more = offset + limit < rows.length;

@@ -9553,6 +9553,18 @@
             }
           },
           {
+            "description": "Only rows on active checking, savings and credit accounts, the ones the spending summary reads",
+            "in": "query",
+            "name": "cash_accounts_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Only rows on active checking, savings and credit accounts, the ones the spending summary reads",
+              "title": "Cash Accounts Only",
+              "type": "boolean"
+            }
+          },
+          {
             "in": "query",
             "name": "limit",
             "required": false,
