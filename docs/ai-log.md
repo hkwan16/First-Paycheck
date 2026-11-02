@@ -576,4 +576,28 @@ Every entry has a dated heading and these fields, in this order. A field that do
 
 **Fix:** As above.
 
+## 2026-11-01: a second confirmed copy of a pay stub counted its pay twice (issue 190)
+
+**Task:** On production, two confirmed copies of the synthetic Acme stub made October's Spending read "2 pay stubs" and "Gross pay, 2 stubs" at $5,416.66, with $595.52 federal tax; locally the e2e user reached "Gross pay, 5 stubs". Find every reader of confirmed stubs and make a stub confirmed twice count once.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Reproduce end to end on the local real-API stack first, decide the semantics in spec 005 (supersede, or refuse the confirm) before code, failing tests first, then the fix at the root cause.
+
+**What it produced:** Spec 005 rules 22a-22e: two confirmed stubs are the same paycheck when the employer (compared without spacing or case), pay date and pay period all match; a newer confirm supersedes the current stub of the same paycheck and any current stub of a document it replaced, along the replace chain; nothing is deleted. Migration `0020_pay_stub_superseded_by` (`employer_key` generated column, `superseded_by_id` deferred same-user self reference, partial unique index `uq_pay_stubs_current_paycheck`, `UPDATE (superseded_by_id)` grant and the `pay_stubs_supersede_only` AFTER trigger, a backfill in confirm order). `db/pay_stubs.py` (`add_confirmed` with a per-user advisory lock, `current_pay_stubs`, `latest_pay_date`, `paid_between_count`) and every reader moved onto it: `GET /pay-stubs`, `newest_pay_stub` (explain and staleness), `GET /cashflow` and the check-in's cash flow, `paycheck_count`, the next pay date's anchor, `GET /plan` and its PDF, and the check-in facts. A boundary test that fails on any other query of `PayStub`. Integration tests per rule and per reader, a migration test, and a second test in `web/e2e/confirm.spec.ts`.
+
+**What was wrong:**
+- Refusing the duplicate confirm was considered and rejected: the document would sit in review until retention expired it, and a corrected copy (a typo fixed) could not be confirmed without Replace. Superseding keeps both rows on record and lets the newest confirm lead, like decision versions.
+- Replace had the same bug in another form: a confirmed replacement with corrected dates was not "the same paycheck", so both counted. Rule 22b now also supersedes along the replace chain.
+- The newest-stub readers looked correct with plain copies (both rows are identical), so their tests use a Replace that corrected a stub dated later (2026-10-31, 5% to the 401(k)); before the fix the plan, the explanation's rate, the check-in facts and the election check's due date all read the superseded stub.
+- First trigger draft was BEFORE UPDATE comparing `to_jsonb(NEW)` with `to_jsonb(OLD)`; in a BEFORE trigger the generated columns of NEW are still null, so every legal supersede was refused. It is an AFTER trigger now.
+- The backfill first ran after the deferred foreign key and trigger existed, and `CREATE INDEX` then failed on pending trigger events in the same transaction; the backfill now runs before both, and adding the foreign key validates its rows.
+- The test database had already been migrated with the first trigger, and `upgrade head` was a no-op; the database had to be recreated to pick up the corrected revision.
+- The boundary check first flagged a docstring naming ``pay_stubs``; it now looks for SQL that reads the table.
+- A docstring change on `list_pay_stubs` changed `api/openapi.json`; `make types` regenerated it.
+
+**How it was caught:** The production screens (user report); a Playwright reproduction on the local stack confirming the Acme PDF twice ("October 1 to 31 · 2 pay stubs", "Gross pay, 2 stubs $5,416.66", "Federal tax $595.52"); 19 new integration tests and the boundary test failing before the fix; the same reproduction after it ("1 pay stub", "Gross pay, 1 stub $2,708.33", "Federal tax $297.76").
+
+**Fix:** As above, in the subagent's branch.
+
 **Time saved or lost:** Not measured.
