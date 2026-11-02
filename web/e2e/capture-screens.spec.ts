@@ -42,12 +42,14 @@ test('04, 05, 07 and 08 the Spending screen', async ({ page }) => {
   const transactions = page.getByRole('region', { name: 'Transactions' });
   await shot(transactions, '04-spending-transactions');
 
-  const select = table.getByRole('combobox').first();
-  const current = await select.inputValue();
-  const options = await select
-    .locator('option')
-    .evaluateAll((all) => all.map((o) => (o as HTMLOptionElement).value));
-  const target = options.find((o) => o && o !== current) ?? current;
+  // A fix is a rule for its merchant, which never goes back to the AI. Fix a
+  // merchant an earlier run fixed ("You") when there is one, so reruns do not
+  // take the AI's labels away one merchant at a time; it toggles between two
+  // categories, as spending.spec.ts does.
+  const rows = table.getByRole('row');
+  const yours = rows.filter({ has: page.getByText('You', { exact: true }) });
+  const select = ((await yours.count()) > 0 ? yours : rows.nth(1)).getByRole('combobox').first();
+  const target = (await select.inputValue()) === 'entertainment' ? 'Dining' : 'Entertainment';
   await select.selectOption(target);
   await expect(page.getByText(/^Saved as a rule\./)).toBeVisible({ timeout: 15_000 });
   await shot(transactions, '05-spending-rule-notice');
@@ -74,9 +76,18 @@ test('09, 10 and 11 the Decisions and Why screens', async ({ page }) => {
   await card.getByRole('link', { name: 'Why this decision' }).click();
   await expect(page).toHaveURL(/\/why\/[^/]+$/);
   await settled(page);
-  const write = page.getByRole('button', { name: 'Write the explanation' });
-  if (await write.isVisible()) {
-    await write.click();
+  // The new version has no explanation yet: write it and wait for its answer
+  // (verified with a model, the calculator's result if the verifier refused
+  // the draft, or "not available" without a model).
+  const none = page.getByRole('region', { name: 'No explanation yet' });
+  const verified = page.getByText('Verified against calculator');
+  const fallback = page.getByText('Could not verify the explanation');
+  await expect(verified.or(fallback).or(none)).toBeVisible({ timeout: 60_000 });
+  if (await none.isVisible()) {
+    await none.getByRole('button', { name: 'Write the explanation' }).click();
+    await expect(
+      verified.or(fallback).or(page.getByText('Explanations are not available yet.')),
+    ).toBeVisible({ timeout: 180_000 });
     await settled(page);
   }
   await shot(page, '11-why-verified');

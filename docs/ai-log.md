@@ -527,3 +527,31 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above, in the subagent's branch.
 
 **Time saved or lost:** Not measured.
+
+## 2026-11-01: the alpha demo recording, and a capture that works with the model live
+
+**Task:** The alpha document needs a short demo and production screenshots taken now that production has a working model key. The October 22 capture assumed no model: it typed every pay stub field, reused whatever stub was waiting for review, and set roles on `user_good`'s account names, which the production e2e account (the dynamic sandbox user) does not have.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session (which took the production screenshots itself with Claude in Chrome).
+
+**Prompt or skill:** Read the capture config and the real-API specs it reuses, then build a recording spec and verify both against the local real-API stack only (`scripts/e2e_stack.py` on its own database and ports, a production build of the web app pointed at it, a synthetic October CSV for transactions because the worktree has no Plaid keys), twice in a row over the same database.
+
+**What it produced:** `capture-demo.spec.ts` and `support/demo.ts`: one 1280x720 `recordVideo` window from the saved session, a caption per scene and an animated pointer through Playwright 1.64's screencast overlays, the stub uploaded and read off camera, the 401(k) explanation written off camera while the recording shows the health plan and the W-4, then ffmpeg to H.264 (`+faststart`, CRF 24). Locally: about 95 seconds and 4 MB. From production on November 1: 111 seconds and 4.6 MB. `support/capture.ts` gained `uploadAcmeStub` (follows the new document by the id `POST /docs` returned, replacing a stub left waiting) and `confirmAcmeFields` (reads the proposal from the screen's own request, types only what is missing or wrong, confirms the rest at once), which `capture-setup.spec.ts` now uses too. The capture config skips the issue 172 test and documents the production commands, with and without the saved session.
+
+**What was wrong:**
+- The capture's `settled` waited a minute and failed on Spending: after a client-side navigation Next keeps the previous page in the DOM, hidden, and the Confirm screen's button was still `aria-busy` in it. It now counts busy regions on screen only.
+- A third run in the same hour failed after two minutes waiting for the upload's response: the API's limit of 10 uploads an hour had answered 429, and the helper waited only for a successful one. It now fails at once with the status, the API's message and the minutes until the next hour. A full capture run makes two uploads (capture-setup and the demo).
+- Clicking the 401(k) slider to focus it moved its thumb to the click point, so the saved rate was arbitrary (8%); it is focused, then moved from the keyboard.
+- Each confirmed copy of the Acme stub is counted again: the local e2e user's October read "Gross pay, 5 stubs" with every pay date Oct 15. Every capture or demo run adds one more confirmed copy. Not changed here (it is a product question whether a second confirmed stub for the same employer and pay date should replace the first); the demo opens the Essentials popover rather than the gross pay one.
+- On production, three more problems, each fixed by the main session:
+  - The first run waited a minute on accounts and failed. The saved session had expired, so the page was the sign-in form, and the guard missed it twice over: it ran after the minute's wait, and its pattern `/\/setup\/link$/` matched `/sign-in?next=/setup/link`. It now opens the page first and compares the path, so an expired session fails at once and says to run the setup project.
+  - With a fresh session, the accounts never finished loading. Render had put the API to sleep, and waking it took over 80 s, more than `openLink`'s 60 s. Its first wait, on the region's `aria-busy`, had never checked anything, because the region never sets it. It now makes one wait, on the loading rows, of 120 s.
+  - The W-4 scene waited for "If you change nothing", which production never showed. The Acme stub is semimonthly and the account's plan details are biweekly, and the card makes that comparison only when the two share a pay schedule. The scene now shows the calculator's result, which every W-4 card has.
+
+  Two more confirmed copies of the stub made October's cash flow read "Gross pay, 2 stubs" at $5,416.66 on production. That bug is now in the backlog.
+
+**How it was caught:** The failing run's page snapshot and the busy element's HTML; frames pulled from the MP4 with ffmpeg and looked at.
+
+**Fix:** As above.
+
+**Time saved or lost:** Not measured.
