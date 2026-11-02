@@ -601,3 +601,26 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above, in the subagent's branch.
 
 **Time saved or lost:** Not measured.
+
+## 2026-11-01: check-in findings repeated after a newer copy of a pay stub, and one stub change read as six (issues 194, 202, 209)
+
+**Task:** On production, November's check-in went from 7 findings to 13 after the Acme stub was confirmed again: six findings twice plus one, while the status line said "This page is up to date". One stub change also showed as six cards, each with a blue primary Done. Fix both and reword every check-in string for a first-job reader.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** The shared usability brief: decide the model in spec 015 first, reproduce end to end and keep the reproduction as a Playwright regression, failing tests first, wording rules for every check-in string.
+
+**What it produced:** Spec 015's paycheck id (the first copy of a paycheck along the supersede chain, `db/pay_stubs.py:paycheck_ids`), so `pay_change` and `election_mismatch` keys name the paycheck, not the row, and a newer copy updates the same finding in place. One `pay_change` per paycheck carries gross pay and every deduction line that moved (`deductions`); `deduction_change` is gone. Rule 10.4 retracts an unhandled `pay_change` about a stub that is no longer current. Migration `0021_paycheck_change` folds stored deduction changes into their pay change, merges the duplicates copies made (open or completed check-ins), and drops the label. `POST /check-ins`' status line now says what the run did from the job's `inserted` and `retracted` counts. The web shows one paycheck table per change, default-weight "Mark as done" and Dismiss, and new wording across the check-in screens, net worth and holdings. Unit, integration, migration, eval and e2e tests (`a pay stub confirmed again is still one paycheck change (issue 194)`).
+
+**What was wrong:**
+- Keys used the newest stub's row id, and rule 10.4 retracted only recurring findings, so every confirmed copy added a new set of pay findings and kept the old ones.
+- The status line printed "up to date" for any refresh, whatever the run inserted.
+- Ordering copies by `created_at` to find the first one failed in tests, where one transaction gives every row the same `now()`; the chain itself (the stub that superseded nothing) decides it, with `created_at, id` only to break the tie when one confirm superseded two stubs.
+- The first migration test's pay change had no gross change, which the downgrade deletes by design; it now uses a raise.
+- `Result.tuples()` is deprecated in SQLAlchemy 2.1 and the warning is an error under the test settings; the migration reads rows directly.
+
+**How it was caught:** A Playwright reproduction on the local stack before the fix: "401(k) went from $0.00 to $108.33." twice, "0 of 5 handled", and "Checked again just now. This page is up to date."; the new tests failing with the fix reverted; the same Playwright test passing after it.
+
+**Fix:** As above, in the subagent's branch.
+
+**Time saved or lost:** Not measured.
