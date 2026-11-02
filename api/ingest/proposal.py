@@ -32,7 +32,7 @@ from llm.schemas import (
 )
 
 REDACTED_MARK = "[REDACTED]"
-NOT_FOUND = "Not found on the document"
+NOT_FOUND = "Type it if the document shows it."
 NO_OTHER_DEDUCTIONS = "No other deductions listed"
 OTHER_DEDUCTIONS = "other_deductions_cents"
 DEDUCTION_KINDS = frozenset({"tax", "pre_tax_deduction", "post_tax_deduction"})
@@ -300,7 +300,7 @@ def _other_deductions(spec: FieldSpec, line_items: Sequence[LineItem]) -> Propos
         item for item in line_items if item.kind in DEDUCTION_KINDS and item.field is None
     ]
     note = (
-        "Sum of: " + ", ".join(item.label for item in unassigned)
+        f"From {_and_list([item.label for item in unassigned])}"
         if unassigned
         else NO_OTHER_DEDUCTIONS
     )
@@ -313,6 +313,12 @@ def _other_deductions(spec: FieldSpec, line_items: Sequence[LineItem]) -> Propos
         kind=spec.kind,
         role=spec.role,
     )
+
+
+def _and_list(labels: Sequence[str]) -> str:
+    """ "A", "A and B", "A, B and C"."""
+    *rest, last = labels
+    return f"{', '.join(rest)} and {last}" if rest else last
 
 
 def _plan(plan: PlanExtraction) -> PlanProposal:
