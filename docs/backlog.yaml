@@ -1959,4 +1959,5 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: High
-    status: todo
+    status: done
+    # Fixed November 1: spec 005 rules 22a-22e. A newer confirm of the same paycheck supersedes the old stub; every reader goes through db/pay_stubs.py.
