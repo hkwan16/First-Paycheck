@@ -135,7 +135,7 @@ Bring a user's bank data into First Paycheck and keep it current. A linked insti
 | 11 | `test_a_new_item_waits_for_its_transactions` | Item linked 1 s before `now`; the first page raises `TransactionsNotReady("INITIAL_UPDATE_COMPLETE")` | `RetryLater(after_seconds=120)`; no accounts, transactions or snapshots written; cursor still null |
 | 12 | `test_an_item_past_the_window_syncs_without_transactions` | The same answer, item linked 5 minutes before `now` | `synced`, accounts and balances written, 0 transactions, cursor still null |
 | 13 | `test_each_page_is_logged` | Example 3 | Two `transactions page` lines: page 1 added 2, modified 0, removed 0, `has_more` true; page 2 added 1, modified 1, removed 1, `has_more` false; both with the provider's `update_status` |
-| 14 | `test_a_just_linked_item_never_syncs_empty` (live, `plaid_sandbox`) | Link `user_good`, run the sync every second until it stops raising `RetryLater` | `synced` with at least one transaction. Before rule 9a it ended `synced` with 0 transactions in 2 of 3 runs |
+| 14 | `test_a_just_linked_item_never_syncs_empty` (live, `plaid_sandbox`) | Link `user_good`, run the sync every second until it stops raising `RetryLater` | `synced` with at least one transaction. Before rule 9a a sandbox sync polled every second ended `synced` with 0 transactions in 3 of 6 runs |
 
 Arithmetic for example 1: `89.4 * 100 = 8940`; `0.005 * 100 = 0.5`, a tie, rounds away from zero to `1`; `4.335 * 100 = 433.5` to `434`; `-1234.567 * 100 = -123456.7` to `-123457`. Because the JSON is read as `Decimal`, `4.335` is exactly `4.335`, not `4.33499...` as a binary float.
 
