@@ -4,7 +4,11 @@ import Link from 'next/link';
 import type { ComponentPropsWithRef, MouseEvent, ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 
-/** From the mockup's `.btn`, `.btn-primary`, `.btn-confirmed`, `.btn-sm`, `.btn-block`. */
+/**
+ * From the mockup's `.btn`, `.btn-primary`, `.btn-confirmed`, `.btn-sm`, `.btn-block`.
+ * `destructive` is for an action that deletes something: red, so it never
+ * reads as the safe choice beside the button that keeps things as they are.
+ */
 export const buttonClasses = cva(
   [
     'relative inline-flex items-center justify-center gap-2 rounded-control border-0',
@@ -22,6 +26,8 @@ export const buttonClasses = cva(
         primary: 'bg-blue text-white hover:bg-blue-deep hover:text-white',
         confirmed:
           'bg-green-tint text-green-text hover:bg-[color-mix(in_srgb,var(--color-green)_8%,var(--color-green-tint))] hover:text-green-text',
+        destructive:
+          'bg-red-tint text-red-text hover:bg-[color-mix(in_srgb,var(--color-red)_10%,var(--color-red-tint))] hover:text-red-text',
       },
       size: {
         md: 'min-h-11 px-4 text-control',
@@ -42,7 +48,7 @@ interface StyleProps {
 
 /** A toggle in the confirmed style must say whether it is pressed. */
 type VariantProps =
-  | { variant?: 'default' | 'primary'; pressed?: boolean }
+  | { variant?: 'default' | 'primary' | 'destructive'; pressed?: boolean }
   | { variant: 'confirmed'; pressed: boolean };
 
 type NativeButtonProps = Omit<

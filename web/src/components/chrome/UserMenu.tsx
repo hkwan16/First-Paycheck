@@ -16,7 +16,8 @@ export interface UserMenuProps {
 
 /**
  * The header's user chip as a disclosure button: it opens a small panel with
- * "Sign out" and "Delete account". Escape or a click elsewhere closes it.
+ * "Sign out" and, below a rule and in the destructive style, "Delete account"
+ * (issue 205). Escape or a click elsewhere closes it.
  * Sign-out ends only this browser's session, then fully navigates to /sign-in
  * so no state from the session survives. Delete account swaps the panel for
  * an in-page confirmation (`DeleteAccountConfirm`); closing the menu drops it.
@@ -122,7 +123,14 @@ export function UserMenu({ label }: UserMenuProps) {
             <Button block loading={signingOut} onClick={signOut}>
               Sign out
             </Button>
-            <Button ref={deleteRef} block disabled={signingOut} onClick={() => setDeleting(true)}>
+            <hr className="m-0 border-0 border-t border-line" />
+            <Button
+              ref={deleteRef}
+              variant="destructive"
+              block
+              disabled={signingOut}
+              onClick={() => setDeleting(true)}
+            >
               Delete account
             </Button>
             {error && (
