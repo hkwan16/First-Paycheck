@@ -17,17 +17,19 @@ export interface LinkScreenProps {
 /**
  * Setup step 1, from docs/mockup/Link.dc.html: link bank accounts and set
  * their roles, then add documents. The next step opens once an account
- * exists: Confirm when a document is waiting, otherwise Spending.
+ * exists: Confirm when a document is waiting, otherwise Spending. Until the
+ * accounts have loaded it is held without asking for an account (issue 196).
  */
 export function LinkScreen({ showSandboxLink = features.e2e }: LinkScreenProps) {
-  const accounts = useAccounts().data ?? [];
+  const accounts = useAccounts();
   const firstDocument = newestReviewable(useDocuments().data);
+  const noAccounts = accounts.isSuccess && accounts.data.length === 0;
 
   let next: StepFooterProps['next'];
-  if (accounts.length === 0) {
+  if (!accounts.isSuccess || noAccounts) {
     next = { label: 'Continue to spending', disabled: true };
   } else if (firstDocument) {
-    next = { label: 'Review extracted fields', href: confirmRoute(firstDocument.id) };
+    next = { label: 'Check what we read', href: confirmRoute(firstDocument.id) };
   } else {
     next = { label: 'Continue to spending', href: '/setup/spending' };
   }
@@ -36,7 +38,7 @@ export function LinkScreen({ showSandboxLink = features.e2e }: LinkScreenProps) 
     <>
       <PageTitle
         title="Link your accounts and add your documents"
-        lead="Both feed one pipeline. Nothing here is sent to an AI model; only the redacted document pages are, on the next step."
+        lead="Your bank shows where your money goes. Your pay stub shows what comes out of each paycheck."
       />
       <CardErrorBoundary title="Bank accounts">
         <AccountsCard showSandboxLink={showSandboxLink} />
@@ -44,10 +46,7 @@ export function LinkScreen({ showSandboxLink = features.e2e }: LinkScreenProps) 
       <CardErrorBoundary title="Documents">
         <DocumentsCard />
       </CardErrorBoundary>
-      <StepFooter
-        next={next}
-        status={accounts.length === 0 ? 'Link an account to continue' : undefined}
-      />
+      <StepFooter next={next} status={noAccounts ? 'Link an account to continue' : undefined} />
     </>
   );
 }

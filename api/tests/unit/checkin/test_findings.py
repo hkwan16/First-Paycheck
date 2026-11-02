@@ -13,7 +13,7 @@ from checkin.findings import (
     FINDERS,
     Affects,
     BalanceFact,
-    DeductionChangePayload,
+    DeductionLine,
     ElectionMismatchPayload,
     Finding,
     FindingPayload,
@@ -23,7 +23,6 @@ from checkin.findings import (
     UpcomingDeadlinePayload,
     all_findings,
     calendar_affects,
-    deduction_change,
     election_mismatch,
     goal_off_pace,
     pay_change,
@@ -49,6 +48,7 @@ from tests.unit.checkin.scenarios import (
     PERIOD,
     S1,
     S2,
+    S2A,
     S3,
     charge,
     event,
@@ -261,12 +261,11 @@ def test_each_recurring_finder_reports_only_its_status() -> None:
     ]
 
 
-# ---------------------------------------------------------------- pay and deductions
+# ---------------------------------------------------------------- paycheck changes
 
 
 def test_raise() -> None:
-    newest = facts(pay_stubs=[stub(S3), stub(S1)])
-    found = only(pay_change(newest))
+    found = only(pay_change(facts(pay_stubs=[stub(S3), stub(S1)])))
     assert found.severity is FindingSeverity.INFO
     assert found.key == f"pay_change:{S3['id']}"
     payload = found.payload
@@ -274,7 +273,8 @@ def test_raise() -> None:
     assert (payload.gross_change_cents, payload.net_change_cents) == (20_834, 19_241)
     assert (payload.previous_pay_stub_id, payload.previous_gross_cents) == (S1["id"], 270_833)
     assert payload.affects == "w4"
-    assert deduction_change(newest) == []
+    # Social Security and Medicare follow gross; rule 6 lists no line.
+    assert payload.deductions == []
 
 
 def test_pay_cut() -> None:
@@ -291,36 +291,68 @@ def test_pay_change_links_the_w4_decision() -> None:
 
 
 def test_deduction_changes() -> None:
-    found = deduction_change(facts(pay_stubs=[stub(S2), stub(S1)]))
-    assert [f.severity for f in found] == [FindingSeverity.INFO] * 3
-    payloads = [f.payload for f in found]
-    assert all(isinstance(p, DeductionChangePayload) for p in payloads)
-    assert [
-        (p.line, p.previous_cents, p.amount_cents, p.change_cents, p.affects)
-        for p in payloads
-        if isinstance(p, DeductionChangePayload)
-    ] == [
-        ("federal_withholding", 29_776, 21_196, -8_580, "w4"),
-        ("retirement_contribution", 0, 5_417, 5_417, "k401_match"),
-        ("medical_premium", 6_250, 3_125, -3_125, "health_plans"),
+    """Issue 202: one stub's changed lines are one finding, not one each."""
+    found = only(pay_change(facts(pay_stubs=[stub(S2), stub(S1)], k401=K401, health=HEALTH)))
+    assert found.severity is FindingSeverity.INFO
+    assert found.key == f"pay_change:{S2['id']}"
+    assert found.decision_id is None
+    payload = found.payload
+    assert isinstance(payload, PayChangePayload)
+    assert payload.affects == "w4"
+    assert (payload.gross_cents, payload.previous_gross_cents, payload.gross_change_cents) == (
+        270_833,
+        270_833,
+        0,
+    )
+    assert (payload.net_cents, payload.previous_net_cents, payload.net_change_cents) == (
+        205_892,
+        199_604,
+        6_288,
+    )
+    assert payload.deductions == [
+        DeductionLine(
+            line="federal_withholding",
+            label="Federal tax",
+            amount_cents=21_196,
+            previous_cents=29_776,
+            change_cents=-8_580,
+        ),
+        DeductionLine(
+            line="retirement_contribution",
+            label="401(k)",
+            amount_cents=5_417,
+            previous_cents=0,
+            change_cents=5_417,
+        ),
+        DeductionLine(
+            line="medical_premium",
+            label="Health premiums",
+            amount_cents=3_125,
+            previous_cents=6_250,
+            change_cents=-3_125,
+        ),
     ]
-    assert [f.key for f in found] == [
-        f"deduction_change:{S2['id']}:federal_withholding",
-        f"deduction_change:{S2['id']}:retirement_contribution",
-        f"deduction_change:{S2['id']}:medical_premium",
-    ]
-    assert pay_change(facts(pay_stubs=[stub(S2), stub(S1)])) == []
 
 
-def test_deduction_changes_link_current_decisions() -> None:
-    found = deduction_change(facts(pay_stubs=[stub(S2), stub(S1)], k401=K401, health=HEALTH))
-    assert [f.decision_id for f in found] == [None, K401_DECISION, HEALTH_DECISION]
+def test_same_paycheck_twice_is_no_change() -> None:
+    assert pay_change(facts(pay_stubs=[stub(S1, id=S2["id"]), stub(S1)])) == []
 
 
 def test_one_stub_has_nothing_to_compare() -> None:
-    one = facts(pay_stubs=[stub(S2)])
-    assert pay_change(one) == []
-    assert deduction_change(one) == []
+    assert pay_change(facts(pay_stubs=[stub(S2)])) == []
+
+
+def test_keys_name_the_paycheck() -> None:
+    """Spec 015 rule 12, issue 194: a newer copy of a paycheck keeps its findings' keys."""
+    copy = stub(S2, paycheck_id=S2A)
+    found = all_findings(facts(k401=K401, pay_stubs=[copy, stub(S1)]))
+    assert [f.key for f in found] == [
+        f"election_mismatch:k401_match:{K401_DECISION}:{S2A}",
+        f"pay_change:{S2A}",
+    ]
+    for finding in found:
+        assert isinstance(finding.payload, ElectionMismatchPayload | PayChangePayload)
+        assert finding.payload.pay_stub_id == S2["id"]
 
 
 # ---------------------------------------------------------------- upcoming deadlines
@@ -400,9 +432,7 @@ def test_all_findings_runs_in_rule_order() -> None:
         FindingKind.ELECTION_MISMATCH,
         FindingKind.GOAL_OFF_PACE,
         FindingKind.RECURRING_NEW,
-        FindingKind.DEDUCTION_CHANGE,
-        FindingKind.DEDUCTION_CHANGE,
-        FindingKind.DEDUCTION_CHANGE,
+        FindingKind.PAY_CHANGE,
         FindingKind.UPCOMING_DEADLINE,
     ]
 

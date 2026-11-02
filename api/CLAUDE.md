@@ -111,7 +111,8 @@ Rules:
   validated by `llm/prompts/__init__.py`. A released prompt file is never
   edited; a change is a new version.
 - One public method per prompt: `categorize` (`categorize/v3`),
-  `extract_pay_stub` (`extract_pay_stub/v1`), `extract_benefits`
+  `extract_pay_stub` (`extract_pay_stub/v2`: a dash or `0.00` printed on a line is 0
+  tied to that line, not null; spec 005 rule 1a, issue 195), `extract_benefits`
   (`extract_benefits/v2`), `explain` (`explain/v4`), `judge_rate_claim`
   (`judge_rate_claim/v1`, schema `RateClaimVerdict`; spec 008 rule 24a), the
   explain eval's judge of whether a final explanation calls the chosen 401(k)
@@ -198,8 +199,8 @@ Rules:
   `0013_plan_export_job`, `0014_delete_account_fn`, `0015_loan_account_kind`,
   `0016_rule_match_contains`, `0017_document_replaced_by`,
   `0018_check_in_last_run_at`, `0019_explanation_context_digest`,
-  `0020_pay_stub_superseded_by` (each revises the one before it); the head is
-  `0020_pay_stub_superseded_by`.
+  `0020_pay_stub_superseded_by`, `0021_paycheck_change` (each revises the one
+  before it); the head is `0021_paycheck_change`.
 - Adding an enum label is `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with
   `AFTER` when the order means something, as `by_kind` does for
   `account_kind`); the downgrade maps the rows that use it and rebuilds the
@@ -268,7 +269,8 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   stub of the same paycheck (same `employer_key`, pay date and period) and any
   current stub of a document the confirmed one replaced, along the replace chain.
   Read pay stubs only through `db/pay_stubs.py` (`current_pay_stubs()`,
-  `NEWEST_FIRST`, `latest_pay_date`, `paid_between_count`): `test_boundaries`
+  `NEWEST_FIRST`, `latest_pay_date`, `paid_between_count`, `superseded_documents`, which
+  gives `DocumentOut.superseded` for Link, rule 22f): `test_boundaries`
   fails on a `select`/`select_from`/`get` of `PayStub` or SQL naming `pay_stubs`
   anywhere else. `uq_pay_stubs_current_paycheck` (partial unique index) is the
   backstop; `superseded_by_id` is a deferred same-user self reference, and the
@@ -401,10 +403,14 @@ explanation, `GET /calendar` shows the check it implies.
   of every total and reported as `income_outflows_ignored_cents`, so
   `income_cents` is never negative. Spending buckets still net refunds.
   Only `checking`, `savings` and `credit` rows are read (rule 21a,
-  `SPENDING_ACCOUNT_KINDS`): a loan's, investment's or retirement account's
-  own ledger (a loan books the payment that left checking as money in, and
-  interest as money out) is in no total and reported as `ledger_rows_skipped`
-  (`count`, `net_cents`); a new `AccountKind` must join one of the two sets.
+  `SPENDING_ACCOUNT_KINDS` in `db/accounts.py`, with the join and predicate
+  helpers `transaction_account()` and `active_account_of(kinds)`): a loan's,
+  investment's or retirement account's own ledger (a loan books the payment
+  that left checking as money in, and interest as money out) is in no total
+  and reported as `ledger_rows_skipped` (`count`, `net_cents`); a new
+  `AccountKind` must join one of the two sets. Recurring detection (spec 009
+  rule 1a) and `GET /transactions?cash_accounts_only=true` (the Spending
+  screen's list, spec 003 rule 17) read the same accounts.
   A share of income is null with no income or when its size would exceed
   1,000.0 (`calc.spending.MAX_SHARE_PCT`, rule 25).
   `tests/support/sandbox_history.py:link_sandbox` runs a recorded sandbox
@@ -447,7 +453,8 @@ Specs 009 and 010. Migration `0005_checkins` adds `recurring_charges`,
 (no ON DELETE action) and `explanations.finding_id`.
 
 - **Recurring detection** (`sync/recurring.py`): `detect(charges, today)` is
-  pure: money-out transactions grouped by `merchant_norm`, the series is the
+  pure: money-out transactions (posted, on active cash accounts: rule 1a, so a
+  loan's monthly interest is no bill) grouped by `merchant_norm`, the series is the
   charges within 15% of the group median, a cadence band (weekly 6-8 d,
   monthly 27-33 d, yearly 350-380 d) must hold three quarters of the gaps, and
   each cadence has a minimum length (4, 3, 2). Amount arithmetic is
@@ -576,8 +583,12 @@ adds `check_in_findings.key` (`UNIQUE (check_in_id, key)`, index `(user_id,
 key)`) and rebuilds `finding_action` as `done`, `dismissed`. No new table or
 function. `0018_check_in_last_run_at` adds `check_ins.last_run_at` (rule 9a):
 every run that creates or refreshes a check-in sets it to the job's clock, also
-when nothing changed, and the screen's "Compared with your plan on" reads it,
-never `updated_at`, which moves only when the row itself changes (issue #171).
+when nothing changed, and the screen's "We compared your pay stubs and spending
+with your plan on" reads it, never `updated_at`, which moves only when the row
+itself changes (issue #171). `0021_paycheck_change` folds the stored
+`deduction_change` findings into their paycheck's `pay_change`, merges the
+duplicates a newer copy of a stub made, and drops the label (rule 13a, issues
+194 and 202).
 
 - **Finders** (`checkin/findings.py`) are pure, one per `finding_kind`,
   `f(Facts) -> list[Finding]`; `all_findings` runs them in rule order. Facts
@@ -591,7 +602,12 @@ never `updated_at`, which moves only when the row itself changes (issue #171).
   in place (the user's action stays), a condition (`election_mismatch`,
   `goal_off_pace`, `upcoming_deadline`) nobody produces any more is retracted
   unless handled, events are kept unless their subject is gone (a recurring
-  finding whose charge an unlink removed). Surfacing sets `new`/`changed` recurring
+  finding whose charge an unlink removed, a `pay_change` about a stub that is no
+  longer current). Pay stub keys name the paycheck, not the row: `paycheck_id`
+  is the first copy of a paycheck (`db/pay_stubs.py:paycheck_ids`), so a newer
+  copy updates the same finding in place (issue 194). One `pay_change` per
+  paycheck carries gross pay and every deduction line that moved
+  (`deductions`, issue 202). Surfacing sets `new`/`changed` recurring
   charges `active`; the engine holds `checkin:{user}` then
   `recurring.detect:{user}` advisory locks so it never interleaves with
   detection.

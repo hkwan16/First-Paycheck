@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Connection, text
 
 from app.db import user_session_for
-from db.enums import JobKind
+from db.enums import AccountKind, JobKind
 from jobs import queue
 from jobs.context import Services
 from jobs.registry import default_handlers
@@ -224,6 +224,28 @@ def test_only_the_users_transactions_count(
     assert detect_as(db_connection, user_a, TODAY) == DetectionResult()
     assert rows(db_connection, user_a) == []
     assert rows(db_connection, user_b) == []
+
+
+def test_loan_interest_is_not_a_recurring_charge(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    # Spec 009 rule 1a, job example 8 (issue 200): a loan books its interest as
+    # money out every month, though no cash left the user's accounts; Plaid's
+    # dynamic sandbox user showed it as a bill beside Netflix.
+    item = make_item(db_connection, user_a.id)
+    netflix(db_connection, user_a, make_account(db_connection, user_a.id, item))
+    loan = make_account(db_connection, user_a.id, item, kind=AccountKind.LOAN, name="Auto loan")
+    brokerage = make_account(
+        db_connection, user_a.id, item, kind=AccountKind.INVESTMENT, name="Brokerage"
+    )
+    for day in ("2026-07-02", "2026-08-02", "2026-09-02", "2026-10-02"):
+        charge(db_connection, user_a, loan, day, 11_147, "Interest")
+        charge(db_connection, user_a, brokerage, day, 2_500, "Advisory fee")
+
+    result = detect_as(db_connection, user_a, TODAY)
+
+    assert result.detected == 1
+    assert [row["merchant_norm"] for row in rows(db_connection, user_a)] == ["netflix.com"]
 
 
 def test_pending_and_hidden_accounts_are_ignored(

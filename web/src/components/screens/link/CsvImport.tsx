@@ -41,17 +41,17 @@ function ImportJobs({ result }: { result: CsvImported }) {
         Imported {formatNumber(result.imported)} {noun} into {result.account.name}.
       </Notice>
       <JobProgress
-        label="Labeling categories"
+        label="Sorting into categories"
         job={categorize.data}
         failed={categorize.isFailed}
-        failedMessage="The transactions are imported; their categories can be fixed by hand."
+        failedMessage="Your transactions are imported. You can set their categories on Spending."
         onRetry={categorize.refetch}
       />
       <JobProgress
         label="Finding recurring charges"
         job={recurring.data}
         failed={recurring.isFailed}
-        failedMessage="The transactions are imported; recurring charges are found on the next sync."
+        failedMessage="Your transactions are imported. We look for repeating charges again after your next import."
         onRetry={recurring.refetch}
       />
     </div>
@@ -93,8 +93,8 @@ function ImportError({
       <Notice tone="warning" compact role="alert" className="items-center">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span>
-            Another import into this account finished first. Try again: rows already imported are
-            not added twice.
+            Another import into this account finished first. Try again. Transactions already
+            imported are not added twice.
           </span>
           <Button size="sm" onClick={onRetry}>
             Try again
@@ -275,8 +275,7 @@ export function CsvImport({ id }: { id?: string }) {
             Import CSV
           </Button>
           <span className="text-small text-ink-3">
-            Nothing here is sent to an AI model; unknown merchants are categorized like a linked
-            bank&apos;s.
+            We sort the transactions into categories, as we do for a linked bank.
           </span>
         </div>
       </form>

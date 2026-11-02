@@ -1459,19 +1459,15 @@ export interface components {
       /** Version */
       version: number;
     };
-    /** DeductionChangePayload */
-    DeductionChangePayload: {
-      /** Affects */
-      affects: ('k401_match' | 'health_plans' | 'emergency_fund' | 'w4' | 'spending') | null;
+    /**
+     * DeductionLine
+     * @description One deduction line that differs between the two stubs (rule 6).
+     */
+    DeductionLine: {
       /** Amount Cents */
       amount_cents: number;
       /** Change Cents */
       change_cents: number;
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      kind: 'deduction_change';
       /** Label */
       label: string;
       /**
@@ -1486,28 +1482,8 @@ export interface components {
         | 'retirement_contribution'
         | 'medical_premium'
         | 'other_deductions';
-      /**
-       * Pay Date
-       * Format: date
-       */
-      pay_date: string;
-      /**
-       * Pay Stub Id
-       * Format: uuid
-       */
-      pay_stub_id: string;
       /** Previous Cents */
       previous_cents: number;
-      /**
-       * Previous Pay Date
-       * Format: date
-       */
-      previous_pay_date: string;
-      /**
-       * Previous Pay Stub Id
-       * Format: uuid
-       */
-      previous_pay_stub_id: string;
     };
     /** DocumentCreated */
     DocumentCreated: {
@@ -1539,6 +1515,8 @@ export interface components {
       replaced_by_id: string | null;
       status: components['schemas']['DocumentStatus'];
       status_reason: components['schemas']['DocumentStatusReason'] | null;
+      /** Superseded */
+      superseded: boolean;
       type: components['schemas']['DocumentType'];
       /**
        * Uploaded At
@@ -1567,6 +1545,8 @@ export interface components {
       replaced_by_id: string | null;
       status: components['schemas']['DocumentStatus'];
       status_reason: components['schemas']['DocumentStatusReason'] | null;
+      /** Superseded */
+      superseded: boolean;
       type: components['schemas']['DocumentType'];
       /**
        * Uploaded At
@@ -1794,7 +1774,6 @@ export interface components {
       | 'recurring_changed'
       | 'recurring_stopped'
       | 'pay_change'
-      | 'deduction_change'
       | 'upcoming_deadline';
     /** FindingOut */
     FindingOut: {
@@ -1824,7 +1803,6 @@ export interface components {
         | components['schemas']['GoalOffPacePayload']
         | components['schemas']['RecurringPayload']
         | components['schemas']['PayChangePayload']
-        | components['schemas']['DeductionChangePayload']
         | components['schemas']['UpcomingDeadlinePayload'];
       severity: components['schemas']['FindingSeverity'];
       /**
@@ -2423,6 +2401,8 @@ export interface components {
     PayChangePayload: {
       /** Affects */
       affects: ('k401_match' | 'health_plans' | 'emergency_fund' | 'w4' | 'spending') | null;
+      /** Deductions */
+      deductions: components['schemas']['DeductionLine'][];
       /** Gross Cents */
       gross_cents: number;
       /** Gross Change Cents */
@@ -5643,6 +5623,8 @@ export interface operations {
           | null;
         /** @description Rule and user labels count as 1; uncategorized excluded */
         min_confidence?: number | null;
+        /** @description Only rows on active checking, savings and credit accounts, the ones the spending summary reads */
+        cash_accounts_only?: boolean;
         limit?: number;
         cursor?: string | null;
       };

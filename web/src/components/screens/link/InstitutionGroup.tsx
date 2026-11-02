@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { RefreshIcon } from '@/components/icons';
 import { Button } from '@/components/ui/Button';
 import { ListRows } from '@/components/ui/ListRows';
@@ -20,14 +20,18 @@ export interface InstitutionGroupProps {
   unlinkPending: boolean;
   /** Why this institution's unlink failed, or null. */
   unlinkError: unknown;
+  /** The progress or result of the sync its Sync now started, shown under the button. */
+  syncStatus?: ReactNode;
 }
 
 /**
- * One linked institution: its name with Sync now and Unlink, then its
- * accounts. An imported CSV has no Sync now (its data arrives only by import)
- * and says Remove instead (`removalWords`). Unlinking deletes data, so it asks
- * first, inline: focus moves to the safe choice ("Keep"), and returns to
- * Unlink if the person keeps it.
+ * One linked institution: its name with Sync now and Unlink, what the sync it
+ * started is doing (next to the button, issue 208), then its accounts. An
+ * imported CSV has no Sync now (its data arrives only by import) and says
+ * Remove instead (`removalWords`). Unlinking deletes data, so it asks first,
+ * inline: the safe choice ("Keep") is the primary button and takes focus,
+ * the unlink is the destructive one (issue 205), and focus returns to Unlink
+ * if the person keeps it.
  */
 export function InstitutionGroup({
   group,
@@ -37,12 +41,14 @@ export function InstitutionGroup({
   onUnlink,
   unlinkPending,
   unlinkError,
+  syncStatus,
 }: InstitutionGroupProps) {
   const [confirming, setConfirming] = useState(false);
   const keepRef = useRef<HTMLButtonElement>(null);
   const unlinkRef = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef(false);
   const confirmId = useId();
+  const headingId = useId();
   const { name, accounts, provider } = group;
   const words = removalWords(provider);
   const verb = words.verb.toLowerCase();
@@ -61,9 +67,12 @@ export function InstitutionGroup({
   };
 
   return (
-    <div className="flex flex-col gap-3.5">
+    <section aria-labelledby={headingId} className="flex flex-col gap-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="m-0 text-micro font-semibold tracking-[0.06em] text-ink-3 uppercase">
+        <h3
+          id={headingId}
+          className="m-0 text-micro font-semibold tracking-[0.06em] text-ink-3 uppercase"
+        >
           {name}
         </h3>
         {!confirming && (
@@ -108,16 +117,23 @@ export function InstitutionGroup({
               {ownedText(accounts.length)} will be deleted. {words.again}
             </span>
             <span className="flex flex-wrap gap-2">
-              <Button ref={keepRef} size="sm" onClick={keep} disabled={unlinkPending}>
+              <Button
+                ref={keepRef}
+                size="sm"
+                variant="primary"
+                onClick={keep}
+                disabled={unlinkPending}
+              >
                 Keep {name}
               </Button>
-              <Button size="sm" variant="primary" loading={unlinkPending} onClick={onUnlink}>
+              <Button size="sm" variant="destructive" loading={unlinkPending} onClick={onUnlink}>
                 Yes, {verb} {name}
               </Button>
             </span>
           </div>
         </Notice>
       )}
+      {syncStatus}
       {unlinkError != null && (
         <Notice tone="warning" compact role="alert">
           Could not {verb} {name}.{' '}
@@ -130,6 +146,6 @@ export function InstitutionGroup({
           <AccountRow key={account.id} account={account} />
         ))}
       </ListRows>
-    </div>
+    </section>
   );
 }

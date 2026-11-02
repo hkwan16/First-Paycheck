@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import uuid
+from typing import Any
 
 from sqlalchemy import Engine, text
 
@@ -494,4 +496,249 @@ def test_0020_supersedes_copies_already_confirmed_in_confirm_order(
     }
 
     downgrade(url, "0019_explanation_context_digest")
+    upgrade(url, "head")
+
+
+def _uid(name: str) -> str:
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"0021:{name}"))
+
+
+# Spec 015's November stubs S1 and S2 (and S2b, a copy of S2), by the columns
+# that differ: pay date, period, federal, 401(k), medical, net.
+_STUBS = {
+    "s1": ("2026-10-31", "2026-10-16", "2026-10-31", 29_776, 0, 6_250, 199_604),
+    "s2": ("2026-11-15", "2026-11-01", "2026-11-15", 21_196, 5_417, 3_125, 205_892),
+    "s2b": ("2026-11-15", "2026-11-01", "2026-11-15", 21_196, 5_417, 3_125, 205_892),
+}
+# S2 against S1, the three lines that differ (spec 015 finder row 16).
+_LINES = [
+    {
+        "line": "federal_withholding",
+        "label": "Federal tax",
+        "amount_cents": 21_196,
+        "previous_cents": 29_776,
+        "change_cents": -8_580,
+    },
+    {
+        "line": "retirement_contribution",
+        "label": "401(k)",
+        "amount_cents": 5_417,
+        "previous_cents": 0,
+        "change_cents": 5_417,
+    },
+    {
+        "line": "medical_premium",
+        "label": "Health premiums",
+        "amount_cents": 3_125,
+        "previous_cents": 6_250,
+        "change_cents": -3_125,
+    },
+]
+
+
+def _pair(stub: str) -> dict[str, object]:
+    return {
+        "pay_stub_id": _uid(stub),
+        "pay_date": "2026-11-15",
+        "previous_pay_stub_id": _uid("s1"),
+        "previous_pay_date": "2026-10-31",
+    }
+
+
+def _deduction(stub: str, line: dict[str, object]) -> dict[str, object]:
+    return {"kind": "deduction_change", "affects": None, **_pair(stub), **line}
+
+
+_PAY_CHANGE: dict[str, object] = {
+    "kind": "pay_change",
+    "affects": "w4",
+    **_pair("s2"),
+    "gross_cents": 270_833,
+    "previous_gross_cents": 270_833,
+    "gross_change_cents": 0,
+    "net_cents": 205_892,
+    "previous_net_cents": 199_604,
+    "net_change_cents": 6_288,
+}
+# Row 1's pay change, a raise to 291,667 as the finder wrote it: a kept pay
+# change keeps its own figures, so these need not match the stubs' rows.
+_RAISE: dict[str, object] = {
+    **_PAY_CHANGE,
+    "gross_cents": 291_667,
+    "gross_change_cents": 20_834,
+    "net_cents": 225_133,
+    "net_change_cents": 25_529,
+}
+
+
+def _election(stub: str) -> dict[str, object]:
+    return {
+        "kind": "election_mismatch",
+        "affects": "k401_match",
+        "calculator": "k401_match",
+        "pay_stub_id": _uid(stub),
+        "pay_date": "2026-11-15",
+        "expected_cents": 10_833,
+        "actual_cents": 5_417,
+        "difference_cents": -5_416,
+        "elected_pct": "4.00",
+        "actual_pct": "2.00",
+        "plan_name": None,
+    }
+
+
+def _seed_0021(engine: Engine, user: str) -> None:
+    """Spec 015's migration rows 1-3, one check-in each, as 0020 stored them."""
+    # (finding, check-in, kind, payload, action, minute it was written and handled)
+    findings: list[tuple[str, str, str, dict[str, object], str | None, int]] = [
+        ("p1", "c1", "pay_change", _RAISE, "done", 0),
+        ("f1", "c1", "deduction_change", _deduction("s2", _LINES[0]), "done", 1),
+        ("r1", "c1", "deduction_change", _deduction("s2", _LINES[1]), "done", 2),
+        ("m1", "c1", "deduction_change", _deduction("s2", _LINES[2]), None, 3),
+        ("f2", "c2", "deduction_change", _deduction("s2", _LINES[0]), "dismissed", 1),
+        ("r2", "c2", "deduction_change", _deduction("s2", _LINES[1]), "dismissed", 3),
+        ("m2", "c2", "deduction_change", _deduction("s2", _LINES[2]), "dismissed", 2),
+    ]
+    # Issue 194's November: the run before the copy, then the run after it.
+    for stub, minute in (("s2", 0), ("s2b", 10)):
+        findings.append((f"e:{stub}", "c3", "election_mismatch", _election(stub), None, minute))
+        findings.extend(
+            (
+                f"{line['line']}:{stub}",
+                "c3",
+                "deduction_change",
+                _deduction(stub, line),
+                None,
+                minute,
+            )
+            for line in _LINES
+        )
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO auth.users (id) VALUES (:u)"), {"u": user})
+        connection.execute(
+            text(
+                "INSERT INTO decisions (id, user_id, calculator, inputs, result, version)"
+                " VALUES (:id, :u, 'k401_match', '{}', '{}', 1)"
+            ),
+            {"id": _uid("k401"), "u": user},
+        )
+        # S2b supersedes S2 before it exists: the reference is deferred to commit.
+        for name, superseded_by, day in (("s1", None, 1), ("s2", "s2b", 16), ("s2b", None, 20)):
+            connection.execute(
+                text(
+                    "INSERT INTO documents (id, user_id, type, content_type, size_bytes)"
+                    " VALUES (:d, :u, 'pay_stub', 'application/pdf', 1)"
+                ),
+                {"d": _uid(f"doc:{name}"), "u": user},
+            )
+            pay_date, start, end, federal, retirement, medical, net = _STUBS[name]
+            connection.execute(
+                text(
+                    "INSERT INTO pay_stubs (id, user_id, document_id, employer_name, pay_date,"
+                    " period_start, period_end, gross_cents, federal_withholding_cents,"
+                    " social_security_cents, medicare_cents, state_tax_cents,"
+                    " retirement_contribution_cents, medical_premium_cents,"
+                    " other_deductions_cents, net_cents, superseded_by_id, created_at)"
+                    " VALUES (:id, :u, :d, 'Acme Corp', :pay_date, :start, :end, 270833,"
+                    " :federal, 16792, 3927, 9814, :retirement, :medical, 4670, :net, :by, :at)"
+                ),
+                {
+                    "id": _uid(name),
+                    "u": user,
+                    "d": _uid(f"doc:{name}"),
+                    "pay_date": pay_date,
+                    "start": start,
+                    "end": end,
+                    "federal": federal,
+                    "retirement": retirement,
+                    "medical": medical,
+                    "net": net,
+                    "by": _uid(superseded_by) if superseded_by else None,
+                    "at": f"2026-11-{day:02d} 09:00+00",
+                },
+            )
+        for check_in, period in (("c1", "2026-09-01"), ("c2", "2026-10-01"), ("c3", "2026-11-01")):
+            connection.execute(
+                text(
+                    "INSERT INTO check_ins (id, user_id, period, triggered_by)"
+                    " VALUES (:id, :u, :period, 'schedule')"
+                ),
+                {"id": _uid(check_in), "u": user, "period": period},
+            )
+        for name, check_in, kind, payload, action, minute in findings:
+            connection.execute(
+                text(
+                    "INSERT INTO check_in_findings (id, user_id, check_in_id, kind, severity, key,"
+                    " decision_id, payload, user_action, user_action_at, created_at) VALUES"
+                    " (:id, :u, :c, CAST(:kind AS finding_kind), 'info', :key, :decision,"
+                    " CAST(:payload AS jsonb), CAST(:action AS finding_action),"
+                    " CASE WHEN CAST(:action AS text) IS NULL THEN NULL ELSE CAST(:at AS"
+                    " timestamptz) END, :at)"
+                ),
+                {
+                    "id": _uid(name),
+                    "u": user,
+                    "c": _uid(check_in),
+                    "kind": kind,
+                    # The keys before issue 194 named the stub's row; any unique text will do.
+                    "key": f"{kind}:{name}",
+                    "decision": _uid("k401") if kind == "election_mismatch" else None,
+                    "payload": json.dumps(payload),
+                    "action": action,
+                    "at": f"2026-11-20 09:{minute:02d}+00",
+                },
+            )
+
+
+def _findings_of(engine: Engine, check_in: str) -> list[dict[str, Any]]:
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text(
+                "SELECT id::text, kind::text, severity::text, key, payload, user_action::text,"
+                " user_action_at FROM check_in_findings WHERE check_in_id = :c"
+                " ORDER BY kind::text, key"
+            ),
+            {"c": _uid(check_in)},
+        ).all()
+    return [dict(row._mapping) for row in rows]
+
+
+def test_0021_folds_paycheck_findings(scratch_database: tuple[str, Engine]) -> None:
+    """Spec 015 rule 13a (issues 194 and 202): a stub's deduction changes join its
+    pay change, and the findings a copy of the paycheck repeated become one."""
+    url, engine = scratch_database
+    upgrade(url, "0020_pay_stub_superseded_by")
+    _seed_0021(engine, "00000000-0000-4000-8000-0000000000c3")
+    paycheck_key = f"pay_change:{_uid('s2')}"
+
+    upgrade(url, "head")
+
+    # Row 1: the pay change keeps its row and takes its lines; one line was open.
+    [one] = _findings_of(engine, "c1")
+    assert (one["id"], one["key"], one["user_action"]) == (_uid("p1"), paycheck_key, None)
+    assert one["payload"] == {**_RAISE, "deductions": _LINES}
+    # Row 2: lines only, every one dismissed; the newest dismissal was at 9:03.
+    [two] = _findings_of(engine, "c2")
+    assert (two["kind"], two["severity"], two["key"]) == ("pay_change", "info", paycheck_key)
+    assert two["payload"] == {**_PAY_CHANGE, "deductions": _LINES}
+    assert two["user_action"] == "dismissed"
+    assert two["user_action_at"].minute == 3
+    # Row 3: one of each, keyed by the first copy, about the newest.
+    election, paycheck = _findings_of(engine, "c3")
+    assert election["id"] == _uid("e:s2b")
+    assert election["key"] == f"election_mismatch:k401_match:{_uid('k401')}:{_uid('s2')}"
+    assert paycheck["key"] == paycheck_key
+    assert paycheck["payload"] == {**_PAY_CHANGE, **_pair("s2b"), "deductions": _LINES}
+    assert (election["user_action"], paycheck["user_action"]) == (None, None)
+
+    downgrade(url, "0020_pay_stub_superseded_by")
+    lines = [str(line["line"]) for line in _LINES]
+    one_back = _findings_of(engine, "c1")
+    assert [(row["kind"], row["payload"].get("line")) for row in one_back] == [
+        ("deduction_change", line) for line in sorted(lines)
+    ] + [("pay_change", None)]
+    two_back = _findings_of(engine, "c2")
+    assert [(row["kind"], row["user_action"]) for row in two_back] == [
+        ("deduction_change", "dismissed")
+    ] * 3
     upgrade(url, "head")

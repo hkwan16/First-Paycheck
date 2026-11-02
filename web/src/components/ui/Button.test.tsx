@@ -16,9 +16,9 @@ describe('Button', () => {
     expect(screen.getByRole('button')).toHaveClass('bg-blue', 'text-white');
   });
 
-  it('renders the destructive variant in red, apart from the safe choices (issue 205)', () => {
-    render(<Button variant="destructive">Delete account</Button>);
-    const button = screen.getByRole('button', { name: 'Delete account' });
+  it('renders the destructive variant in red on its tint, a step below primary', () => {
+    render(<Button variant="destructive">Yes, unlink Chase</Button>);
+    const button = screen.getByRole('button');
     expect(button).toHaveClass('bg-red-tint', 'text-red-text');
     expect(button).not.toHaveClass('bg-blue');
   });

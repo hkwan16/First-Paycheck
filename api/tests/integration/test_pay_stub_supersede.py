@@ -8,6 +8,7 @@ $5,416.66 gross and $595.52 federal tax.
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from collections.abc import Callable
 from typing import Any
@@ -18,6 +19,7 @@ from sqlalchemy import Connection, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from app.db import user_session_for
+from db.enums import DocumentStatus
 from tests.conftest import FixtureUser
 from tests.support.factories import MOCKUP_STUB, make_document, make_pay_stub
 from tests.support.pay_stub_copies import (
@@ -273,3 +275,30 @@ def test_two_current_stubs_of_one_paycheck_are_refused(
             make_document(db_connection, user_a.id),
             employer_name=f"  {str(MOCKUP_STUB['employer_name']).upper()} ",
         )
+
+
+def test_documents_say_which_copy_was_superseded(
+    db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Rule 22f (issue 199): Link badges only the copy that counts as Confirmed."""
+    client = client_as(user_a)
+    first = document_of(db_connection, confirm_stub(client, db_connection, user_a))
+    second = document_of(db_connection, confirm_stub(client, db_connection, user_a))
+    reading = make_document(db_connection, user_a.id, status=DocumentStatus.EXTRACTING)
+    confirmed_at = dt.datetime(2026, 10, 20, tzinfo=dt.UTC)
+    benefits = make_document(
+        db_connection,
+        user_a.id,
+        type="benefits",
+        status=DocumentStatus.CONFIRMED,
+        confirmed_at=confirmed_at,
+        deleted_at=confirmed_at,
+        with_blob=False,
+    )
+
+    response = client.get("/docs")
+    assert response.status_code == 200, response.text
+    flags = {uuid.UUID(doc["id"]): doc["superseded"] for doc in response.json()}
+    assert flags == {first: True, second: False, reading: False, benefits: False}
+    assert client.get(f"/docs/{first}").json()["superseded"] is True
+    assert client.get(f"/docs/{second}").json()["superseded"] is False

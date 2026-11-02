@@ -33,8 +33,8 @@ describe('nextFocus', () => {
   });
 
   it('without a band, goes to the nearest node of the next or previous column', () => {
-    // Not yet spent has no categories; Dining is the category level with its middle.
-    expect(move('bucket:left_over', 'ArrowRight')).toBe('category:dining');
+    // Left over has no categories; Transport is the category level with its middle.
+    expect(move('bucket:left_over', 'ArrowRight')).toBe('category:transport');
     // The $0 401(k) has no band in; gross pay is the only node to its left.
     expect(move('line:retirement_contribution', 'ArrowLeft')).toBe('gross');
     // The first line has no band out; the nearest bucket is the top one.

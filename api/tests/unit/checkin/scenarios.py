@@ -30,6 +30,7 @@ GOAL = uuid.UUID(int=0x60A1)
 
 S1: dict[str, Any] = {
     "id": uuid.UUID(int=0x51),
+    "paycheck_id": uuid.UUID(int=0x51),
     "pay_date": dt.date(2026, 10, 31),
     "period_start": dt.date(2026, 10, 16),
     "period_end": dt.date(2026, 10, 31),
@@ -46,6 +47,7 @@ S1: dict[str, Any] = {
 S2: dict[str, Any] = {
     **S1,
     "id": uuid.UUID(int=0x52),
+    "paycheck_id": uuid.UUID(int=0x52),
     "pay_date": dt.date(2026, 11, 15),
     "period_start": dt.date(2026, 11, 1),
     "period_end": dt.date(2026, 11, 15),
@@ -57,11 +59,16 @@ S2: dict[str, Any] = {
 S3: dict[str, Any] = {
     **S1,
     "id": uuid.UUID(int=0x53),
+    "paycheck_id": uuid.UUID(int=0x53),
     "gross_cents": 291_667,
     "social_security_cents": 18_083,
     "medicare_cents": 4_229,
     "net_cents": 218_845,
 }
+
+
+# An earlier copy of S2 that S2 superseded (spec 005 rule 22b): S2's paycheck id.
+S2A = uuid.UUID(int=0x52A)
 
 
 def stub(base: dict[str, Any], **changes: Any) -> StubFact:

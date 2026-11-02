@@ -43,9 +43,29 @@ def test_generation_is_deterministic_and_seed_dependent() -> None:
 OUTPUTS = {"text_pdf", "png", "noisy_png", "noisy_jpeg", "scanned_pdf"}
 
 
-def test_thirty_stubs_across_layouts_and_formats() -> None:
+def test_zero_lines_print_a_dash_or_zero_and_are_labeled_zero() -> None:
+    """Spec 005 rule 1a (issue 195): stubs 31-34 each print one deduction line
+    with a dash or 0.00 for its amount, which a correct reading gives as 0."""
+    stubs = {stub.id: stub for stub in gen.generate()}
+    printed = {
+        stub_id: [(line.field, line.printed) for line in stubs[stub_id].deductions if line.printed]
+        for stub_id in ("stub-31", "stub-32", "stub-33", "stub-34")
+    }
+    assert printed == {
+        "stub-31": [("retirement_contribution_cents", "-")],
+        "stub-32": [("retirement_contribution_cents", "0.00")],
+        "stub-33": [("medical_premium_cents", "-")],
+        "stub-34": [("retirement_contribution_cents", "--")],
+    }
+    for stub_id, [(field, mark)] in printed.items():
+        assert stubs[stub_id].labels()["fields"][field] == 0, stub_id
+        assert f">{mark}<" in gen.render_html(stubs[stub_id]), stub_id
+    assert not any(line.printed for stub in list(stubs.values())[:30] for line in stub.deductions)
+
+
+def test_thirty_four_stubs_across_layouts_and_formats() -> None:
     stubs = gen.generate()
-    assert len(stubs) == 30
+    assert len(stubs) == 34
     assert {stub.layout for stub in stubs} == {"ledger", "summary", "advice"}
     # Every layout appears in every output format.
     for layout in ("ledger", "summary", "advice"):

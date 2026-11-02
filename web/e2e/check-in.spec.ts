@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { e2eApiUrl, NO_E2E_API } from './support/api';
+import { e2eApiUrl, NO_E2E_API, openLink } from './support/api';
 import { e2eUser, NO_E2E_USER, waitForHydration } from './support/auth';
+import { ACME_OCTOBER_31, confirmAcmeFields, proposalOf, uploadAcmeStub } from './support/capture';
 
 /*
  * The monthly check-in against the real API with the saved e2e session. The
@@ -49,9 +50,9 @@ test('checks in now from the list, then lists this month’s check-in', async ({
   );
 
   await checkInNow(page).click();
-  const outcome = page
-    .getByRole('status')
-    .filter({ hasText: /^This month’s check-in is (ready|up to date|already complete)/ });
+  const outcome = page.getByRole('status').filter({
+    hasText: /^(This month’s check-in is (ready|already complete)|Checked this month again)/,
+  });
   await expect(outcome).toBeVisible({ timeout: RUN_BUDGET_MS });
   await expect(checkInNow(page)).not.toHaveAttribute('aria-busy');
 
@@ -68,6 +69,61 @@ test('checks in now from the list, then lists this month’s check-in', async ({
       timeout: 30_000,
     });
   }
+});
+
+/**
+ * Upload the Acme stub, type Acme's October 31 paycheck over its reading and
+ * confirm it, as a person entering their next pay stub does.
+ */
+async function confirmOctober31(page: Page) {
+  await openLink(page);
+  const id = await uploadAcmeStub(page);
+  const proposal = proposalOf(page, id);
+  await page.goto(`/setup/confirm/${id}`);
+  await waitForHydration(page);
+  await confirmAcmeFields(page, await proposal, undefined, ACME_OCTOBER_31);
+  await page.getByRole('button', { name: /Confirm and continue/ }).click();
+  await expect(page).toHaveURL('/setup/spending', { timeout: 30_000 });
+}
+
+/** This month's check-in, opened from the list. */
+async function openThisMonth(page: Page) {
+  await openIndex(page);
+  await list(page).getByRole('link', { name: thisMonth() }).click();
+  await waitForHydration(page);
+  await expect(page.getByRole('heading', { level: 1, name: /check-in$/ })).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
+test('a pay stub confirmed again is still one paycheck change (issue 194)', async ({ page }) => {
+  test.setTimeout(600_000);
+  // A second paycheck, so the check-in has two stubs to compare (spec 015 rule 5).
+  await confirmOctober31(page);
+  await openThisMonth(page);
+  const findings = page.getByRole('region', { name: 'What changed' });
+  await checkInNow(page).click();
+  await expect(page.getByText(/^Checked again just now\./)).toBeVisible({
+    timeout: RUN_BUDGET_MS,
+  });
+  const paycheck = findings.getByRole('listitem').filter({ hasText: 'Oct 31, 2026' });
+  await expect(paycheck).toHaveCount(1);
+  const badge = findings.getByText(/^\d+ of \d+ handled$/);
+  const before = (await badge.textContent())!;
+
+  // The same paycheck confirmed again supersedes the first copy (issue 190).
+  // Before issue 194 the next run reported its changes a second time: 13
+  // findings where there had been 7, under "This page is up to date."
+  await confirmOctober31(page);
+  await openThisMonth(page);
+  await checkInNow(page).click();
+  await expect(page.getByText('Checked again just now. No new findings.')).toBeVisible({
+    timeout: RUN_BUDGET_MS,
+  });
+  await expect(paycheck).toHaveCount(1);
+  await expect(badge).toHaveText(before);
+  await reload(page);
+  await expect(paycheck).toHaveCount(1, { timeout: 30_000 });
 });
 
 /** The finding's row, found again by its title (its accessible name) after reloads. */
@@ -102,20 +158,22 @@ test('runs this month’s check-in again, then marks a finding done, dismissed a
   const findings = page.getByRole('region', { name: 'What changed' });
   await expect(findings).toBeVisible();
   await expect(
-    page.getByRole('region', { name: /cash flow against the plan$/ }).getByRole('table'),
+    page.getByRole('region', { name: /cash flow against your plan$/ }).getByRole('table'),
   ).toBeVisible();
 
   // An open check-in for this month can be run again from its own page.
   if (await checkInNow(page).isVisible()) {
     const before = today();
     await checkInNow(page).click();
-    await expect(page.getByText('Checked again just now. This page is up to date.')).toBeVisible({
+    await expect(page.getByText(/^Checked again just now\. /)).toBeVisible({
       timeout: RUN_BUDGET_MS,
     });
     // Issue 171: the lead dates the run just made, not the check-in's last change.
     const dates = [...new Set([before, today()])].join('|');
     await expect(
-      page.getByText(new RegExp(`^Compared with your plan on (${dates})\\.`)),
+      page.getByText(
+        new RegExp(`^We compared your pay stubs and spending with your plan on (${dates})\\.`),
+      ),
     ).toBeVisible();
   }
 
@@ -124,20 +182,20 @@ test('runs this month’s check-in again, then marks a finding done, dismissed a
   // A run against a hosted API may find it handled already: put it back first.
   if (await button('Undo').isVisible()) {
     await button('Undo').click();
-    await expect(button('Done')).toBeFocused();
+    await expect(button('Mark as done')).toBeFocused();
   }
   const badge = findings.getByText(/^\d+ of \d+ handled$/);
   const before = (await badge.textContent())!;
 
-  // Done, kept by the server across a reload, then undone.
-  await button('Done').click();
+  // Marked done, kept by the server across a reload, then undone.
+  await button('Mark as done').click();
   await expect(button('Undo')).toBeFocused();
   await expect(badge).not.toHaveText(before);
   await reload(page);
   await expect(button('Undo')).toBeVisible({ timeout: 30_000 });
   await expect(row.getByText('Done', { exact: true })).toBeVisible();
   await button('Undo').click();
-  await expect(button('Done')).toBeFocused();
+  await expect(button('Mark as done')).toBeFocused();
   await expect(badge).toHaveText(before);
 
   // Dismissed, kept across a reload, then undone and left open as it was.
@@ -147,9 +205,9 @@ test('runs this month’s check-in again, then marks a finding done, dismissed a
   await expect(button('Undo')).toBeVisible({ timeout: 30_000 });
   await expect(row.getByText('Dismissed', { exact: true })).toBeVisible();
   await button('Undo').click();
-  await expect(button('Done')).toBeFocused();
+  await expect(button('Mark as done')).toBeFocused();
   await reload(page);
-  await expect(button('Done')).toBeVisible({ timeout: 30_000 });
+  await expect(button('Mark as done')).toBeVisible({ timeout: 30_000 });
   await expect(badge).toHaveText(before);
 });
 
@@ -160,7 +218,7 @@ test('links a finding to the decision step it affects', async ({ page }) => {
   const findings = page.getByRole('region', { name: 'What changed' });
   await expect(findings).toBeVisible({ timeout: 30_000 });
   // Spec 018 rule 4: a decision's finding opens that calculator's own step.
-  const affects = findings.getByRole('link', { name: /^Affects: (?!Spending map$)/ });
+  const affects = findings.getByRole('link', { name: /^Review your / });
   const count = await affects.count();
   for (let index = 0; index < count; index += 1) {
     await expect(affects.nth(index)).toHaveAttribute(
@@ -170,7 +228,7 @@ test('links a finding to the decision step it affects', async ({ page }) => {
   }
   // Issue 170: the W-4 hand-in reminder Decisions saved names the W-4 step too.
   const w4 = findings.getByRole('listitem', { name: 'Give your employer your updated Form W-4' });
-  await expect(w4.getByRole('link', { name: /^Affects: / })).toHaveAttribute(
+  await expect(w4.getByRole('link', { name: 'Review your W-4' })).toHaveAttribute(
     'href',
     '/setup/decisions/w4',
   );

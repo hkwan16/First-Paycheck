@@ -115,20 +115,31 @@ export type CheckInOutcome = 'created' | 'refreshed' | 'skipped';
 
 const OUTCOMES: ReadonlySet<string> = new Set(['created', 'refreshed', 'skipped']);
 
+/** What a finished run did: its outcome, its check-in and how its findings changed. */
+export interface CheckInRun {
+  outcome: CheckInOutcome;
+  checkInId: string | null;
+  /** Findings the run added. */
+  inserted: number;
+  /** Findings it took back because they no longer apply. */
+  retracted: number;
+}
+
 /**
- * The outcome and check-in a succeeded `checkin.monthly` job reports in its
- * `result` (`CheckInRun.as_job_result`); null before it succeeds.
+ * The run a succeeded `checkin.monthly` job reports in its `result`
+ * (`CheckInRun.as_job_result`); null before it succeeds.
  */
-export function checkInRunOf(
-  job: Job | undefined,
-): { outcome: CheckInOutcome; checkInId: string | null } | null {
+export function checkInRunOf(job: Job | undefined): CheckInRun | null {
   if (job?.kind !== 'checkin.monthly' || job.status !== 'succeeded') return null;
-  const outcome = job.result?.outcome;
-  const checkInId = job.result?.check_in_id;
+  const result: Record<string, unknown> = job.result ?? {};
+  const { outcome, check_in_id: checkInId, inserted, retracted } = result;
   if (typeof outcome !== 'string' || !OUTCOMES.has(outcome)) return null;
+  if (typeof inserted !== 'number' || typeof retracted !== 'number') return null;
   return {
     outcome: outcome as CheckInOutcome,
     checkInId: typeof checkInId === 'string' ? checkInId : null,
+    inserted,
+    retracted,
   };
 }
 
@@ -147,7 +158,7 @@ export interface CheckInNowState {
    */
   checkInId: string | null;
   /** What the run did, once its job succeeded; null before. */
-  outcome: CheckInOutcome | null;
+  run: CheckInRun | null;
 }
 
 /**
@@ -174,6 +185,6 @@ export function useCheckInNow(): CheckInNowState {
     jobId,
     job,
     checkInId: run?.checkInId ?? queued?.checkInId ?? null,
-    outcome: run?.outcome ?? null,
+    run,
   };
 }

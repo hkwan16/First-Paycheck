@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 from typing import Any
 
@@ -99,9 +100,10 @@ def _health(decision: Decision | None) -> HealthFact | None:
     )
 
 
-def _stub(row: PayStub) -> StubFact:
+def _stub(row: PayStub, paychecks: Mapping[uuid.UUID, uuid.UUID]) -> StubFact:
     return StubFact(
         id=row.id,
+        paycheck_id=paychecks[row.id],
         pay_date=row.pay_date,
         period_start=row.period_start,
         period_end=row.period_end,
@@ -216,8 +218,14 @@ def _events(session: Session, today: dt.date) -> list[EventFact]:
     ]
 
 
-def load_facts(session: Session, period: dt.date, today: dt.date) -> Facts:
-    """Everything the finders read for ``period``, as of ``today``."""
+def load_facts(
+    session: Session,
+    period: dt.date,
+    today: dt.date,
+    paychecks: Mapping[uuid.UUID, uuid.UUID],
+) -> Facts:
+    """Everything the finders read for ``period``, as of ``today``; ``paychecks``
+    is ``db/pay_stubs.py:paycheck_ids``, which the engine reads once for both."""
     current = current_decisions(session)
     stubs = session.scalars(current_pay_stubs().order_by(*NEWEST_FIRST).limit(2))
     by_id = {decision.id: decision for decision in current.values()}
@@ -231,7 +239,7 @@ def load_facts(session: Session, period: dt.date, today: dt.date) -> Facts:
     return Facts(
         period=period,
         today=today,
-        pay_stubs=[_stub(row) for row in stubs],
+        pay_stubs=[_stub(row, paychecks) for row in stubs],
         k401=_k401(current.get(CalculatorKind.K401_MATCH)),
         health=_health(current.get(CalculatorKind.HEALTH_PLANS)),
         w4_decision_id=w4.id if w4 is not None else None,

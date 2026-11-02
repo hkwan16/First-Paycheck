@@ -45,7 +45,8 @@ describe('SampleScreen', () => {
     const requests = countRequests();
     render(<SampleScreen screen="spending" />);
     const table = await screen.findByRole('table', { name: 'Transactions' });
-    expect(within(table).getAllByRole('row')).toHaveLength(17);
+    // The header and the newest 10 rows; the card opens on those (spec 003 rule 17a).
+    expect(within(table).getAllByRole('row')).toHaveLength(11);
     expect(screen.getByRole('link', { name: 'Spending map' })).toHaveAttribute(
       'aria-current',
       'page',
@@ -63,9 +64,9 @@ describe('SampleScreen', () => {
   it('renders the Confirm screen on the sample stub, with no requests', async () => {
     const requests = countRequests();
     render(<SampleScreen screen="confirm" />);
-    const fields = await screen.findByRole('region', { name: 'Extracted fields' });
+    const fields = await screen.findByRole('region', { name: 'What we read' });
     expect(within(fields).getAllByRole('group')).toHaveLength(14);
-    expect(screen.getByText('2 items redacted')).toBeInTheDocument();
+    expect(screen.getByText('2 numbers hidden')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Confirm pay stub' })).toHaveAttribute(
       'aria-current',
       'page',
@@ -79,14 +80,14 @@ describe('SampleScreen', () => {
     const fields = await screen.findByRole('region', { name: 'Plans and 401(k) match' });
     expect(fields).toHaveTextContent('0 of 29 confirmed');
     expect(within(fields).getByRole('heading', { name: 'Plan 2: Gold PPO' })).toBeInTheDocument();
-    expect(screen.getByRole('list', { name: 'Redacted benefits summary' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Benefits summary text' })).toBeInTheDocument();
     expect(requests).toEqual([]);
   });
 
   it('renders the manual entry variant with every field open, with no requests', async () => {
     const requests = countRequests();
     render(<SampleScreen screen="confirm-manual" />);
-    const fields = await screen.findByRole('region', { name: 'Pay stub fields' });
+    const fields = await screen.findByRole('region', { name: 'Pay stub details' });
     expect(within(fields).getAllByRole('textbox')).toHaveLength(10);
     expect(requests).toEqual([]);
   });
@@ -96,10 +97,10 @@ describe('SampleScreen after the AI was unavailable', () => {
   it('renders manual entry that offers Read again, with no requests', async () => {
     const requests = countRequests();
     render(<SampleScreen screen="confirm-unread" />);
-    await screen.findByRole('region', { name: 'Pay stub fields' });
-    expect(screen.getByText(/^The AI was not available when this was read/)).toBeInTheDocument();
+    await screen.findByRole('region', { name: 'Pay stub details' });
+    expect(screen.getByText(/^Automatic reading was not available then/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Read again' })).toBeInTheDocument();
-    expect(screen.getByRole('complementary', { name: 'Source, redacted' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Your pay stub' })).toBeInTheDocument();
     expect(requests).toEqual([]);
   });
 });
@@ -261,7 +262,7 @@ describe('SampleScreen after Confirm', () => {
   it.each([
     ['confirm-extracting', /Reading pay stub/],
     ['confirm-failed', /This file could not be opened\./],
-    ['confirm-confirmed', /This pay stub is confirmed\./],
+    ['confirm-confirmed', /Your plan now uses the amounts you checked\./],
   ] as const)(
     'renders the Confirm screen in its %s state, with no requests',
     async (name, text) => {

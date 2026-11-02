@@ -152,6 +152,10 @@ comment.
 | `DropZone`                                      | `.drop`                                           | a real file input, keyboard operable; filters by `accept` (drops too)                                                                                                                                                                                                |
 | `Money`, `Num`                                  | `.num`                                            | format only: cents in, tabular numerals, `decimals` 0 or 2, `signed`, `tone`                                                                                                                                                                                         |
 
+`Button` also has a `destructive` variant: a red tint for the act that deletes (Yes, unlink), set
+beside a safe choice that is primary (Keep), so the safe choice is never the weaker one (issue
+205).
+
 Chrome (`components/chrome`): `Wordmark`, `Header` (`chips`, `account` slot, `minimal`),
 `HeaderAccount` (server: "Sample data" chip and `UserMenu` from the Supabase user), `UserMenu` (the
 user chip as a disclosure button with "Sign out" and "Delete account"; see "Deleting the account"),
@@ -281,15 +285,16 @@ or checked for a phone.
   `useToday()` (null on the server, so nothing reads the clock while rendering).
   The Transactions card and the diagram's category popovers list the period the summary shows
   (spec 003 rule 17a): `useTransactions(periodFilters(period))`, the chosen period or the dates
-  `GET /cashflow` answered its default with (nothing until then; `NEWEST_TRANSACTIONS`, no dates,
-  if the cash flow fails). `SpendingScreen` picks the filters and hands them to the card, whose
+  `GET /cashflow` answered its default with (nothing until then; `NEWEST_SPENDING`, no dates,
+  if the cash flow fails). Both ask `cash_accounts_only=true`, so the list holds only rows on the
+  accounts the totals read (issue 200: loan ledgers sat unmarked under totals that left them out). `SpendingScreen` picks the filters and hands them to the card, whose
   `null` means not known yet, as the hook's does. Both build the same filters, so they share one
   cached list; setup progress reads `NEWEST_TRANSACTIONS`.
   `useRecurring()` lists recurring charges; `useUpdateRecurring()` PATCHes `user_status` or
   `name` optimistically, with rollback.
   The summary reads only the account kinds in `account_kinds_counted` (checking, savings,
-  credit; spec 007 rule 21a): the summary card names only those accounts, a category's popover
-  lists only their rows, and `ledgerNote` says how many loan, investment and retirement rows
+  credit; spec 007 rule 21a): the summary card names only those accounts, the list and a
+  category's popover hold only their rows (the API filters them), and `ledgerNote` says how many loan, investment and retirement rows
   `ledger_rows_skipped` left out (on Spending and the check-in's cash flow). A share of income the
   API sends as null (no income, or one over 1,000%: rule 25) reads `NO_SHARE`, "n/a, income too
   small to compare", through `shareText` (`spending-format.ts`); never work one out.
@@ -308,7 +313,8 @@ or checked for a phone.
   holdings. `useCheckInNow()` posts `POST /check-ins` (`start()`; 202 `{ job_id, check_in_id }`,
   the waiting job again while one is queued), follows the job with `useJob`, and gives `outcome`
   (`created`, `refreshed`, `skipped`) and `checkInId` from the succeeded job's `result`
-  (`checkInRunOf`; before that, the 202's id, null for a month with no check-in yet). A dead job is
+  (`checkInRunOf`; before that, the 202's id, null for a month with no check-in yet), as `run`:
+  `{ outcome, checkInId, inserted, retracted }`. A dead job is
   `job.isFailed`; `start()` again queues a new run.
 - **The plan** (`hooks/plan.ts`, spec 016): `usePlan()` is `GET /plan`. `useExportPlan()` posts
   `POST /plan/export` (`start()`; the API returns the queued job again while one waits), follows
@@ -338,7 +344,9 @@ or checked for a phone.
   keeps an account as the one to import into, only while the account list has that account
   (`useImportCsv` adds the imported account to the list at once), so removing the account clears
   both (issue 173). `lib/documents.ts` maps a
-  document's status to its badge and reason text; `isReviewable`/`newestReviewable` pick what
+  document's status to its badge and reason text (`documentBadge`: a confirmed pay stub that a
+  newer confirm of the same paycheck superseded, `superseded` from the API, reads "Replaced by a
+  newer copy" and offers no Replace, issue 199); `isReviewable`/`newestReviewable` pick what
   Confirm opens: a pay stub first, else a benefits summary that was read.
 - **Money** is formatted only. Transactions keep Plaid's sign (positive is money out):
   `formatTransactionAmount` and `transactionFlow` in `lib/money.ts` turn that into "-$84.12" and
@@ -355,13 +363,15 @@ or checked for a phone.
   from `fixtures/cashflow.ts` and reset after every test.
 - Check-in routes (`GET /check-ins`, `GET /check-ins/{id}`, `PATCH .../findings/{fid}`,
   `POST /check-ins`, `GET /net-worth`, `GET /holdings`) live in `src/test/msw/checkin-handlers.ts`
-  over `checkinDb`, seeded from `fixtures/checkins.ts` (November open with nine findings, October
+  over `checkinDb`, seeded from `fixtures/checkins.ts` (November open with seven findings, October
   completed) and reset after every test. `GET /calendar` filters `from`/`to` over `db.calendar`.
   `POST /check-ins` works on the month of `checkinDb.now` (November); its n-th job is
   `checkInJobId(n)` in `db.jobs`, and one nothing scripted has already succeeded, having created
   the month's check-in (November's findings), refreshed an open one or skipped a completed one.
   `scriptJob(checkInJobStates(checkInJobId(1), { outcome, check_in_id }), onSucceeded)` before the
   click shows queued, running and succeeded instead (`onSucceeded` writes what the run would).
+  A succeeded job's result carries `inserted` and `retracted` (by default all of November's
+  findings for a created check-in, none otherwise), which the status line reads.
 - Plan routes (`GET /plan`, `GET /plan/calendar.ics`, `POST /plan/export`,
   `GET /plan/export/{job_id}`) live in `src/test/msw/plan-handlers.ts` over `planDb` (`plan`,
   the export job ids handed out), reset after every test. `samplePlan()` (every decision saved;
@@ -527,15 +537,21 @@ offer letter states).
   server checks again: a 422 `pay_stub_unbalanced` becomes `PayStubUnbalanced` from
   `useConfirmDocument`, and the screen renders its diff (`MathNotice`).
 - **Manual entry**: a proposal with `manual_entry_required` starts every field empty and in edit;
-  the source pane shows the redacted lines to type from, Confirm all is off, and each row saves on
+  the source pane shows the lines to type from, Confirm all is off, and each row saves on
   its own. The notice says why in the past tense (`statusReasonText`: what happened when it was
   read, never "right now"), and when the API says `can_read_again` (the AI was unavailable: no
   model, a spent budget, failed attempts; spec 004 rules 32-37) it offers Read again (`ReadAgain`,
   also under a benefits summary nothing was read from; the Link row has its own Read again).
-- **Source pane**: the redacted lines the AI saw, with redactions drawn as labeled bars
-  (`role="img"`, "Redacted") and the selected field's line marked `aria-current`. Titled "Source, as
-  the AI saw it" only when the lines were sent (`linesSentToAi`); otherwise "Source, redacted",
-  saying they were not sent to the AI.
+- **Source pane**: the document's lines with private numbers hidden, drawn as labeled bars
+  (`role="img"`, "Hidden number"), and the selected field's line marked `aria-current`. It is titled
+  after the document ("Your pay stub", "Your benefits summary"), never with how it was read, so it
+  is true whether or not the lines were sent to the model (spec 004 rule 37). The badge counts
+  hidden numbers (`hiddenText`). Screen words never name internals (the AI, a pipeline, a
+  confidence score): the confidence badge reads "Check this" or "Read clearly" (issue 209).
+- **Nothing to check**: a confirmed pay stub, a confirmed benefits summary, an offer letter and
+  `/setup/confirm` with every stub confirmed are titled by their state ("Your pay stub is
+  confirmed"), with the next step, never as a review (issue 209). A field opened to type starts
+  without an error; what to fix shows once it is saved (issue 195).
 - **Benefits summary** (`BenefitsReview`, spec 013): `initBenefitsState` (`benefits-fields.ts`)
   lays the proposal's plans, match tiers and vesting out as reducer fields keyed
   `plans.1.deductible_cents`, `match_tiers.0.employer_pct`, `vesting_years`, each with a `group`
@@ -705,11 +721,15 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
 - **What changed** (`FindingsCard`, `FindingRow`): findings in the API's order. Each has a
   severity tile (`severityTone`: alert `off`, warning `warning`, info `blue`; neutral once
   handled), its kind, and its text from one small component per payload kind (`FindingText.tsx`),
-  which prints payload fields only, formatted, signs included. "Affects" links to that
-  calculator's step or the Spending map. Done and Dismiss become Undo; focus moves to the button that replaces the
-  one pressed (and back on a rollback), and a polite status line says what changed. The badge
+  which prints payload fields only, formatted, signs included. One paycheck change is one
+  finding (spec 015 rules 5-6, issue 202): `PayChangeText` puts gross pay and every deduction
+  line that moved in one table, in the API's order. The badge beside the kind links to that
+  calculator's step or the Spending map ("Review your W-4", "See your spending"). "Mark as done"
+  and Dismiss are default (not primary) buttons, so a page of findings has no primary button
+  each; they become Undo, focus moves to the button that replaces the one pressed (and back on
+  a rollback), and a polite status line says what changed. The badge
   reads `handled_count` and `finding_count`; a completed check-in shows a confirmed notice.
-- **Cash flow against the plan** (`PlanLinesCard`): `cash_flow.plan` lines as a table. Each
+- **Cash flow against your plan** (`PlanLinesCard`): `cash_flow.plan` lines as a table. Each
   line's `status` (spec 015 rule 19a: `on_plan | over | under`, null without a plan) is the API's;
   `planStatusTone` only decides whether that side matters for the line: `on_plan` is `confirmed`;
   over is a `warning` on spending lines (essentials, flexible, other) and under is `confirmed`;
@@ -720,7 +740,8 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
   actual over plan), never shown or compared. In a card under 28rem (a container query) the
   difference moves under the plan and the badge wraps under the actual.
 - **Net worth** (`NetWorthCard`) sits beside it, where the mockup puts it, and on the list of
-  check-ins, so it does not wait for the first check-in: the figure, assets and liabilities, the
+  check-ins, so it does not wait for the first check-in: the figure, what you have and what you
+  owe (the assets and liabilities), the
   change since the first month, `NetWorthChart`, a "Monthly figures" table, each account (its
   role, else its kind from `ACCOUNT_KIND_LABELS` in `lib/accounts.ts`, which the CSV import's
   account types share; a liability, `side` from the API, adds "owed"), and
@@ -741,9 +762,11 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
   and leaves a completed check-in as it is. While the job runs, `JobProgress` ("Checking in"; a
   dead job says "Nothing was changed." with Try again); a refused start says "Could not check in
   now." and `apiErrorMessage` (the 429 sentence). A polite status line, always rendered, says the
-  outcome: on the list "This month's check-in is ready." or "is up to date." with Open it, on the
-  check-in "Checked again just now. This page is up to date.", and for a completed month "already
-  complete, so nothing was changed."
+  outcome from the job's counts (`checkInNowMessage`, spec 015 rule 23.6, issue 194: never "up
+  to date" while findings were added): on the list "This month's check-in is ready with 7
+  findings." or "Checked this month again. 2 new findings." with Open it, on the check-in
+  "Checked again just now. No new findings." (or what was added and what no longer applies),
+  and for a completed month "already complete, so nothing changed."
 
 ## Plan screen
 
@@ -782,7 +805,8 @@ for the amounts over one SVG of cubic bands. Not d3-sankey and not a chart libra
 
 - **Layout** (`layoutCashFlow(flow, containerWidth)`) is pure geometry: four columns (gross pay;
   withholding lines and take-home; buckets; categories), node heights from a scale fixed by a
-  400 px target for the tallest node: gross pay (income when there is no confirmed stub), or a
+  240 px target for the tallest node (every column stacked from the top, so the diagram is as tall
+  as its tallest column, issue 201): gross pay (income when there is no confirmed stub), or a
   bucket or category when spending outran that income (the Plaid sandbox deposits $4.22 in a
   month that spends $1,689.63). No scale, and no badge, without pay or income to draw from. The
   "1 px is about $N" badge is computed, not hand-tuned. Amounts are placed, never added or
@@ -939,8 +963,11 @@ the saved file starts with `%PDF-`. `check-in.spec.ts` (project
 findings) presses Check in now on the list and waits for the worker's run, finds this month's
 check-in at the top of the list and opens it, runs it again from its own page, marks a finding
 done and then dismissed, undoing each (checking every step survives a reload and leaving it open),
-follows a finding's "Affects" link to its decision step, and opens a check-in that is not the
-user's. Never use a real document as a fixture.
+follows a finding's "Review your" link to its decision step, and opens a check-in that is not the
+user's. Its issue 194 test confirms an October 31 Acme stub twice (two copies of one paycheck)
+and checks the month's check-in lists that paycheck's change once and that running it again
+says "No new findings."; the capture config leaves that test out, since it changes the
+paycheck the later screens show. Never use a real document as a fixture.
 
 ### Local real-API stack
 

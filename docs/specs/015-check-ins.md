@@ -1,10 +1,10 @@
 # 015: Monthly check-ins, net worth and holdings
 
-Status: Implemented, M8; `POST /check-ins` (rule 23) and plan line status (rule 19a) in M10. Every example is a test; the finder scenarios are also the `checkin` eval suite.
+Status: Implemented, M8; `POST /check-ins` (rule 23) and plan line status (rule 19a) in M10. Issue 194: pay stub findings name the paycheck, not the stub row (rules 1, 2, 5, 10.4, 12 and 13a). Issue 202: one paycheck change is one finding, its deduction lines inside it (rules 5-6, migration `0021_paycheck_change`). Every example is a test; the finder scenarios are also the `checkin` eval suite.
 
 ## Goal
 
-Once a month, again whenever a sync lands new data that month, and whenever the user asks to check in now, compare the user's newest data with the plan they saved and say what changed: an election that did not reach the pay stub, a savings goal that fell behind, a new, repriced or stopped recurring charge, a change in pay or in a deduction, and a dated checkpoint coming up. Each change is a typed **finding** with a severity, the decision it affects, and a payload of plain numbers the client prints without adding anything. The user marks a finding done or dismissed, or undoes that. The check-in screen also shows the month's cash flow next to the plan's targets, the user's net worth by month, and their newest investment holdings.
+Once a month, again whenever a sync lands new data that month, and whenever the user asks to check in now, compare the user's newest data with the plan they saved and say what changed: an election that did not reach the pay stub, a savings goal that fell behind, a new, repriced or stopped recurring charge, a paycheck that differs from the one before it (in pay or in a deduction), and a dated checkpoint coming up. Each change is a typed **finding** with a severity, the decision it affects, and a payload of plain numbers the client prints without adding anything. The user marks a finding done or dismissed, or undoes that. The check-in screen also shows the month's cash flow next to the plan's targets, the user's net worth by month, and their newest investment holdings.
 
 Code: pure finders in `api/checkin/findings.py` (one function per kind, `f(facts) -> list[Finding]`), the facts loader in `api/checkin/facts.py`, the engine (pure reconciliation plus the writer) in `api/checkin/engine.py`, the `checkin.monthly` handler in `api/jobs/handlers/checkin.py`, the monthly enqueue in `api/jobs/scheduler.py`, the on-demand enqueue `queue_check_in_now` in `api/checkin/engine.py`, the sync-triggered refresh in `api/jobs/handlers/recurring.py`, routes in `api/app/routers/checkins.py` and `api/app/routers/net_worth.py`, money math in `api/calc/checkin.py`, `api/calc/cashflow.py` (`against_plan`, `plan_status`) and `api/calc/net_worth.py`, migration `0012_checkin_findings`, eval suite `evals/suites/checkin.py`.
 
@@ -16,13 +16,15 @@ Code: pure finders in `api/checkin/findings.py` (one function per kind, `f(facts
 |---|---|---|
 | `period` | date | First day of the check-in's month |
 | `today` | date | The job clock's UTC date, capped at the period's last day |
-| `pay_stubs` | list, newest first, at most 2 | The two newest current confirmed `pay_stubs` (superseded copies left out, spec 005 rule 22d) by `pay_date`, then `created_at`, then `id` (descending): `id`, `pay_date`, `period_start`, `period_end`, `gross_cents`, the seven deduction columns, `net_cents` |
+| `pay_stubs` | list, newest first, at most 2 | The two newest current confirmed `pay_stubs` (superseded copies left out, spec 005 rule 22d) by `pay_date`, then `created_at`, then `id` (descending): `id`, `paycheck_id` (below), `pay_date`, `period_start`, `period_end`, `gross_cents`, the seven deduction columns, `net_cents` |
 | `k401` | object or null | The current `k401_match` decision: `decision_id`, `decided_on` (its `created_at` as a UTC date), `contribution_pct` (Decimal) |
 | `health` | object or null | The current `health_plans` decision: `decision_id`, `decided_on`, `plan_name` and `premium_per_period_cents` of `inputs.plans[selected_plan_index]` |
 | `w4_decision_id` | uuid or null | The current `w4` decision, when there is one |
 | `goals` | list | Every `active` goal with a linked account: `id`, `kind`, `decision_id`, `started_on` (the goal's decision's `created_at` as a UTC date, else the goal's own `created_at`), `target_amount_cents`, `monthly_contribution_cents`, `balances` (the linked account's snapshots, oldest first: `as_of` UTC date, `balance_cents`) |
 | `recurring` | list | Every `recurring_charges` row with `status` `new`, `changed` or `stopped`: `id`, `merchant` (`merchant_clean`), `cadence`, `status`, `user_status`, `typical_amount_cents`, `first_seen`, `last_seen`, `last_reported_amount_cents` (the `typical_amount_cents` of the newest earlier recurring finding about this charge, or null) |
 | `events` | list | `upcoming` `calendar_events` with `today <= due_at <= today + 30 days`: `id`, `kind`, `title`, `due_at`, `decision_id` |
+
+**Paycheck id.** A stub's `paycheck_id` is the id of the first confirmed copy of its paycheck: of the stub and every stub it superseded, directly or through earlier copies (spec 005 rule 22b), the one that superseded nothing (`db/pay_stubs.py:paycheck_ids`). A stub that superseded nothing is its own paycheck id, and a newer copy never changes it, because a newer copy always supersedes something. When one confirm supersedes two current stubs at once (rule 22b's same paycheck and a replaced document's stub), the two become one paycheck, named by the older of their first copies (`created_at`, then `id`).
 
 ### Routes
 
@@ -47,8 +49,7 @@ Code: pure finders in `api/checkin/findings.py` (one function per kind, `f(facts
 | `election_mismatch` | `calculator` (`k401_match` or `health_plans`), `pay_stub_id`, `pay_date`, `expected_cents`, `actual_cents`, `difference_cents` (actual minus expected), `elected_pct` and `actual_pct` (401(k) only, two places, else null), `plan_name` (health only, else null) |
 | `goal_off_pace` | `goal_id`, `started_on`, `start_balance_cents`, `monthly_contribution_cents`, `months_elapsed`, `expected_cents`, `balance_cents`, `balance_as_of`, `shortfall_cents`, `target_amount_cents` |
 | `recurring_new`, `recurring_changed`, `recurring_stopped` | `recurring_charge_id`, `merchant`, `cadence`, `typical_amount_cents`, `previous_amount_cents` and `change_cents` (changed only, null when unknown), `first_seen`, `last_seen`, `user_status` |
-| `pay_change` | `pay_stub_id`, `pay_date`, `previous_pay_stub_id`, `previous_pay_date`, `gross_cents`, `previous_gross_cents`, `gross_change_cents`, `net_cents`, `previous_net_cents`, `net_change_cents` |
-| `deduction_change` | the four stub fields of `pay_change`, `line` (a `calc/cashflow.py` line key), `label`, `amount_cents`, `previous_cents`, `change_cents` |
+| `pay_change` | `pay_stub_id`, `pay_date`, `previous_pay_stub_id`, `previous_pay_date`, `gross_cents`, `previous_gross_cents`, `gross_change_cents`, `net_cents`, `previous_net_cents`, `net_change_cents`, `deductions` (a list, in rule 6's order, of each changed line: `line`, a `calc/cashflow.py` line key, `label`, `amount_cents`, `previous_cents`, `change_cents`) |
 | `upcoming_deadline` | `calendar_event_id`, `calendar_kind`, `title`, `due_at`, `days_until` |
 
 `FindingOut` adds `id`, `check_in_id`, `user_action` (`done`, `dismissed` or null), `user_action_at`, `created_at`, `updated_at`.
@@ -72,12 +73,12 @@ Code: pure finders in `api/checkin/findings.py` (one function per kind, `f(facts
 
 Each finder is `f(facts) -> list[Finding]`, with no I/O and no clock. `all_findings` runs them in the order below and fails on a repeated key. Every amount a finder reports is computed by `calc/checkin.py` (integer cents, `Decimal` rates, one `round_half_up`); the finders compare the cents they are handed, and do date arithmetic themselves.
 
-1. **401(k) election.** Uses the newest stub, and only when its `period_start > k401.decided_on` (a whole pay period after the election was saved). `expected = round_half_up(gross * contribution_pct / 100)`. A finding when `|actual - expected| > 1` cent (payrolls round differently), where `actual = retirement_contribution_cents`. Severity `alert`. `actual_pct = actual / gross * 100`, two places half up. Affects `k401_match`. Key `election_mismatch:k401_match:{decision_id}:{pay_stub_id}`.
-2. **Health plan election.** Same stub rule against `health.decided_on`. `expected = premium_per_period_cents`, `actual = medical_premium_cents`, a finding when they differ at all. Severity `warning`. Affects `health_plans`. Key `election_mismatch:health_plans:{decision_id}:{pay_stub_id}`.
+1. **401(k) election.** Uses the newest stub, and only when its `period_start > k401.decided_on` (a whole pay period after the election was saved). `expected = round_half_up(gross * contribution_pct / 100)`. A finding when `|actual - expected| > 1` cent (payrolls round differently), where `actual = retirement_contribution_cents`. Severity `alert`. `actual_pct = actual / gross * 100`, two places half up. Affects `k401_match`. Key `election_mismatch:k401_match:{decision_id}:{paycheck_id}`.
+2. **Health plan election.** Same stub rule against `health.decided_on`. `expected = premium_per_period_cents`, `actual = medical_premium_cents`, a finding when they differ at all. Severity `warning`. Affects `health_plans`. Key `election_mismatch:health_plans:{decision_id}:{paycheck_id}`.
 3. **Goal off pace.** For each goal with at least one balance: the start balance is the newest balance with `as_of <= started_on`, else the oldest balance; the current balance is the newest. `months_elapsed` is the largest `k >= 0` with `add_months(started_on, k) <= current.as_of` (the current balance's own date, so stale data is judged at its date). `expected = start + monthly_contribution * months_elapsed`; `shortfall = expected - current`. A finding when `shortfall > 0` and `current < target_amount_cents` (a goal at or past its target is never behind). Severity `warning`. Affects `emergency_fund` for an emergency-fund goal, else null. Key `goal_off_pace:{goal_id}:{period}`, so it is judged again each month.
 4. **Recurring charges.** Charges with `user_status = ignored` are skipped (spec 009 rule 17). Status `new`: `recurring_new`, `warning`. Status `changed`: `recurring_changed`; `previous_amount_cents = last_reported_amount_cents`, `change_cents = typical - previous` when known; `info` when `change_cents < 0`, else `warning`. Status `stopped`: `recurring_stopped`, `info` (with `user_status = cancelled` it confirms a cancellation). Affects `spending`, no decision. Keys `{kind}:{charge_id}:{last_seen}`.
-5. **Pay change.** With two stubs, a finding when `gross_cents` differs: `warning` when it fell, `info` when it rose. Affects `w4` (withholding follows pay) with the current `w4` decision. Key `pay_change:{newest_stub_id}`.
-6. **Deduction change.** With two stubs, one finding per changed line among `federal_withholding`, `state_tax`, `retirement_contribution`, `medical_premium` and `other_deductions`, in that order; Social Security and Medicare are fixed shares of gross and are covered by rule 5. Severity `info`. Affects `w4`, null, `k401_match`, `health_plans` and null respectively, with that calculator's current decision. Key `deduction_change:{newest_stub_id}:{line}`.
+5. **Paycheck change.** With two stubs, one `pay_change` finding when `gross_cents` or any of rule 6's lines differs: the newest stub against the one before it, with the gross and net pay of both and their changes, and every changed line in `deductions`. One paycheck that differs is one finding, so the person marks it done once (issue 202: a changed stub used to make a pay change plus one finding per deduction line, each with its own Done). Severity `warning` when gross fell, else `info`. Affects `w4` with the current `w4` decision: withholding follows gross pay and the pre-tax 401(k) and health lines, which the W-4 calculator reads. Key `pay_change:{paycheck_id}` of the newest stub.
+6. **Deduction lines.** The lines rule 5 compares and lists, in this order: `federal_withholding`, `state_tax`, `retirement_contribution`, `medical_premium` and `other_deductions`, each with its `calc/cashflow.py` label. Social Security and Medicare are fixed shares of gross, so the gross change covers them and they are not listed.
 7. **Upcoming deadline.** One finding per fact event: `days_until = due_at - today`; `warning` when `days_until <= 7`, else `info`. Affects by calendar kind: `election_check` `k401_match`; `enrollment_deadline` and `open_enrollment` `health_plans`; `goal_contribution`, `goal_review` and `goal_target` `emergency_fund`; `tax_season` and `w4_submit` `w4`. Every calendar kind affects a calculator: the mapping is total over `calendar_kind`, so a new kind cannot ship without one (`checkin/findings.py:calendar_affects`, a `match` that mypy checks is exhaustive, and a test over every kind; issue #170, where `w4_submit` had none and its finding had no Affects link). `decision_id` is the event's. Key `upcoming_deadline:{event_id}`.
 
 ### Engine (`checkin/engine.py`)
@@ -89,10 +90,16 @@ Each finder is `f(facts) -> list[Finding]`, with no I/O and no clock. `all_findi
     1. A candidate whose key is already on a finding of another of the user's check-ins is **dropped**: a finding is reported once.
     2. A candidate whose key is on this check-in **updates** that finding's severity, decision and payload, keeping the user's action.
     3. Any other candidate is **inserted**.
-    4. An existing finding no candidate matches is **retracted** (deleted) when it has no user action and either it is a condition (`election_mismatch`, `goal_off_pace`, `upcoming_deadline`), so the condition cleared, or its subject is gone: a `recurring_*` finding whose `recurring_charge_id` is not one of the user's `recurring_charges` any more (the institution was unlinked, spec 017 rule 14). Every other finding is kept, because events (`recurring_*`, `pay_change`, `deduction_change`) stay true once reported, and the user's action is history.
+    4. An existing finding no candidate matches is **retracted** (deleted) when it has no user action and either it is a condition (`election_mismatch`, `goal_off_pace`, `upcoming_deadline`), so the condition cleared, or its subject is gone: a `recurring_*` finding whose `recurring_charge_id` is not one of the user's `recurring_charges` any more (the institution was unlinked, spec 017 rule 14), or a `pay_change` whose `pay_stub_id` or `previous_pay_stub_id` is not a current stub any more (a confirm superseded it, spec 005 rule 22b, and no candidate took its key: a Replace that corrected the stub's dates, so the two stubs compared are not the newest two now). Every other finding is kept, because events (`recurring_*`, `pay_change`, `deduction_change`) stay true once reported, and the user's action is history.
 11. **Surfacing consumes recurring flags.** After writing, every `new` or `changed` charge the finders saw (inserted, updated or dropped) is set to `active` (spec 009 rule 13). `stopped` charges keep their status; the key's `last_seen` stops them being reported twice. Ignored charges are left alone.
-12. **Keys** name the event a finding reports (rules 1-7). They are unique per check-in (`UNIQUE (check_in_id, key)`, migration `0012`).
+12. **Keys** name the event a finding reports (rules 1-7). They are unique per check-in (`UNIQUE (check_in_id, key)`, migration `0012`). A pay stub finding names the paycheck (`paycheck_id`), never the stub row: confirming the same paycheck again (spec 005 rule 22b) updates the finding in place and keeps the user's action, and a paycheck change reported in one month's check-in is not reported again in the next. Before issue 194 the keys named the newest stub's row, so each new copy made a second set of findings (production's November check-in went from 7 findings to 13: six twice, plus one).
 13. **Status.** A check-in is `completed`, with `completed_at` set, when it has at least one finding and every finding has a user action; otherwise it is `open` with `completed_at` null. The engine and `PATCH` both apply this after writing.
+13a. **Findings stored before issues 194 and 202.** Migration `0021_paycheck_change` rewrites a check-in's pay stub findings the way rules 5, 6 and 12 write them now, then drops `deduction_change` from `finding_kind`:
+    1. Its `pay_change` and `deduction_change` findings whose `pay_stub_id` has one paycheck id (Inputs) are one paycheck change. That covers the findings a copy repeated (issue 194) as well as a stub's pay change and its deduction lines (issue 202). They become one `pay_change` keyed `pay_change:{paycheck_id}`: the newest copy's pay change, kept with its id, severity and decision, or, when that copy had deduction lines only, a new one with rule 5's severity and no decision, built from its two stubs (`calc/checkin.py:change_cents` for the gross and net changes) and dated as the oldest finding folded in. Its `deductions` are the newest copy's deduction lines in rule 6's order.
+    2. Its `election_mismatch` findings with one calculator, decision and paycheck id are one, keyed `election_mismatch:{calculator}:{decision_id}:{paycheck_id}`: the newest, about the newest copy.
+    3. The finding left has a user action only when every finding it stands for had one: the newest of them, at its time. A check-in with an open finding keeps one, and a completed one stays completed, so rule 13's status holds without being worked out again.
+
+    The downgrade writes each `pay_change`'s lines back as `deduction_change` findings (keyed `deduction_change:{pay_stub_id}:{line}`, with the pay change's action), drops the pay changes whose gross did not change, which only carried lines, and restores the label. It leaves the keys and the merged findings as they are.
 
 ### Jobs
 
@@ -115,6 +122,7 @@ Each finder is `f(facts) -> list[Finding]`, with no I/O and no clock. `all_findi
     3. The job then follows rule 8: it creates the month's check-in or refreshes the open one; a completed check-in is not refreshed (outcome `skipped`, the edge case below).
     4. The response is 202 with `job_id` and `check_in_id`, the month's check-in when it exists, else null. Its `triggered_by` stays `schedule`: this is the month's one check-in run early, not a second one (the `manual` trigger stays unused).
     5. Limited to 10 requests per user per clock hour (`app/ratelimit.py:CHECK_INS`, 429 `rate_limited`); every request counts, including one that returns a waiting job. Another user's jobs and check-ins are invisible (RLS), so their keyed job or check-in never answers this user's request.
+    6. **What the screen says** when the job succeeds comes from its result (Outputs): `inserted` new findings and `retracted` findings that no longer apply, counted, or "No new findings." when both are 0. It never says the page is up to date on its own: issue 194's run said "This page is up to date." while it added six findings.
 
 ## Hand-worked examples
 
@@ -137,11 +145,12 @@ The November user: semimonthly at Acme, a 4% 401(k) election and the "HDHP + HSA
 | 11 | `test_recurring_change_without_history` | Netflix, `changed`, 1,699, nothing reported before | `recurring_changed`, `warning`, previous and change null |
 | 12 | `test_recurring_stopped_after_cancel` | Hulu, `stopped`, last seen 2026-09-03, `cancelled` | `recurring_stopped`, `info`, `user_status` cancelled |
 | 13 | `test_ignored_charge_is_not_reported` | Equinox `new`, `ignored` | none |
-| 14 | `test_raise` | Stubs S3, S1 (S3 below) | `pay_change`, `info`: gross +20,834, net +19,241; no `deduction_change` |
+| 14 | `test_raise` | Stubs S3, S1 (S3 below) | `pay_change`, `info`: gross +20,834, net +19,241, `deductions` empty |
 | 15 | `test_pay_cut` | Stubs S1, S3 | `pay_change`, `warning`: gross -20,834, net -19,241 |
-| 16 | `test_deduction_changes` | Stubs S2, S1, no decisions | three `deduction_change`, `info`: federal -8,580 (affects `w4`), 401(k) +5,417 (`k401_match`), medical -3,125 (`health_plans`) |
+| 16 | `test_deduction_changes` | Stubs S2, S1, no decisions | one `pay_change`, `info`, affects `w4`, key `pay_change:{S2}`: gross 270,833, change 0; net 205,892 from 199,604, +6,288; `deductions` federal 21,196 from 29,776 (-8,580), 401(k) 5,417 from 0 (+5,417), medical 3,125 from 6,250 (-3,125) |
 | 17 | `test_upcoming_deadlines` | Events due 2026-11-20 (`goal_contribution`) and 2026-12-16 (`enrollment_deadline`) | `warning` with 4 days, `info` with 30 days |
 | 18 | `test_nothing_to_report` | Period and today only | none |
+| 19 | `test_keys_name_the_paycheck` | 401(k) 4%; stubs S2 (paycheck id S2a, an earlier copy it superseded) and S1 | keys `election_mismatch:k401_match:{K401}:{S2a}` and `pay_change:{S2a}`; both payloads' `pay_stub_id` is S2 |
 
 S3 is S1 with a raise to 291,667 gross: Social Security 18,083 and Medicare 4,229, every other line as S1, net 218,845.
 
@@ -153,7 +162,7 @@ Arithmetic:
 - Row 7: shortfall is still 16,000, but 274,000 is not below the 274,000 target.
 - Rows 9-10: `1,699 - 1,549 = 150`; `999 - 1,199 = -200`.
 - S3: `291,667 * 6.2% = 18,083.354`, `* 1.45% = 4,229.17`; deductions `29,776 + 18,083 + 4,229 + 9,814 + 0 + 6,250 + 4,670 = 72,822`; net `291,667 - 72,822 = 218,845`. Row 14: `291,667 - 270,833 = 20,834`, `218,845 - 199,604 = 19,241`.
-- S2's net: `21,196 + 16,792 + 3,927 + 9,814 + 5,417 + 3,125 + 4,670 = 64,941`, `270,833 - 64,941 = 205,892`. Row 16: `21,196 - 29,776 = -8,580`; `5,417 - 0`; `3,125 - 6,250 = -3,125`; state and other are equal.
+- S2's net: `21,196 + 16,792 + 3,927 + 9,814 + 5,417 + 3,125 + 4,670 = 64,941`, `270,833 - 64,941 = 205,892`. Row 16: `21,196 - 29,776 = -8,580`; `5,417 - 0`; `3,125 - 6,250 = -3,125`; state and other are equal; net `205,892 - 199,604 = 6,288`, which is the three line changes with their signs turned: `8,580 - 5,417 + 3,125 = 6,288`.
 - Row 17: 2026-11-20 minus 2026-11-16 is 4 days (at most 7); 2026-12-16 is 30 days. An event due 2026-12-17 (31 days) or 2026-11-15 (past) is not a fact (Inputs).
 
 ### Reconcile (`api/tests/unit/checkin/test_engine.py`)
@@ -165,18 +174,34 @@ Arithmetic:
 | 3 | `test_cleared_condition_is_retracted` | `goal_off_pace` G1 unhandled, G2 `dismissed` | none | retract G1; keep G2 |
 | 4 | `test_reported_events_are_kept` | `recurring_new` R1 unhandled | none | keep R1 |
 | 5 | `test_reported_elsewhere_is_dropped` | none | P1; P1 elsewhere | drop P1 |
+| 6 | `test_paycheck_change_about_a_superseded_stub_is_retracted_unless_handled` | `pay_change` P1 about S2 unhandled, P2 about S2 `done`; S2 superseded | none | retract P1; keep P2 |
+| 7 | `test_newer_copy_updates_the_paycheck_change` | `pay_change` P1 about S2, `done`; S2 superseded by S2b, the same paycheck | P1 about S2b | update P1; its action stays `done` |
 
 ### Jobs (`api/tests/integration/checkin/test_checkin_job.py`)
 
 | # | Test | Setup | Expected |
 |---|---|---|---|
 | 1 | `test_tick_queues_one_check_in_per_user_per_month` | Users A and B; tick at 2026-11-01 08:00 UTC twice, then at 2026-12-01 | Two jobs with key `checkin.monthly:2026-11` after the first tick, none more after the second, two `2026-12` jobs after the third |
-| 2 | `test_monthly_job_builds_the_check_in` | The November user with S1, S2, the decisions, the goal of row 5 and the Equinox charge; clock 2026-11-16 | One scheduled check-in for 2026-11-01, `open`; findings `election_mismatch` (401(k), alert), `goal_off_pace`, `recurring_new`, three `deduction_change`; Equinox is `active` |
+| 2 | `test_monthly_job_builds_the_check_in` | The November user with S1, S2, the decisions, the goal of row 5 and the Equinox charge; clock 2026-11-16 | One scheduled check-in for 2026-11-01, `open`; findings `election_mismatch` (401(k), alert), `goal_off_pace`, `recurring_new`, one `pay_change` (S2 against S1, three lines); Equinox is `active` |
 | 3 | `test_rerunning_changes_nothing` | Run row 2's job, then a `sync` job | Same finding ids; second outcome `refreshed` with 0 inserted |
 | 4 | `test_detect_queues_a_refresh_for_an_open_check_in` | An open November check-in; `recurring.detect` at 2026-11-16 | One queued `checkin.monthly` with `trigger = sync`; a second detection reuses it |
 | 5 | `test_no_refresh_without_an_open_check_in` | None, then a completed one | No `checkin.monthly` job |
 | 6 | `test_refresh_keeps_actions_and_retracts_cleared_conditions` | Row 2, mark the 401(k) finding `done`; the goal reaches 290,000; a `sync` refresh | 401(k) finding still `done`; `goal_off_pace` gone |
 | 7 | `test_sync_refresh_never_creates_a_check_in` | No check-in; a `sync` job | outcome `skipped`, no row |
+| 8 | `test_a_newer_copy_is_the_same_paycheck` | Row 2 with S2 confirmed through `POST /docs/{id}/confirm`; mark the `pay_change` `done`; confirm a copy of S2 (S2b supersedes S2); a `sync` refresh | Same finding ids, nothing inserted or retracted; the `pay_change` is still `done`, keyed `pay_change:{S2}`, its `pay_stub_id` S2b |
+| 9 | `test_a_corrected_stub_retracts_the_change_it_made` | Row 2 with S2 confirmed through the route; the user replaces S2's document and confirms the correction with S1's lines (S2 was read wrong); a `sync` refresh | The `pay_change` is retracted: its stub S2 is superseded and the correction and S1 differ in nothing (rule 10.4) |
+
+### Findings stored before issues 194 and 202 (`api/tests/integration/test_migrations.py::test_0021_folds_paycheck_findings`, rule 13a)
+
+One check-in each, upgraded from `0020_pay_stub_superseded_by`; S2b is a copy of S2 confirmed later (it supersedes S2).
+
+| # | Before | After |
+|---|---|---|
+| 1 | `pay_change` about S2, written for a raise (`done`); `deduction_change` about S2 for federal (`done`), 401(k) (`done`) and medical (open) | the same `pay_change` row, key `pay_change:{S2}`, `deductions` federal, 401(k), medical; open |
+| 2 | `deduction_change` about S2 for federal, 401(k) and medical, all `dismissed` | a new `pay_change`, `info`, key `pay_change:{S2}`: gross 270,833 from 270,833 (0), net 205,892 from 199,604 (+6,288), the three lines; `dismissed` at the newest of their times |
+| 3 | Issue 194's November: an `election_mismatch` and three `deduction_change` about S2, then the same four about S2b (keyed by S2b's id), all open | one `election_mismatch` and one `pay_change`, both keyed by S2 (the first copy) and about S2b; open |
+
+The downgrade turns row 1's `pay_change` back into it and three `deduction_change`, and row 2's into three `deduction_change` (`dismissed`) with no `pay_change`.
 
 ### Routes (`api/tests/integration/checkin/test_checkin_routes.py`, `test_net_worth.py`, `test_check_in_now.py`)
 
@@ -236,6 +261,7 @@ Route row 2 adds these statuses: `essentials`, `savings` and `retirement` `under
 - A health premium line that includes dental or vision differs from the medical plan's premium and reads as a mismatch, at `warning` rather than `alert` for that reason.
 - A goal whose account was unlinked has no account and is not judged; a paused or reached goal is not judged.
 - A charge that stops and resumes gets a new `last_seen`, so its new `recurring_new` is reported again.
+- A pay stub confirmed again (the same paycheck, or a Replace of its document) is the same paycheck (rule 12): its findings are updated, never repeated, and the payloads point at the newest copy's row.
 - A check-in completed by the user is not refreshed; whatever appears afterwards waits for next month's check-in (new and changed charges stay flagged until then).
 - A job that runs after its month ended is dated the period's last day, so it never judges another month's data as this one's.
 - `GET /net-worth` with no snapshots returns zeros, `as_of` null and an empty series.

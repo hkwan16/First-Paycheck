@@ -1,4 +1,4 @@
-import type { CategorySource, SpendingSummary, Transaction } from '@/lib/api/types';
+import type { SpendingSummary, Transaction } from '@/lib/api/types';
 import { parseISODate } from '@/lib/dates';
 import type { Tone } from '@/lib/design/tone';
 import { formatNumber, formatPct } from '@/lib/money';
@@ -7,7 +7,7 @@ import { formatNumber, formatPct } from '@/lib/money';
  * What a share of income says when the API sent none: no income, or too
  * little to compare a bucket with (spec 007 rule 25).
  */
-export const NO_SHARE = 'n/a, income too small to compare';
+export const NO_SHARE = 'Too little income to compare';
 
 /**
  * A bucket's share of income as the API rounded it, worded by `words`, or
@@ -21,17 +21,20 @@ export function shareText(
   return pct === null ? NO_SHARE : words(formatPct(pct, { decimals }));
 }
 
+/** Why a loan payment is not counted twice: once leaving checking, once arriving at the loan. */
+const COUNTED_ONCE = 'A loan payment counts once, when it leaves checking.';
+
 /**
- * Why rows on loan, investment and retirement accounts are not in the totals
- * (spec 007 rule 21a), or null when the API left none out. A count of rows,
- * never their amount.
+ * How many transactions on loan, investment and retirement accounts the
+ * totals leave out (spec 007 rule 21a), or null when the API left none out.
+ * A count, never their amount.
  */
 export function ledgerNote(skipped: SpendingSummary['ledger_rows_skipped']): string | null {
   if (skipped.count === 0) return null;
   if (skipped.count === 1) {
-    return "1 row on a loan, investment or retirement account is left out: it is that account's own ledger, not money you spent or received.";
+    return `Not counted: 1 transaction on a loan, investment or retirement account. ${COUNTED_ONCE}`;
   }
-  return `${formatNumber(skipped.count)} rows on loan, investment and retirement accounts are left out: they are those accounts' own ledgers, not money you spent or received.`;
+  return `Not counted: ${formatNumber(skipped.count)} transactions on loan, investment and retirement accounts. ${COUNTED_ONCE}`;
 }
 
 /**
@@ -45,7 +48,7 @@ export function payStubsText(count: number): string {
   return `${formatNumber(count)} ${count === 1 ? 'pay stub' : 'pay stubs'}`;
 }
 
-/** Below this confidence an AI label is shown as a warning: worth a look. */
+/** Below this confidence a guessed category asks to be checked. */
 export const LOW_CONFIDENCE = 0.7;
 
 export interface SourceBadgeView {
@@ -54,36 +57,24 @@ export interface SourceBadgeView {
 }
 
 /**
- * Who labeled a transaction, as the mockup's "Labeled by" badge: the person
- * (confirmed, "You"), the AI with its confidence (blue, amber under 70%), or
- * a rule (neutral).
+ * Where a transaction's category came from, as the mockup's source badge, in
+ * the person's words: they set it (confirmed, "You"), we guessed it from the
+ * merchant's name (blue, or a warning asking for a check under 70%
+ * confidence), or the merchant is one we know (neutral).
  */
 export function sourceBadge(txn: Transaction): SourceBadgeView {
   switch (txn.category_source) {
     case 'user':
       return { tone: 'confirmed', text: 'You' };
-    case 'llm': {
-      if (txn.confidence === null) return { tone: 'blue', text: 'AI' };
-      // Confidence is 0 to 1; shown as whole percentage points.
-      const pct = formatPct(txn.confidence * 100);
-      return { tone: txn.confidence < LOW_CONFIDENCE ? 'warning' : 'blue', text: `AI · ${pct}` };
-    }
+    case 'llm':
+      return txn.confidence !== null && txn.confidence < LOW_CONFIDENCE
+        ? { tone: 'warning', text: 'Guess, check it' }
+        : { tone: 'blue', text: 'Our guess' };
     case 'rule':
-      return { tone: 'neutral', text: 'Rule' };
+      return { tone: 'neutral', text: 'Known merchant' };
     default:
-      return { tone: 'neutral', text: 'Not labeled' };
+      return { tone: 'neutral', text: 'No category' };
   }
-}
-
-export type SourceCounts = Record<CategorySource, number>;
-
-/** How many of the loaded rows each source labeled (a row count, not money). */
-export function countSources(transactions: readonly Transaction[]): SourceCounts {
-  const counts: SourceCounts = { rule: 0, llm: 0, user: 0 };
-  for (const txn of transactions) {
-    if (txn.category_source) counts[txn.category_source] += 1;
-  }
-  return counts;
 }
 
 const MONTH = new Intl.DateTimeFormat('en-US', { month: 'long', timeZone: 'UTC' });

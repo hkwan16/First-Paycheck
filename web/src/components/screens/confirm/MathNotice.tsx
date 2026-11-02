@@ -6,28 +6,28 @@ import type { Gate } from './confirmReducer';
 /**
  * The arithmetic gate, from the mockup's two inline result rows: confirmed
  * when gross minus every deduction equals net, a warning with the difference
- * when it does not, and "$?" while an amount is missing or not an amount.
+ * when it does not, and which amount is missing or not an amount yet while it
+ * cannot run (never "$?", issue 195).
  */
 export function GateNotice({ gate }: { gate: Gate }) {
   switch (gate.status) {
     case 'ok':
       return (
         <Notice tone="confirmed" compact title="The math checks out.">
-          Gross minus every deduction equals net pay, to the cent.
+          Gross pay minus deductions equals your net pay.
         </Notice>
       );
     case 'off':
       return (
         <Notice tone="warning" compact title="These don't add up.">
-          Gross minus deductions is off from net pay by{' '}
-          <Money cents={Math.abs(gate.differenceCents)} />. Check the edited field.
+          Gross pay minus deductions is <Money cents={Math.abs(gate.differenceCents)} /> away from
+          net pay. Check each amount against your pay stub.
         </Notice>
       );
     case 'unknown':
       return (
         <Notice tone="warning" compact title="Can't check the math yet.">
-          {gate.label} is {gate.reason === 'invalid' ? 'not an amount yet' : 'missing'}, so the
-          difference is $?.
+          {gate.label} is {gate.reason === 'invalid' ? 'not an amount yet' : 'missing'}.
         </Notice>
       );
     case 'none':
@@ -48,8 +48,8 @@ export function ServerDiff({ balance }: { balance: PayStubBalance }) {
     ['Off by', Math.abs(balance.difference_cents)],
   ];
   return (
-    <Notice tone="warning" compact role="alert" title="The server found that these don't add up.">
-      Nothing was saved. Fix the amount that is off, then continue.
+    <Notice tone="warning" compact role="alert" title="These don't add up, so nothing was saved.">
+      Fix the amount that is off, then continue.
       <ul className="m-0 mt-2 flex list-none flex-col gap-0.5 p-0">
         {rows.map(([label, cents]) => (
           <li key={label} className="flex justify-between gap-3">
