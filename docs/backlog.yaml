@@ -2001,6 +2001,7 @@ issues:
     milestone: M10
     priority: Medium
     status: todo
+  # Deferred on November 1 by the product owner: cold starts are accepted for now.
   - title: "The API sleeps because GitHub runs the keepalive schedule only every few hours"
     body: >-
       keepalive.yml asks for a ping every 10 minutes, but GitHub ran it three
