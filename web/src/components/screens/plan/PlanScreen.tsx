@@ -23,6 +23,7 @@ import { completenessText } from './plan-format';
 import { decisionKindRoute, firstDecisionRoute, lastDecisionRoute } from '@/lib/routes';
 
 const TITLE = 'Your plan, on one page';
+const LEAD = 'Everything you decided, with the dates that matter next.';
 
 /** The calculators the API lists as missing, each linked to its card on Decisions. */
 function StillToDecide({ completeness }: { completeness: PlanCompleteness }) {
@@ -44,7 +45,7 @@ function StillToDecide({ completeness }: { completeness: PlanCompleteness }) {
 
 /**
  * `/plan`, from docs/mockup/Plan.dc.html: every saved decision with the
- * figures its calculator produced and whether its explanation was verified,
+ * figures the API chose for it and the state of its explanation,
  * the pay stub it is built on, the goals, the next 90 days, and the PDF and
  * calendar exports. One read (`GET /plan`); every number is a field of it.
  */
@@ -57,7 +58,10 @@ export function PlanScreen() {
       <>
         <PageTitle title={TITLE} />
         <Notice tone="warning" role="alert">
-          {apiErrorMessage(plan.error, 'Could not load your plan. Reload to try again.')}
+          {apiErrorMessage(
+            plan.error,
+            'We could not load your plan. Reload the page to try again.',
+          )}
         </Notice>
       </>
     );
@@ -79,15 +83,12 @@ export function PlanScreen() {
   if (data.decisions.length === 0) {
     return (
       <>
-        <PageTitle
-          title={TITLE}
-          lead="Your saved decisions, with the numbers behind them and the dates when each one matters next."
-        />
+        <PageTitle title={TITLE} lead={LEAD} />
         <Card gap={14} aria-label="Your plan">
           <p className="m-0">No decisions saved yet.</p>
           <p className="m-0 text-small text-ink-3">
-            Save a decision on any of the four calculators and it appears here, ready to print and
-            to add to your calendar.
+            Save a decision on any of the four steps and it shows up here, ready to print or add to
+            your calendar.
           </p>
           <div>
             <Button href={firstDecisionRoute()} variant="primary">
@@ -104,7 +105,7 @@ export function PlanScreen() {
     <>
       <PageTitle
         title={TITLE}
-        lead={`Your saved decisions with the numbers behind them, and the dates when each one matters next. As of ${formatDate(data.as_of)}.`}
+        lead={`${LEAD} As of ${formatDate(data.as_of)}.`}
         aside={
           <Badge tone={complete ? 'confirmed' : 'neutral'}>
             {completenessText(data.completeness)}

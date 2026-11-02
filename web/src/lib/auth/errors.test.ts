@@ -42,7 +42,7 @@ describe('authErrorMessage', () => {
       'New accounts are closed right now.',
     );
     expect(authErrorMessage(apiError('Invalid email', 400, 'email_address_invalid'))).toBe(
-      'Supabase cannot send email to this address. Use a different one.',
+      'We cannot send email to this address. Use a different one.',
     );
   });
 

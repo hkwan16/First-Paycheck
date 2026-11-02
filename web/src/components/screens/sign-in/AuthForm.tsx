@@ -45,8 +45,7 @@ const COPY = {
 
 const LINK_ERROR =
   'That sign-in link is invalid or has expired. Email yourself a new one, or sign in with your password.';
-const NOT_CONFIGURED =
-  'Sign-in is not set up in this environment: the Supabase URL and key are missing.';
+const NOT_CONFIGURED = 'Sign-in is not set up on this server yet.';
 
 /**
  * The sign-in card of the mockup's screen 0 (Main.dc.html), wired to Supabase
@@ -216,8 +215,8 @@ export function AuthForm({ mode, next, linkError }: AuthFormProps) {
         Email me a sign-in link
       </Button>
       <p className="mt-1 mb-0 text-small text-ink-3">
-        Secured by Supabase Auth. Your bank login never passes through First Paycheck; Plaid handles
-        it on the next step.{' '}
+        You sign in to your bank through Plaid on the next step, so First Paycheck never sees your
+        bank password.{' '}
         {mode === 'sign-in' ? (
           <Link href={signInRoute({ mode: 'sign-up', next })}>Create an account</Link>
         ) : (

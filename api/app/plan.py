@@ -44,8 +44,9 @@ CALENDAR_WINDOW = dt.timedelta(days=90)
 
 _current_decisions = table("current_decisions", column("id"))
 
-# ``net_cost`` is money too: a yearly net cost whose negative value reads as an
-# amount ahead (spec 012 rule 17), so clients pick those words by kind.
+# ``net_cost`` and ``refund`` are money too: a yearly net cost whose negative
+# value reads as an amount ahead (spec 012 rule 17), and a refund whose negative
+# value is a balance due (spec 016 rule 3), so clients pick those words by kind.
 FigureKind = Literal["money", "net_cost", "refund", "percent", "count", "text"]
 ExplanationStatus = Literal["verified", "fallback", "none"]
 
@@ -135,8 +136,8 @@ def _emergency_fund(data: dict[str, Any]) -> list[PlanFigure]:
         _figure(data, "result.target_cents", "Target", "money"),
         _figure(data, "inputs.monthly_contribution_cents", "Monthly contribution", "money"),
         _figure(data, "result.per_paycheck_contribution_cents", "Per paycheck", "money"),
-        _figure(data, "result.months_to_target", "Months to target", "count"),
-        _figure(data, "result.funded_pct", "Funded today", "percent"),
+        _figure(data, "result.months_to_target", "Months to reach it", "count"),
+        _figure(data, "result.funded_pct", "Saved so far", "percent"),
     ]
 
 
@@ -145,7 +146,7 @@ def _k401(data: dict[str, Any]) -> list[PlanFigure]:
         _figure(data, "inputs.contribution_pct", "Your contribution", "percent"),
         _figure(data, "result.full_match_pct", "Contribution for the full match", "percent"),
         _figure(data, "result.employer_match_cents_current", "Employer match a year", "money"),
-        _figure(data, "result.missed_cents", "Match missed a year", "money"),
+        _figure(data, "result.missed_cents", "Match you miss a year", "money"),
     ]
 
 
@@ -169,18 +170,16 @@ def _w4(data: dict[str, Any]) -> list[PlanFigure]:
         _figure(
             data,
             "result.withholding_per_paycheck_cents",
-            "Federal withholding per paycheck",
+            "Federal tax withheld per paycheck with your new W-4",
             "money",
         ),
         _figure(
             data,
             "result.projected_tax_after_credits_cents",
-            f"Projected federal tax for {year}",
+            f"Federal income tax for {year}",
             "money",
         ),
-        _figure(
-            data, "result.projected_refund_cents", "Refund or amount due at tax time", "refund"
-        ),
+        _figure(data, "result.projected_refund_cents", "At tax time with your new W-4", "refund"),
     ]
     suggestion = data["result"]["suggestion"]
     if suggestion in ("increase_extra_withholding", "decrease_extra_withholding"):
@@ -188,15 +187,13 @@ def _w4(data: dict[str, Any]) -> list[PlanFigure]:
             _figure(
                 data,
                 "result.suggested_extra_withholding_cents",
-                "Suggested Step 4(c) extra withholding per paycheck",
+                "Extra withholding per paycheck, W-4 Step 4(c)",
                 "money",
             )
         )
     elif suggestion == "increase_deductions":
         found.append(
-            _figure(
-                data, "result.suggested_deductions_cents", "Suggested Step 4(b) deductions", "money"
-            )
+            _figure(data, "result.suggested_deductions_cents", "Deductions, W-4 Step 4(b)", "money")
         )
     return found
 

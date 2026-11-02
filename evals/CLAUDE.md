@@ -133,7 +133,17 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   `first_try_verified`, `no_fallback`, `cited`. Its baseline is measured:
   1.0 on all five metrics in three live runs on October 30, about 47 cents a
   run (spec 008 targets 0.8, 0.95, 1.0); a run on `explain/v3` (issue 181)
-  measured the same, 47 cents. `rate_framing` (issue
+  measured the same, 47 cents. `concise` and `whole_dollars` (issue 204,
+  `suites/readability.py`, spec 008 rule 24f): over the decisions whose final
+  row is a draft (a fallback is code's text and not counted), the share whose
+  text has at most 150 words, and the share that writes no amount of $100 or
+  more with cents, except an amount a fact gives per paycheck. They measure
+  drafts and never gate one. Before `explain/v4`, `explain/v3` measured
+  `concise` 0.10 (26 of 29 over 150 words, up to 224) and `whole_dollars` 0.0
+  in one live run on November 1 (47 cents). On `explain/v4` the baseline is
+  1.0 on every metric in a run on November 1 (39 cents); a second run the same
+  day measured `concise` and `whole_dollars` 0.97 each (one decision each, 38
+  cents). `rate_framing` (issue
   132): over the 18 decisions whose stub shows another rate or none, the share
   whose final row does not claim the chosen rate is already in effect, as an
   LLM judge reads it (`Gateway.judge_rate_claim`, `judge_rate_claim/v1`, spec
@@ -168,7 +178,7 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   the row's words). `judge_accuracy` is the share of the 24 hand-labeled items in
   `fixtures/explain/withholding_claims.json` (10 claims, 14 not; rule 24e) it
   reads as labeled. A suite of its own so the 401(k) suite's metrics and
-  baseline keep their meaning. Its baseline is measured: 1.0 on all five metrics in three live runs on October 30, 21 to 23 cents a run. `SuiteUnavailable` without
+  baseline keep their meaning. Its baseline is measured: 1.0 on all five metrics in three live runs on October 30, 21 to 23 cents a run. `concise` and `whole_dollars` as in `explain`: `explain/v3` measured 0.42 (7 of 12 over 150 words, up to 225) and 0.0 on November 1 (23 cents); on `explain/v4` two runs that day measured `concise` 1.0 both times and `whole_dollars` 0.58 and 0.75 (the model keeps the cents on some yearly W-4 amounts; 19 cents each), and the baseline records 0.58, with every other metric at 1.0. `SuiteUnavailable` without
   `ANTHROPIC_API_KEY`; scoring is unit-tested with scripted judges.
 - `suites/explain_smoke.py` (`explain-smoke`, free): the same flow with
   `ScriptedGateway` over eight scripted runs (pass, fail-then-pass,
@@ -230,7 +240,9 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   `accuracy` 2.6 (one label covers all 14 `sunrise bakery` rows, of the 119 the
   model labels and the 534 in all), explain 3.4 (29 decisions), its
   `rate_framing` 5.6 (a share of only the 18 it scores) and its
-  `judge_accuracy` 2.7 (37 calibration items); explain-w4 8.3 (12 decisions), its `withholding_framing` 11.1 (a share of the 9 it scores) and its `judge_accuracy` 4.2 (24 items). A metric above its baseline passes. The
+  `judge_accuracy` 2.7 (37 calibration items), `concise` and `whole_dollars` one
+  drafted decision each (3.4 when all 29 are drafted); explain-w4 8.3 (12 decisions, also its
+  `concise` and `whole_dollars`), its `withholding_framing` 11.1 (a share of the 9 it scores) and its `judge_accuracy` 4.2 (24 items). A metric above its baseline passes. The
   report gives each metric's tolerance under `tolerances`. `test_run.py` checks
   the rule through the CLI; each LLM suite's tests check its `case_worth`.
   A metric that does not depend on the model belongs in a free suite, which

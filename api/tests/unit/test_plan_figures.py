@@ -88,7 +88,64 @@ def test_w4_suggestion_figure_matches_the_suggestion(
 
 def test_w4_tax_label_names_the_year() -> None:
     found = w4_figures(salary_cents=6_500_000, pay_periods_per_year=24)
-    assert found[1].label == "Projected federal tax for 2026"
+    assert found[1].label == "Federal income tax for 2026"
+
+
+def test_w4_figures_are_in_plain_words_with_the_outcome_as_a_refund_figure() -> None:
+    """Spec 016 rule 3 (issue 209): no \"negative is owed\"; the sign picks the words."""
+    found = w4_figures(
+        salary_cents=5_000_000,
+        pay_periods_per_year=26,
+        other_jobs_wages_cents=2_000_000,
+        other_jobs_withholding_cents=39_000,
+    )
+    assert [(figure.label, figure.kind) for figure in found] == [
+        ("Federal tax withheld per paycheck with your new W-4", "money"),
+        ("Federal income tax for 2026", "money"),
+        ("At tax time with your new W-4", "refund"),
+        ("Extra withholding per paycheck, W-4 Step 4(c)", "money"),
+    ]
+
+
+def test_w4_deductions_figure_names_its_step() -> None:
+    found = w4_figures(
+        salary_cents=9_000_000,
+        pay_periods_per_year=26,
+        filing_status="married_filing_jointly",
+        multiple_jobs=True,
+        other_jobs_wages_cents=3_000_000,
+        other_jobs_withholding_cents=142_012,
+    )
+    assert found[-1].label == "Deductions, W-4 Step 4(b)"
+
+
+def test_fund_and_401k_labels_read_as_the_cards_do() -> None:
+    """Spec 016 rule 3: \"Months to reach it\" and \"Saved so far\" as the Why page's fund card
+    says them, and \"Match you miss a year\" as the 401(k) card says it."""
+    fund = EmergencyFundInput.model_validate(
+        {
+            "monthly_essentials_cents": 182_325,
+            "target_months": 3,
+            "current_balance_cents": 214_000,
+            "monthly_contribution_cents": 30_000,
+            "pay_periods_per_year": 24,
+        }
+    )
+    labels = [
+        figure.label
+        for figure in figures(
+            CalculatorKind.EMERGENCY_FUND,
+            fund.model_dump(mode="json"),
+            emergency_fund(fund).model_dump(mode="json"),
+        )
+    ]
+    assert labels == [
+        "Target",
+        "Monthly contribution",
+        "Per paycheck",
+        "Months to reach it",
+        "Saved so far",
+    ]
 
 
 def test_unreachable_fund_has_a_null_months_figure() -> None:
@@ -131,9 +188,3 @@ def test_health_costs_are_net_cost_figures_with_the_api_sign() -> None:
         ("result.plans[0].annual_premium_cents", "money", 65_000),
         ("result.plans[0].worst_case_cents", "net_cost", 309_700),
     ]
-
-
-def test_w4_refund_is_a_refund_figure() -> None:
-    """Spec 016 rule 3 (issue 209): no "(negative is owed)" label; the kind picks the words."""
-    found = w4_figures(salary_cents=6_500_000, pay_periods_per_year=24)
-    assert (found[2].label, found[2].kind) == ("Refund or amount due at tax time", "refund")

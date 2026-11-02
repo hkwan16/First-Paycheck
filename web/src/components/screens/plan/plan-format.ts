@@ -15,8 +15,8 @@ import { CALCULATOR_CARDS } from '../decisions/DecisionCard';
 /*
  * Words for the Plan screen (spec 016). Every figure is a field of
  * `GET /plan`, formatted as its `kind` says (a negative `net_cost` reads as an
- * amount ahead, spec 012 rule 17); nothing is added, compared or
- * rounded here.
+ * amount ahead, spec 012 rule 17, and a `refund` as a refund or an amount due,
+ * spec 016 rule 3); nothing is added, compared or rounded here.
  */
 
 /** The emergency fund's months figure is null when the target is past the 10-year horizon. */

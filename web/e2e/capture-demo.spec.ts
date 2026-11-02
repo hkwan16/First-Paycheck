@@ -44,14 +44,14 @@ const nav = (page: Page) => page.getByRole('navigation', { name: 'Setup steps' }
  * Write the decision's explanation from another window while the recording
  * goes on, as the Why screen's own button does. A draft the verifier rejects
  * shows the calculator's result instead; it is asked for once more, which is
- * what "Try writing the explanation again" offers anyone.
+ * what "Try again" offers anyone.
  */
 async function writeExplanation(page: Page, whyHref: string) {
   await page.goto(whyHref);
   await waitForHydration(page);
-  const verified = page.getByText('Verified against calculator');
-  const fallback = page.getByText('Could not verify the explanation');
-  const unavailable = page.getByText('Explanations are not available yet.');
+  const verified = page.getByText(/^We checked every number here/);
+  const fallback = page.getByText(/^We could not write an explanation/);
+  const unavailable = page.getByText('Explanations are not available right now.');
   const none = page.getByRole('region', { name: 'No explanation yet' });
   await expect(verified.or(fallback).or(none)).toBeVisible({ timeout: 60_000 });
   if (await none.isVisible()) {
@@ -64,7 +64,7 @@ async function writeExplanation(page: Page, whyHref: string) {
         new URL(response.url()).pathname === '/explain' && response.request().method() === 'POST',
       { timeout: 180_000 },
     );
-    await page.getByRole('button', { name: 'Try writing the explanation again' }).click();
+    await page.getByRole('button', { name: 'Try again' }).click();
     await answer;
     await expect(verified.or(fallback)).toBeVisible({ timeout: 30_000 });
   }
@@ -246,7 +246,7 @@ test('records the alpha demo', async ({ browser }, testInfo) => {
   // 5. Why: the 401(k) version just saved, explained and checked.
   await explained;
   await nav(page)
-    .getByRole('link', { name: /^Why this decision/ })
+    .getByRole('link', { name: /^Why each decision/ })
     .click();
   await expect(page).toHaveURL('/why');
   await settled(page);

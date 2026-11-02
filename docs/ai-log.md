@@ -602,6 +602,28 @@ Every entry has a dated heading and these fields, in this order. A field that do
 
 **Time saved or lost:** Not measured.
 
+## 2026-11-01: the Why page, the plan and the app chrome in plain words (issues 204, 205, 209)
+
+**Task:** Package E of the usability fixes. The Why page showed internals ("Explanation prompt explain/v2", "checked by plain code", a Retries tile) and turned its header into a large amber "Out of date" banner once a newer pay stub arrived; explanations ran to 225 words with cents on yearly amounts and quoted IRS passages in the body. The account menu drew Delete account like Sign out. The plan, side nav, sign-in, dev kit and the API's error messages used words a first-job employee would not.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** The shared usability brief: spec first, a Playwright reproduction before each fix, a new prompt version (never an edit to a released one) with a live eval baseline, every changed string's tests and baselines updated.
+
+**What it produced:** Spec 008 rule 19b's one calm note ("About this explanation": checked, written before a change with Write it again, or not written with Try again) replacing the status panel and the banner; `explain/v4` (two or three short paragraphs, at most 150 words, whole dollars at $100 and over except an amount per paycheck, no quoted passages, never mentions the calculator); `evals/suites/readability.py` with `concise` and `whole_dollars` over drafted final rows (rule 24f) in both explain suites; a `destructive` Button variant (the same one Package B added) for Delete account and its confirmation, behind a separator; plan figure labels in plain words and a `refund` figure kind ("$0.08 refund", "$3,918.70 due") in `GET /plan` and the PDF; "Why each decision" in the side nav; reworded sign-in, kit, sample screens and API error messages. Reproductions in `smoke.spec.ts` (issue 204, 205 and 209 tests) and `plan.spec.ts`.
+
+**What was wrong:**
+- The first `explain/v4` draft rounded every amount, including the per-paycheck ones a person checks against the stub; `whole_dollars` read 0.08 on the W-4 suite for drafts that were right to keep the cents. The prompt and the metric now exempt amounts a fact gives per paycheck.
+- The second draft rounded $1,804.94 down to $1,804 and $2,360.08 up to $2,361, which the verifier rejected, so `first_try_verified` fell to 0.97 and 0.92. The prompt now spells out half-up rounding with worked amounts. Both drafts were before any release, so v4 was amended rather than versioned.
+- On the final prompt the W-4 suite still keeps the cents on some yearly amounts (`whole_dollars` 0.58 and 0.75 in two runs); the verifier accepts both forms, so the lower run is the baseline rather than a third prompt revision.
+- The account menu e2e test read the menu's Delete account color after clicking it, when the confirmation had already replaced the button, and timed out; it reads the color first.
+- ESLint's status-color rule rejected `text-red-text` in the chrome test; the test compares the class string `buttonClasses` builds instead.
+- Linux screenshot baselines were not regenerated: Docker Desktop stopped on an error dialog offering a factory reset, which was not taken.
+
+**How it was caught:** Smoke reproductions failing (9 tests) and the real-stack plan test failing on "v2 · Saved" before the fixes; the eval runs' failure lines; the e2e run's timeout.
+
+**Fix:** As above, in the subagent's branch. Live eval cost: 300.73 cents over five runs of the two suites (v3 before, three v4 drafts, one confirmation), each capped at 300.
+
 ## 2026-11-01: a first Plaid sync could finish with no transactions (issue 213)
 
 **Task:** On PR 211's first CI run the e2e user's `sync.initial` succeeded two seconds after the link, with no retry, and every month showed no transactions, so `spending.spec.ts` failed with "No period in the picker has transactions". The alpha user's link in the same run waited out a not-ready retry and got its rows. Make the sync say what Plaid answered, reproduce against the real sandbox, and fix the root cause in the sync.

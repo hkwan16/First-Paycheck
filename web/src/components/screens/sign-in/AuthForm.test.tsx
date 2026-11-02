@@ -223,7 +223,7 @@ describe('AuthForm, sign in', () => {
     await user.type(password, PASSWORD);
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Sign-in is not set up in this environment: the Supabase URL and key are missing.',
+      'Sign-in is not set up on this server yet.',
     );
   });
 });

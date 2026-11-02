@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
-import { Badge } from './Badge';
 
 export interface KVListProps {
   /**
@@ -39,13 +38,11 @@ export function KVList({
 export interface KVProps {
   label: ReactNode;
   value: ReactNode;
-  /** The verifier found this exact figure in the calculator's output. */
-  verified?: boolean;
   className?: string;
 }
 
 /** From the mockup's `.kv`: label left, tabular value right, hairline between rows. */
-export function KV({ label, value, verified = false, className }: KVProps) {
+export function KV({ label, value, className }: KVProps) {
   return (
     <div
       className={cn(
@@ -54,14 +51,7 @@ export function KV({ label, value, verified = false, className }: KVProps) {
       )}
     >
       <dt>{label}</dt>
-      <dd className="m-0 inline-flex items-center gap-1.5 text-right tabular-nums">
-        {value}
-        {verified && (
-          <Badge tone="confirmed" aria-label="matches calculator">
-            =
-          </Badge>
-        )}
-      </dd>
+      <dd className="m-0 inline-flex items-center gap-1.5 text-right tabular-nums">{value}</dd>
     </div>
   );
 }

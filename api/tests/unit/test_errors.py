@@ -142,5 +142,8 @@ def test_unhandled_exception_hides_internals() -> None:
     response = client.get("/boom")
     assert response.status_code == 500
     assert response.json() == {
-        "error": {"code": "internal_error", "message": "Internal server error"}
+        "error": {
+            "code": "internal_error",
+            "message": "Something went wrong on our side. Try again in a moment.",
+        }
     }

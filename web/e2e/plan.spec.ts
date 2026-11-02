@@ -48,7 +48,7 @@ test('reads the saved decisions back with their figures and the next 90 days', a
   ]);
   const k401 = page.getByRole('region', { name: '401(k) match' });
   await expect(k401.getByText('Your contribution')).toBeVisible();
-  await expect(k401.getByText(/^v\d+ · Saved /)).toBeVisible();
+  await expect(k401.getByText(/^Saved /)).toBeVisible();
   await expect(page.getByRole('region', { name: 'Your paycheck' })).toContainText('Take-home pay');
   await expect(page.getByRole('region', { name: 'Next 90 days' })).toContainText(/Through /);
   // Spec 018: each date's badge opens its decision's step; Back goes to the last step.
@@ -65,12 +65,30 @@ test('reads the saved decisions back with their figures and the next 90 days', a
   );
 });
 
+/** Words that describe how the app works rather than the person's money (issues 204, 209). */
+const INTERNALS =
+  /\b(prompt|explain\/v\d+|v\d+|plain code|retr(?:y|ies)|verifier|calculator|language model|AI|LLM|curated|fallback)\b/i;
+
+test('opens the 401(k) explanation from the plan, in plain words', async ({ page }) => {
+  await openPlan(page);
+  expect(await page.getByRole('main').innerText()).not.toMatch(INTERNALS);
+  // decisions.spec.ts wrote the 401(k) explanation (or its stand-in) on the Why page.
+  const k401 = page.getByRole('region', { name: '401(k) match' });
+  await k401.getByRole('link', { name: /explanation/i }).click();
+  await expect(page).toHaveURL(/\/why\/[^/]+$/);
+  await waitForHydration(page);
+  await expect(page.getByRole('region', { name: 'About this explanation' })).toBeVisible({
+    timeout: 30_000,
+  });
+  expect(await page.getByRole('main').innerText()).not.toMatch(INTERNALS);
+});
+
 test('downloads the calendar file', async ({ page }) => {
   await openPlan(page);
   const exportCard = page.getByRole('region', { name: 'Export' });
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    exportCard.getByRole('button', { name: 'Add to calendar (.ics)' }).click(),
+    exportCard.getByRole('button', { name: 'Add to calendar' }).click(),
   ]);
   expect(download.suggestedFilename()).toBe('first-paycheck-calendar.ics');
   const text = await readFile((await download.path())!, 'utf8');

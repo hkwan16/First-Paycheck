@@ -20,7 +20,7 @@ describe('SideNav', () => {
       within(plan as HTMLElement)
         .getAllByRole('listitem')
         .map((li) => li.textContent),
-    ).toEqual(['Why this decision', 'Plan and calendar', 'Monthly check-in']);
+    ).toEqual(['Why each decision', 'Plan and calendar', 'Monthly check-in']);
   });
 
   it('links the routes that need no id', () => {
@@ -48,9 +48,9 @@ describe('SideNav', () => {
     );
   });
 
-  it('links Why this decision to the list of saved decisions', () => {
+  it('links Why each decision to the list of saved decisions', () => {
     render(<SideNav />);
-    expect(screen.getByRole('link', { name: 'Why this decision' })).toHaveAttribute('href', '/why');
+    expect(screen.getByRole('link', { name: 'Why each decision' })).toHaveAttribute('href', '/why');
   });
 
   it('links Confirm to the page that finds the pay stub waiting for review', () => {
@@ -75,7 +75,7 @@ describe('SideNav', () => {
       'href',
       '/setup/confirm/doc_1',
     );
-    expect(screen.getByRole('link', { name: 'Why this decision' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Why each decision' })).toHaveAttribute(
       'href',
       '/why/dec_1',
     );

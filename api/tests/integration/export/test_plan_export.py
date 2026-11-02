@@ -111,7 +111,7 @@ def test_pdf_has_two_pages_and_the_plan_text(
         "$5,469.00",
         "$2,600.00",
         "Bronze HSA",
-        "Federal withholding per paycheck",
+        "Federal tax withheld per paycheck",
         "Verified against the calculator",
     ):
         assert expected in plan_page, expected

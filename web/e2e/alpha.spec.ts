@@ -172,13 +172,15 @@ test('a new user goes from sign-in to a verified 401(k) explanation', async ({ p
     await card(page).getByRole('link', { name: 'Why this decision' }).click();
     await expect(page).toHaveURL(/\/why\/[^/]+$/);
     await waitForHydration(page);
-    await expect(page.getByText('401(k) match · decision v2')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Why contribute 6% to your 401(k)' }),
+    ).toBeVisible();
 
     const none = page.getByRole('region', { name: 'No explanation yet' });
     await none.getByRole('button', { name: 'Write the explanation' }).click();
     // The local stack runs LLM_FAKE=true: the fake drafts from the facts it is
     // given and cites the first passage, so the verifier accepts it.
-    await expect(page.getByText('Verified against calculator')).toBeVisible({ timeout: 90_000 });
+    await expect(page.getByText(/^We checked every number here/)).toBeVisible({ timeout: 90_000 });
     const sources = page.getByRole('region', { name: 'Sources' });
     await expect(sources.getByRole('link').first()).toHaveAttribute(
       'href',

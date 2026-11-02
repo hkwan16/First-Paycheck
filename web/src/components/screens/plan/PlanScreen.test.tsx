@@ -80,18 +80,22 @@ describe('PlanScreen with every decision saved', () => {
     const fund = region('Emergency fund');
     expect(figure(fund, 'Target')).toHaveTextContent('$5,469.75');
     expect(figure(fund, 'Monthly contribution')).toHaveTextContent('$300.00');
-    expect(figure(fund, 'Funded today')).toHaveTextContent('39.12%');
+    expect(figure(fund, 'Saved so far')).toHaveTextContent('39.12%');
     const k401 = region('401(k) match');
     expect(figure(k401, 'Your contribution')).toHaveTextContent('4%');
     expect(figure(k401, 'Employer match a year')).toHaveTextContent('$2,600.00');
-    expect(figure(k401, 'Match missed a year')).toHaveTextContent('$0.00');
-    expect(within(k401).getByText('v1 · Saved Oct 17, 2026')).toBeInTheDocument();
+    expect(figure(k401, 'Match you miss a year')).toHaveTextContent('$0.00');
+    expect(within(k401).getByText('Saved Oct 17, 2026')).toBeInTheDocument();
+    expect(k401).not.toHaveTextContent(/\bv1\b/);
     const health = region('Health plan');
     expect(figure(health, 'Plan')).toHaveTextContent('Gold PPO');
     expect(figure(health, 'Expected cost a year at medium use')).toHaveTextContent('$2,025.00');
     const w4 = region('W-4, federal only');
-    expect(figure(w4, 'Federal withholding per paycheck')).toHaveTextContent('$213.67');
-    expect(figure(w4, 'Refund or amount due at tax time')).toHaveTextContent('$0.08 refund');
+    expect(figure(w4, 'Federal tax withheld per paycheck with your new W-4')).toHaveTextContent(
+      '$213.67',
+    );
+    // Issue 209: the sign picks the words; no "negative is owed".
+    expect(figure(w4, 'At tax time with your new W-4')).toHaveTextContent('$0.08 refund');
   });
 
   it('says a health plan that comes out ahead is that much ahead, with no minus sign', async () => {
@@ -110,17 +114,20 @@ describe('PlanScreen with every decision saved', () => {
     expect(health).not.toHaveTextContent('-$');
   });
 
-  it("gives each explanation's status: verified, fallback, not written, or none for this calculator", async () => {
+  it("gives each explanation's state in plain words, and none for an emergency fund", async () => {
     await open();
     expect(
-      within(region('401(k) match')).getByRole('link', { name: 'Verified explanation' }),
+      within(region('401(k) match')).getByRole('link', { name: 'Read the explanation' }),
     ).toHaveAttribute('href', `/why/${DECISION_V1_ID}`);
-    expect(
-      within(region('Health plan')).getByRole('link', { name: 'See the calculator’s result' }),
-    ).toHaveAttribute('href', `/why/${HEALTH_DECISION_ID}`);
+    const health = region('Health plan');
+    expect(within(health).getByText(/We could not write this explanation\./)).toBeInTheDocument();
+    expect(within(health).getByRole('link', { name: 'Try again on its page' })).toHaveAttribute(
+      'href',
+      `/why/${HEALTH_DECISION_ID}`,
+    );
     const w4 = region('W-4, federal only');
-    expect(within(w4).getByText(/Explanation not written yet\./)).toBeInTheDocument();
-    expect(within(w4).getByRole('link', { name: 'Write it' })).toHaveAttribute(
+    expect(within(w4).getByText(/No explanation yet\./)).toBeInTheDocument();
+    expect(within(w4).getByRole('link', { name: 'Write the explanation' })).toHaveAttribute(
       'href',
       `/why/${W4_DECISION_ID}`,
     );
@@ -134,9 +141,11 @@ describe('PlanScreen with every decision saved', () => {
     planDb.plan = plan;
     await open();
     const card = region('401(k) match');
-    expect(within(card).queryByRole('link', { name: 'Verified explanation' })).toBeNull();
-    expect(within(card).getByText(/Explanation out of date\./)).toBeInTheDocument();
-    expect(within(card).getByRole('link', { name: 'Write it again' })).toHaveAttribute(
+    expect(within(card).queryByRole('link', { name: 'Read the explanation' })).toBeNull();
+    expect(
+      within(card).getByText(/Written before some of your information changed\./),
+    ).toBeInTheDocument();
+    expect(within(card).getByRole('link', { name: 'Update the explanation' })).toHaveAttribute(
       'href',
       `/why/${DECISION_V1_ID}`,
     );
@@ -324,7 +333,7 @@ describe('PlanScreen export', () => {
     const exportCard = region('Export');
     await user.click(within(exportCard).getByRole('button', { name: 'Download PDF' }));
     const alert = await within(exportCard).findByRole('alert');
-    expect(alert).toHaveTextContent('Could not download your PDF. Something went wrong.');
+    expect(alert).toHaveTextContent('We could not download your PDF. Something went wrong.');
 
     refused = false;
     await user.click(within(alert).getByRole('button', { name: 'Try again' }));
@@ -344,7 +353,7 @@ describe('PlanScreen export', () => {
     const exportCard = region('Export');
     await user.click(within(exportCard).getByRole('button', { name: 'Download PDF' }));
     expect(await within(exportCard).findByRole('alert')).toHaveTextContent(
-      'Could not start the PDF. Something went wrong.',
+      'We could not start your PDF. Something went wrong.',
     );
   });
 });
@@ -353,7 +362,7 @@ describe('PlanScreen calendar file', () => {
   it('downloads the .ics and says so', async () => {
     const { user } = await open();
     const exportCard = region('Export');
-    await user.click(within(exportCard).getByRole('button', { name: 'Add to calendar (.ics)' }));
+    await user.click(within(exportCard).getByRole('button', { name: 'Add to calendar' }));
     await waitFor(() =>
       expect(downloads.clicks.map((c) => c.download)).toEqual([CALENDAR_FILENAME]),
     );
@@ -373,9 +382,9 @@ describe('PlanScreen calendar file', () => {
     );
     const { user } = await open();
     const exportCard = region('Export');
-    await user.click(within(exportCard).getByRole('button', { name: 'Add to calendar (.ics)' }));
+    await user.click(within(exportCard).getByRole('button', { name: 'Add to calendar' }));
     expect(await within(exportCard).findByRole('alert')).toHaveTextContent(
-      'Could not download your calendar. Something went wrong.',
+      'We could not download your calendar file. Something went wrong.',
     );
   });
 });

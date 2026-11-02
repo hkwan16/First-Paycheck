@@ -1,8 +1,7 @@
 import Link from 'next/link';
-import { AlertIcon, CheckIcon } from '@/components/icons';
+import { CheckIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/Badge';
 import { KV, KVList } from '@/components/ui/KV';
-import { Notice } from '@/components/ui/Notice';
 import type { PlanDecision } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import { calculatorIdOf, CALCULATOR_LABELS } from '@/lib/decisions';
@@ -10,7 +9,7 @@ import { whyRoute } from '@/lib/routes';
 import { CALCULATOR_CARDS, DecisionCard } from '../decisions/DecisionCard';
 import { explanationView, figureText } from './plan-format';
 
-/** Whether the decision's explanation was checked against the calculator, and where to read it. */
+/** The decision's explanation in a line: checked, out of date, not written, or none yet (spec 008 rule 19b). */
 function ExplanationStatus({ decision }: { decision: PlanDecision }) {
   const why = whyRoute(decision.id);
   switch (explanationView(decision)) {
@@ -18,27 +17,27 @@ function ExplanationStatus({ decision }: { decision: PlanDecision }) {
       return (
         <div>
           <Badge tone="confirmed" icon={<CheckIcon />} href={why}>
-            Verified explanation
+            Read the explanation
           </Badge>
         </div>
       );
     case 'stale':
       return (
-        <Notice tone="warning" compact icon={<AlertIcon size={14} />}>
-          <strong>Explanation out of date.</strong> <Link href={why}>Write it again</Link>
-        </Notice>
+        <p className="m-0 text-small text-ink-3">
+          Written before some of your information changed.{' '}
+          <Link href={why}>Update the explanation</Link>
+        </p>
       );
     case 'fallback':
       return (
-        <Notice tone="warning" compact icon={<AlertIcon size={14} />}>
-          <strong>Explanation not verified.</strong>{' '}
-          <Link href={why}>See the calculator&rsquo;s result</Link>
-        </Notice>
+        <p className="m-0 text-small text-ink-3">
+          We could not write this explanation. <Link href={why}>Try again on its page</Link>
+        </p>
       );
     case 'none':
       return (
         <p className="m-0 text-small text-ink-3">
-          Explanation not written yet. <Link href={why}>Write it</Link>
+          No explanation yet. <Link href={why}>Write the explanation</Link>
         </p>
       );
     case 'unavailable':
@@ -47,7 +46,7 @@ function ExplanationStatus({ decision }: { decision: PlanDecision }) {
 }
 
 /**
- * One saved decision on the plan: its version, the figures `GET /plan`
+ * One saved decision on the plan: when it was saved, the figures `GET /plan`
  * chose for its calculator (spec 016 rule 3), each by the API's label, and
  * its explanation status.
  */
@@ -59,11 +58,7 @@ export function DecisionSummary({ decision }: { decision: PlanDecision }) {
       title={CALCULATOR_LABELS[decision.calculator]}
       icon={icon}
       tone={tone}
-      badge={
-        <Badge>
-          v{decision.version} · Saved {formatDate(decision.created_at)}
-        </Badge>
-      }
+      badge={<Badge>Saved {formatDate(decision.created_at)}</Badge>}
     >
       <KVList>
         {decision.figures.map((figure) => (

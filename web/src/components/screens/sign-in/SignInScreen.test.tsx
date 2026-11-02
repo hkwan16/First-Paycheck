@@ -14,15 +14,12 @@ describe('SignInScreen', () => {
     expect(screen.getByText('with your own numbers.')).toHaveClass('text-coral-text');
   });
 
-  it('explains the three guarantees', () => {
-    renderScreen();
-    for (const title of [
-      'Money math runs in tested code.',
-      'AI reads, it does not decide.',
-      'A monthly check-in.',
-    ]) {
+  it('explains the three promises in plain words (issue 209)', () => {
+    const { container } = renderScreen();
+    for (const title of ['Numbers you can check.', 'You decide.', 'A monthly check-in.']) {
       expect(screen.getByText(title).tagName).toBe('STRONG');
     }
+    expect(container).not.toHaveTextContent(/\b(AI|language model|calculator|Supabase)\b/);
   });
 
   it('shows the sign-in form', () => {

@@ -19,7 +19,13 @@ vi.mock('@/lib/supabase/client', () => ({
 }));
 vi.mock('@/lib/navigation', () => ({ hardNavigate: mocks.hardNavigate }));
 
+import { buttonClasses } from '@/components/ui/Button';
+import { cn } from '@/lib/cn';
 import { UserMenu } from './UserMenu';
+
+/** A full-width Button's classes in a variant, as Button merges them (issue 205). */
+const blockButton = (variant: 'default' | 'destructive') =>
+  cn(buttonClasses({ variant, block: true }));
 
 const LABEL = 'alex@example.com';
 
@@ -59,6 +65,19 @@ describe('UserMenu', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     const panel = document.getElementById(trigger.getAttribute('aria-controls') ?? '');
     expect(panel).toContainElement(screen.getByRole('button', { name: 'Sign out' }));
+  });
+
+  it('sets deleting the account apart from signing out (issue 205)', async () => {
+    const { user, trigger } = setup();
+    await user.click(trigger);
+    const signOut = screen.getByRole('button', { name: 'Sign out' });
+    const remove = screen.getByRole('button', { name: 'Delete account' });
+    const separator = screen.getByRole('separator');
+    // Sign out, then a rule, then the destructive action.
+    expect(signOut.compareDocumentPosition(separator)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(separator.compareDocumentPosition(remove)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(remove.className).toBe(blockButton('destructive'));
+    expect(signOut.className).toBe(blockButton('default'));
   });
 
   it('closes on Escape and returns focus to the chip', async () => {
@@ -155,6 +174,8 @@ describe('UserMenu, deleting the account', () => {
     expect(button).toBeDisabled();
     await user.type(field, 'e');
     expect(button).toBeEnabled();
+    // The last step is drawn as the destructive action, never as the blue primary.
+    expect(button.className).toBe(blockButton('destructive'));
     await user.click(button);
 
     await waitFor(() =>

@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { KV, KVList } from '@/components/ui/KV';
 import { Money } from '@/components/ui/Money';
@@ -9,7 +8,6 @@ import {
   asEmergencyFundResult,
   asK401Inputs,
   asK401Result,
-  CALCULATOR_LABELS,
 } from '@/lib/decisions';
 import { formatRate } from '@/lib/money';
 import { tiersText } from '../decisions/decision-format';
@@ -23,25 +21,20 @@ export interface CalculatorResultCardProps {
   fallbackText?: string;
   /** Buttons under the result. */
   actions?: ReactNode;
-  /**
-   * Shown in place of a written explanation that failed (the default), or as
-   * the whole answer for a decision that is never explained (spec 011 rule 18).
-   */
-  fallback?: boolean;
 }
 
 /**
  * From the mockup's fallback card: the saved decision's inputs and result as
- * the calculator returned them. Nothing in it came from a language model.
+ * the API stored them, shown in place of an explanation that could not be
+ * written, or as the whole answer for a decision that is never explained
+ * (spec 011 rule 18).
  */
 export function CalculatorResultCard({
   decision,
   employer,
   fallbackText,
   actions,
-  fallback = true,
 }: CalculatorResultCardProps) {
-  const title = `${CALCULATOR_LABELS[decision.calculator]} calculator result`;
   const inputs = decision.calculator === 'k401_match' ? asK401Inputs(decision.inputs) : null;
   const result = decision.calculator === 'k401_match' ? asK401Result(decision.result) : null;
   const fundInputs =
@@ -50,23 +43,19 @@ export function CalculatorResultCard({
     decision.calculator === 'emergency_fund' ? asEmergencyFundResult(decision.result) : null;
 
   return (
-    <Card inset aria-labelledby="calculator-result-title" gap={14}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="calculator-result-title" className="m-0">
-          {title}
-        </h2>
-        {fallback && <Badge>Fallback</Badge>}
-      </div>
+    <Card inset aria-labelledby="saved-numbers-title" gap={14}>
+      <h2 id="saved-numbers-title" className="m-0">
+        Your saved numbers
+      </h2>
       {inputs && result ? (
         <>
           <KVList spacing="comfortable">
             <KV
-              label="Inputs"
+              label="Based on"
               value={
                 <span>
                   Salary <Money cents={inputs.salary_cents} decimals={0} /> · match{' '}
-                  {tiersText(inputs.match_tiers)} · contribution{' '}
-                  {formatRate(inputs.contribution_pct)}
+                  {tiersText(inputs.match_tiers)} · your rate {formatRate(inputs.contribution_pct)}
                 </span>
               }
             />

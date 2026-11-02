@@ -19,8 +19,8 @@ const BY_CODE: Partial<Record<string, string>> = {
   email_exists: 'An account with this email already exists. Sign in instead.',
   weak_password: WEAK_PASSWORD,
   signup_disabled: 'New accounts are closed right now.',
-  email_address_invalid: 'Supabase cannot send email to this address. Use a different one.',
-  email_address_not_authorized: 'Supabase cannot send email to this address. Use a different one.',
+  email_address_invalid: 'We cannot send email to this address. Use a different one.',
+  email_address_not_authorized: 'We cannot send email to this address. Use a different one.',
   over_request_rate_limit: RATE_LIMITED,
   over_email_send_rate_limit: RATE_LIMITED,
 };

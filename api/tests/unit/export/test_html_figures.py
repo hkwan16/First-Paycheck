@@ -24,6 +24,24 @@ def test_a_net_cost_figure_reads_as_coming_out_ahead(value: int, text: str) -> N
     assert figure_value(figure("net_cost", value)) == text
 
 
+@pytest.mark.parametrize(
+    ("value", "text"),
+    [
+        (8, "$0.08 refund"),
+        (-391_870, "$3,918.70 due"),
+        (0, "Nothing due, no refund"),
+    ],
+)
+def test_a_refund_figure_says_refund_or_due(value: int, text: str) -> None:
+    """Spec 016 rule 3 (issue 209): the sign picks the words, as on the W-4 card."""
+    assert figure_value(figure("refund", value)) == text
+
+
+def test_a_refund_figure_must_be_cents() -> None:
+    with pytest.raises(ValueError, match="refund"):
+        figure_value(figure("refund", "12"))
+
+
 def test_a_money_figure_keeps_its_sign() -> None:
     assert figure_value(figure("money", -12_345)) == "-$123.45"
 
@@ -31,16 +49,3 @@ def test_a_money_figure_keeps_its_sign() -> None:
 def test_a_net_cost_figure_must_be_cents() -> None:
     with pytest.raises(ValueError, match="net_cost"):
         figure_value(figure("net_cost", "12"))
-
-
-@pytest.mark.parametrize(
-    ("value", "text"),
-    [
-        (8, "$0.08 refund"),
-        (-344_992, "$3,449.92 due"),
-        (0, "Nothing due, no refund"),
-    ],
-)
-def test_a_refund_figure_says_refund_or_due(value: int, text: str) -> None:
-    """Spec 016 rule 3 and spec 014 rule 21 (issue 209): words, never a sign."""
-    assert figure_value(figure("refund", value)) == text

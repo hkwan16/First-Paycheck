@@ -113,7 +113,7 @@ Rules:
 - One public method per prompt: `categorize` (`categorize/v3`),
   `extract_pay_stub` (`extract_pay_stub/v2`: a dash or `0.00` printed on a line is 0
   tied to that line, not null; spec 005 rule 1a, issue 195), `extract_benefits`
-  (`extract_benefits/v2`), `explain` (`explain/v3`), `judge_rate_claim`
+  (`extract_benefits/v2`), `explain` (`explain/v4`), `judge_rate_claim`
   (`judge_rate_claim/v1`, schema `RateClaimVerdict`; spec 008 rule 24a), the
   explain eval's judge of whether a final explanation calls the chosen 401(k)
   rate the one in effect, and `judge_withholding_claim`
@@ -357,7 +357,8 @@ explanation, `GET /calendar` shows the check it implies.
   decision, which is immutable. The verifier checks numbers and citations
   only; whether drafts call the chosen rate the one in effect is the explain
   eval's `rate_framing` metric, read by `Gateway.judge_rate_claim`, not a
-  check. The gateway sends `explain/v3`; fallback rows are `fallback/v4`.
+  check. The gateway sends `explain/v4` (issue 204: shorter, whole dollars at
+  $100 and over, no quoted passages); fallback rows are `fallback/v4`.
 - **The entries' withholding is not the withholding in effect** (spec 008
   rule 7b, issue 181), the same pattern for a W-4 decision. The same read of
   the newest stub gives `pay_stub_withholding_cents`

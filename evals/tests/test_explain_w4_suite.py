@@ -98,6 +98,11 @@ def test_the_stub_withholding_reaches_the_model() -> None:
     }
 
 
+def judge_lines(failures: list[str]) -> list[str]:
+    """The judge's failure lines, without the readability ones (rule 24f)."""
+    return [line for line in failures if line.startswith("judge ")]
+
+
 def test_fake_drafts_verify_for_every_w4_decision() -> None:
     result = explain_w4.score(explain_w4.load_w4_decisions(), fake(), fake(), NO_CALIBRATION)
     assert result.metrics == {
@@ -106,8 +111,12 @@ def test_fake_drafts_verify_for_every_w4_decision() -> None:
         "cited": 1.0,
         "withholding_framing": 1.0,
         "judge_accuracy": 1.0,
+        # The fake states the facts as given, with cents (rule 24f).
+        "concise": 1.0,
+        "whole_dollars": 0.0,
     }
-    assert result.failures == []
+    assert len(result.failures) == 12
+    assert all(": cents on $100 or more: " in line for line in result.failures)
 
 
 def test_the_fallback_of_every_w4_decision_verifies() -> None:
@@ -340,11 +349,11 @@ def test_judge_accuracy_is_the_share_of_labels_the_judge_matches() -> None:
     ][:1]
     exact = explain_w4.score(decisions, fake(), AnswersFromLabels(items), items)
     assert exact.metrics["judge_accuracy"] == 1.0
-    assert exact.failures == []
+    assert judge_lines(exact.failures) == []
     miss = "entries-as-the-subject"
     one_wrong = explain_w4.score(decisions, fake(), AnswersFromLabels(items, miss), items)
     assert one_wrong.metrics["judge_accuracy"] == pytest.approx((len(items) - 1) / len(items))
-    [line] = one_wrong.failures
+    [line] = judge_lines(one_wrong.failures)
     assert line.startswith(f"judge {miss}: labeled no claim, judged a claim: ")
     free = explain_w4.score(decisions, fake(), fake(), items)
     assert free.metrics["judge_accuracy"] == pytest.approx(
@@ -359,6 +368,8 @@ def test_one_case_is_a_decision_and_the_judged_metrics_count_only_their_own() ->
     assert result.case_worth == {
         "withholding_framing": pytest.approx(1 / 9),
         "judge_accuracy": pytest.approx(1 / len(items)),
+        "concise": pytest.approx(1 / 12),
+        "whole_dollars": pytest.approx(1 / 12),
     }
 
 
@@ -387,5 +398,5 @@ def test_the_live_suite_drafts_and_judges_through_one_gateway(
     assert result.cost_cents == 0
     [ledger] = ledgers
     versions = [entry.prompt_version for entry in ledger.entries]
-    assert versions.count("explain/v3") == 12
+    assert versions.count("explain/v4") == 12
     assert versions.count("judge_withholding_claim/v1") == 9 + len(items)

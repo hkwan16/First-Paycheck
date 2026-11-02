@@ -38,7 +38,11 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
 def _unavailable() -> AppError:
-    return AppError("Database unavailable", code="database_unavailable", status_code=503)
+    return AppError(
+        "We cannot reach your data right now. Try again in a moment.",
+        code="database_unavailable",
+        status_code=503,
+    )
 
 
 def get_db_bind() -> Engine | Connection:
@@ -108,7 +112,7 @@ def get_llm_gateway(settings: SettingsDep, bind: DbBind) -> GatewayFactory:
         except LLMNotConfigured as exc:
             logger.error("the LLM gateway is not configured: %s", exc)
             raise AppError(
-                "Explanations are not available right now",
+                "Explanations are not available right now.",
                 code="llm_unavailable",
                 status_code=503,
             ) from exc

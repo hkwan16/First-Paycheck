@@ -258,7 +258,7 @@ def get_explanation(decision_id: uuid.UUID, session: UserSession) -> Explanation
     decision = _decision(session, decision_id)
     row = _latest(session, decision.id, verified=False)
     if row is None:
-        raise NotFound("This decision has no explanation yet")
+        raise NotFound("This decision has no explanation yet.")
     citations = for_calculator(session, decision.calculator, _tax_year(decision))
     setup = current_setup(session, decision, citations)
     return _out(row, decision.id, citations, stale=is_stale(row, setup))

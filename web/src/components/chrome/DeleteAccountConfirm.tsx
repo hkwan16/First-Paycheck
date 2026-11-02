@@ -72,7 +72,7 @@ export function DeleteAccountConfirm({ onCancel }: DeleteAccountConfirmProps) {
           </p>
         )}
         <div className="flex flex-col gap-2">
-          <Button type="submit" variant="primary" block disabled={!ready} loading={busy}>
+          <Button type="submit" variant="destructive" block disabled={!ready} loading={busy}>
             Delete my account
           </Button>
           <Button type="button" block onClick={onCancel} disabled={busy}>

@@ -28,9 +28,10 @@ describe('figureText', () => {
     // A health plan's net cost: a negative one comes out ahead (spec 012 rule 17).
     expect(figureText(fig('net_cost', 202_500))).toBe('$2,025.00');
     expect(figureText(fig('net_cost', -40_300))).toBe('$403.00 ahead');
-    // The W-4's refund: a refund or an amount due, in words (spec 016 rule 3).
+    // A W-4 outcome: the sign says refund or due (spec 016 rule 3, issue 209).
     expect(figureText(fig('refund', 8))).toBe('$0.08 refund');
-    expect(figureText(fig('refund', -344_992))).toBe('$3,449.92 due');
+    expect(figureText(fig('refund', -391_870))).toBe('$3,918.70 due');
+    expect(figureText(fig('refund', 0))).toBe('Nothing due, no refund');
     expect(figureText(fig('percent', '39.12'))).toBe('39.12%');
     expect(figureText(fig('percent', '4.00'))).toBe('4%');
     expect(figureText(fig('count', 12))).toBe('12');
@@ -46,6 +47,7 @@ describe('figureText', () => {
     expect(() => figureText(fig('money', '12'))).toThrow(TypeError);
     expect(() => figureText(fig('percent', 4))).toThrow(TypeError);
     expect(() => figureText(fig('net_cost', '12'))).toThrow(TypeError);
+    expect(() => figureText(fig('refund', '12'))).toThrow(TypeError);
   });
 
   it('formats every figure of the sample plan', () => {

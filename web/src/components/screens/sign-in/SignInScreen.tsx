@@ -54,16 +54,17 @@ export function SignInScreen({ mode, next, linkError, deleted }: SignInScreenPro
           </p>
         </div>
         <div className="flex flex-col gap-3.5">
-          <Point tone="blue" icon={<LinesIcon />} title="Money math runs in tested code.">
-            Every dollar figure comes from a calculator, never from a language model.
+          <Point tone="blue" icon={<LinesIcon />} title="Numbers you can check.">
+            Every dollar figure is worked out from your own pay stub, benefits and accounts, and
+            each explanation links to the IRS rule behind it.
           </Point>
-          <Point tone="coral" icon={<ShieldIcon />} title="AI reads, it does not decide.">
-            It extracts fields from redacted documents, labels unknown merchants and writes
-            explanations that are checked against the calculator and cite an IRS or plan source.
+          <Point tone="coral" icon={<ShieldIcon />} title="You decide.">
+            We read your documents for you, with your Social Security and account numbers blacked
+            out first, and nothing is saved until you check it.
           </Point>
           <Point tone="teal" icon={<CalendarIcon />} title="A monthly check-in.">
-            Each month it compares new pay stubs and transactions against your plan and tells you
-            what changed.
+            Each month we compare your new pay stubs and spending with your plan and tell you what
+            changed.
           </Point>
         </div>
       </div>
