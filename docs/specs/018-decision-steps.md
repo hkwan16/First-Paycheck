@@ -1,6 +1,6 @@
 # 018: Decisions as four steps
 
-Status: Implemented, M10 (web only). Rule 6a, a footer link landing at the top (issue 172): Implemented, Hardening (web only). Rules 11-17, the side nav on a phone (issue 155): implemented in Hardening, removed November 1, 2026, when First Paycheck became desktop only.
+Status: Implemented, M10 (web only). Rule 6a, a footer link landing at the top (issue 172): Implemented, Hardening (web only). Rules 11-17, the side nav on a phone (issue 155): implemented in Hardening, removed November 1, 2026, when First Paycheck became desktop only. Rules 5a and 5b (saving in words, one primary action, issue 206) and rule 5's lead (issue 209) changed November 1, 2026.
 
 ## Goal
 
@@ -42,7 +42,9 @@ The side nav's "Decisions" item gets a nested list of four sub-items, labeled "E
 
 ### Each step page
 
-5. **Title**: an eyebrow row with "Decision n of 4" (the step's place in the order, counting every calculator, live or not) and, once `GET /decisions` has answered, the "n of 4 saved" badge (the number of calculators in `GET /decisions`, `items.length`, of the 4); the h1 from the table; and, for a live calculator only, the lead "Move the controls to try what-ifs. Every number comes from the calculator, not the AI. Saving keeps a versioned record and adds it to your plan." A placeholder has no controls, so its card says what it will decide instead. The tab title is the table's page title.
+5. **Title**: an eyebrow row with "Decision n of 4" (the step's place in the order, counting every calculator, live or not) and, once `GET /decisions` has answered, the "n of 4 saved" badge (the number of calculators in `GET /decisions`, `items.length`, of the 4); the h1 from the table; and, for a live calculator only, the lead "Try a few choices and watch the numbers change. Save the one you want, and it goes into your plan." (issue 209: the lead before it described the system, "Every number comes from the calculator, not the AI. Saving keeps a versioned record") A placeholder has no controls, so its card says what it will decide instead. The tab title is the table's page title.
+5a. **Saving, in words** (issue 206). Each card's save button and badge say what will happen and what is saved, never a version number (versions belong to the Why pages and the Plan): with nothing saved, the button is "Save" and the badge "Not saved"; once what is on screen differs from what is saved, "Save changes" and "Changes not saved"; once it matches, a pressed "Saved" and "Saved {date}". The words come from one place, `lib/decisions.ts:decisionSaveState`. A what-if that only changes how the result is shown never counts as a change (the health plan's usage, spec 012 rule 18), and the badge never changes because a form opened in place of the result (spec 012 rule 18a).
+5b. **One primary action** (issue 206). On a step, the card's save button is the one primary button while there is something to save; once saved it turns into the confirmed "Saved". The footer's next link is the default (secondary) button on every step, so Next never looks like the step's action and nothing suggests it saves. A form that opens in place of the result (plan details, the plan table) brings its own primary button, the only one while it is open.
 6. **Footer**: Back goes to the previous live step, or to `/setup/spending` before the first live one; next goes to the next live step, or to `/plan` after the last live one. Steps that are not live are skipped, so the alpha (`calculators=401k_match`) walks Spending, 401(k), Plan as before. Labels: "Back to {name}" and "Next: {name}", where the names are "emergency fund", "401(k) match", "health plan" and "W-4"; Back to Spending is "Back"; next to the Plan is "See your plan" (today's label). A step that is not live has the same neighbors as if it were: the live steps around its place in the order.
 6a. **A footer link lands at the top of the next page** (issue 172), at every width, for every `StepFooter` link (the setup screens' too). Next's App Router scrolls only when the changed segment's top edge is out of view. Following a footer link at the bottom of a long step, the browser first clamps the scroll offset to the new page, which is still short while its cards load; the new page's top edge is then in view, so Next leaves it part way down the page, with the top of the page under the sticky header. A step change is a new page and starts at the top: the link turns Next's scroll off and asks (`onNavigate`, `lib/land-at-top.ts`), and the new page's `HydrationMarker`, which every page renders, scrolls to the top as its content commits, before it is painted. Back and forward, reloads and every other link keep the browser's and Next's scrolling. A `scroll-padding-top` the size of the header was weighed and set aside: Next would then scroll this case, but a clamp that leaves the page's top edge below the header would still land part way down. `e2e/decisions.spec.ts` follows a Next and a Back link from the bottom of a step in a 1280x650 window and checks the page is at 0. On desktop the clamp leaves the top edge in view only in a window about 625 to 675px tall, so the test also checks its own precondition: as the landing scrolls (`window.scrollTo`, wrapped by an init script), the new page was in the DOM, scrolled down, with its root's top edge in view, the state Next leaves alone. A window that stops showing it fails the test and says to rescan the height; the sample screens cannot show it, since their footers lead out of the sample layout and the whole page remounts.
 
@@ -76,6 +78,17 @@ The side nav's "Decisions" item gets a nested list of four sub-items, labeled "E
 | `the alpha` | `401k_match` | `/setup/decisions/401k` | `/setup/decisions/401k` |
 | `none live` | none | `/setup/decisions/emergency-fund` | `/setup/decisions/w4` |
 
+### Saving (`web/src/lib/decisions.test.ts`, rules 5a and 5b)
+
+| Test | Saved | On screen | Button | Badge |
+|---|---|---|---|---|
+| `nothing saved yet` | none | any inputs | Save (primary) | Not saved |
+| `the saved inputs` | v2, saved Oct 21 | v2's inputs, in another key order | Saved (pressed, confirmed) | Saved Oct 21 |
+| `other inputs` | v2 | v2's inputs at another contribution | Save changes (primary) | Changes not saved |
+| `ignores what describes, not decides` | a health plan v1 at medium use | v1's inputs at high use, `expected_usage` ignored | Saved | Saved Oct 21 |
+
+No row shows a version: v2 saved on screen reads "Saved", never "Saved as v2", and the next save "Save changes", never "Save as v3". Every step's footer next link is the default variant (`step-footer.test.ts`), and `DecisionStepScreen.test.tsx` checks that a step with something to save has one primary button.
+
 ### Done marks (`web/src/lib/setup-progress.test.ts`)
 
 | Test | Live | Saved | Sub-items done | Decisions done |
@@ -105,5 +118,5 @@ The side nav's "Decisions" item gets a nested list of four sub-items, labeled "E
 
 - An overview page at `/setup/decisions` listing the four with their saved state. The side nav already shows all four with their done marks on every screen, each step shows "n of 4 saved", and the Plan lists every saved decision with its figures; an overview would be one more page between the person and the first decision, with nothing to decide on it.
 - Sending a person to their first unsaved step. The proxy has no session data to know it, and reading it in the page would mean a client redirect after render. The nav's done marks show which ones are left.
-- Changing any calculator card, the API, or the mockup.
+- Changing any calculator card, the API, or the mockup, beyond rules 5a and 5b.
 - Phone widths: the product targets the desktop website only (since November 1, 2026).
