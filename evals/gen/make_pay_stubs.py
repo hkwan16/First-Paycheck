@@ -12,7 +12,9 @@ HTML rendered to PDF with WeasyPrint; image stubs are that PDF rasterized with
 pypdfium2 at 200 dpi, some with scan-style speckle, blur and a slight
 rotation, some wrapped back into a PDF with no text layer.
 Several print a synthetic SSN (area 900-999, never issued) and an account
-number, masked or in full, so redaction is exercised.
+number, masked or in full, so redaction is exercised. Stubs 31-34 each print
+one deduction line with a dash or ``0.00`` for its amount, which reads as 0
+(spec 005 rule 1a, issue 195).
 
 Next to each document, ``<id>.json`` holds its labels: the values a correct
 reading gives, with ``null`` for an amount the stub does not print.
@@ -44,6 +46,11 @@ RASTER_DPI = 200
 Layout = Literal["ledger", "summary", "advice"]
 Output = Literal["text_pdf", "png", "noisy_png", "noisy_jpeg", "scanned_pdf"]
 Frequency = Literal["weekly", "biweekly", "semimonthly", "monthly"]
+ZeroField = Literal["retirement_contribution_cents", "medical_premium_cents"]
+ZERO_LABELS: dict[ZeroField, str] = {
+    "retirement_contribution_cents": "401(k)",
+    "medical_premium_cents": "Medical Pre-Tax",
+}
 
 PERIODS_PER_YEAR: dict[Frequency, int] = {
     "weekly": 52,
@@ -96,6 +103,9 @@ class Plan:
     output: Output
     ssn: Literal["full", "masked", "none"]
     account: Literal["full", "masked", "none"]
+    # A deduction line printed with no amount taken: (its pay_stubs column, what the
+    # amount cells say), such as a 401(k) the employee has not started.
+    zero: tuple[ZeroField, str] | None = None
 
 
 PLANS: tuple[Plan, ...] = (
@@ -130,6 +140,11 @@ PLANS: tuple[Plan, ...] = (
     Plan("summary", "text_pdf", "full", "masked"),
     Plan("ledger", "noisy_jpeg", "full", "masked"),
     Plan("advice", "scanned_pdf", "full", "full"),
+    # Issue 195: a deduction printed as a dash or a zero is 0, not missing.
+    Plan("ledger", "text_pdf", "full", "masked", zero=("retirement_contribution_cents", "-")),
+    Plan("summary", "png", "none", "full", zero=("retirement_contribution_cents", "0.00")),
+    Plan("advice", "noisy_png", "full", "masked", zero=("medical_premium_cents", "-")),
+    Plan("ledger", "scanned_pdf", "masked", "none", zero=("retirement_contribution_cents", "--")),
 )
 
 
@@ -139,6 +154,11 @@ class Line:
     cents: int
     # The pay_stubs column the line is counted in; None means other deductions.
     field: str | None
+    # What the amount cells print instead of the dollars (a dash); None prints them.
+    printed: str | None = None
+
+    def amount(self, multiple: int = 1) -> str:
+        return self.printed or dollars(self.cents * multiple)
 
 
 @dataclass(frozen=True)
@@ -293,6 +313,10 @@ def _stub(index: int, plan: Plan, rng: random.Random) -> Stub:
         deductions.append(Line("Vision", rng.choice([280, 410]), None))
     if rng.random() < 0.3:
         deductions.append(Line("Commuter Transit", rng.choice([5_000, 7_500]), None))
+    if plan.zero is not None:
+        field, printed = plan.zero
+        others = [line for line in deductions if line.field != field]
+        deductions = [Line(ZERO_LABELS[field], 0, field, printed), *others]
 
     ssn = f"9{rng.randint(0, 99):02d}-{rng.randint(10, 99)}-{rng.randint(1000, 9999)}"
     account = str(rng.randint(10**9, 10**12 - 1))
@@ -359,8 +383,8 @@ def _rows(lines: Sequence[Line], ytd: int | None) -> str:
     cells = []
     for line in lines:
         label = f"<td>{html.escape(line.label)}</td>"
-        amount = f"<td class='num'>{dollars(line.cents)}</td>"
-        year = f"<td class='num'>{dollars(line.cents * ytd)}</td>" if ytd else ""
+        amount = f"<td class='num'>{line.amount()}</td>"
+        year = f"<td class='num'>{line.amount(ytd)}</td>" if ytd else ""
         cells.append(f"<tr>{label}{amount}{year}</tr>")
     return "".join(cells)
 
@@ -444,8 +468,7 @@ def _iso(day: dt.date) -> str:
 
 def _side(lines: Sequence[Line]) -> list[str]:
     return [
-        f"<td>{html.escape(line.label)}</td><td class='num'>{dollars(line.cents)}</td>"
-        for line in lines
+        f"<td>{html.escape(line.label)}</td><td class='num'>{line.amount()}</td>" for line in lines
     ]
 
 
