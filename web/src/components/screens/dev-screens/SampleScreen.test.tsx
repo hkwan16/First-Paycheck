@@ -45,7 +45,8 @@ describe('SampleScreen', () => {
     const requests = countRequests();
     render(<SampleScreen screen="spending" />);
     const table = await screen.findByRole('table', { name: 'Transactions' });
-    expect(within(table).getAllByRole('row')).toHaveLength(17);
+    // The header and the newest 10 rows; the card opens on those (spec 003 rule 17a).
+    expect(within(table).getAllByRole('row')).toHaveLength(11);
     expect(screen.getByRole('link', { name: 'Spending map' })).toHaveAttribute(
       'aria-current',
       'page',

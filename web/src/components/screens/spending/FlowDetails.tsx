@@ -4,13 +4,7 @@ import Link from 'next/link';
 import type { FlowNode } from '@/components/sankey';
 import { Money } from '@/components/ui/Money';
 import { maskLabel } from '@/lib/accounts';
-import type {
-  AccountKind,
-  CashFlow,
-  SpendingSummary,
-  Transaction,
-  WithholdingLine,
-} from '@/lib/api/types';
+import type { CashFlow, SpendingSummary, Transaction, WithholdingLine } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import { formatNumber, formatTransactionAmount } from '@/lib/money';
 import { shareText } from './spending-format';
@@ -39,12 +33,13 @@ const Muted = ({ children }: { children: React.ReactNode }) => (
 export interface FlowDetailsProps {
   node: FlowNode;
   flow: CashFlow;
-  /** The period's transactions loaded for the table, newest first. */
+  /**
+   * The period's transactions loaded for the table, newest first: only rows
+   * on the accounts the totals read (`cash_accounts_only`, spec 003 rule 17).
+   */
   transactions: readonly Transaction[];
   /** account_id to its mask ("4821"). */
   masks: ReadonlyMap<string, string | null>;
-  /** account_id to its kind, to leave out the ledgers the API does not count. */
-  kinds: ReadonlyMap<string, AccountKind>;
 }
 
 /** A bucket's share of income in the summary; the other buckets have none. */
@@ -57,10 +52,10 @@ const BUCKET_SHARES = {
 /**
  * What a Sankey node's popover says under its name and amount. Every number
  * is one the API sent (amounts, percentages, counts); the category lines are
- * the loaded transactions of that category in the period on the accounts the
- * API counted, as the table lists them.
+ * the loaded posted transactions of that category in the period, as the
+ * table lists them.
  */
-export function FlowDetails({ node, flow, transactions, masks, kinds }: FlowDetailsProps) {
+export function FlowDetails({ node, flow, transactions, masks }: FlowDetailsProps) {
   const stubs = flow.withholding.paycheck_count;
   const stubWords = count(stubs, 'pay stub', 'pay stubs');
 
@@ -69,8 +64,8 @@ export function FlowDetails({ node, flow, transactions, masks, kinds }: FlowDeta
       if (stubs === 0) {
         return (
           <Muted>
-            No confirmed pay stub was paid in this period.{' '}
-            <Link href="/setup/confirm">Confirm one from it</Link> to see gross pay and withholding.
+            No pay stub from this period. <Link href="/setup/confirm">Confirm one</Link> to see what
+            comes out of your pay.
           </Muted>
         );
       }
@@ -86,7 +81,7 @@ export function FlowDetails({ node, flow, transactions, masks, kinds }: FlowDeta
       if (node.zero && node.key === 'retirement_contribution') {
         return (
           <div className="flex flex-col gap-1">
-            <Muted>Nothing went to a 401(k) from {stubWords}.</Muted>
+            <Muted>Nothing went to a 401(k) on {stubWords}.</Muted>
             <Link href={decisionStepRoute('401k_match')} className="text-small">
               See what a 401(k) match is worth
             </Link>
@@ -100,21 +95,21 @@ export function FlowDetails({ node, flow, transactions, masks, kinds }: FlowDeta
       if (stubs === 0) {
         return (
           <Muted>
-            Deposits labeled income in this period. A confirmed pay stub shows what came before
-            them.
+            Pay and other income that reached your accounts. Confirm a pay stub to see what came out
+            before payday.
           </Muted>
         );
       }
       return (
         <dl className="m-0 flex flex-col gap-0.5 text-tiny text-ink-3">
           <div>
-            <dt className="inline">Net pay on {stubWords}: </dt>
+            <dt className="inline">Take-home on {stubWords}: </dt>
             <dd className="inline">
               <Money cents={flow.withholding.net_cents} className="font-semibold text-ink" />
             </dd>
           </div>
           <div>
-            <dt className="inline">Deposited as income: </dt>
+            <dt className="inline">Income deposited in your accounts: </dt>
             <dd className="inline">
               <Money cents={flow.spending.income_cents} className="font-semibold text-ink" />
             </dd>
@@ -131,8 +126,8 @@ export function FlowDetails({ node, flow, transactions, masks, kinds }: FlowDeta
         return (
           <Muted>
             {node.cents < 0
-              ? 'Spending ran past the income deposited in this period.'
-              : 'Still in your accounts, not spent or moved.'}
+              ? 'You spent more than the income deposited.'
+              : 'Still in your accounts.'}
           </Muted>
         );
       }
@@ -141,20 +136,14 @@ export function FlowDetails({ node, flow, transactions, masks, kinds }: FlowDeta
 
     case 'category': {
       const total = flow.spending.categories.find((c) => c.category === node.key);
-      // The rows the API counted: posted, in the period, and not on a loan,
-      // investment or retirement ledger (spec 007 rule 21a).
-      const counted = (accountId: string) => {
-        const kind = kinds.get(accountId);
-        return kind === undefined || flow.spending.account_kinds_counted.includes(kind);
-      };
+      // The rows the API counted: posted and in the period.
       const lines = transactions
         .filter(
           (t) =>
             t.category === node.key &&
             !t.pending &&
             t.posted_at >= flow.start &&
-            t.posted_at <= flow.end &&
-            counted(t.account_id),
+            t.posted_at <= flow.end,
         )
         .slice(0, POPOVER_LINES);
       return (
@@ -187,7 +176,7 @@ export function FlowDetails({ node, flow, transactions, masks, kinds }: FlowDeta
               })}
             </ul>
           )}
-          <Muted>Fix a label in the table below and this total follows.</Muted>
+          <Muted>Change a category under Transactions and this total follows.</Muted>
         </div>
       );
     }

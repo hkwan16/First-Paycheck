@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sampleTransactions } from '@/test/fixtures/sample';
 import {
-  countSources,
   ledgerNote,
   monthName,
   NO_SHARE,
@@ -21,41 +20,34 @@ describe('sourceBadge', () => {
     });
   });
 
-  it('shows an AI label with its confidence, as a warning under 70%', () => {
+  it('calls a category we read from the name a guess, and asks for a check under 70%', () => {
     expect(sourceBadge({ ...txn, category_source: 'llm', confidence: 0.91 })).toEqual({
       tone: 'blue',
-      text: 'AI · 91%',
+      text: 'Our guess',
     });
     expect(sourceBadge({ ...txn, category_source: 'llm', confidence: 0.7 })).toEqual({
       tone: 'blue',
-      text: 'AI · 70%',
+      text: 'Our guess',
     });
     expect(sourceBadge({ ...txn, category_source: 'llm', confidence: 0.62 })).toEqual({
       tone: 'warning',
-      text: 'AI · 62%',
+      text: 'Guess, check it',
     });
     expect(sourceBadge({ ...txn, category_source: 'llm', confidence: null })).toEqual({
       tone: 'blue',
-      text: 'AI',
+      text: 'Our guess',
     });
   });
 
-  it('shows rules as neutral, and says when nothing has labeled it yet', () => {
+  it('shows a known merchant as neutral, and says when nothing has set a category', () => {
     expect(sourceBadge({ ...txn, category_source: 'rule' })).toEqual({
       tone: 'neutral',
-      text: 'Rule',
+      text: 'Known merchant',
     });
     expect(sourceBadge({ ...txn, category: null, category_source: null })).toEqual({
       tone: 'neutral',
-      text: 'Not labeled',
+      text: 'No category',
     });
-  });
-});
-
-describe('countSources', () => {
-  it('counts the loaded rows by who labeled them', () => {
-    expect(countSources(sampleTransactions)).toEqual({ rule: 11, llm: 4, user: 1 });
-    expect(countSources([])).toEqual({ rule: 0, llm: 0, user: 0 });
   });
 });
 
@@ -79,19 +71,19 @@ describe('shareText', () => {
     expect(shareText('-15.0', (pct) => `Savings rate ${pct}`)).toBe('Savings rate -15%');
   });
 
-  it('says n/a and why when the API sent no share', () => {
-    expect(NO_SHARE).toBe('n/a, income too small to compare');
+  it('says why when the API sent no share', () => {
+    expect(NO_SHARE).toBe('Too little income to compare');
     expect(shareText(null, (pct) => `${pct} of income`)).toBe(NO_SHARE);
   });
 });
 
 describe('ledgerNote', () => {
-  it('says how many ledger rows the totals left out', () => {
+  it('says how many loan, investment and retirement transactions the totals left out', () => {
     expect(ledgerNote({ count: 165, net_cents: -5_619_612 })).toBe(
-      "165 rows on loan, investment and retirement accounts are left out: they are those accounts' own ledgers, not money you spent or received.",
+      'Not counted: 165 transactions on loan, investment and retirement accounts. A loan payment counts once, when it leaves checking.',
     );
     expect(ledgerNote({ count: 1, net_cents: 3_500 })).toBe(
-      "1 row on a loan, investment or retirement account is left out: it is that account's own ledger, not money you spent or received.",
+      'Not counted: 1 transaction on a loan, investment or retirement account. A loan payment counts once, when it leaves checking.',
     );
   });
 

@@ -16,8 +16,9 @@ from sqlalchemy import or_, select, tuple_
 from app.auth import CurrentUser
 from app.deps import UserSession
 from app.errors import AppError, NotFound, error_responses
+from db.accounts import SPENDING_ACCOUNT_KINDS, active_account_of, transaction_account
 from db.enums import CategorySource
-from db.models import Transaction
+from db.models import Account, Transaction
 from sync.categories import Category
 from sync.categorize import record_user_label
 
@@ -114,6 +115,13 @@ def list_transactions(
         float | None,
         Query(ge=0, le=1, description="Rule and user labels count as 1; uncategorized excluded"),
     ] = None,
+    cash_accounts_only: Annotated[
+        bool,
+        Query(
+            description="Only rows on active checking, savings and credit accounts, the ones"
+            " the spending summary reads"
+        ),
+    ] = False,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
     cursor: Annotated[str | None, Query(max_length=200)] = None,
 ) -> TransactionPage:
@@ -136,6 +144,10 @@ def list_transactions(
                 Transaction.category_source.in_([CategorySource.RULE, CategorySource.USER]),
                 Transaction.confidence >= min_confidence,
             ),
+        )
+    if cash_accounts_only:
+        query = query.join(Account, transaction_account()).where(
+            active_account_of(SPENDING_ACCOUNT_KINDS)
         )
     if cursor is not None:
         after_posted, after_id = decode_cursor(cursor)

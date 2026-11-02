@@ -402,10 +402,14 @@ explanation, `GET /calendar` shows the check it implies.
   of every total and reported as `income_outflows_ignored_cents`, so
   `income_cents` is never negative. Spending buckets still net refunds.
   Only `checking`, `savings` and `credit` rows are read (rule 21a,
-  `SPENDING_ACCOUNT_KINDS`): a loan's, investment's or retirement account's
-  own ledger (a loan books the payment that left checking as money in, and
-  interest as money out) is in no total and reported as `ledger_rows_skipped`
-  (`count`, `net_cents`); a new `AccountKind` must join one of the two sets.
+  `SPENDING_ACCOUNT_KINDS` in `db/accounts.py`, with the join and predicate
+  helpers `transaction_account()` and `active_account_of(kinds)`): a loan's,
+  investment's or retirement account's own ledger (a loan books the payment
+  that left checking as money in, and interest as money out) is in no total
+  and reported as `ledger_rows_skipped` (`count`, `net_cents`); a new
+  `AccountKind` must join one of the two sets. Recurring detection (spec 009
+  rule 1a) and `GET /transactions?cash_accounts_only=true` (the Spending
+  screen's list, spec 003 rule 17) read the same accounts.
   A share of income is null with no income or when its size would exceed
   1,000.0 (`calc.spending.MAX_SHARE_PCT`, rule 25).
   `tests/support/sandbox_history.py:link_sandbox` runs a recorded sandbox
@@ -448,7 +452,8 @@ Specs 009 and 010. Migration `0005_checkins` adds `recurring_charges`,
 (no ON DELETE action) and `explanations.finding_id`.
 
 - **Recurring detection** (`sync/recurring.py`): `detect(charges, today)` is
-  pure: money-out transactions grouped by `merchant_norm`, the series is the
+  pure: money-out transactions (posted, on active cash accounts: rule 1a, so a
+  loan's monthly interest is no bill) grouped by `merchant_norm`, the series is the
   charges within 15% of the group median, a cadence band (weekly 6-8 d,
   monthly 27-33 d, yearly 350-380 d) must hold three quarters of the gaps, and
   each cadence has a minimum length (4, 3, 2). Amount arithmetic is
