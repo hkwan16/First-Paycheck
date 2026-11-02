@@ -17,7 +17,7 @@ from collections.abc import Collection
 from dataclasses import dataclass
 
 from pydantic import BaseModel
-from sqlalchemy import func, select, update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.errors import AppError
@@ -34,7 +34,8 @@ from db.enums import (
     GoalKind,
     GoalStatus,
 )
-from db.models import Account, CalendarEvent, Decision, Goal, PayStub, Profile
+from db.models import Account, CalendarEvent, Decision, Goal, Profile
+from db.pay_stubs import latest_pay_date
 
 __all__ = [
     "ELECTION_CHECK_TITLE",
@@ -99,8 +100,8 @@ def _pay_frequency(session: Session, user_id: uuid.UUID, periods: int) -> PayFre
 
 
 def _next_pay_date(session: Session, user_id: uuid.UUID, periods: int, today: dt.date) -> dt.date:
-    """Spec 007 rule 16, anchored on the latest confirmed pay stub."""
-    anchor = session.scalar(select(func.max(PayStub.pay_date)))
+    """Spec 007 rule 16, anchored on the latest current confirmed pay stub."""
+    anchor = latest_pay_date(session)
     return next_pay_date(_pay_frequency(session, user_id, periods), anchor, today)
 
 

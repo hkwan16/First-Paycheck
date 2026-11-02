@@ -89,7 +89,7 @@ src/app/dev/screens/{link,account,spending,confirm,confirm/manual,confirm/unread
                     after-alpha},why,why/fallback,why/stale,why/emergency-fund,why-index,check-in,
                     check-in/complete,check-in-index,plan,plan/empty}  a screen on the sample data, no
                     API (development only); `account` is Link with the header's account menu
-src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, queued animation frames settled
+src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, Recharts' batched updates settled
                     before jsdom closes: animation-frames.ts; Testing Library's async wrapper
                     taught Vitest's fake timers: async-wrapper.ts), render.tsx, fake-xhr.ts,
                     fake-download.ts (object URLs and anchor clicks recorded, no navigation),
@@ -904,7 +904,10 @@ Both change the e2e user's data, so they are ordered projects with serial files 
 parallel tests. `confirm.spec.ts` (project `authenticated-confirm`) uploads
 `e2e/fixtures/acme-paystub.pdf`, a synthetic stub with an example SSN the API must redact and a
 masked account number (regenerate it with `node e2e/fixtures/make-acme-paystub.mjs`), waits for
-the read, confirms every field and continues to Spending. `decisions.spec.ts` (project
+the read, confirms every field and continues to Spending; it then uploads and confirms the same
+file again (not a Replace) and checks Spending's October still reads "1 pay stub" and "Gross pay,
+1 stub $2,708.33" (issue 190: the newer confirm supersedes the copy). It fails asking for the
+fixture to move when the period picker no longer offers October 2026. `decisions.spec.ts` (project
 `authenticated-decisions`, after confirm) opens `/setup/decisions` (redirected to the first
 step) and takes the side nav to the 401(k) step, fills in the plan details if the profile has none,
 saves a 401(k) decision, changes it and saves the next version, then opens its explanation and

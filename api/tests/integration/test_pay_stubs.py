@@ -12,6 +12,7 @@ from app.db import user_session_for
 from app.routers.pay_stubs import newest_pay_stub, pay_stub_rate, pay_stub_withholding
 from tests.conftest import FixtureUser
 from tests.support.factories import STUB_01, make_document, make_pay_stub
+from tests.support.pay_stub_copies import confirm_stub, replaced_late_october
 
 Client = Callable[[FixtureUser], TestClient]
 
@@ -137,3 +138,26 @@ def test_annual_salary_is_null_without_a_pay_frequency(
 
 def test_no_stubs(client_as: Client, user_a: FixtureUser) -> None:
     assert client_as(user_a).get("/pay-stubs").json() == []
+
+
+def test_superseded_stub_is_not_listed(
+    db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """The same stub confirmed twice is listed once (spec 005 rules 22b-22d, issue 190)."""
+    client = client_as(user_a)
+    confirm_stub(client, db_connection, user_a)
+    second = confirm_stub(client, db_connection, user_a)
+    assert [s["id"] for s in client.get("/pay-stubs").json()] == [str(second)]
+
+
+def test_newest_pay_stub_skips_a_superseded_stub(
+    db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """A Replace that corrected the pay period: the corrected stub is the newest,
+    though the one it superseded has the later pay date (spec 005 rule 22b)."""
+    _, new = replaced_late_october(client_as(user_a), db_connection, user_a)
+    with user_session_for(user_a.id, bind=db_connection) as session:
+        newest = newest_pay_stub(session)
+        assert newest is not None
+        # The superseded stub shows 5.00%; the current one 0.00%.
+        assert (newest.id, str(pay_stub_rate(newest))) == (new, "0.00")

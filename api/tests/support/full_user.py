@@ -55,6 +55,7 @@ from tests.support.factories import (
     make_recurring_charge,
     make_snapshot,
     make_transaction,
+    supersede_pay_stub,
 )
 
 NOW = dt.datetime(2026, 10, 21, 15, 0, tzinfo=dt.UTC)
@@ -112,7 +113,16 @@ def populate_every_table(connection: Connection, user_id: uuid.UUID) -> FullUser
     make_holding(connection, user_id, brokerage)
 
     stub_document = make_document(connection, user_id, with_blob=False)
-    make_pay_stub(connection, user_id, stub_document)
+    current_stub = make_pay_stub(connection, user_id, stub_document)
+    # A stub the one above superseded (spec 005 rule 22b): the same-user self
+    # reference must cascade too.
+    superseded_stub = make_pay_stub(
+        connection,
+        user_id,
+        make_document(connection, user_id, with_blob=False),
+        pay_date=dt.date(2026, 10, 14),
+    )
+    supersede_pay_stub(connection, user_id, superseded_stub, current_stub)
     replacement = make_document(connection, user_id)  # with its blob
     # Retired by the upload above (spec 004 rule 24): the same-user key must cascade too.
     make_document(connection, user_id, with_blob=False, deleted_at=NOW, replaced_by_id=replacement)

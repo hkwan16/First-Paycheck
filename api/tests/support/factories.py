@@ -9,7 +9,7 @@ import uuid
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, update
 
 from app.db import user_session_for
 from db.enums import (
@@ -265,6 +265,14 @@ def make_pay_stub(
         session.add(stub)
         session.flush()
         return stub.id
+
+
+def supersede_pay_stub(
+    connection: Connection, user_id: uuid.UUID, old: uuid.UUID, new: uuid.UUID
+) -> None:
+    """Mark ``old`` superseded by ``new``, as the user (spec 005 rule 22b)."""
+    with user_session_for(user_id, bind=connection) as session:
+        session.execute(update(PayStub).where(PayStub.id == old).values(superseded_by_id=new))
 
 
 def make_job(

@@ -14,7 +14,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.deps import Now, UserSession
@@ -23,6 +22,7 @@ from app.routers.spending import SpendingSummary, period, summary_for
 from calc.cashflow import StubFlow, withholding
 from calc.pay_stub import PayStubAmounts
 from db.models import PayStub
+from db.pay_stubs import current_pay_stubs
 
 router = APIRouter(prefix="/cashflow", tags=["spending"])
 
@@ -79,7 +79,7 @@ def cash_flow_for(session: Session, first: dt.date, last: dt.date) -> CashFlow:
     """The cash flow of an already validated period (the check-in detail shares it)."""
     stubs = list(
         session.scalars(
-            select(PayStub)
+            current_pay_stubs()
             .where(PayStub.pay_date.between(first, last))
             .order_by(PayStub.pay_date, PayStub.id)
         )

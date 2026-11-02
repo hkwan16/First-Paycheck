@@ -42,6 +42,7 @@ from db.models import (
     PayStub,
     RecurringCharge,
 )
+from db.pay_stubs import NEWEST_FIRST, current_pay_stubs
 
 __all__ = ["DEADLINE_WINDOW_DAYS", "current_decisions", "load_facts", "plan_targets", "utc_date"]
 
@@ -218,11 +219,7 @@ def _events(session: Session, today: dt.date) -> list[EventFact]:
 def load_facts(session: Session, period: dt.date, today: dt.date) -> Facts:
     """Everything the finders read for ``period``, as of ``today``."""
     current = current_decisions(session)
-    stubs = session.scalars(
-        select(PayStub)
-        .order_by(PayStub.pay_date.desc(), PayStub.created_at.desc(), PayStub.id.desc())
-        .limit(2)
-    )
+    stubs = session.scalars(current_pay_stubs().order_by(*NEWEST_FIRST).limit(2))
     by_id = {decision.id: decision for decision in current.values()}
     goal_decisions = {
         row.id: row

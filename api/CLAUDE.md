@@ -197,8 +197,9 @@ Rules:
   `0011_no_model_reason`, `0009_w4_calendar_kind`, `0012_checkin_findings`,
   `0013_plan_export_job`, `0014_delete_account_fn`, `0015_loan_account_kind`,
   `0016_rule_match_contains`, `0017_document_replaced_by`,
-  `0018_check_in_last_run_at`, `0019_explanation_context_digest` (each revises
-  the one before it); the head is `0019_explanation_context_digest`.
+  `0018_check_in_last_run_at`, `0019_explanation_context_digest`,
+  `0020_pay_stub_superseded_by` (each revises the one before it); the head is
+  `0020_pay_stub_superseded_by`.
 - Adding an enum label is `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with
   `AFTER` when the order means something, as `by_kind` does for
   `account_kind`); the downgrade maps the rows that use it and rebuilds the
@@ -261,6 +262,20 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   gross, never stored. The 401(k) card starts from it when nothing is saved,
   and `POST /explain` states it beside the chosen rate (spec 008 rule 7a).
   `app/routers/pay_stubs.py:newest_pay_stub` is the newest stub in that order.
+- **One current stub per paycheck** (spec 005 rules 22a-22e, issue 190, migration
+  `0020`). Confirm goes through `db/pay_stubs.py:add_confirmed`, which takes a
+  per-user advisory lock and marks as superseded (`superseded_by_id`) the current
+  stub of the same paycheck (same `employer_key`, pay date and period) and any
+  current stub of a document the confirmed one replaced, along the replace chain.
+  Read pay stubs only through `db/pay_stubs.py` (`current_pay_stubs()`,
+  `NEWEST_FIRST`, `latest_pay_date`, `paid_between_count`): `test_boundaries`
+  fails on a `select`/`select_from`/`get` of `PayStub` or SQL naming `pay_stubs`
+  anywhere else. `uq_pay_stubs_current_paycheck` (partial unique index) is the
+  backstop; `superseded_by_id` is a deferred same-user self reference, and the
+  `pay_stubs_supersede_only` AFTER trigger plus a column grant keep every other
+  value append-only. Tests confirm copies through the route with
+  `tests/support/pay_stub_copies.py`; `make_pay_stub` twice with the same dates
+  now hits the index, so give a second stub its own pay date.
 - Refusal, a spent budget, no readable page or no model (no gateway, or
   `LLMMisconfigured`: the API rejected the key or the model id) make the
   document `manual_entry_required` on the first attempt; schema and other API

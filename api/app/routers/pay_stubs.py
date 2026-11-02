@@ -8,7 +8,6 @@ from decimal import Decimal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, computed_field
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.deps import UserSession
@@ -19,6 +18,7 @@ from calc.pay_dates import frequency_named
 from calc.types import ResultPercent
 from db.enums import PayFrequency
 from db.models import PayStub
+from db.pay_stubs import NEWEST_FIRST, current_pay_stubs
 
 router = APIRouter(prefix="/pay-stubs", tags=["pay-stubs"])
 
@@ -73,12 +73,10 @@ class PayStubOut(BaseModel):
         return cls.model_validate(stub, from_attributes=True)
 
 
-NEWEST_FIRST = (PayStub.pay_date.desc(), PayStub.created_at.desc())
-
-
 def newest_pay_stub(session: Session) -> PayStub | None:
-    """The user's newest confirmed stub, in ``GET /pay-stubs`` order (spec 005 rule 24)."""
-    return session.scalars(select(PayStub).order_by(*NEWEST_FIRST).limit(1)).first()
+    """The user's newest current confirmed stub, in ``GET /pay-stubs`` order (spec 005
+    rules 22d and 24)."""
+    return session.scalars(current_pay_stubs().order_by(*NEWEST_FIRST).limit(1)).first()
 
 
 def pay_stub_rate(stub: PayStub | None) -> Decimal | None:
@@ -107,6 +105,6 @@ def pay_stub_withholding(stub: PayStub | None, pay_periods_per_year: int) -> int
 
 @router.get("", responses=error_responses(401))
 def list_pay_stubs(session: UserSession) -> list[PayStubOut]:
-    """The user's confirmed pay stubs, newest pay date first."""
-    stubs = session.scalars(select(PayStub).order_by(*NEWEST_FIRST))
+    """The user's current confirmed pay stubs, newest pay date first."""
+    stubs = session.scalars(current_pay_stubs().order_by(*NEWEST_FIRST))
     return [PayStubOut.of(stub) for stub in stubs]

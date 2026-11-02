@@ -417,3 +417,81 @@ def test_0001_leaves_the_cluster_wide_role_alone_once_it_is_set_up(
     assert role_rows(engine) == before
     upgrade(url, "head")
     assert role_rows(engine) == before
+
+
+def test_0020_supersedes_copies_already_confirmed_in_confirm_order(
+    scratch_database: tuple[str, Engine],
+) -> None:
+    """Spec 005 rule 22e (issue 190): stubs stored before 0020 are superseded as
+    rule 22b would have done, so each paycheck keeps its newest copy current."""
+    url, engine = scratch_database
+    upgrade(url, "0019_explanation_context_digest")
+    user = "00000000-0000-4000-8000-0000000000c1"
+    other = "00000000-0000-4000-8000-0000000000c2"
+    document = text(
+        "INSERT INTO documents (id, user_id, type, content_type, size_bytes, replaced_by_id,"
+        " deleted_at) VALUES (:d, :u, 'pay_stub', 'application/pdf', 1, :r,"
+        " CASE WHEN CAST(:r AS uuid) IS NULL THEN NULL ELSE now() END)"
+    )
+    stub = text(
+        "INSERT INTO pay_stubs (id, user_id, document_id, employer_name, pay_date,"
+        " period_start, period_end, gross_cents, net_cents, created_at)"
+        " VALUES (:id, :u, :d, :employer, :pay_date, '2026-10-01', '2026-10-15',"
+        " 270833, 270833, :at)"
+    )
+    # (stub, owner, document, replaced by, employer, pay date, confirmed at)
+    rows = [
+        ("a1", user, "d1", None, "Acme Corp", "2026-10-15", "2026-10-20 10:00"),
+        ("a2", user, "d2", None, "ACME  corp", "2026-10-15", "2026-10-20 10:05"),
+        ("a3", user, "d3", None, "Acme Corp", "2026-10-15", "2026-10-20 10:10"),
+        ("b1", user, "d4", None, "Beta LLC", "2026-10-15", "2026-10-20 10:15"),
+        # A typo the user replaced (d5 by d6) and confirmed with another pay date.
+        ("t1", user, "d5", "d6", "Typo Co", "2026-10-13", "2026-10-21 09:00"),
+        ("t2", user, "d6", None, "Typo Co", "2026-10-14", "2026-10-21 09:05"),
+        ("o1", other, "d7", None, "Acme Corp", "2026-10-15", "2026-10-20 09:00"),
+    ]
+
+    def uid(name: str) -> str:
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, name))
+
+    with engine.begin() as connection:
+        for owner in (user, other):
+            connection.execute(text("INSERT INTO auth.users (id) VALUES (:u)"), {"u": owner})
+        # Documents nothing replaced first, so a replaced one can name its replacement.
+        for _, owner, doc, replaced_by, *_ in sorted(rows, key=lambda row: row[3] is not None):
+            connection.execute(
+                document,
+                {"d": uid(doc), "u": owner, "r": uid(replaced_by) if replaced_by else None},
+            )
+        for name, owner, doc, _, employer, pay_date, at in rows:
+            connection.execute(
+                stub,
+                {
+                    "id": uid(name),
+                    "u": owner,
+                    "d": uid(doc),
+                    "employer": employer,
+                    "pay_date": pay_date,
+                    "at": f"{at}+00",
+                },
+            )
+
+    upgrade(url, "head")
+    with engine.connect() as connection:
+        rows_after = connection.execute(
+            text("SELECT id::text, superseded_by_id::text FROM pay_stubs")
+        ).all()
+    superseded: dict[str, str | None] = {row[0]: row[1] for row in rows_after}
+    by_name = {uid(name): name for name, *_ in rows}
+    assert {by_name[k]: v and by_name[v] for k, v in superseded.items()} == {
+        "a1": "a2",
+        "a2": "a3",
+        "a3": None,
+        "b1": None,
+        "t1": "t2",
+        "t2": None,
+        "o1": None,
+    }
+
+    downgrade(url, "0019_explanation_context_digest")
+    upgrade(url, "head")

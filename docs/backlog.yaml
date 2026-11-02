@@ -1588,6 +1588,7 @@ issues:
     milestone: M10
     priority: High
     status: done
+    # Fixed October 29: the shared afterAll waits one frame. November 1 (CI on PR 192): a chart mounted under fake timers keeps the fake frame, so the wait now covers the 100 ms fallback timer (settleChartUpdates).
   # Found on October 29 in the first measured eval runs (#144).
   - title: "Nightly evals run the LLM suites"
     body: >-
@@ -1959,4 +1960,5 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: High
-    status: todo
+    status: done
+    # Fixed November 1: spec 005 rules 22a-22e. A newer confirm of the same paycheck supersedes the old stub; every reader goes through db/pay_stubs.py.

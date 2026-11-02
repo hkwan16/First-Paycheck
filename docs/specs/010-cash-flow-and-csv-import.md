@@ -75,7 +75,7 @@ Part B lets a user bring in an account they will not link through Plaid: `POST /
 
 ### Part A: cash flow
 
-1. **Which stubs.** The user's confirmed `pay_stubs` with `pay_date` in the period, read under RLS (the same stubs `paycheck_count` counts in spec 007 rule 26).
+1. **Which stubs.** The user's current confirmed `pay_stubs` with `pay_date` in the period, read under RLS (the same stubs `paycheck_count` counts in spec 007 rule 26). A stub another confirm superseded (spec 005 rules 22a-22d, issue 190) draws nothing, so the same stub confirmed twice is one paycheck, not two.
 2. **Lines.** Each stub's seven deduction columns become the seven lines above. Amounts are the stored non-negative magnitudes (spec 001 rule 23).
 3. **Per stub.** `deductions_cents` is the sum of the seven lines; `roles` sums the lines by role. `calc/cashflow.py` checks `gross_cents - deductions_cents = net_cents` and raises on a stub that does not balance (the `pay_stub_balances` constraint makes that unreachable for stored rows).
 4. **Period totals.** `withholding` sums each line, `gross_cents`, `deductions_cents` and `net_cents` over the period's stubs; with no stubs every amount is 0 and `pay_stubs` is empty.

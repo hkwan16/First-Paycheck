@@ -23,7 +23,8 @@ from app.routers.goals import GoalOut, goal_out
 from app.types import UtcDateTime
 from calc.registry import calculator
 from db.enums import CalculatorKind, CalendarStatus, PayFrequency
-from db.models import CalendarEvent, Decision, Explanation, Goal, PayStub
+from db.models import CalendarEvent, Decision, Explanation, Goal
+from db.pay_stubs import NEWEST_FIRST, current_pay_stubs
 from retrieval.citations import by_key, for_calculator
 
 __all__ = [
@@ -320,9 +321,7 @@ def _calendar(session: Session, start: dt.date, end: dt.date) -> list[CalendarEv
 
 
 def _pay_stub(session: Session) -> PlanPayStub | None:
-    stub = session.scalars(
-        select(PayStub).order_by(PayStub.pay_date.desc(), PayStub.created_at.desc()).limit(1)
-    ).first()
+    stub = session.scalars(current_pay_stubs().order_by(*NEWEST_FIRST).limit(1)).first()
     if stub is None:
         return None
     return PlanPayStub(

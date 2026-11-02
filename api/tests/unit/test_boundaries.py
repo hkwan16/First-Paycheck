@@ -7,12 +7,15 @@
 * The privileged engine is used only by ``app/db.py`` (its definition),
   ``jobs/queue.py``, ``jobs/scheduler.py`` and the deploy-time seed loader
   ``db/seed/load.py`` (spec 001 rule 11).
+* Pay stubs are read only through ``db/pay_stubs.py``, so a superseded copy is
+  never counted (spec 005 rule 22d, issue 190).
 """
 
 from __future__ import annotations
 
 import ast
 import os
+import re
 import subprocess
 import sys
 from collections.abc import Iterator
@@ -311,6 +314,80 @@ def test_only_the_export_store_touches_plan_exports() -> None:
         and (found := export_violations(path.read_text()))
     }
     assert not problems, f"only export/store.py may touch plan_exports: {problems}"
+
+
+PAY_STUB_READS_ALLOWED = {"db/pay_stubs.py", "db/models.py"}
+QUERY_CALLS = {"select", "select_from", "get"}
+SQL_NAMING_PAY_STUBS = re.compile(r"\b(from|join|update|into)\s+(public\.)?pay_stubs\b", re.I)
+
+
+def pay_stub_query_violations(source: str) -> list[str]:
+    """Queries of ``pay_stubs`` that do not start from ``current_pay_stubs()``:
+    a ``select``, ``select_from`` or ``Session.get`` naming ``PayStub``, or SQL
+    text naming the table (spec 005 rule 22d, issue 190)."""
+    tree = ast.parse(source)
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
+        if name in QUERY_CALLS and any(
+            isinstance(inner, ast.Name) and inner.id == "PayStub"
+            for arg in node.args
+            for inner in ast.walk(arg)
+        ):
+            found.append(f"line {node.lineno}: {name}() of PayStub")
+    found += [
+        f"line {node.lineno}: names pay_stubs"
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and SQL_NAMING_PAY_STUBS.search(node.value)
+    ]
+    return found
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "session.scalars(select(PayStub).order_by(PayStub.pay_date))",
+        "session.scalar(select(func.max(PayStub.pay_date)))",
+        "select(func.count()).select_from(PayStub)",
+        "session.get(PayStub, stub_id)",
+        "session.execute(text('SELECT gross_cents FROM pay_stubs'))",
+    ],
+)
+def test_pay_stub_check_flags_direct_queries(source: str) -> None:
+    assert pay_stub_query_violations(source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "session.scalars(current_pay_stubs().order_by(*NEWEST_FIRST).limit(2))",
+        "def of(stub: PayStub) -> PayStubOut: ...",
+        "stub = PayStub(user_id=user_id, **fields)",
+        "router = APIRouter(prefix='/pay-stubs')",
+        '"""A confirmed pay stub (spec 001 ``pay_stubs``)."""',
+    ],
+)
+def test_pay_stub_check_allows_current_reads(source: str) -> None:
+    assert not pay_stub_query_violations(source)
+
+
+def test_pay_stubs_are_read_only_through_current_pay_stubs() -> None:
+    """Spec 005 rule 22d: a superseded copy is never counted, so no reader may
+    query the table except through ``db/pay_stubs.py``."""
+    problems = {
+        relative(path): found
+        for path in python_files(API)
+        if not path.is_relative_to(API / "tests")
+        and not path.is_relative_to(API / "alembic")
+        and relative(path) not in PAY_STUB_READS_ALLOWED
+        and (found := pay_stub_query_violations(path.read_text()))
+    }
+    assert not problems, f"read pay stubs through db.pay_stubs.current_pay_stubs: {problems}"
 
 
 def test_routers_never_import_ocr_or_parsers() -> None:

@@ -171,8 +171,10 @@ Confirmed fields from one pay stub.
 | `gross_cents` | `bigint` | `NOT NULL`, `CHECK (gross_cents > 0)` |
 | `federal_withholding_cents`, `social_security_cents`, `medicare_cents`, `state_tax_cents`, `retirement_contribution_cents`, `medical_premium_cents`, `other_deductions_cents` | `bigint` | Each `NOT NULL DEFAULT 0`, `CHECK (>= 0)` |
 | `net_cents` | `bigint` | `NOT NULL`, `CHECK (net_cents >= 0)` |
+| `employer_key` | `text` | `GENERATED ALWAYS AS (lower(btrim(regexp_replace(coalesce(employer_name, ''), '\s+', ' ', 'g')))) STORED`: the employer as spec 005 rule 22a compares it (added in `0020`) |
+| `superseded_by_id` | `uuid` | Null while the stub is current; the stub that superseded it (spec 005 rules 22b-22c). FK `(superseded_by_id, user_id) -> pay_stubs (id, user_id)`, NO ACTION, `CHECK (superseded_by_id <> id)` (added in `0020`) |
 
-Constraint `pay_stub_balances`: `CHECK (gross_cents - federal_withholding_cents - social_security_cents - medicare_cents - state_tax_cents - retirement_contribution_cents - medical_premium_cents - other_deductions_cents = net_cents)`. This is the database backstop for the confirm gate (spec amendment 17); `other_deductions_cents` holds every confirmed deduction line without its own column, so the identity holds for real stubs. Indexes: `(user_id, pay_date DESC)`.
+Constraint `pay_stub_balances`: `CHECK (gross_cents - federal_withholding_cents - social_security_cents - medicare_cents - state_tax_cents - retirement_contribution_cents - medical_premium_cents - other_deductions_cents = net_cents)`. This is the database backstop for the confirm gate (spec amendment 17); `other_deductions_cents` holds every confirmed deduction line without its own column, so the identity holds for real stubs. Indexes: `(user_id, pay_date DESC)`; `uq_pay_stubs_current_paycheck`, unique on `(user_id, employer_key, pay_date, period_start, period_end) WHERE superseded_by_id IS NULL` (one current stub per paycheck, issue 190). `UNIQUE (id, user_id)` for the self reference. Grants: `SELECT`, `INSERT`, and `UPDATE (superseded_by_id)` only; the `pay_stubs_supersede_only` trigger refuses any update but setting a null `superseded_by_id` once, so a stub's confirmed values never change.
 
 ### `benefits_plans`
 
@@ -458,6 +460,7 @@ Reference data, no `user_id` (RLS exception).
 | `0016_rule_match_contains` | Nothing new. `rule_match` gains `contains` after `prefix`, and `category_rules` the check `ck_category_rules_contains_is_seed_money_in` (spec 003 rule 3c). It clears the `rule` and `llm` labels of money-in rows with a spending category (the old precedence's paycheck-as-dining) so the next categorize run's rules pass labels them again under spec 003 rule 4. The downgrade deletes the `contains` rows, drops the check and rebuilds the type with its two 0002 labels; the cleared labels stay cleared |
 | `0017_document_replaced_by` | Nothing new. `documents.replaced_by_id` with its unique key, same-user foreign key and two checks (spec 004 rule 24). The downgrade drops them; replaced documents then list again, with no file |
 | `0018_check_in_last_run_at` | Nothing new. `check_ins.last_run_at` (spec 015 rule 9a), filled from `updated_at` for existing rows with the `updated_at` trigger off. The downgrade drops it |
+| `0020_pay_stub_superseded_by` | Nothing new but a trigger function. `pay_stubs.employer_key` and `superseded_by_id` with the same-user foreign key, `uq_pay_stubs_current_paycheck`, `UPDATE (superseded_by_id)` for `authenticated` and the `pay_stubs_supersede_only()` trigger (spec 005 rules 22a-22e, issue 190). It supersedes the stubs already stored in confirm order before creating the index. The downgrade drops them; every copy then counts again |
 
 CI runs upgrade, downgrade, upgrade and `alembic check` on every pull request.
 
