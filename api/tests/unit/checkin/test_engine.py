@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import uuid
 
-from checkin.engine import Existing, reconcile, subject_gone
+from checkin.engine import Existing, Subjects, reconcile, subject_gone
 from checkin.findings import Finding, all_findings
 from db.enums import FindingKind, RecurringStatus
-from tests.unit.checkin.scenarios import K401, S1, S2, charge, facts, goal, stub
+from tests.unit.checkin.scenarios import K401, S1, S2, S2A, charge, facts, goal, stub
 
 CANDIDATES = all_findings(
     facts(
@@ -51,16 +51,39 @@ def test_cleared_condition_is_retracted() -> None:
 
 def test_reported_events_are_kept() -> None:
     new_charge = existing(candidate(FindingKind.RECURRING_NEW))
-    deduction = existing(candidate(FindingKind.DEDUCTION_CHANGE))
-    changes = reconcile([new_charge, deduction], [], set())
+    paycheck = existing(candidate(FindingKind.PAY_CHANGE))
+    changes = reconcile([new_charge, paycheck], [], set())
     assert changes.retract == []
 
 
 def test_reported_elsewhere_is_dropped() -> None:
-    deduction = candidate(FindingKind.DEDUCTION_CHANGE)
-    changes = reconcile([], [deduction], {deduction.key})
-    assert changes.dropped == [deduction]
+    paycheck = candidate(FindingKind.PAY_CHANGE)
+    changes = reconcile([], [paycheck], {paycheck.key})
+    assert changes.dropped == [paycheck]
     assert changes.insert == []
+
+
+def test_paycheck_change_about_a_superseded_stub_is_retracted_unless_handled() -> None:
+    """Spec 015 rule 10.4: a corrected stub took the place of the one compared."""
+    paycheck = candidate(FindingKind.PAY_CHANGE)
+    gone = Existing(
+        id=uuid.uuid4(), key=paycheck.key, kind=paycheck.kind, handled=False, subject_gone=True
+    )
+    kept = Existing(
+        id=uuid.uuid4(), key="pay_change:x", kind=paycheck.kind, handled=True, subject_gone=True
+    )
+    changes = reconcile([gone, kept], [], set())
+    assert changes.retract == [gone.id]
+
+
+def test_newer_copy_updates_the_paycheck_change() -> None:
+    """Spec 015 rule 12, issue 194: a copy of S2 is the same paycheck, so the same key."""
+    first = all_findings(facts(pay_stubs=[stub(S2, paycheck_id=S2A), stub(S1)]))
+    copy = all_findings(facts(pay_stubs=[stub(S2, id=uuid.uuid4(), paycheck_id=S2A), stub(S1)]))
+    done = existing(first[0], handled=True)
+    changes = reconcile([done], copy, set())
+    assert changes.update == [(done.id, copy[0])]
+    assert (changes.insert, changes.retract) == ([], [])
 
 
 def test_event_whose_subject_is_gone_is_retracted_unless_handled() -> None:
@@ -76,6 +99,9 @@ def test_event_whose_subject_is_gone_is_retracted_unless_handled() -> None:
     assert changes.retract == [gone.id]
 
 
+NOTHING = Subjects(charge_ids=frozenset(), current_stub_ids=frozenset())
+
+
 def test_subject_gone_reads_the_recurring_charge_id() -> None:
     charge_id = uuid.uuid4()
     payload = {"recurring_charge_id": str(charge_id)}
@@ -84,8 +110,18 @@ def test_subject_gone_reads_the_recurring_charge_id() -> None:
         FindingKind.RECURRING_CHANGED,
         FindingKind.RECURRING_STOPPED,
     ):
-        assert subject_gone(kind, payload, {charge_id}) is False
-        assert subject_gone(kind, payload, set()) is True
-    # Findings about pay stubs, decisions and events never depend on bank data.
-    assert subject_gone(FindingKind.PAY_CHANGE, {}, set()) is False
-    assert subject_gone(FindingKind.GOAL_OFF_PACE, {"goal_id": str(charge_id)}, set()) is False
+        assert subject_gone(kind, payload, Subjects({charge_id}, frozenset())) is False
+        assert subject_gone(kind, payload, NOTHING) is True
+    # Findings about decisions, goals and events have no subject to lose.
+    for kind in (FindingKind.ELECTION_MISMATCH, FindingKind.GOAL_OFF_PACE):
+        assert subject_gone(kind, {"goal_id": str(charge_id)}, NOTHING) is False
+
+
+def test_subject_gone_reads_both_stubs_of_a_paycheck_change() -> None:
+    """Spec 015 rule 10.4: either stub superseded and the change it reported is gone."""
+    newest, previous = uuid.uuid4(), uuid.uuid4()
+    payload = {"pay_stub_id": str(newest), "previous_pay_stub_id": str(previous)}
+    kind = FindingKind.PAY_CHANGE
+    assert subject_gone(kind, payload, Subjects(frozenset(), {newest, previous})) is False
+    assert subject_gone(kind, payload, Subjects(frozenset(), {newest})) is True
+    assert subject_gone(kind, payload, Subjects(frozenset(), {previous})) is True

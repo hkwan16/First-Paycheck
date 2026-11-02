@@ -68,11 +68,9 @@ def test_check_in_now_queues_the_months_job(
     assert job["result"]["outcome"] == "created"
     assert job["result"]["check_in_id"] == str(made[0]["id"])
     assert sorted(f["kind"] for f in findings(db_connection, user_a)) == [
-        "deduction_change",
-        "deduction_change",
-        "deduction_change",
         "election_mismatch",
         "goal_off_pace",
+        "pay_change",
         "recurring_new",
     ]
 

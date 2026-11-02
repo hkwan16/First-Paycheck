@@ -30,6 +30,7 @@
           "net_cents": 205892,
           "other_deductions_cents": 4670,
           "pay_date": "2026-11-15",
+          "paycheck_id": "9d230b47-3cee-5583-b27b-fbe66e2f40a6",
           "period_end": "2026-11-15",
           "period_start": "2026-11-01",
           "retirement_contribution_cents": 5417,
@@ -60,6 +61,7 @@
           "net_cents": 205892,
           "other_deductions_cents": 4670,
           "pay_date": "2026-11-15",
+          "paycheck_id": "9d230b47-3cee-5583-b27b-fbe66e2f40a6",
           "period_end": "2026-11-15",
           "period_start": "2026-11-01",
           "retirement_contribution_cents": 10834,
@@ -90,6 +92,7 @@
           "net_cents": 199604,
           "other_deductions_cents": 4670,
           "pay_date": "2026-10-31",
+          "paycheck_id": "869a5f56-0b5b-5805-8112-37f778c36deb",
           "period_end": "2026-10-31",
           "period_start": "2026-10-16",
           "retirement_contribution_cents": 0,
@@ -133,6 +136,7 @@
           "net_cents": 205892,
           "other_deductions_cents": 4670,
           "pay_date": "2026-11-15",
+          "paycheck_id": "9d230b47-3cee-5583-b27b-fbe66e2f40a6",
           "period_end": "2026-11-15",
           "period_start": "2026-11-01",
           "retirement_contribution_cents": 5417,
@@ -419,6 +423,7 @@
         "key": "pay_change:fc312d0b-59a2-5a8a-af4a-5c866ed8f97d",
         "kind": "pay_change",
         "payload": {
+          "deductions": [],
           "gross_change_cents": 20834,
           "net_change_cents": 19241
         },
@@ -436,6 +441,7 @@
           "net_cents": 218845,
           "other_deductions_cents": 4670,
           "pay_date": "2026-10-31",
+          "paycheck_id": "fc312d0b-59a2-5a8a-af4a-5c866ed8f97d",
           "period_end": "2026-10-31",
           "period_start": "2026-10-16",
           "retirement_contribution_cents": 0,
@@ -451,6 +457,7 @@
           "net_cents": 199604,
           "other_deductions_cents": 4670,
           "pay_date": "2026-10-31",
+          "paycheck_id": "869a5f56-0b5b-5805-8112-37f778c36deb",
           "period_end": "2026-10-31",
           "period_start": "2026-10-16",
           "retirement_contribution_cents": 0,
@@ -486,6 +493,7 @@
           "net_cents": 199604,
           "other_deductions_cents": 4670,
           "pay_date": "2026-10-31",
+          "paycheck_id": "869a5f56-0b5b-5805-8112-37f778c36deb",
           "period_end": "2026-10-31",
           "period_start": "2026-10-16",
           "retirement_contribution_cents": 0,
@@ -501,6 +509,7 @@
           "net_cents": 218845,
           "other_deductions_cents": 4670,
           "pay_date": "2026-10-31",
+          "paycheck_id": "fc312d0b-59a2-5a8a-af4a-5c866ed8f97d",
           "period_end": "2026-10-31",
           "period_start": "2026-10-16",
           "retirement_contribution_cents": 0,
@@ -516,29 +525,35 @@
   {
     "expected": [
       {
-        "key": "deduction_change:9d230b47-3cee-5583-b27b-fbe66e2f40a6:federal_withholding",
-        "kind": "deduction_change",
+        "key": "pay_change:9d230b47-3cee-5583-b27b-fbe66e2f40a6",
+        "kind": "pay_change",
         "payload": {
           "affects": "w4",
-          "change_cents": -8580
-        },
-        "severity": "info"
-      },
-      {
-        "key": "deduction_change:9d230b47-3cee-5583-b27b-fbe66e2f40a6:retirement_contribution",
-        "kind": "deduction_change",
-        "payload": {
-          "affects": "k401_match",
-          "change_cents": 5417
-        },
-        "severity": "info"
-      },
-      {
-        "key": "deduction_change:9d230b47-3cee-5583-b27b-fbe66e2f40a6:medical_premium",
-        "kind": "deduction_change",
-        "payload": {
-          "affects": "health_plans",
-          "change_cents": -3125
+          "deductions": [
+            {
+              "amount_cents": 21196,
+              "change_cents": -8580,
+              "label": "Federal tax",
+              "line": "federal_withholding",
+              "previous_cents": 29776
+            },
+            {
+              "amount_cents": 5417,
+              "change_cents": 5417,
+              "label": "401(k)",
+              "line": "retirement_contribution",
+              "previous_cents": 0
+            },
+            {
+              "amount_cents": 3125,
+              "change_cents": -3125,
+              "label": "Health premiums",
+              "line": "medical_premium",
+              "previous_cents": 6250
+            }
+          ],
+          "gross_change_cents": 0,
+          "net_change_cents": 6288
         },
         "severity": "info"
       }
@@ -554,6 +569,7 @@
           "net_cents": 205892,
           "other_deductions_cents": 4670,
           "pay_date": "2026-11-15",
+          "paycheck_id": "9d230b47-3cee-5583-b27b-fbe66e2f40a6",
           "period_end": "2026-11-15",
           "period_start": "2026-11-01",
           "retirement_contribution_cents": 5417,
@@ -569,6 +585,7 @@
           "net_cents": 199604,
           "other_deductions_cents": 4670,
           "pay_date": "2026-10-31",
+          "paycheck_id": "869a5f56-0b5b-5805-8112-37f778c36deb",
           "period_end": "2026-10-31",
           "period_start": "2026-10-16",
           "retirement_contribution_cents": 0,
@@ -629,5 +646,69 @@
       "today": "2026-11-16"
     },
     "id": "spec-015-test_nothing_to_report"
+  },
+  {
+    "expected": [
+      {
+        "key": "election_mismatch:k401_match:d94924f2-45c6-553c-8d7a-7d0ddfb16ea6:6e7bb24a-0da3-5034-8c90-d654395c88b2",
+        "kind": "election_mismatch",
+        "payload": {
+          "pay_stub_id": "9d230b47-3cee-5583-b27b-fbe66e2f40a6"
+        },
+        "severity": "alert"
+      },
+      {
+        "key": "pay_change:6e7bb24a-0da3-5034-8c90-d654395c88b2",
+        "kind": "pay_change",
+        "payload": {
+          "pay_stub_id": "9d230b47-3cee-5583-b27b-fbe66e2f40a6"
+        },
+        "severity": "info"
+      }
+    ],
+    "facts": {
+      "k401": {
+        "contribution_pct": "4",
+        "decided_on": "2026-10-20",
+        "decision_id": "d94924f2-45c6-553c-8d7a-7d0ddfb16ea6"
+      },
+      "pay_stubs": [
+        {
+          "federal_withholding_cents": 21196,
+          "gross_cents": 270833,
+          "id": "9d230b47-3cee-5583-b27b-fbe66e2f40a6",
+          "medical_premium_cents": 3125,
+          "medicare_cents": 3927,
+          "net_cents": 205892,
+          "other_deductions_cents": 4670,
+          "pay_date": "2026-11-15",
+          "paycheck_id": "6e7bb24a-0da3-5034-8c90-d654395c88b2",
+          "period_end": "2026-11-15",
+          "period_start": "2026-11-01",
+          "retirement_contribution_cents": 5417,
+          "social_security_cents": 16792,
+          "state_tax_cents": 9814
+        },
+        {
+          "federal_withholding_cents": 29776,
+          "gross_cents": 270833,
+          "id": "869a5f56-0b5b-5805-8112-37f778c36deb",
+          "medical_premium_cents": 6250,
+          "medicare_cents": 3927,
+          "net_cents": 199604,
+          "other_deductions_cents": 4670,
+          "pay_date": "2026-10-31",
+          "paycheck_id": "869a5f56-0b5b-5805-8112-37f778c36deb",
+          "period_end": "2026-10-31",
+          "period_start": "2026-10-16",
+          "retirement_contribution_cents": 0,
+          "social_security_cents": 16792,
+          "state_tax_cents": 9814
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_keys_name_the_paycheck"
   }
 ]
