@@ -3,6 +3,7 @@ import {
   formatMoney,
   formatNetCost,
   formatNumber,
+  formatRefund,
   netCost,
   formatPct,
   formatRate,
@@ -46,6 +47,17 @@ describe('formatMoney', () => {
 
   it.each([1.5, Number.NaN, Infinity, 2 ** 53])('rejects %s, which is not integer cents', (bad) => {
     expect(() => formatMoney(bad)).toThrow(RangeError);
+  });
+});
+
+describe('formatRefund', () => {
+  // Spec 014 rule 21: a refund or an amount due in words, never a sign.
+  it.each([
+    [8, '$0.08 refund'],
+    [-344_992, '$3,449.92 due'],
+    [0, 'Nothing due, no refund'],
+  ])('writes %i cents as %s', (cents, text) => {
+    expect(formatRefund(cents)).toBe(text);
   });
 });
 

@@ -157,7 +157,10 @@ describe('useCalc', () => {
       http.post(apiUrl(PATH), () =>
         HttpResponse.json(
           {
-            error: { code: 'validation_error', message: 'no federal constants for tax year 2027' },
+            error: {
+              code: 'validation_error',
+              message: 'We do not have the federal tax figures for 2027 yet',
+            },
           },
           { status: 422 },
         ),

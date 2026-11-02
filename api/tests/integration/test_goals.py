@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Connection, text
 
 from app.deps import get_now
-from db.enums import AccountKind, AccountRole
+from db.enums import AccountKind, AccountRole, PayFrequency
 from tests.conftest import FixtureUser
 from tests.support.factories import (
     make_account,
@@ -87,10 +87,17 @@ def save_health(client: TestClient, inputs: dict[str, Any], **kwargs: Any) -> di
 
 
 def biweekly_with_stub(client: TestClient, connection: Connection, user: FixtureUser) -> None:
-    profile = client.put("/profile", json={"salary_cents": 6_500_000, "pay_frequency": "biweekly"})
+    """A biweekly stub paid 2026-10-16: the pay schedule (spec 005 rule 25a) and its anchor."""
+    profile = client.put("/profile", json={"salary_cents": 6_500_000})
     assert profile.status_code == 200, profile.text
     document = make_document(connection, user.id, with_blob=False)
-    make_pay_stub(connection, user.id, document, pay_date=dt.date(2026, 10, 16))
+    make_pay_stub(
+        connection,
+        user.id,
+        document,
+        pay_date=dt.date(2026, 10, 16),
+        pay_frequency=PayFrequency.BIWEEKLY,
+    )
 
 
 def fund_account(connection: Connection, user: FixtureUser) -> uuid.UUID:

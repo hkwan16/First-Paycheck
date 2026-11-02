@@ -3706,6 +3706,53 @@
         "title": "PayFrequency",
         "type": "string"
       },
+      "PaySchedule": {
+        "properties": {
+          "frequency": {
+            "$ref": "#/components/schemas/PayFrequency"
+          },
+          "pay_stub_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The pay date of the stub it comes from; null when it is the profile's",
+            "title": "Pay Stub Date"
+          },
+          "periods_per_year": {
+            "enum": [
+              12,
+              24,
+              26,
+              52
+            ],
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "source": {
+            "description": "Where the schedule comes from: the newest stub, or the profile's entry",
+            "enum": [
+              "pay_stub",
+              "profile"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "frequency",
+          "periods_per_year",
+          "source",
+          "pay_stub_date"
+        ],
+        "title": "PaySchedule",
+        "type": "object"
+      },
       "PayStubFlow": {
         "properties": {
           "deductions_cents": {
@@ -4978,6 +5025,17 @@
               }
             ]
           },
+          "pay_schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaySchedule"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The pay schedule every calculator uses (spec 005 rule 25a): the newest confirmed stub's, else pay_frequency; null without either. Computed on read."
+          },
           "salary_cents": {
             "anyOf": [
               {
@@ -5030,7 +5088,8 @@
           }
         },
         "required": [
-          "updated_at"
+          "updated_at",
+          "pay_schedule"
         ],
         "title": "ProfileOut",
         "type": "object"

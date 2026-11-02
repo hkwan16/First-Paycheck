@@ -122,13 +122,15 @@ class W4Input(BaseModel):
             tax_year(value)
             pub15t(value)
         except UnknownTaxYear as exc:
-            raise ValueError(f"no federal withholding constants for tax year {value}") from exc
+            raise ValueError(f"We do not have the federal tax figures for {value} yet") from exc
         return value
 
     @model_validator(mode="after")
     def _wages_cover_deductions(self) -> Self:
         if _taxable_wages(self, tax_year(self.tax_year)) < 0:
-            raise ValueError("the 401(k) deferral and health premiums exceed the salary")
+            raise ValueError(
+                "Your 401(k) contribution and health premiums add up to more than your salary"
+            )
         return self
 
 

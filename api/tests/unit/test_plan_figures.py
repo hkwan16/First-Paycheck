@@ -188,3 +188,9 @@ def test_health_costs_are_net_cost_figures_with_the_api_sign() -> None:
         ("result.plans[0].annual_premium_cents", "money", 65_000),
         ("result.plans[0].worst_case_cents", "net_cost", 309_700),
     ]
+
+
+def test_w4_refund_is_a_refund_figure() -> None:
+    """Spec 016 rule 3 (issue 209): no "(negative is owed)" label; the kind picks the words."""
+    found = w4_figures(salary_cents=6_500_000, pay_periods_per_year=24)
+    assert (found[2].label, found[2].kind) == ("Refund or amount due at tax time", "refund")

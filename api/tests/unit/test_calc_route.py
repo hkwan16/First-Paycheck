@@ -196,7 +196,7 @@ def test_w4_over_http(client: TestClient) -> None:
     ("change", "fragment"),
     [
         ({"tax_year": 2027}, "2027"),
-        ({"health_premium_per_paycheck_cents": 200_000}, "exceed the salary"),
+        ({"health_premium_per_paycheck_cents": 200_000}, "more than your salary"),
         ({"extra_withholding_cents": 10.5}, "extra_withholding_cents"),
     ],
 )

@@ -13,6 +13,7 @@ import { AmountField } from './AmountField';
 import {
   draftFromOption,
   EMPTY_PLAN_DRAFT,
+  HEALTH_TERMS,
   MAX_PLANS,
   PLAN_KIND_LABELS,
   readPlanDrafts,
@@ -80,14 +81,15 @@ export function PlanOptionsForm({
       className="flex flex-col gap-4"
     >
       <p className="m-0 text-small text-ink-3">
-        Enter each medical plan your employer offers, for employee-only coverage in network. Your
-        benefits summary or enrollment site lists them.
+        Enter each medical plan your employer offers, at the price for covering only you and for
+        doctors in the plan&apos;s network. Your benefits summary or enrollment site lists them.
       </p>
       {drafts.map((draft, index) => {
         const problems = errors[index] ?? {};
         const field = (name: string) => `${id}-${index}-${name}`;
-        const describe = (name: keyof PlanDraft) =>
-          problems[name] ? `${field(name)}-error` : undefined;
+        // What to fix when there is something, else the term's meaning where it has one.
+        const describe = (name: keyof PlanDraft, hint = false) =>
+          problems[name] ? `${field(name)}-error` : hint ? `${field(name)}-hint` : undefined;
         return (
           <fieldset
             key={index}
@@ -115,7 +117,7 @@ export function PlanOptionsForm({
                   id={field('kind')}
                   value={draft.kind}
                   invalid={Boolean(problems.kind)}
-                  aria-describedby={describe('kind')}
+                  aria-describedby={describe('kind', true)}
                   onChange={(event) =>
                     change(index, { kind: event.currentTarget.value as PlanKind | '' })
                   }
@@ -127,6 +129,11 @@ export function PlanOptionsForm({
                     </option>
                   ))}
                 </Select>
+                {!problems.kind && (
+                  <p id={`${field('kind')}-hint`} className="mt-1.5 mb-0 text-tiny text-ink-3">
+                    {HEALTH_TERMS.hdhp.meaning}
+                  </p>
+                )}
                 <FieldError id={`${field('kind')}-error`}>{problems.kind}</FieldError>
               </div>
               <AmountField
@@ -134,6 +141,7 @@ export function PlanOptionsForm({
                 label="Premium per paycheck"
                 value={draft.premium}
                 error={problems.premium ?? null}
+                hint={HEALTH_TERMS.premium.meaning}
                 onChange={(premium) => change(index, { premium })}
               />
               <AmountField
@@ -141,6 +149,7 @@ export function PlanOptionsForm({
                 label="Deductible"
                 value={draft.deductible}
                 error={problems.deductible ?? null}
+                hint={HEALTH_TERMS.deductible.meaning}
                 onChange={(deductible) => change(index, { deductible })}
               />
               <div>
@@ -151,10 +160,18 @@ export function PlanOptionsForm({
                   autoComplete="off"
                   value={draft.coinsurance}
                   invalid={Boolean(problems.coinsurance)}
-                  aria-describedby={describe('coinsurance')}
+                  aria-describedby={describe('coinsurance', true)}
                   onChange={(event) => change(index, { coinsurance: event.currentTarget.value })}
                   className="tabular-nums"
                 />
+                {!problems.coinsurance && (
+                  <p
+                    id={`${field('coinsurance')}-hint`}
+                    className="mt-1.5 mb-0 text-tiny text-ink-3"
+                  >
+                    {HEALTH_TERMS.coinsurance.meaning}
+                  </p>
+                )}
                 <FieldError id={`${field('coinsurance')}-error`}>{problems.coinsurance}</FieldError>
               </div>
               <AmountField
@@ -162,6 +179,7 @@ export function PlanOptionsForm({
                 label="Out-of-pocket maximum"
                 value={draft.oopMax}
                 error={problems.oopMax ?? null}
+                hint={HEALTH_TERMS.oop_max.meaning}
                 onChange={(oopMax) => change(index, { oopMax })}
               />
               {draft.kind === 'hdhp' && (
@@ -170,6 +188,7 @@ export function PlanOptionsForm({
                   label="Employer HSA money per year"
                   value={draft.employerHsa}
                   error={problems.employerHsa ?? null}
+                  hint={`What your employer puts into your HSA each year. ${HEALTH_TERMS.hsa.meaning}`}
                   placeholder="0.00"
                   onChange={(employerHsa) => change(index, { employerHsa })}
                 />

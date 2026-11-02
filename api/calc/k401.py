@@ -75,7 +75,7 @@ def tiers_ascending(tiers: Sequence[MatchTier]) -> None:
     uptos = [tier.employee_pct_upto for tier in tiers]
     if any(later <= earlier for earlier, later in pairwise(uptos)):
         raise ValueError(
-            "Each match tier must reach a higher contribution rate than the one before it"
+            "Each tier of the match must go up to a higher share of your pay than the one before it"
         )
 
 
@@ -127,7 +127,7 @@ class K401MatchInput(BaseModel):
         try:
             tax_year(value)
         except UnknownTaxYear as exc:
-            raise ValueError(f"no federal constants for tax year {value}") from exc
+            raise ValueError(f"We do not have the federal tax figures for {value} yet") from exc
         return value
 
     @model_validator(mode="after")

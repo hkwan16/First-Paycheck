@@ -9,9 +9,8 @@ import type {
 import { calculatorIdOf } from '@/lib/decisions';
 import type { Hue } from '@/lib/design/tone';
 import { isExplained } from '@/lib/explanations';
-import { formatMoney, formatNetCost, formatNumber, formatRate } from '@/lib/money';
+import { formatMoney, formatNetCost, formatNumber, formatRate, formatRefund } from '@/lib/money';
 import { CALCULATOR_CARDS } from '../decisions/DecisionCard';
-import { refundText } from '../decisions/w4-format';
 
 /*
  * Words for the Plan screen (spec 016). Every figure is a field of
@@ -45,8 +44,8 @@ export function figureText(figure: PlanFigure): string {
       // A health plan's yearly net cost: a negative one reads as an amount ahead.
       return formatNetCost(expect(figure, isNumber));
     case 'refund':
-      // A W-4 outcome, in the W-4 card's own words.
-      return refundText(expect(figure, isNumber));
+      // The W-4's refund at tax time: a negative one is an amount due.
+      return formatRefund(expect(figure, isNumber));
     case 'percent':
       return formatRate(expect(figure, isString));
     case 'count':

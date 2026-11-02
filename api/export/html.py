@@ -17,7 +17,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from app.plan import PlanFigure, PlanOut
 from db.enums import CalculatorKind, CalendarKind, GoalKind, GoalStatus
-from verify.format import dollars, net_cost, percent
+from verify.format import dollars, net_cost, percent, refund
 
 __all__ = ["STALE_LABEL", "render_html"]
 
@@ -53,16 +53,6 @@ NO_COUNT = "Not within 10 years"
 def long_date(value: dt.date) -> str:
     """``2026-10-31`` -> ``Oct 31, 2026``."""
     return f"{value:%b} {value.day}, {value.year}"
-
-
-def refund(cents: int) -> str:
-    """A refund (positive) or balance due (negative), as the W-4 card says it
-    (spec 016 rule 3): ``8`` -> ``$0.08 refund``, ``-391870`` -> ``$3,918.70 due``."""
-    if cents > 0:
-        return f"{dollars(cents)} refund"
-    if cents < 0:
-        return f"{dollars(-cents)} due"
-    return "Nothing due, no refund"
 
 
 def figure_value(figure: PlanFigure) -> str:

@@ -26,7 +26,7 @@ const CARDS: Record<CalculatorId, ComponentType> = {
 
 /** How to use a calculator; a placeholder has none, so its card says what it will decide. */
 const LEAD =
-  'Move the controls to try what-ifs. Every number comes from the calculator, not the AI. Saving keeps a versioned record and adds it to your plan.';
+  'Try a few choices and watch the numbers change. Save the one you want, and it goes into your plan.';
 
 export interface DecisionStepScreenProps {
   calculator: CalculatorId;

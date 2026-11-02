@@ -8,7 +8,6 @@ from decimal import Decimal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, computed_field
-from sqlalchemy.orm import Session
 
 from app.deps import UserSession
 from app.errors import error_responses
@@ -71,12 +70,6 @@ class PayStubOut(BaseModel):
     @classmethod
     def of(cls, stub: PayStub) -> PayStubOut:
         return cls.model_validate(stub, from_attributes=True)
-
-
-def newest_pay_stub(session: Session) -> PayStub | None:
-    """The user's newest current confirmed stub, in ``GET /pay-stubs`` order (spec 005
-    rules 22d and 24)."""
-    return session.scalars(current_pay_stubs().order_by(*NEWEST_FIRST).limit(1)).first()
 
 
 def pay_stub_rate(stub: PayStub | None) -> Decimal | None:
