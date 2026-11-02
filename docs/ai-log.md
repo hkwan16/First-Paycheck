@@ -486,6 +486,28 @@ Every entry has a dated heading and these fields, in this order. A field that do
 
 **Revised before merge:** Making spending rules money-out only also stopped refunds from netting (the `user_good` October's United Airlines refund, -50,000, became uncategorized and changed spec 007's figures). The coordinator replaced it with direction-aware precedence: money out goes user exact, user prefix, seed exact, seed prefix; money in goes user exact, user prefix, seed contains, seed exact, seed prefix. The paycheck is still `income` (`payroll` beats the prefix `sweetgreen` for money in), the refund is `travel` again, the model may call money in a refund, and a user rule applies both ways. A failing precedence row (`united airlines`, -50,000 -> `travel`) reproduced it first; the migration test now runs the categorize rules pass after 0016 to show the cleared rows come back right.
 
+## 2026-10-29 to 2026-10-31: the live model, and end-to-end passes on production with Claude in Chrome
+
+**Task:** Turn on the Anthropic key in production, run the LLM eval suites live, and then test the deployed product end to end as a person would, signed in as the synthetic test user. Every finding was to be fixed.
+
+**Tool:** Claude Code (Opus 5.5), driving Chrome through the Claude in Chrome extension against the production web app and API. Opus 5.5 subagents in their own worktrees wrote the fixes, and the main session reviewed each one before merging it.
+
+**Prompt or skill:** "Test end to end with Claude in Chrome," and later, "make sure every button works." Each finding became a GitHub issue through `docs/backlog.yaml` and was fixed with a failing test first.
+
+**What it produced:** Measured eval baselines from live runs (#123), with the first full run costing $0.77. Categorization moved to Sonnet 5.5 (#139), and the Decisions screen split into four steps, one per calculator (#151). Four passes on production found 25 issues between #132 and #184, and each was fixed.
+
+**What was wrong:**
+- The key was saved on Render as `ABTHROPIC_API_KEY`. Production started without a model, fell back to rules and manual entry as designed, and looked healthy. Production now refuses to start without the key (#133).
+- Haiku 5.5 labeled Rocket Money, a $21.54 charge, as a savings transfer at 90% confidence, which raised the savings rate (#136).
+- Twice, an explanation called a planned figure the one in effect. The 401(k) explanation said the chosen contribution rate was already in effect (#132), and the W-4 explanation said the new entries' $423.16 was withheld now, while the pay stub withholds $272.44 (#181). Both times, the explain context labeled the figure that way, so the model and the number checker both accepted it. Each fix gave the context the pay stub's figure and added an LLM judge, calibrated on labeled items, to the eval.
+- The every-button passes found dead ends and stale states that unit tests had passed over: a paused goal that still said it was on pace (#166), a document that could never be read again after a fallback to manual entry (#163), and an Escape key that closed only some inline editors (#184).
+
+**How it was caught:** The Chrome passes on production found every issue above, reading each screen's text against the numbers on the screens beside it. The live eval runs measured the baselines.
+
+**Fix:** Each fix landed in its own PR with a failing test first, and each PR was reviewed and merged after CI passed.
+
+**Time saved or lost:** Not measured.
+
 ## 2026-10-30: the W-4 explanation tells the stub's withholding from the entries' (issue 181)
 
 **Task:** The e2e account's W-4 explanation (`explain/v2`) said "Your employer withholds $423.16 of federal income tax from each paycheck ... withholding is almost exactly matched", while its pay stub withholds $272.44 and the W-4 card says $3,918.70 is due if nothing changes. Issue 132's 401(k) bug, on the W-4.
