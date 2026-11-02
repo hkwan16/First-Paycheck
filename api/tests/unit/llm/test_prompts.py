@@ -257,6 +257,8 @@ def test_explain_v4_is_short_in_whole_dollars_and_quotes_no_passage() -> None:
     assert money not in v4
     assert "two or three short paragraphs, at most 150 words in all" in v4
     assert "Write money of $100 or more as whole dollars (`$2,400`, `$3,919`)" in v4
+    # A person checks an amount per paycheck against the pay stub, to the cent.
+    assert "except an amount per paycheck: write that exactly as the fact gives it" in v4
     assert '("no extra cost")' in v4
     assert "Do not quote the citations or the benefits passages" in v4
     assert "Never mention the calculator" in v4

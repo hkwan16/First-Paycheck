@@ -52,7 +52,7 @@ from evals.suites.readability import Readability
 from llm.schemas import ClaimDraft, ExplanationDraft, RateClaimRequest, RateClaimVerdict
 from retrieval.benefits_search import BenefitsPassage
 from retrieval.citations import Citation
-from retrieval.context import explain_setup
+from retrieval.context import ExplainSetup, explain_setup
 from verify.flow import Attempt, Drafter, run_explain
 from verify.format import percent
 
@@ -130,23 +130,25 @@ def seed_citations(tax_year: int, calculator: str = CALCULATOR) -> list[Citation
     )
 
 
-def explain_decision(drafter: Drafter, decision: EvalDecision) -> list[Attempt]:
-    """One run of the flow, as POST /explain runs it, without the database."""
-    name = decision.calculator
-    citations = seed_citations(decision.tax_year, name)
+def decision_setup(decision: EvalDecision) -> ExplainSetup:
+    """What POST /explain would build for the decision: context, allowed numbers, fallback."""
     passages = [
         BenefitsPassage(document_id=EVAL_USER, chunk_index=index, text=text, rank=1.0)
         for index, text in enumerate(decision.benefits_passages)
     ]
-    setup = explain_setup(
-        name,
+    return explain_setup(
+        decision.calculator,
         decision.inputs,
         decision.result,
-        citations,
+        seed_citations(decision.tax_year, decision.calculator),
         passages,
         pay_stub_pct=decision.pay_stub_pct,
         pay_stub_withholding_cents=decision.pay_stub_withholding_cents,
     )
+
+
+def explain_with(drafter: Drafter, setup: ExplainSetup) -> list[Attempt]:
+    """One run of the flow over a setup, as POST /explain runs it, without the database."""
     return run_explain(
         drafter,
         EVAL_USER,
@@ -155,6 +157,11 @@ def explain_decision(drafter: Drafter, decision: EvalDecision) -> list[Attempt]:
         setup.citation_keys,
         setup.fallback,
     )
+
+
+def explain_decision(drafter: Drafter, decision: EvalDecision) -> list[Attempt]:
+    """One run of the flow for the decision."""
+    return explain_with(drafter, decision_setup(decision))
 
 
 class RateJudge(Protocol):
@@ -281,9 +288,10 @@ def score(
     failures: list[str] = []
     readability = Readability()
     for decision in decisions:
-        attempts = explain_decision(drafter, decision)
+        setup = decision_setup(decision)
+        attempts = explain_with(drafter, setup)
         final = attempts[-1]
-        readability.add(decision.id, final.draft, fallback=final.fallback)
+        readability.add(decision.id, final, setup.context)
         first_try += attempts[0].verified
         fallbacks += final.fallback
         cited += bool(final.draft.citation_keys)

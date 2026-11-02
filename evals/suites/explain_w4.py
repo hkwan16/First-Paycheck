@@ -40,7 +40,8 @@ from evals.suites.explain import (
     EVAL_USER,
     W4_FIXTURES,
     EvalDecision,
-    explain_decision,
+    decision_setup,
+    explain_with,
     flow_failures,
     load_decisions,
 )
@@ -196,9 +197,10 @@ def score(
     failures: list[str] = []
     readability = Readability()
     for decision in decisions:
-        attempts = explain_decision(drafter, decision)
+        setup = decision_setup(decision)
+        attempts = explain_with(drafter, setup)
         final = attempts[-1]
-        readability.add(decision.id, final.draft, fallback=final.fallback)
+        readability.add(decision.id, final, setup.context)
         first_try += attempts[0].verified
         fallbacks += final.fallback
         cited += bool(final.draft.citation_keys)

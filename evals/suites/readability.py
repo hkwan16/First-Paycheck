@@ -8,7 +8,9 @@ a draft: the verifier still accepts exact cents.
 
 - ``concise``: the share whose ``text`` has at most ``WORD_LIMIT`` words.
 - ``whole_dollars``: the share that writes no amount of ``WHOLE_DOLLARS_FROM``
-  or more with cents, in the concept, text, what-ifs or number values.
+  or more with cents, in the concept, text, what-ifs or number values, apart
+  from an amount per paycheck, which the person checks against a pay stub to
+  the cent (a fact whose label says "per paycheck").
 """
 
 from __future__ import annotations
@@ -16,25 +18,47 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from llm.schemas import ExplanationDraft
+from llm.schemas import ExplainContext, ExplanationDraft
+from verify.flow import Attempt
 from verify.numbers import extract_numbers
 
 WORD_LIMIT = 150
 WHOLE_DOLLARS_FROM = Decimal(100)
+PER_PAYCHECK = "per paycheck"
 
 
 def word_count(text: str) -> int:
     return len(text.split())
 
 
-def cents_on_large_amounts(draft: ExplanationDraft) -> list[str]:
-    """Every money token of $100 or more the draft writes with cents, as written."""
+def money_values(text: str) -> list[Decimal]:
+    return [abs(token.value) for token in extract_numbers(text) if token.kind == "money"]
+
+
+def per_paycheck_amounts(context: ExplainContext) -> frozenset[Decimal]:
+    """The amounts the context states per paycheck, which keep their cents."""
+    return frozenset(
+        value
+        for fact in context.facts
+        if PER_PAYCHECK in fact.label.lower()
+        for value in money_values(fact.value)
+    )
+
+
+def cents_on_large_amounts(
+    draft: ExplanationDraft, per_paycheck: frozenset[Decimal] = frozenset()
+) -> list[str]:
+    """Every money token of $100 or more the draft writes with cents, as written,
+    apart from the amounts per paycheck."""
     parts = [draft.concept, draft.text, *draft.what_ifs, *(claim.value for claim in draft.numbers)]
     return [
         token.raw
         for part in parts
         for token in extract_numbers(part)
-        if token.kind == "money" and token.has_cents and abs(token.value) >= WHOLE_DOLLARS_FROM
+        if token.kind == "money"
+        and token.has_cents
+        and abs(token.value) >= WHOLE_DOLLARS_FROM
+        and abs(token.value) not in per_paycheck
     ]
 
 
@@ -47,16 +71,16 @@ class Readability:
     whole_dollars: int = 0
     failures: list[str] = field(default_factory=list)
 
-    def add(self, decision_id: str, draft: ExplanationDraft, *, fallback: bool) -> None:
-        if fallback:
+    def add(self, decision_id: str, final: Attempt, context: ExplainContext) -> None:
+        if final.fallback:
             return
         self.drafted += 1
-        words = word_count(draft.text)
+        words = word_count(final.draft.text)
         if words <= WORD_LIMIT:
             self.concise += 1
         else:
             self.failures.append(f"{decision_id}: text is {words} words, over {WORD_LIMIT}")
-        cents = cents_on_large_amounts(draft)
+        cents = cents_on_large_amounts(final.draft, per_paycheck_amounts(context))
         if cents:
             self.failures.append(f"{decision_id}: cents on $100 or more: {', '.join(cents)}")
         else:
