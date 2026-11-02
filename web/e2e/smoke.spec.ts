@@ -279,6 +279,75 @@ test.describe('the side nav (spec 018 rules 7-10)', () => {
   });
 });
 
+/**
+ * Words that describe how the app works rather than what it means for the
+ * person's money (issues 204 and 209). None belongs on a screen.
+ */
+const INTERNALS =
+  /\b(prompt|explain\/v\d+|v\d+|plain code|retr(?:y|ies)|verifier|calculator|language model|AI|LLM|curated|fallback|pipeline)\b/i;
+
+test.describe('the Why page (issue 204)', () => {
+  for (const path of [
+    '/dev/screens/why',
+    '/dev/screens/why/stale',
+    '/dev/screens/why/fallback',
+    '/dev/screens/why/emergency-fund',
+    '/dev/screens/why-index',
+  ]) {
+    test(`${path} names none of the app's internals`, async ({ page }) => {
+      await open(page, screenAt(path));
+      expect(await page.getByRole('main').innerText()).not.toMatch(INTERNALS);
+    });
+  }
+
+  test('an out-of-date explanation is a note with a way to write it again', async ({ page }) => {
+    await open(page, screenAt('/dev/screens/why/stale'));
+    const note = page.getByRole('region', { name: 'About this explanation' });
+    await expect(note).toContainText('has changed since');
+    await expect(note.getByRole('button', { name: 'Write it again' })).toBeVisible();
+    await expect(page.getByText('Out of date', { exact: true })).toHaveCount(0);
+  });
+
+  test('the side nav calls it what the page does', async ({ page }) => {
+    await open(page, screenAt('/dev/screens/why-index'));
+    const nav = page.getByRole('navigation', { name: 'Setup steps' });
+    await expect(nav.getByRole('link', { name: 'Why each decision' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+});
+
+test('the plan and the sign-in page name none of the app internals (issue 209)', async ({
+  page,
+}) => {
+  for (const path of ['/dev/screens/plan', '/dev/screens/plan/empty']) {
+    await open(page, screenAt(path));
+    expect(await page.getByRole('main').innerText(), path).not.toMatch(INTERNALS);
+  }
+  await open(page, screenAt('/sign-in'));
+  expect(await page.getByRole('main').innerText()).not.toMatch(INTERNALS);
+});
+
+test('the account menu sets deleting apart from signing out (issue 205)', async ({ page }) => {
+  await open(page, screenAt('/dev/screens/account'));
+  await page.getByRole('button', { name: 'J. Rivera' }).click();
+  const signOut = page.getByRole('button', { name: 'Sign out' });
+  const remove = page.getByRole('button', { name: 'Delete account' });
+  await expect(page.getByRole('separator')).toBeVisible();
+  const color = (locator: Locator) =>
+    locator.evaluate((element) => getComputedStyle(element).color);
+  expect(await color(remove)).not.toBe(await color(signOut));
+
+  await remove.click();
+  const confirm = page.getByRole('group', { name: 'Delete your account?' });
+  await confirm.getByRole('textbox', { name: 'Type delete to confirm' }).fill('delete');
+  // The final step is drawn as the destructive action, the way the menu drew it.
+  expect(await color(confirm.getByRole('button', { name: 'Delete my account' }))).toBe(
+    await color(remove),
+  );
+});
+
 interface TabWalk {
   trapped: boolean;
   /** The last controls focused, for a trap's message. */
