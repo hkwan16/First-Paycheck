@@ -152,9 +152,8 @@ comment.
 | `DropZone`                                      | `.drop`                                           | a real file input, keyboard operable; filters by `accept` (drops too)                                                                                                                                                                                                |
 | `Money`, `Num`                                  | `.num`                                            | format only: cents in, tabular numerals, `decimals` 0 or 2, `signed`, `tone`                                                                                                                                                                                         |
 
-`Button` also has a `destructive` variant: a red tint for the act that deletes (Yes, unlink), set
-beside a safe choice that is primary (Keep), so the safe choice is never the weaker one (issue
-205).
+A `destructive` Button (Yes, unlink; Delete account) sits beside a safe choice that is primary
+(Keep), so the safe choice is never the weaker one (issue 205).
 
 Chrome (`components/chrome`): `Wordmark`, `Header` (`chips`, `account` slot, `minimal`),
 `HeaderAccount` (server: "Sample data" chip and `UserMenu` from the Supabase user), `UserMenu` (the
