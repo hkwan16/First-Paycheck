@@ -1961,3 +1961,189 @@ issues:
     priority: High
     status: done
     # Fixed November 1: spec 005 rules 22a-22e. A newer confirm of the same paycheck supersedes the old stub; every reader goes through db/pay_stubs.py.
+  # Found on November 1 in a usability pass on production with Claude in Chrome.
+  - title: "Check-in findings repeat after a newer copy of a pay stub supersedes the old one"
+    body: >-
+      November's check-in listed 13 findings, 12 of them six findings twice.
+      Pay and deduction findings are keyed by the newest stub's id
+      (checkin/findings.py), so when a newer confirmed copy supersedes a stub
+      (issue 190) the next run makes new findings, and the old ones stay
+      because retraction covers only recurring charges (checkin/engine.py
+      subject_gone). A finding about a superseded stub should be retracted
+      or carried over. Reproduce end to end, failing test first. Done when a
+      superseded stub leaves no finding behind and an existing check-in is
+      cleaned up on its next run.
+    labels: ["area:api", "type:bug"]
+    milestone: M10
+    priority: High
+    status: todo
+  - title: "Confirm reads a 401(k) dash as not found and leaves the user stuck"
+    body: >-
+      The Acme stub prints "401(k) -", a dash meaning zero. Confirm shows
+      "None, Not found on the document" at 90% confidence, Confirm all
+      remaining skips the row, the math notice says "the difference is $?.",
+      and pressing the row's Confirm opens an empty field already showing a
+      red error. A printed dash or zero on a deduction line should be
+      proposed as $0.00 tied to its line, and a missing value should never
+      produce "$?" or an error before the person types. Failing test first.
+      Done when the Acme stub confirms with Confirm all remaining alone.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: High
+    status: todo
+  - title: "Link says No documents yet while documents are still loading"
+    body: >-
+      While the API wakes up, the Documents card shows "No documents yet" for
+      an account with five documents, beside the accounts' loading rows. An
+      empty state should show only once the list has loaded empty. Failing
+      test first. Done when a slow documents read shows a loading state.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: todo
+  - title: "The API sleeps because GitHub runs the keepalive schedule only every few hours"
+    body: >-
+      keepalive.yml asks for a ping every 10 minutes, but GitHub ran it three
+      times in eight hours on November 1, so Render Free spins the API down and
+      a first visit waits 20 to 60 seconds. Choose a pinger that runs on time.
+      Done when /health answers warm across a day of spot checks.
+    labels: ["area:infra", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: todo
+  - title: "The pay schedule disagrees between the confirmed stub and the plan details"
+    body: >-
+      The confirmed Acme stub is paid twice a month (24 paychecks), but the
+      emergency fund's per-paycheck figure, the W-4 and the plan use 26, and
+      the W-4 drops its "If you change nothing" comparison because of it. The
+      plan details form has no pay schedule field, so a person cannot see or
+      fix where 26 comes from. Decide in the specs which source wins and how a
+      person sees and changes it. Failing test first. Done when one pay
+      schedule is used everywhere and shown where it can be changed.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: High
+    status: todo
+  - title: "Link lists every copy of a pay stub as Confirmed"
+    body: >-
+      After issue 190 a newer confirm supersedes an older copy, but Link still
+      badges every copy "Confirmed", so a person cannot tell which one counts.
+      A superseded stub's row should say a newer copy replaced it. Failing test
+      first. Done when only the stub that counts reads Confirmed.
+    labels: ["area:api", "area:web"]
+    milestone: M10
+    priority: Medium
+    status: todo
+  - title: "Spending shows two incomes, loan rows its totals leave out, and loan interest as a bill"
+    body: >-
+      The Income tile reads $3,240.12 (deposits labeled income) while the
+      diagram starts from $2,708.33 gross pay, with nothing saying why they
+      differ. The transaction list includes loan ledger rows the totals leave
+      out, unmarked, and loan "Interest" is listed as a recurring charge beside
+      Netflix. Failing test first. Done when the two figures are named so they
+      read as different things, ledger rows are marked or left out of the list,
+      and recurring detection ignores loan accounts.
+    labels: ["area:api", "area:web"]
+    milestone: M10
+    priority: Medium
+    status: todo
+  - title: "Spending is eight screens tall"
+    body: >-
+      Spending runs 7.9 screens with 2,337 words, 93 buttons and 66 controls:
+      a cash-flow diagram about two screens tall and mostly empty, three
+      explainer paragraphs, and the full transaction list. Category names are
+      cut off in their selects. Done when the diagram fits its content, the
+      explainers are cut to what a first-time user needs, and the list does not
+      bury the summary.
+    labels: ["area:web"]
+    milestone: M10
+    priority: Medium
+    status: todo
+  - title: "Check-in: one stub change makes six cards, each with a blue Done"
+    body: >-
+      A changed pay stub yields a pay change plus one "For your information"
+      card per deduction line, each with its own primary Done button (13 on
+      one page). Group a stub's deduction changes under its pay change, and
+      give Done a weight that does not shout. Done when one stub change reads
+      as one item.
+    labels: ["area:api", "area:web"]
+    milestone: M10
+    priority: Medium
+    status: todo
+  - title: "The W-4 step shows every line of the form at once"
+    body: >-
+      A first-job employee usually needs only the filing status, but the step
+      shows Steps 1(c), 2(c), 3, 4(a), 4(b) and 4(c) plus "Deductions you
+      expect to claim". Show the filing status first and the rest behind one
+      question about other jobs, dependents or extra income, opened when any of
+      them has a value. Done when a person with one job sees one choice.
+    labels: ["area:web"]
+    milestone: M10
+    priority: Medium
+    status: todo
+  - title: "Why shows internals and alarms on every out-of-date explanation"
+    body: >-
+      The status panel shows "Explanation prompt explain/v2", "checked by plain
+      code" and a Retries tile, and any newer stub turns every explanation's
+      header into a large amber "Out of date" banner. Keep what a person needs
+      (the numbers and sources were checked; it was written before a newer
+      stub; write it again) in calmer form. Done when the panel has no internal
+      names and out of date reads as a note, not an alarm.
+    labels: ["area:web"]
+    milestone: M10
+    priority: Medium
+    status: todo
+  - title: "Destructive actions get the most weight (unlink, delete account)"
+    body: >-
+      The unlink confirmation makes "Yes, unlink" the blue primary and "Keep"
+      grey, and the account menu gives "Delete account" the same weight as
+      "Sign out" right under it. Done when the safe choice is never the weaker
+      one and deleting is visually set apart.
+    labels: ["area:web"]
+    milestone: M10
+    priority: Medium
+    status: todo
+  - title: "Decision steps put version numbers in buttons and show two primary buttons"
+    body: >-
+      Each step's save button says "Save as v3" next to a blue "Next", so a
+      person cannot tell whether Next saves. Health plan what-ifs mark the
+      decision "Changed since v1", and opening Edit plans flips it back. Use
+      plain save wording, one primary action at a time, and a badge that does
+      not flicker. Done on all four steps.
+    labels: ["area:web"]
+    milestone: M10
+    priority: Medium
+    status: todo
+  - title: "Health plan terms need plain explanations"
+    body: >-
+      The comparison uses coinsurance, deductible, out-of-pocket maximum, HDHP
+      and HSA with no explanation for a first-time employee. Add a short plain
+      definition where each term first appears, without crowding the table.
+      Done when every term in the table is explained on the page.
+    labels: ["area:web"]
+    milestone: M10
+    priority: Medium
+    status: todo
+  - title: "Status messages appear away from the control that caused them"
+    body: >-
+      Sync now's result appears under the account list, far below the button,
+      and a new upload's row appears at the top of the documents list while the
+      person is at the upload box at the bottom. Show each outcome next to the
+      control, or bring it into view. Done for sync and upload.
+    labels: ["area:web"]
+    milestone: M10
+    priority: Low
+    status: todo
+  - title: "Plain-language wording on every screen"
+    body: >-
+      Leads and notices describe the system instead of the task ("Both feed one
+      pipeline", "Saving keeps a versioned record", "Wawa will never go back to
+      the AI for you", "Projected refund (negative is owed)", "Publication 15-T
+      percentage method"). Rewrite every user-facing string in web/src to the
+      no-ai-slop guidelines for a first-time employee: concrete, active, no
+      internals, no jargon without a plain explanation. Done when every screen
+      has been through the pass and its tests and baselines match.
+    labels: ["area:web", "area:docs"]
+    milestone: M10
+    priority: High
+    status: todo
