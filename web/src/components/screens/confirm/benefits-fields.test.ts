@@ -114,11 +114,18 @@ describe('the benefits review in confirmReducer', () => {
       { type: 'toggle', key: 'match_tiers.1.employee_pct_upto' },
       { type: 'toggle', key: 'plans.0.enrollment_deadline' },
     );
+    // Opened to type, with nothing to correct until it is saved (issue 195).
     expect(field(state, 'match_tiers.1.employee_pct_upto')).toMatchObject({
       confirmed: false,
       draft: '',
-      error: 'Enter a percentage, like 20 or 12.5',
+      error: null,
     });
+    expect(
+      field(
+        run(state, { type: 'save', key: 'match_tiers.1.employee_pct_upto' }),
+        'match_tiers.1.employee_pct_upto',
+      ).error,
+    ).toBe('Enter a percentage, like 20 or 12.5');
     // An enrollment deadline is optional: a plan may not print one.
     expect(field(state, 'plans.0.enrollment_deadline')).toMatchObject({
       confirmed: true,

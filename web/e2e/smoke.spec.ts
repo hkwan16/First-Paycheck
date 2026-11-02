@@ -65,7 +65,7 @@ const SCREENS: readonly Screen[] = [
   {
     path: '/dev/screens/confirm/confirmed',
     name: 'confirm-confirmed',
-    heading: 'Check what we read from your pay stub',
+    heading: 'Your pay stub is confirmed',
     sample: true,
   },
   {

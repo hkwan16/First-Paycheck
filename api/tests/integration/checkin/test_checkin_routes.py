@@ -62,6 +62,7 @@ def finding_payload(kind: FindingKind) -> dict[str, object]:
             "net_cents": 218_845,
             "previous_net_cents": 199_604,
             "net_change_cents": 19_241,
+            "deductions": [],
         }
     return {
         "kind": "upcoming_deadline",

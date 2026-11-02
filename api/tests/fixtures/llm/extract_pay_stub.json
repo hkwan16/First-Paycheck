@@ -9,7 +9,7 @@
   "social_security_cents": {"value": 16792, "confidence": 0.99, "source_text": "Social Security 167.92"},
   "medicare_cents": {"value": 3927, "confidence": 0.99, "source_text": "Medicare 39.27"},
   "state_tax_cents": {"value": 9814, "confidence": 0.91, "source_text": "CA State Tax 98.14"},
-  "retirement_contribution_cents": {"value": null, "confidence": 0.74, "source_text": null},
+  "retirement_contribution_cents": {"value": 0, "confidence": 0.97, "source_text": "401(k) -"},
   "medical_premium_cents": {"value": 6250, "confidence": 0.88, "source_text": "Medical Pretax 62.50"},
   "net_cents": {"value": 199604, "confidence": 0.99, "source_text": "Net Pay 1,996.04"},
   "line_items": [
@@ -19,9 +19,10 @@
     {"label": "Medicare", "amount_cents": 3927, "kind": "tax", "field": "medicare_cents"},
     {"label": "CA State Tax", "amount_cents": 9814, "kind": "tax", "field": "state_tax_cents"},
     {"label": "CA SDI", "amount_cents": 3250, "kind": "tax", "field": null},
+    {"label": "401(k)", "amount_cents": 0, "kind": "pre_tax_deduction", "field": "retirement_contribution_cents"},
     {"label": "Medical Pretax", "amount_cents": 6250, "kind": "pre_tax_deduction", "field": "medical_premium_cents"},
     {"label": "Dental/Vision", "amount_cents": 1420, "kind": "pre_tax_deduction", "field": null},
     {"label": "Net Pay", "amount_cents": 199604, "kind": "net", "field": "net_cents"}
   ],
-  "notes": "No 401(k) line is printed; check whether you contribute."
+  "notes": null
 }

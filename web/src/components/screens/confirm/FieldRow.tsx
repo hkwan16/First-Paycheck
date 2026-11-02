@@ -174,7 +174,7 @@ export const FieldRow = memo(function FieldRow({
       )}
 
       {badge ? (
-        <Badge tone={badge.tone} title="Extraction confidence">
+        <Badge tone={badge.tone} title="How clearly we read it">
           {badge.label}
         </Badge>
       ) : (

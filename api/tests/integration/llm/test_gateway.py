@@ -473,7 +473,7 @@ def test_extract_sends_images_before_one_text_block(
     # Sonnet: (3000 * 2.00 + 900 * 10.00) * 100 = 1,500,000 microcents.
     assert (row["purpose"], row["prompt_version"], row["cost_microcents"], row["job_id"]) == (
         "extract",
-        "extract_pay_stub/v1",
+        "extract_pay_stub/v2",
         1_500_000,
         job_id,
     )
@@ -528,7 +528,7 @@ def test_fake_extracts_from_fixtures(db_connection: Connection, user_a: FixtureU
     # Both rows carry the same frozen timestamp, so compare without order.
     assert sorted(row["prompt_version"] for row in ledger(db_connection, user_a)) == [
         "extract_benefits/v2",
-        "extract_pay_stub/v1",
+        "extract_pay_stub/v2",
     ]
 
 
@@ -539,7 +539,7 @@ def test_a_memory_ledger_needs_no_database(user_a: FixtureUser) -> None:
     [entry] = memory.entries
     assert (entry.status, entry.prompt_version, entry.cost_microcents) == (
         LlmStatus.OK,
-        "extract_pay_stub/v1",
+        "extract_pay_stub/v2",
         0,
     )
     assert memory.spent_today(user_a.id) == 0

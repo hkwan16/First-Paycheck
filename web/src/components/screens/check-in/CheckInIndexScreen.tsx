@@ -54,9 +54,8 @@ export function CheckInIndexScreen() {
     body = (
       <Card gap={14} aria-label="Check-ins">
         <p className="m-0">
-          No check-in yet. The first one runs at the start of next month, and again whenever a sync
-          brings in new pay stubs or transactions that month. Check in now to run this month’s
-          today.
+          No check-in yet. The first one runs at the start of next month. Press Check in now to see
+          this month’s today.
         </p>
       </Card>
     );
@@ -97,7 +96,7 @@ export function CheckInIndexScreen() {
     <>
       <PageTitle
         title="Monthly check-ins"
-        lead="Each month, and whenever new data arrives, your pay stubs and transactions are compared with the plan you saved."
+        lead="Each month we compare your pay stubs and spending with the plan you saved, and again when new ones come in."
         aside={<CheckInNowButton state={checkInNow} />}
       />
       <CheckInNowStatus state={checkInNow} from="list" />

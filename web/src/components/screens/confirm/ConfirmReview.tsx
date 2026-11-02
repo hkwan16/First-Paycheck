@@ -12,7 +12,7 @@ import { apiErrorMessage } from '@/lib/api/errors';
 import { PayStubUnbalanced, useConfirmDocument } from '@/lib/api/hooks';
 import type { DocumentDetail, PayStubValues, Proposal } from '@/lib/api/types';
 import { formatNumber } from '@/lib/money';
-import { linesSentToAi, statusReasonText } from '@/lib/documents';
+import { statusReasonText } from '@/lib/documents';
 import {
   confirmReducer,
   initConfirmState,
@@ -79,8 +79,8 @@ export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
         title={manual ? 'Enter what your pay stub says' : 'Check what we read from your pay stub'}
         lead={
           manual
-            ? 'Type each field from the redacted lines beside it. Calculators only ever read values you confirm.'
-            : 'Each field is a proposal until you confirm it. Calculators only ever read confirmed values. Select a field to see where it came from.'
+            ? 'Type each amount from your pay stub. Your plan uses only what you confirm.'
+            : 'Check each amount against your pay stub, then confirm it. Your plan uses only what you confirm.'
         }
       />
       {manual && reason && (
@@ -97,7 +97,7 @@ export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 id={titleId} className="m-0">
-                {manual ? 'Pay stub fields' : 'Extracted fields'}
+                {manual ? 'Pay stub details' : 'What we read'}
               </h2>
               <div className="text-small text-ink-3">
                 <span className="tabular-nums">{formatNumber(summary.confirmedCount)}</span> of{' '}
@@ -144,6 +144,7 @@ export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
 
         <SourcePane
           id={sourceId}
+          type={document.type}
           className="min-w-0 flex-[1_1_320px]"
           lines={proposal.source_lines}
           redactionCount={document.redaction_count}
@@ -151,7 +152,6 @@ export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
           selectedKey={state.selected}
           selectedLabel={selected?.label ?? null}
           manual={manual}
-          sentToAi={linesSentToAi(document.status_reason)}
         />
       </div>
 

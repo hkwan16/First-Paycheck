@@ -191,46 +191,45 @@ export const huluFinding = (): Finding =>
     user_status: 'cancelled',
   });
 
-const STUBS = {
-  pay_stub_id: S2_ID,
-  pay_date: '2026-11-15',
-  previous_pay_stub_id: S1_ID,
-  previous_pay_date: '2026-10-31',
-};
-
-/** Finder row 16: S2 against S1, three changed lines. */
-export const deductionFindings = (): Finding[] => [
-  finding(7, 'info', `deduction_change:${S2_ID}:federal_withholding`, W4_DECISION_ID, {
-    kind: 'deduction_change',
+/** Finder row 16: S2 against S1, one finding with its three changed lines (issue 202). */
+export const paycheckFinding = (): Finding =>
+  finding(7, 'info', `pay_change:${S2_ID}`, W4_DECISION_ID, {
+    kind: 'pay_change',
     affects: 'w4',
-    ...STUBS,
-    line: 'federal_withholding',
-    label: 'Federal tax',
-    amount_cents: 21_196,
-    previous_cents: 29_776,
-    change_cents: -8_580,
-  }),
-  finding(8, 'info', `deduction_change:${S2_ID}:retirement_contribution`, DECISION_V1_ID, {
-    kind: 'deduction_change',
-    affects: 'k401_match',
-    ...STUBS,
-    line: 'retirement_contribution',
-    label: '401(k)',
-    amount_cents: 5_417,
-    previous_cents: 0,
-    change_cents: 5_417,
-  }),
-  finding(9, 'info', `deduction_change:${S2_ID}:medical_premium`, HEALTH_DECISION_ID, {
-    kind: 'deduction_change',
-    affects: 'health_plans',
-    ...STUBS,
-    line: 'medical_premium',
-    label: 'Health premiums',
-    amount_cents: 3_125,
-    previous_cents: 6_250,
-    change_cents: -3_125,
-  }),
-];
+    pay_stub_id: S2_ID,
+    pay_date: '2026-11-15',
+    previous_pay_stub_id: S1_ID,
+    previous_pay_date: '2026-10-31',
+    gross_cents: 270_833,
+    previous_gross_cents: 270_833,
+    gross_change_cents: 0,
+    net_cents: 205_892,
+    previous_net_cents: 199_604,
+    net_change_cents: 6_288,
+    deductions: [
+      {
+        line: 'federal_withholding',
+        label: 'Federal tax',
+        amount_cents: 21_196,
+        previous_cents: 29_776,
+        change_cents: -8_580,
+      },
+      {
+        line: 'retirement_contribution',
+        label: '401(k)',
+        amount_cents: 5_417,
+        previous_cents: 0,
+        change_cents: 5_417,
+      },
+      {
+        line: 'medical_premium',
+        label: 'Health premiums',
+        amount_cents: 3_125,
+        previous_cents: 6_250,
+        change_cents: -3_125,
+      },
+    ],
+  });
 
 /** Finder row 14: a raise (S3 against S1). Not in November's list; for its own tests. */
 export const payChangeFinding = (): Finding =>
@@ -247,6 +246,7 @@ export const payChangeFinding = (): Finding =>
     net_cents: 218_845,
     previous_net_cents: 199_604,
     net_change_cents: 19_241,
+    deductions: [],
   });
 
 /** Finder row 15: the same two stubs the other way round, a pay cut. */
@@ -273,7 +273,7 @@ export const novemberFindings = (): Finding[] => [
   netflixFinding(),
   deadlineFinding(),
   huluFinding(),
-  ...deductionFindings(),
+  paycheckFinding(),
 ];
 
 const LINE_INFO: readonly [WithholdingLine['key'], string, WithholdingLine['role'], number][] = [
@@ -676,10 +676,16 @@ export function partialBasisHoldings(): Holdings {
 /** The n-th `checkin.monthly` job `POST /check-ins` hands out. */
 export const checkInJobId = (n: number) => `5c000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
-/** What a `checkin.monthly` job reports when it ends (spec 015, `CheckInRun.as_job_result`). */
+/**
+ * What a `checkin.monthly` job reports when it ends (spec 015,
+ * `CheckInRun.as_job_result`); a run that is not given its counts made
+ * November's findings when it created the check-in, and changed nothing else.
+ */
 export interface CheckInJobResult {
   outcome: 'created' | 'refreshed' | 'skipped';
   check_in_id: string | null;
+  inserted?: number;
+  retracted?: number;
 }
 
 /** A `checkin.monthly` job in one state. */
@@ -693,12 +699,17 @@ export function checkInJob(id: string, overrides: Partial<Job> = {}): Job {
 }
 
 /** The job's result as the API writes it, the counts included. */
-export const checkInJobResult = ({ outcome, check_in_id }: CheckInJobResult) => ({
+export const checkInJobResult = ({
   outcome,
   check_in_id,
-  inserted: outcome === 'created' ? 9 : 0,
-  updated: outcome === 'refreshed' ? 9 : 0,
-  retracted: 0,
+  inserted = outcome === 'created' ? novemberFindings().length : 0,
+  retracted = 0,
+}: CheckInJobResult) => ({
+  outcome,
+  check_in_id,
+  inserted,
+  updated: outcome === 'refreshed' ? novemberFindings().length : 0,
+  retracted,
   dropped: 0,
   marked_active: 0,
 });

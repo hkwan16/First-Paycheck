@@ -13,6 +13,7 @@ from llm import schemas
 from llm.gateway import (
     CATEGORIZE_PROMPT,
     EXPLAIN_PROMPT,
+    EXTRACT_PAY_STUB_PROMPT,
     JUDGE_RATE_CLAIM_PROMPT,
     JUDGE_WITHHOLDING_CLAIM_PROMPT,
 )
@@ -146,12 +147,36 @@ def test_extract_benefits_v2() -> None:
     assert "YYYY-MM-DD" in prompt.system
 
 
-def test_pay_stub_prompt_names_every_line_kind_and_field() -> None:
-    prompt = load_prompt("extract_pay_stub", "v1")
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_pay_stub_prompt_names_every_line_kind_and_field(version: str) -> None:
+    prompt = load_prompt("extract_pay_stub", version)
     for kind in get_args(schemas.LineItemKind):
         assert f"`{kind}`" in prompt.system
     for frequency in get_args(schemas.PayFrequencyValue):
         assert f"`{frequency}`" in prompt.system
+
+
+def test_extract_pay_stub_v2_reads_a_dash_as_zero() -> None:
+    """Spec 005 rule 1a (issue 195): v1 told the model a dash was null, so the
+    Acme stub's "401(k) -" could not be confirmed. v2 is v1 with that rule
+    turned around: a printed dash or zero is 0, tied to its line; null is for a
+    line the stub does not print. It is the version the gateway sends."""
+    v1 = load_prompt("extract_pay_stub", "v1").system
+    v2 = load_prompt("extract_pay_stub", "v2")
+    rule = "a dash or a blank where an amount would be is null"
+    assert rule in v1
+    assert rule not in v2.system
+    assert '"401(k) -"' in v2.system
+    assert "0.00" in v2.system
+    assert (v2.version, v2.schema, v2.effort) == (
+        "extract_pay_stub/v2",
+        schemas.PayStubExtraction,
+        "low",
+    )
+    for field in [*schemas.PayStubExtraction.model_fields, *schemas.LineItem.model_fields]:
+        assert f"`{field}`" in v2.system, field
+    assert chr(0x2014) not in v2.system
+    assert EXTRACT_PAY_STUB_PROMPT == ("extract_pay_stub", "v2")
 
 
 @pytest.mark.parametrize("version", ["v1", "v2", "v3"])

@@ -32,7 +32,8 @@ export function fieldDisplay(
   manual: boolean,
 ): string {
   const { kind, value } = field;
-  if (value === null) return manual ? 'Not entered yet' : 'None';
+  // Never "None", which reads as zero (issue 195).
+  if (value === null) return manual ? 'Not entered yet' : 'Not found';
   if (kind === 'money' && typeof value === 'number') return formatMoney(value);
   if (kind === 'date' && typeof value === 'string') {
     try {
@@ -55,9 +56,9 @@ export function fieldDisplay(
 export const REVIEW_THRESHOLD = 0.9;
 
 /**
- * The extraction confidence badge: "Check · 74%" (warning) below 0.9,
- * "Read · 99%" otherwise. A computed field has no confidence ("Added up");
- * typed fields have no badge.
+ * How clearly a value was read: "Check this" (warning) below 0.9, "Read
+ * clearly" otherwise, never a score (issue 209). A computed field has no
+ * confidence ("Added up"); typed fields have no badge.
  */
 export function confidenceBadge(
   confidence: number | null,
@@ -65,10 +66,9 @@ export function confidenceBadge(
 ): { label: string; tone: Tone } | null {
   if (manual) return null;
   if (confidence === null) return { label: 'Added up', tone: 'neutral' };
-  const pct = `${Math.round(confidence * 100)}%`;
   return confidence < REVIEW_THRESHOLD
-    ? { label: `Check · ${pct}`, tone: 'warning' }
-    : { label: `Read · ${pct}`, tone: 'blue' };
+    ? { label: 'Check this', tone: 'warning' }
+    : { label: 'Read clearly', tone: 'blue' };
 }
 
 const REDACTED = '[REDACTED]';

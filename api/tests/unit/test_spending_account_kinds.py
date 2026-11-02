@@ -3,7 +3,7 @@ or skipped as a ledger, never both and never neither."""
 
 from __future__ import annotations
 
-from app.routers.spending import LEDGER_ACCOUNT_KINDS, SPENDING_ACCOUNT_KINDS
+from db.accounts import LEDGER_ACCOUNT_KINDS, SPENDING_ACCOUNT_KINDS
 from db.enums import AccountKind
 
 

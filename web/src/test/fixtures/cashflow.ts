@@ -79,7 +79,7 @@ const category = (
   count: number,
 ): CategoryTotal => ({ category: name, bucket, total_cents, count });
 
-/** `SPENDING_ACCOUNT_KINDS` in api/app/routers/spending.py (spec 007 rule 21a). */
+/** `SPENDING_ACCOUNT_KINDS` in api/db/accounts.py (spec 007 rule 21a). */
 export const ACCOUNT_KINDS_COUNTED: SpendingSummary['account_kinds_counted'] = [
   'checking',
   'savings',

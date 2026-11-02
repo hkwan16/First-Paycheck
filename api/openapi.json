@@ -1339,27 +1339,10 @@
         "title": "DecisionVersion",
         "type": "object"
       },
-      "DeductionChangePayload": {
+      "DeductionLine": {
         "additionalProperties": false,
+        "description": "One deduction line that differs between the two stubs (rule 6).",
         "properties": {
-          "affects": {
-            "anyOf": [
-              {
-                "enum": [
-                  "k401_match",
-                  "health_plans",
-                  "emergency_fund",
-                  "w4",
-                  "spending"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Affects"
-          },
           "amount_cents": {
             "title": "Amount Cents",
             "type": "integer"
@@ -1367,12 +1350,6 @@
           "change_cents": {
             "title": "Change Cents",
             "type": "integer"
-          },
-          "kind": {
-            "const": "deduction_change",
-            "default": "deduction_change",
-            "title": "Kind",
-            "type": "string"
           },
           "label": {
             "title": "Label",
@@ -1391,44 +1368,19 @@
             "title": "Line",
             "type": "string"
           },
-          "pay_date": {
-            "format": "date",
-            "title": "Pay Date",
-            "type": "string"
-          },
-          "pay_stub_id": {
-            "format": "uuid",
-            "title": "Pay Stub Id",
-            "type": "string"
-          },
           "previous_cents": {
             "title": "Previous Cents",
             "type": "integer"
-          },
-          "previous_pay_date": {
-            "format": "date",
-            "title": "Previous Pay Date",
-            "type": "string"
-          },
-          "previous_pay_stub_id": {
-            "format": "uuid",
-            "title": "Previous Pay Stub Id",
-            "type": "string"
           }
         },
         "required": [
-          "affects",
-          "pay_stub_id",
-          "pay_date",
-          "previous_pay_stub_id",
-          "previous_pay_date",
           "line",
           "label",
           "amount_cents",
           "previous_cents",
           "change_cents"
         ],
-        "title": "DeductionChangePayload",
+        "title": "DeductionLine",
         "type": "object"
       },
       "DocumentCreated": {
@@ -1530,6 +1482,10 @@
               }
             ]
           },
+          "superseded": {
+            "title": "Superseded",
+            "type": "boolean"
+          },
           "type": {
             "$ref": "#/components/schemas/DocumentType"
           },
@@ -1551,6 +1507,7 @@
           "deleted_at",
           "replaced_by_id",
           "can_read_again",
+          "superseded",
           "proposal"
         ],
         "title": "DocumentDetail",
@@ -1631,6 +1588,10 @@
               }
             ]
           },
+          "superseded": {
+            "title": "Superseded",
+            "type": "boolean"
+          },
           "type": {
             "$ref": "#/components/schemas/DocumentType"
           },
@@ -1651,7 +1612,8 @@
           "confirmed_at",
           "deleted_at",
           "replaced_by_id",
-          "can_read_again"
+          "can_read_again",
+          "superseded"
         ],
         "title": "DocumentOut",
         "type": "object"
@@ -2120,7 +2082,6 @@
           "recurring_changed",
           "recurring_stopped",
           "pay_change",
-          "deduction_change",
           "upcoming_deadline"
         ],
         "title": "FindingKind",
@@ -2165,7 +2126,6 @@
           "payload": {
             "discriminator": {
               "mapping": {
-                "deduction_change": "#/components/schemas/DeductionChangePayload",
                 "election_mismatch": "#/components/schemas/ElectionMismatchPayload",
                 "goal_off_pace": "#/components/schemas/GoalOffPacePayload",
                 "pay_change": "#/components/schemas/PayChangePayload",
@@ -2188,9 +2148,6 @@
               },
               {
                 "$ref": "#/components/schemas/PayChangePayload"
-              },
-              {
-                "$ref": "#/components/schemas/DeductionChangePayload"
               },
               {
                 "$ref": "#/components/schemas/UpcomingDeadlinePayload"
@@ -3664,6 +3621,13 @@
             ],
             "title": "Affects"
           },
+          "deductions": {
+            "items": {
+              "$ref": "#/components/schemas/DeductionLine"
+            },
+            "title": "Deductions",
+            "type": "array"
+          },
           "gross_cents": {
             "title": "Gross Cents",
             "type": "integer"
@@ -3726,7 +3690,8 @@
           "gross_change_cents",
           "net_cents",
           "previous_net_cents",
-          "net_change_cents"
+          "net_change_cents",
+          "deductions"
         ],
         "title": "PayChangePayload",
         "type": "object"
@@ -9550,6 +9515,18 @@
               ],
               "description": "Rule and user labels count as 1; uncategorized excluded",
               "title": "Min Confidence"
+            }
+          },
+          {
+            "description": "Only rows on active checking, savings and credit accounts, the ones the spending summary reads",
+            "in": "query",
+            "name": "cash_accounts_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Only rows on active checking, savings and credit accounts, the ones the spending summary reads",
+              "title": "Cash Accounts Only",
+              "type": "boolean"
             }
           },
           {

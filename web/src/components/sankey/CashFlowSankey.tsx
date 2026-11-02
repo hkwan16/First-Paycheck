@@ -28,8 +28,8 @@ import { KEEP_ATTRIBUTE, useFlowPopover } from './useFlowPopover';
 
 export const DEFAULT_HEADINGS = [
   'Pay stubs',
-  'Withheld and deducted',
-  'Take-home buckets',
+  'Taken out of pay',
+  'Spent and saved',
   'Categories',
 ] as const;
 

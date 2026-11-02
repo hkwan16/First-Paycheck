@@ -50,6 +50,20 @@ test('a role change is saved', async ({ page }) => {
   await expect(saving.getByRole('combobox', { name: 'Role' })).toHaveValue('emergency_fund');
 });
 
+test('Sync now says how it went beside the bank it synced (issue 208)', async ({ page }) => {
+  test.setTimeout(360_000);
+  await openLink(page);
+  const sync = page.getByRole('button', { name: /^Sync now for / }).first();
+  const name = ((await sync.getAttribute('aria-label')) ?? '').replace(/^Sync now for /, '');
+  await sync.click();
+  // The outcome shows in the bank's own group, under the button pressed, not
+  // at the bottom of the card.
+  const bank = page.getByRole('region', { name, exact: true });
+  await expect(bank.getByRole('status').filter({ hasText: `Synced ${name}.` })).toBeVisible({
+    timeout: 300_000,
+  });
+});
+
 test('unlinking asks first, and keeping the bank changes nothing', async ({ page }) => {
   await openLink(page);
   const unlink = page.getByRole('button', { name: /^Unlink / }).first();

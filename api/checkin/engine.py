@@ -32,6 +32,7 @@ from db.enums import (
     RecurringUserStatus,
 )
 from db.models import CheckIn, CheckInFinding, Job, RecurringCharge
+from db.pay_stubs import paycheck_ids
 from jobs import queue
 
 __all__ = [
@@ -39,6 +40,7 @@ __all__ = [
     "Changes",
     "CheckInRun",
     "Existing",
+    "Subjects",
     "Trigger",
     "checkin_key",
     "month_end",
@@ -62,6 +64,8 @@ CONDITIONS = frozenset(
 RECURRING_EVENTS = frozenset(
     {FindingKind.RECURRING_NEW, FindingKind.RECURRING_CHANGED, FindingKind.RECURRING_STOPPED}
 )
+# A paycheck change's subject is the two stubs it compared.
+_COMPARED_STUBS = ("pay_stub_id", "previous_pay_stub_id")
 
 
 @dataclass(frozen=True)
@@ -77,22 +81,38 @@ class Existing:
     subject_gone: bool = False
 
 
-def subject_gone(
-    kind: FindingKind, payload: dict[str, Any], charge_ids: Collection[uuid.UUID]
-) -> bool:
-    """Rule 10.4: a recurring finding whose charge is no longer one of the
-    user's (it was detected only from an unlinked institution, spec 017 rule 14).
+@dataclass(frozen=True)
+class Subjects:
+    """What the user still has for an event finding to report on (rule 10.4)."""
 
-    Other kinds report on pay stubs, decisions, goals and calendar events, which
-    unlinking never deletes.
-    """
-    if kind not in RECURRING_EVENTS:
-        return False
+    charge_ids: Collection[uuid.UUID]
+    # Stubs no newer confirm superseded (spec 005 rule 22c).
+    current_stub_ids: Collection[uuid.UUID]
+
+
+def _all_present(
+    payload: dict[str, Any], fields: Sequence[str], ids: Collection[uuid.UUID]
+) -> bool:
     try:
-        charge_id = uuid.UUID(str(payload.get("recurring_charge_id")))
+        return all(uuid.UUID(str(payload.get(name))) in ids for name in fields)
     except ValueError:
-        return True
-    return charge_id not in charge_ids
+        return False
+
+
+def subject_gone(kind: FindingKind, payload: dict[str, Any], subjects: Subjects) -> bool:
+    """Rule 10.4: an event finding whose subject the user no longer has.
+
+    A recurring finding's charge goes when it was detected only from an
+    unlinked institution (spec 017 rule 14). A paycheck change's stubs go when
+    a newer confirm supersedes one and no candidate took the finding's key
+    (a Replace that corrected the stub, spec 005 rule 22b). Conditions are
+    retracted once no finder produces them, whatever they report on.
+    """
+    if kind in RECURRING_EVENTS:
+        return not _all_present(payload, ("recurring_charge_id",), subjects.charge_ids)
+    if kind is FindingKind.PAY_CHANGE:
+        return not _all_present(payload, _COMPARED_STUBS, subjects.current_stub_ids)
+    return False
 
 
 @dataclass(frozen=True)
@@ -234,7 +254,8 @@ def run_check_in(
     # Rule 9a: the run is recorded even when reconcile changes nothing.
     check_in.last_run_at = now
 
-    facts = load_facts(session, period, today)
+    paychecks = paycheck_ids(session)
+    facts = load_facts(session, period, today, paychecks)
     candidates = all_findings(facts)
     rows = {
         row.id: row
@@ -250,7 +271,10 @@ def run_check_in(
             )
         )
     )
-    charge_ids = set(session.scalars(select(RecurringCharge.id)))
+    subjects = Subjects(
+        charge_ids=set(session.scalars(select(RecurringCharge.id))),
+        current_stub_ids=paychecks.keys(),
+    )
     changes = reconcile(
         [
             Existing(
@@ -258,7 +282,7 @@ def run_check_in(
                 key=row.key,
                 kind=row.kind,
                 handled=row.user_action is not None,
-                subject_gone=subject_gone(row.kind, row.payload, charge_ids),
+                subject_gone=subject_gone(row.kind, row.payload, subjects),
             )
             for row in rows.values()
         ],

@@ -33,8 +33,8 @@ export interface NetWorthSeries {
  */
 export const NET_WORTH_SERIES: readonly NetWorthSeries[] = [
   { key: 'netWorth', label: 'Net worth', tone: 'blue' },
-  { key: 'assets', label: 'Assets', tone: 'teal' },
-  { key: 'liabilities', label: 'Liabilities', tone: 'coral' },
+  { key: 'assets', label: 'What you have', tone: 'teal' },
+  { key: 'liabilities', label: 'What you owe', tone: 'coral' },
 ];
 
 const MONTH_TICK = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' });

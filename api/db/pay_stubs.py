@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from collections.abc import Collection
 
 from sqlalchemy import Select, Text, Update, and_, func, literal, or_, select, text, update
 from sqlalchemy.orm import Session, aliased
@@ -24,6 +25,8 @@ __all__ = [
     "current_pay_stubs",
     "latest_pay_date",
     "paid_between_count",
+    "paycheck_ids",
+    "superseded_documents",
 ]
 
 # GET /pay-stubs order (spec 005 rule 24); id breaks a tie inside one transaction.
@@ -65,6 +68,33 @@ def current_pay_stubs() -> Select[PayStub]:
     return select(PayStub).where(PayStub.superseded_by_id.is_(None))
 
 
+def paycheck_ids(session: Session) -> dict[uuid.UUID, uuid.UUID]:
+    """Each current stub's paycheck id (spec 015, Inputs): the first copy of its
+    paycheck, the one among it and the stubs it superseded, directly or through
+    earlier copies, that superseded nothing.
+
+    A confirm that superseded two current stubs joined two paychecks; the older
+    first copy (``created_at``, then ``id``) names the one they became. A newer
+    copy never supersedes nothing, so it never changes a paycheck id.
+    """
+    rows = session.execute(
+        select(PayStub.id, PayStub.superseded_by_id).order_by(PayStub.created_at, PayStub.id)
+    ).all()
+    successor = {row.id: row.superseded_by_id for row in rows}
+    superseding = set(successor.values())
+
+    def current(stub_id: uuid.UUID) -> uuid.UUID:
+        while (newer := successor[stub_id]) is not None:
+            stub_id = newer
+        return stub_id
+
+    first: dict[uuid.UUID, uuid.UUID] = {}
+    for row in rows:
+        if row.id not in superseding:
+            first.setdefault(current(row.id), row.id)
+    return first
+
+
 def latest_pay_date(session: Session) -> dt.date | None:
     """The newest current stub's pay date: the next pay date's anchor (spec 007 rule 16)."""
     return session.scalar(
@@ -82,6 +112,21 @@ def paid_between_count(session: Session, first: dt.date, last: dt.date) -> int:
         .with_only_columns(func.count(), maintain_column_froms=True)
     )
     return int(count or 0)
+
+
+def superseded_documents(
+    session: Session, document_ids: Collection[uuid.UUID]
+) -> frozenset[uuid.UUID]:
+    """Which of ``document_ids`` were confirmed into a stub a newer confirm has
+    since superseded (rule 22f): what Link shows instead of "Confirmed"."""
+    if not document_ids:
+        return frozenset()
+    rows = session.scalars(
+        select(PayStub.document_id).where(
+            PayStub.superseded_by_id.is_not(None), PayStub.document_id.in_(document_ids)
+        )
+    )
+    return frozenset(rows)
 
 
 def add_confirmed(session: Session, stub: PayStub) -> None:
