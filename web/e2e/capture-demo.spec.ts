@@ -15,7 +15,7 @@ import {
 import { Demo, DEMO_MP4, DEMO_SIZE, toMp4 } from './support/demo';
 
 /*
- * The alpha document's 90-second demo: one continuous recording of a person
+ * The alpha document's two-minute demo: one continuous recording of a person
  * going through the product, with a caption naming each scene, converted to
  * docs/alpha/alpha-demo.mp4 (E2E_DEMO_MP4 elsewhere). It reads the e2e
  * account's data as the other capture projects leave it (a linked bank,
@@ -29,8 +29,8 @@ import { Demo, DEMO_MP4, DEMO_SIZE, toMp4 } from './support/demo';
  * that version's explanation, which the off-camera window starts writing as
  * soon as the version is saved. Those are the only changes it makes: a new
  * confirmed stub with the same values, a decision version and its
- * explanation, all of which the other capture specs and a rerun take in their
- * stride.
+ * explanation. Until a second confirmed copy of a stub stops counting again
+ * (docs/backlog.yaml), each run adds the Acme stub to October's cash flow once more.
  */
 test.skip(!CAPTURE_DIR, NO_CAPTURE_DIR);
 test.skip(
@@ -238,7 +238,9 @@ test('records the alpha demo', async ({ browser }, testInfo) => {
   const w4 = page.getByRole('region', { name: 'W-4, federal only' });
   await demo.scrollTo(w4.getByRole('group', { name: 'From your decisions' }));
   await demo.hold(2500);
-  await demo.scrollTo(w4.getByRole('group', { name: 'If you change nothing' }));
+  // The result, not "If you change nothing": that comparison needs the stub and
+  // the plan details on one pay schedule, and the Acme stub is semimonthly.
+  await demo.scrollTo(w4.getByRole('group', { name: 'Calculator result' }));
   await demo.hold(2500);
 
   // 5. Why: the 401(k) version just saved, explained and checked.
