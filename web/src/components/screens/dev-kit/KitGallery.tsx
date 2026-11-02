@@ -86,7 +86,7 @@ const LEGEND: [SwatchColor, string][] = [
   ['ink-2', 'Take-home'],
   ['blue', 'Essentials'],
   ['teal', 'Savings'],
-  ['flow-idle', 'Not yet spent'],
+  ['flow-idle', 'Left over'],
   ['blue-soft', 'Essentials category'],
   ['coral-soft', 'Flexible category'],
 ];
@@ -131,7 +131,7 @@ export function KitGallery() {
         <Row caption="md, 44px">
           <Button>Back</Button>
           <Button variant="primary">
-            Review extracted fields
+            Check what we read
             <ArrowRightIcon />
           </Button>
           <Button variant="primary">
@@ -192,9 +192,9 @@ export function KitGallery() {
           </Badge>
           <Badge tone="warning">Changed since you saved it</Badge>
           <Badge tone="off">25% of plan</Badge>
-          <Badge tone="blue">Read · 96%</Badge>
+          <Badge tone="blue">Read clearly</Badge>
           <Badge tone="coral" icon={<CheckIcon />}>
-            2 items redacted
+            2 numbers hidden
           </Badge>
           <Badge tone="teal">Emergency fund</Badge>
           <Badge tone="plum">401(k)</Badge>
@@ -597,7 +597,7 @@ export function KitGallery() {
             </div>
             <div className="flex items-center gap-3">
               <Badge tone="coral" icon={<CheckIcon />}>
-                2 items redacted
+                2 numbers hidden
               </Badge>
               <Button size="sm">Replace</Button>
             </div>
@@ -681,7 +681,7 @@ export function KitGallery() {
       <Section id="kit-footer" title="Step footer">
         <StepFooter
           back={{ href: '/setup/link' }}
-          next={{ href: '/setup/spending', label: 'Review extracted fields' }}
+          next={{ href: '/setup/spending', label: 'Check what we read' }}
         />
         <StepFooter
           back={{ href: '/setup/link' }}
