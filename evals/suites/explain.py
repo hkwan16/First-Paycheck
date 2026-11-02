@@ -26,6 +26,9 @@ whichever is larger, as evals/CLAUDE.md says):
 - ``judge_accuracy``: the share of the hand-labeled items in
   ``fixtures/explain/rate_claims.json`` the judge reads as labeled (rule 24b),
   so a run shows whether a low ``rate_framing`` is the drafts or the judge.
+- ``concise`` and ``whole_dollars``: over the decisions whose final row is a
+  draft, the share short enough for the Why page and written in whole dollars
+  at $100 and over (issue 204, rule 24f; ``evals/suites/readability.py``).
 """
 
 from __future__ import annotations
@@ -45,6 +48,7 @@ from db.seed.load import read_seed_citations
 from evals.suites.base import Budget, Suite, SuiteResult
 from evals.suites.claim_judge import ClaimJudge
 from evals.suites.live import live_gateway
+from evals.suites.readability import Readability
 from llm.schemas import ClaimDraft, ExplanationDraft, RateClaimRequest, RateClaimVerdict
 from retrieval.benefits_search import BenefitsPassage
 from retrieval.citations import Citation
@@ -275,9 +279,11 @@ def score(
     rates = rate_judge(judge)
     first_try = fallbacks = cited = framed = scored = 0
     failures: list[str] = []
+    readability = Readability()
     for decision in decisions:
         attempts = explain_decision(drafter, decision)
         final = attempts[-1]
+        readability.add(decision.id, final.draft, fallback=final.fallback)
         first_try += attempts[0].verified
         fallbacks += final.fallback
         cited += bool(final.draft.citation_keys)
@@ -298,14 +304,16 @@ def score(
             "cited": cited / count if count else 1.0,
             "rate_framing": framed / scored if scored else 1.0,
             "judge_accuracy": matched / len(calibration) if calibration else 1.0,
+            **readability.metrics(),
         },
         cases=count,
-        failures=[*failures, *misread],
+        failures=[*failures, *readability.failures, *misread],
         # One case is one decision; rate_framing is a share of only the ones it
         # scores, and judge_accuracy a share of the calibration items.
         case_worth={
             "rate_framing": 1 / scored if scored else 0.0,
             "judge_accuracy": 1 / len(calibration) if calibration else 0.0,
+            **readability.case_worth(),
         },
     )
 

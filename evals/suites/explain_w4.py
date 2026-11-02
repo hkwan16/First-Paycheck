@@ -19,6 +19,7 @@ is larger, as evals/CLAUDE.md says):
   It measures drafts and never gates one.
 - ``judge_accuracy``: the share of the hand-labeled items in
   ``fixtures/explain/withholding_claims.json`` the judge reads as labeled (rule 24e).
+- ``concise`` and ``whole_dollars``: as in the explain suite (rule 24f).
 """
 
 from __future__ import annotations
@@ -44,6 +45,7 @@ from evals.suites.explain import (
     load_decisions,
 )
 from evals.suites.live import live_gateway
+from evals.suites.readability import Readability
 from llm.schemas import (
     ClaimDraft,
     ExplanationDraft,
@@ -192,9 +194,11 @@ def score(
     withholdings = withholding_judge(judge)
     first_try = fallbacks = cited = framed = scored = 0
     failures: list[str] = []
+    readability = Readability()
     for decision in decisions:
         attempts = explain_decision(drafter, decision)
         final = attempts[-1]
+        readability.add(decision.id, final.draft, fallback=final.fallback)
         first_try += attempts[0].verified
         fallbacks += final.fallback
         cited += bool(final.draft.citation_keys)
@@ -217,14 +221,16 @@ def score(
             "cited": cited / count if count else 1.0,
             "withholding_framing": framed / scored if scored else 1.0,
             "judge_accuracy": matched / len(calibration) if calibration else 1.0,
+            **readability.metrics(),
         },
         cases=count,
-        failures=[*failures, *misread],
+        failures=[*failures, *readability.failures, *misread],
         # One case is one decision; withholding_framing is a share of only the ones
         # it scores, and judge_accuracy a share of the calibration items.
         case_worth={
             "withholding_framing": 1 / scored if scored else 0.0,
             "judge_accuracy": 1 / len(calibration) if calibration else 0.0,
+            **readability.case_worth(),
         },
     )
 

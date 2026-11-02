@@ -104,16 +104,26 @@ NO_CALIBRATION: list[explain.RateClaimItem] = []
 SPEC_008 = Path(__file__).resolve().parents[2] / "docs" / "specs" / "008-explain-and-verify.md"
 
 
+def judge_lines(failures: list[str]) -> list[str]:
+    """The judges' failure lines, without the readability ones (rule 24f)."""
+    return [line for line in failures if line.startswith("judge ")]
+
+
 def test_fake_drafts_verify_for_every_decision() -> None:
     result = explain.score(explain.load_decisions(), fake(), fake(), NO_CALIBRATION)
+    # The fake states the facts as given, with cents, so only whole_dollars misses:
+    # 2 of the 29 decisions state no amount of $100 or more among the fake's facts.
     assert result.metrics == {
         "first_try_verified": 1.0,
         "no_fallback": 1.0,
         "cited": 1.0,
         "rate_framing": 1.0,
         "judge_accuracy": 1.0,
+        "concise": 1.0,
+        "whole_dollars": pytest.approx(2 / 29),
     }
-    assert result.failures == []
+    assert len(result.failures) == 27
+    assert all(": cents on $100 or more: " in line for line in result.failures)
 
 
 def test_failing_drafts_count_as_fallbacks_that_stay_cited() -> None:
@@ -130,6 +140,9 @@ def test_failing_drafts_count_as_fallbacks_that_stay_cited() -> None:
         "cited": 1.0,
         "rate_framing": 1.0,
         "judge_accuracy": 1.0,
+        # Both fell back, so no final row is a draft to measure.
+        "concise": 1.0,
+        "whole_dollars": 1.0,
     }
     assert "tiered-under-match attempt 1: " in result.failures[0]
     assert "$123,456.78" in result.failures[0]
@@ -369,11 +382,11 @@ def test_judge_accuracy_is_the_share_of_labels_the_judge_matches() -> None:
     decisions = explain.load_decisions()[:1]
     exact = explain.score(decisions, fake(), AnswersFromLabels(items), items)
     assert exact.metrics["judge_accuracy"] == 1.0
-    assert exact.failures == []
+    assert judge_lines(exact.failures) == []
     miss = "live-stay-at-stub"
     one_wrong = explain.score(decisions, fake(), AnswersFromLabels(items, miss), items)
     assert one_wrong.metrics["judge_accuracy"] == pytest.approx((len(items) - 1) / len(items))
-    [line] = one_wrong.failures
+    [line] = judge_lines(one_wrong.failures)
     assert line.startswith(f"judge {miss}: labeled no claim, judged a claim: ")
     assert "If you stay at the 4% on your pay stub" in line
     # FakeGateway reads no claim anywhere, so it matches only the items that make none.
@@ -393,6 +406,9 @@ def test_one_case_is_a_decision_and_the_judged_metrics_count_only_their_own() ->
     assert result.case_worth == {
         "rate_framing": pytest.approx(1 / 18),
         "judge_accuracy": pytest.approx(1 / len(items)),
+        # Every final row is a draft here, so one is worth 1/29 (rule 24f).
+        "concise": pytest.approx(1 / 29),
+        "whole_dollars": pytest.approx(1 / 29),
     }
 
 
@@ -448,6 +464,9 @@ def test_w4_smoke_decision_is_spec_014_example_9() -> None:
         "cited": 1.0,
         "rate_framing": 1.0,
         "judge_accuracy": 1.0,
+        # The fake states the entries' amounts with cents.
+        "concise": 1.0,
+        "whole_dollars": 0.0,
     }
 
 
