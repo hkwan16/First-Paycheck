@@ -89,7 +89,7 @@ src/app/dev/screens/{link,account,spending,confirm,confirm/manual,confirm/unread
                     after-alpha},why,why/fallback,why/stale,why/emergency-fund,why-index,check-in,
                     check-in/complete,check-in-index,plan,plan/empty}  a screen on the sample data, no
                     API (development only); `account` is Link with the header's account menu
-src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, queued animation frames settled
+src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, Recharts' batched updates settled
                     before jsdom closes: animation-frames.ts; Testing Library's async wrapper
                     taught Vitest's fake timers: async-wrapper.ts), render.tsx, fake-xhr.ts,
                     fake-download.ts (object URLs and anchor clicks recorded, no navigation),

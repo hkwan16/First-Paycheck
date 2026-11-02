@@ -1588,6 +1588,7 @@ issues:
     milestone: M10
     priority: High
     status: done
+    # Fixed October 29: the shared afterAll waits one frame. November 1 (CI on PR 192): a chart mounted under fake timers keeps the fake frame, so the wait now covers the 100 ms fallback timer (settleChartUpdates).
   # Found on October 29 in the first measured eval runs (#144).
   - title: "Nightly evals run the LLM suites"
     body: >-

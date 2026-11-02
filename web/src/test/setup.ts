@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll } from 'vitest';
-import { settleAnimationFrames } from './animation-frames';
+import { settleChartUpdates } from './animation-frames';
 import { installAsyncWrapper } from './async-wrapper';
 import { resetCheckinDb } from './msw/checkin-handlers';
 import { resetDb } from './msw/db';
@@ -27,7 +27,7 @@ afterEach(() => {
 });
 afterAll(async () => {
   server.close();
-  // Run the frames still queued (Recharts' batched updates) before vitest
-  // closes jsdom, or their fallback timers fire into a window that is gone.
-  await settleAnimationFrames();
+  // Let Recharts' batched updates finish before vitest closes jsdom, or their
+  // fallback timers fire into a window that is gone (animation-frames.ts).
+  await settleChartUpdates();
 });
