@@ -337,14 +337,15 @@ test('the account menu sets deleting apart from signing out (issue 205)', async 
   await expect(page.getByRole('separator')).toBeVisible();
   const color = (locator: Locator) =>
     locator.evaluate((element) => getComputedStyle(element).color);
-  expect(await color(remove)).not.toBe(await color(signOut));
+  const removeColor = await color(remove);
+  expect(removeColor).not.toBe(await color(signOut));
 
   await remove.click();
   const confirm = page.getByRole('group', { name: 'Delete your account?' });
   await confirm.getByRole('textbox', { name: 'Type delete to confirm' }).fill('delete');
   // The final step is drawn as the destructive action, the way the menu drew it.
   expect(await color(confirm.getByRole('button', { name: 'Delete my account' }))).toBe(
-    await color(remove),
+    removeColor,
   );
 });
 
