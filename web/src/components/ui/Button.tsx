@@ -4,7 +4,12 @@ import Link from 'next/link';
 import type { ComponentPropsWithRef, MouseEvent, ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 
-/** From the mockup's `.btn`, `.btn-primary`, `.btn-confirmed`, `.btn-sm`, `.btn-block`. */
+/**
+ * From the mockup's `.btn`, `.btn-primary`, `.btn-confirmed`, `.btn-sm`, `.btn-block`.
+ * `destructive` (no mockup class) marks the choice that deletes something: red
+ * on its tint, so it reads as dangerous without outweighing a primary beside it,
+ * which is the safe choice in a confirmation.
+ */
 export const buttonClasses = cva(
   [
     'relative inline-flex items-center justify-center gap-2 rounded-control border-0',
@@ -20,6 +25,8 @@ export const buttonClasses = cva(
       variant: {
         default: 'bg-fill text-ink hover:bg-fill-strong hover:text-ink',
         primary: 'bg-blue text-white hover:bg-blue-deep hover:text-white',
+        destructive:
+          'bg-red-tint text-red-text hover:bg-[color-mix(in_srgb,var(--color-red)_10%,var(--color-red-tint))] hover:text-red-text',
         confirmed:
           'bg-green-tint text-green-text hover:bg-[color-mix(in_srgb,var(--color-green)_8%,var(--color-green-tint))] hover:text-green-text',
       },
@@ -42,7 +49,7 @@ interface StyleProps {
 
 /** A toggle in the confirmed style must say whether it is pressed. */
 type VariantProps =
-  | { variant?: 'default' | 'primary'; pressed?: boolean }
+  | { variant?: 'default' | 'primary' | 'destructive'; pressed?: boolean }
   | { variant: 'confirmed'; pressed: boolean };
 
 type NativeButtonProps = Omit<
