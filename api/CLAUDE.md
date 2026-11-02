@@ -139,6 +139,16 @@ Rules:
 - `sync/provider.py` is the provider protocol; `sync/pipeline.py:run_sync` is
   its only caller (spec 002). Network calls run with no transaction open; the
   cursor is written last, in the same transaction as the data.
+- A `/transactions/sync` answer with an empty `next_cursor` means Plaid has no
+  transactions to give yet, whatever `transactions_update_status` says: the
+  sandbox answers `INITIAL_UPDATE_COMPLETE` or `HISTORICAL_UPDATE_COMPLETE`
+  with no rows and no cursor for a few seconds after a link (issue #213), and
+  for good on an item with no transactions. The provider raises
+  `TransactionsNotReady`; `run_sync` retries (`RetryLater`, 120 s) while the
+  item is under `TRANSACTIONS_READY_WINDOW` (5 minutes) old, then syncs it
+  without transactions and keeps the cursor null (spec 002 rules 9a, 11a).
+  Every page logs `transactions page` with its counts and Plaid's status
+  (rule 11b), so `.e2e-stack/api.log` shows what Plaid answered.
 - `sync/plaid/client.py` is the only module that imports `plaid` (no type
   stubs; the exemption is scoped to that file). It parses money as `Decimal`
   and raises `PlaidError` without request bodies. Access tokens are `SecretStr`

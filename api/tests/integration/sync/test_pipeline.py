@@ -1,8 +1,9 @@
-"""run_sync against a FakeProvider (spec 002 rules 10-18, examples 3-6)."""
+"""run_sync against a FakeProvider (spec 002 rules 10-18, examples 3-6 and 11-13)."""
 
 from __future__ import annotations
 
 import datetime as dt
+import logging
 from contextlib import AbstractContextManager
 from decimal import Decimal
 from typing import Any
@@ -15,7 +16,12 @@ from app.db import user_session_for
 from db.enums import CategorySource
 from jobs.errors import RetryLater
 from sync.pipeline import SyncItemSecrets, run_sync
-from sync.provider import ItemLoginRequired, PaginationMutated, SyncProvider
+from sync.provider import (
+    ItemLoginRequired,
+    PaginationMutated,
+    SyncProvider,
+    TransactionsNotReady,
+)
 from tests.conftest import FixtureUser
 from tests.support.factories import make_item
 from tests.support.fake_provider import (
@@ -94,6 +100,12 @@ class Harness:
         return self.query(
             "SELECT cursor, status, last_synced_at FROM sync_items WHERE id = :id", id=self.item_id
         )[0]
+
+    def linked_at(self) -> dt.datetime:
+        created_at: dt.datetime = self.query(
+            "SELECT created_at FROM sync_items WHERE id = :id", id=self.item_id
+        )[0][0]
+        return created_at
 
     def queued(self) -> list[str]:
         rows = self.query("SELECT kind FROM jobs WHERE status = 'queued' ORDER BY kind")
@@ -342,3 +354,83 @@ def test_a_transaction_added_and_modified_in_one_page_keeps_the_modification(
         )
     )
     assert harness.transactions() == {"t1": (175, "netflix.com")}
+
+
+NOT_READY_LINE = "transactions not available yet"
+
+
+def not_ready_yet() -> FakeProvider:
+    """Plaid seconds after a link: accounts, but transactions not available (rule 9a)."""
+    return FakeProvider(
+        accounts=[CHECKING],
+        balances=[balance("acc-checking", 250_000)],
+        pages={None: TransactionsNotReady("INITIAL_UPDATE_COMPLETE")},
+    )
+
+
+def logged(caplog: pytest.LogCaptureFixture, message: str, *fields: str) -> list[tuple[Any, ...]]:
+    """The named extra fields of each ``message`` line, in order."""
+    return [
+        tuple(vars(record)[name] for name in fields)
+        for record in caplog.records
+        if record.getMessage() == message
+    ]
+
+
+def test_a_new_item_waits_for_its_transactions(
+    harness: Harness, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Spec 002 rules 11a and 11b, example 11 (issue #213)."""
+    with caplog.at_level(logging.INFO, logger="sync.pipeline"), pytest.raises(RetryLater) as raised:
+        harness.run(not_ready_yet(), now=harness.linked_at() + dt.timedelta(seconds=1))
+
+    assert raised.value.after_seconds == 120
+    assert "INITIAL_UPDATE_COMPLETE" in str(raised.value)
+    assert harness.query("SELECT count(*) FROM accounts")[0][0] == 0
+    assert harness.query("SELECT count(*) FROM balance_snapshots")[0][0] == 0
+    assert harness.transactions() == {}
+    assert tuple(harness.item()) == (None, "active", None)
+    assert harness.queued() == []
+    assert logged(caplog, NOT_READY_LINE, "update_status", "retry", "sync_item_id") == [
+        ("INITIAL_UPDATE_COMPLETE", True, str(harness.item_id))
+    ]
+
+
+def test_an_item_past_the_window_syncs_without_transactions(
+    harness: Harness, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Spec 002 rules 11a and 11b, example 12: an item with no transactions stops waiting."""
+    now = harness.linked_at() + dt.timedelta(minutes=5)
+    with caplog.at_level(logging.INFO, logger="sync.pipeline"):
+        result = harness.run(not_ready_yet(), now=now)
+
+    assert (result.outcome, result.accounts, result.added, result.balances) == ("synced", 1, 0, 1)
+    assert harness.transactions() == {}
+    assert tuple(harness.item()) == (None, "active", now)
+    assert harness.queued() == ["categorize.run", "recurring.detect"]
+    assert logged(caplog, NOT_READY_LINE, "update_status", "retry", "sync_item_id") == [
+        ("INITIAL_UPDATE_COMPLETE", False, str(harness.item_id))
+    ]
+
+
+def test_each_page_is_logged(harness: Harness, caplog: pytest.LogCaptureFixture) -> None:
+    """Spec 002 rule 11b, example 13."""
+    status = "HISTORICAL_UPDATE_COMPLETE"
+    provider = FakeProvider(
+        accounts=[CHECKING, SAVINGS],
+        pages={
+            None: page(
+                "c1", added=[txn("t1", 1200), txn("t2", 550)], has_more=True, update_status=status
+            ),
+            "c1": PAGE_TWO.model_copy(update={"update_status": status}),
+        },
+    )
+    with caplog.at_level(logging.INFO, logger="sync.pipeline"):
+        harness.run(provider)
+
+    fields = ("page", "added", "modified", "removed", "has_more", "update_status", "sync_item_id")
+    item = str(harness.item_id)
+    assert logged(caplog, "transactions page", *fields) == [
+        (1, 2, 0, 0, True, status, item),
+        (2, 1, 1, 1, False, status, item),
+    ]

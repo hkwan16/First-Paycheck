@@ -124,13 +124,22 @@ def test_waits_for_transactions_to_be_ready(tmp_path: Path) -> None:
     not_ready = PlaidError(
         code="PRODUCT_NOT_READY", error_type="ITEM_ERROR", message="wait", request_id=None
     )
+    # Plaid's empty cursor is "not available yet" under any status (spec 002
+    # rule 9a), so the recorder waits through both of these (issue #213).
     client = FakeClient(
-        [not_ready, page("c0", has_more=False, status="NOT_READY"), page("c1", has_more=False)]
+        [
+            not_ready,
+            page("", has_more=False, status="NOT_READY"),
+            page("", has_more=False, status="INITIAL_UPDATE_COMPLETE"),
+            page("c1", has_more=False),
+        ]
     )
     written = record(client, tmp_path, ["transactions"])
     assert [path.name for path in written if "sync" in path.name] == [
         "transactions_sync_page1.json"
     ]
+    page1 = json.loads((tmp_path / "transactions_sync_page1.json").read_text())
+    assert page1["next_cursor"] == "c1"
     assert "investments_holdings_get" not in [name for name, _ in client.calls]
 
 

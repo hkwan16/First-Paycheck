@@ -123,6 +123,7 @@ def page(
     modified: Sequence[ProviderTransaction] = (),
     removed: Sequence[str] = (),
     has_more: bool = False,
+    update_status: str | None = None,
 ) -> TransactionPage:
     return TransactionPage(
         added=list(added),
@@ -133,6 +134,7 @@ def page(
         ],
         next_cursor=next_cursor,
         has_more=has_more,
+        update_status=update_status,
     )
 
 
