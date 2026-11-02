@@ -34,11 +34,52 @@ test('starts from a linked sandbox bank', async ({ page }) => {
   await expect(page.getByRole('group', { name: 'Plaid Checking' })).toBeVisible();
 });
 
-test('lists the synced transactions with who labeled each one', async ({ page }) => {
+test('lists the synced transactions with where each category came from', async ({ page }) => {
   const table = await openSpending(page);
   const rows = table.getByRole('row');
   expect(await rows.count()).toBeGreaterThan(2);
-  await expect(table.getByText(/^(Rule|You|AI( · \d+%)?|Not labeled)$/).first()).toBeVisible();
+  await expect(
+    table.getByText(/^(Known merchant|You|Our guess|Guess, check it|No category)$/).first(),
+  ).toBeVisible();
+});
+
+test('lists only the accounts the totals cover, and no loan interest as a bill (issue 200)', async ({
+  page,
+}) => {
+  const table = await openSpending(page);
+  const summary = await loadedSummary(page);
+  // "First Platypus Bank ··1000 and ··2000": the accounts the totals read.
+  const covered = new Set(((await summary.getByText(/··\d+/).textContent()) ?? '').match(/··\d+/g));
+  expect(covered.size).toBeGreaterThan(0);
+  const toggle = page.getByRole('button', { name: 'Show all transactions' });
+  if ((await toggle.count()) > 0) await toggle.click();
+  const masks = await table
+    .getByRole('rowgroup')
+    .nth(1)
+    .getByText(/^··\d+$/)
+    .allTextContents();
+  expect(masks.length).toBeGreaterThan(0);
+  // A loan's "Monthly payment" and "Interest charged" rows used to sit here,
+  // on the loans' own masks, under totals that left them out.
+  for (const mask of masks) expect(covered).toContain(mask);
+  const recurring = page.getByRole('region', { name: 'Recurring charges' });
+  await expect(recurring).not.toHaveAttribute('aria-busy', 'true');
+  await expect(recurring.getByRole('listitem', { name: /^Interest/ })).toHaveCount(0);
+});
+
+test('the summary, the diagram and the recurring charges come before the list (issue 201)', async ({
+  page,
+}) => {
+  const table = await openSpending(page);
+  // The list opens on its newest 10 rows.
+  expect(await table.getByRole('rowgroup').nth(1).getByRole('row').count()).toBeLessThanOrEqual(10);
+  const recurring = page.getByRole('region', { name: 'Recurring charges' });
+  const box = await recurring.boundingBox();
+  const viewport = page.viewportSize();
+  expect(box && viewport).toBeTruthy();
+  // Eight screens before: a 1,129 px diagram and fifty rows. Now the three
+  // cards that sum up the month end within three screens.
+  expect(box!.y + box!.height).toBeLessThan(3 * viewport!.height);
 });
 
 const flowCard = (page: Page) =>
@@ -66,7 +107,12 @@ test('the cash flow and the summary tiles show the same totals from the API', as
   else await expect(scale).toHaveCount(0);
   // Spec 007 rule 26a and spec 010 rule 5a (issue 164): income is deposits, and
   // the pay stubs are counted for this period only, whatever other months hold.
-  await expect(summary.getByText('Deposits labeled income', { exact: true })).toBeVisible();
+  await expect(summary.getByText('Income deposited', { exact: true })).toBeVisible();
+  await expect(
+    summary.getByText('Pay and other income into your accounts', { exact: true }),
+  ).toBeVisible();
+  // Issue 200: the card says which half comes from the stubs and which from the deposits.
+  await expect(card).toContainText(/Spending comes from the \$[\d,]+\.\d{2}/);
   await expect(summary).not.toContainText('paycheck');
   await expect(
     card.getByRole('button', { name: /^(Gross pay, \d+ stubs?|No pay stub this period) \$/ }),
@@ -141,7 +187,7 @@ test('a category fix is saved as a rule and survives a reload', async ({ page })
 
   await select.selectOption(target);
   await expect(select).toHaveValue(value);
-  await expect(page.getByText(/^Saved as a rule\./)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/^Saved\./)).toBeVisible({ timeout: 15_000 });
 
   const reloaded = await openSpending(page);
   const again = reloaded.getByRole('combobox', { name, exact: true }).first();
