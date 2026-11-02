@@ -204,7 +204,9 @@ describe('SampleScreen after Confirm', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Why contribute 4% to your 401(k)' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Verified against calculator')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'About this explanation' })).toHaveTextContent(
+      'We checked every number here',
+    );
     expect(screen.getByRole('region', { name: 'What happens next' })).toHaveTextContent(
       'Oct 31, 2026',
     );
@@ -219,8 +221,8 @@ describe('SampleScreen after Confirm', () => {
     ).toBeInTheDocument();
     const list = screen.getByRole('list', { name: 'Saved decisions' });
     expect(within(list).getByRole('link', { name: '401(k) match' })).toBeInTheDocument();
-    expect(list).toHaveTextContent('v1 · Saved Oct 17');
-    expect(screen.getByRole('link', { name: 'Why this decision' })).toHaveAttribute(
+    expect(list).toHaveTextContent('Saved Oct 17');
+    expect(screen.getByRole('link', { name: 'Why each decision' })).toHaveAttribute(
       'aria-current',
       'page',
     );
@@ -230,30 +232,29 @@ describe('SampleScreen after Confirm', () => {
   it('renders the fallback, with no requests', async () => {
     const requests = countRequests();
     render(<SampleScreen screen="why-fallback" />);
-    expect(await screen.findByText('Could not verify the explanation')).toBeInTheDocument();
-    expect(
-      screen.getByRole('region', { name: '401(k) match calculator result' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'About this explanation' })).toHaveTextContent(
+      'We could not write an explanation',
+    );
+    expect(screen.getByRole('region', { name: 'Your saved numbers' })).toBeInTheDocument();
     expect(requests).toEqual([]);
   });
 
   it("renders an emergency fund's result with no explanation, with no requests", async () => {
     const requests = countRequests();
     render(<SampleScreen screen="why-emergency-fund" />);
-    expect(
-      await screen.findByRole('region', { name: 'No written explanation' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('region', { name: 'Emergency fund calculator result' }),
-    ).toHaveTextContent('Still to save');
+    expect(await screen.findByRole('region', { name: 'Your saved numbers' })).toHaveTextContent(
+      'Still to save',
+    );
+    expect(screen.queryByRole('region', { name: 'About this explanation' })).toBeNull();
     expect(requests).toEqual([]);
   });
 
   it('renders an out-of-date explanation, with no requests', async () => {
     const requests = countRequests();
     render(<SampleScreen screen="why-stale" />);
-    expect(await screen.findByText('Out of date')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Write it again' })).toBeInTheDocument();
+    const note = await screen.findByRole('region', { name: 'About this explanation' });
+    expect(note).toHaveTextContent('may be out of date');
+    expect(within(note).getByRole('button', { name: 'Write it again' })).toBeInTheDocument();
     expect(requests).toEqual([]);
   });
 

@@ -91,18 +91,21 @@ test('calculates, saves a version, saves the next one over it and opens why', as
   await card(page).getByRole('link', { name: 'Why this decision' }).click();
   await expect(page).toHaveURL(/\/why\/[^/]+$/);
   await waitForHydration(page);
-  await expect(page.getByText(`401(k) match · decision v${saved + 1}`)).toBeVisible();
+  const second = first === 4 ? 6 : 3;
+  await expect(
+    page.getByRole('heading', { level: 1, name: `Why contribute ${second}% to your 401(k)` }),
+  ).toBeVisible();
 
   const none = page.getByRole('region', { name: 'No explanation yet' });
-  const verified = page.getByText('Verified against calculator');
-  const fallback = page.getByText('Could not verify the explanation');
+  const verified = page.getByText(/^We checked every number here/);
+  const fallback = page.getByText(/^We could not write an explanation/);
   await expect(verified.or(fallback).or(none)).toBeVisible({ timeout: 30_000 });
   if (await none.isVisible()) {
     await none.getByRole('button', { name: 'Write the explanation' }).click();
   }
   // Verified, a fallback, or no model configured on this API: each is an answer.
   await expect(
-    verified.or(fallback).or(page.getByText('Explanations are not available yet.')),
+    verified.or(fallback).or(page.getByText('Explanations are not available right now.')),
   ).toBeVisible({ timeout: 90_000 });
 });
 

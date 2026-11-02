@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { KV, KVList } from './KV';
 
@@ -52,17 +52,5 @@ describe('KV and KVList', () => {
       </KVList>,
     );
     expect(container.firstElementChild).toHaveClass('flex', 'flex-col', 'gap-2.5');
-  });
-
-  it('marks a value the verifier matched to the calculator', () => {
-    render(
-      <KVList>
-        <KV label="Salary" value="$65,000" verified />
-      </KVList>,
-    );
-    const dd = screen.getByText('$65,000').closest('dd') as HTMLElement;
-    const mark = within(dd).getByLabelText('matches calculator');
-    expect(mark).toHaveTextContent('=');
-    expect(mark).toHaveClass('bg-green-tint', 'text-green-text');
   });
 });

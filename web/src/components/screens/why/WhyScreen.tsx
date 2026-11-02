@@ -17,19 +17,18 @@ import { formatRate } from '@/lib/money';
 import { decisionKindRoute, firstDecisionRoute } from '@/lib/routes';
 import { CalculatorResultCard } from './CalculatorResultCard';
 import {
-  FallbackStatus,
+  CheckedNote,
   NextSteps,
-  StaleStatus,
+  NotWrittenNote,
+  StaleNote,
   VerifiedBody,
-  VerifiedStatus,
 } from './ExplanationViews';
 import { Sources } from './Sources';
 
-const LEAD =
-  "Written by the AI from the calculator's numbers and your benefits text, then checked by plain code before you see it.";
+const LEAD = 'What this decision means for your money, and the rules behind it.';
 // Spec 011 rule 18: a decision that is never explained.
 const UNEXPLAINED_LEAD =
-  'Worked out by the calculator from your own numbers. Nothing on this page came from a language model.';
+  'An emergency fund has no tax rules behind it, so this page shows the numbers you saved.';
 
 function title(decision: Decision | undefined): string {
   const inputs = decision?.calculator === 'k401_match' ? asK401Inputs(decision.inputs) : null;
@@ -45,12 +44,13 @@ const taxYearOf = (decision: Decision | undefined): number | null => {
 
 /**
  * "Why this decision", from docs/mockup/Why.dc.html, for one saved decision.
- * The explanation comes from `GET /decisions/{id}/explanation`: verified (the
- * AI's text, every number checked against the calculator) or a fallback (the
- * calculator's own result). With none yet, the person can ask for one;
- * `POST /explain` answers when the run is over, verified or fallen back. An
- * emergency fund is never explained (spec 011 rule 18): its page shows the
- * saved result and offers no explanation.
+ * The explanation comes from `GET /decisions/{id}/explanation`: verified
+ * (every number checked against the saved decision) or one that could not be
+ * written (the saved numbers instead). With none yet, the person can ask for
+ * one; `POST /explain` answers when the run is over. One note says which
+ * state it is in (spec 008 rule 19b). An emergency fund is never explained
+ * (spec 011 rule 18): its page shows the saved result and offers no
+ * explanation.
  */
 export function WhyScreen({ decisionId }: { decisionId: string }) {
   const decision = useDecision(decisionId);
@@ -77,7 +77,12 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
   const event = calendar.data?.find((e) => e.decision_id === decisionId);
   const llmUnavailable = apiErrorCode(explain.error) === 'llm_unavailable';
   // Back to this decision's own step (spec 018 rule 4).
-  const rerun = current ? decisionKindRoute(current.calculator) : firstDecisionRoute();
+  const change = current ? decisionKindRoute(current.calculator) : firstDecisionRoute();
+  const changeButton = (
+    <Button size="sm" href={change}>
+      Change this decision
+    </Button>
+  );
 
   const progress = explain.isPending && (
     <p role="status" className="m-0 text-small text-ink-3">
@@ -87,7 +92,7 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
   const explainError = explain.isError && (
     <ExplainError error={explain.error} llmUnavailable={llmUnavailable} />
   );
-  const resultCard = (actions?: ReactNode) =>
+  const savedNumbers = (actions?: ReactNode) =>
     current && (
       <CalculatorResultCard
         decision={current}
@@ -96,73 +101,45 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
         actions={actions}
       />
     );
+  const writeButton = (force: boolean, label: string) => (
+    <Button size="sm" loading={explain.isPending} onClick={() => write(force)}>
+      {label}
+    </Button>
+  );
 
   const explained = current === undefined || isExplained(current.calculator);
   let body: ReactNode;
   if (current && !explained) {
-    body = (
-      <>
-        <Card aria-labelledby="unexplained-title" gap={14}>
-          <h2 id="unexplained-title" className="m-0">
-            No written explanation
-          </h2>
-          <p className="m-0 text-small text-ink-3">
-            An emergency fund is arithmetic on your own spending and savings, and no tax rule
-            applies, so there is nothing to explain or cite. Here is what the calculator worked out
-            when you saved it.
-          </p>
-        </Card>
-        <CalculatorResultCard
-          decision={current}
-          employer={employer}
-          fallback={false}
-          actions={
-            <Button size="sm" href={rerun}>
-              Change it on its step
-            </Button>
-          }
-        />
-      </>
-    );
-  } else if (explanation.data) {
+    body = savedNumbers(changeButton);
+  } else if (explanation.data?.verified) {
     // Out of date (spec 008 rule 19b): asked for again without force, so the
     // API answers with a current row another tab may already have written.
-    const status = explanation.data.stale ? (
-      <StaleStatus explanation={explanation.data}>
-        <div>
-          <Button variant="primary" loading={explain.isPending} onClick={() => write(false)}>
-            Write it again
-          </Button>
-        </div>
-        {progress}
-        {explainError}
-      </StaleStatus>
+    const note = explanation.data.stale ? (
+      <StaleNote explanation={explanation.data} action={writeButton(false, 'Write it again')} />
     ) : (
-      <VerifiedStatus explanation={explanation.data} />
+      <CheckedNote explanation={explanation.data} />
     );
-    body = explanation.data.verified ? (
+    body = (
       <Verified
         explanation={explanation.data}
-        status={status}
-        version={current?.version ?? null}
+        note={
+          <>
+            {note}
+            {progress}
+            {explainError}
+          </>
+        }
         taxYear={taxYearOf(current)}
-        next={<NextSteps event={event} rerun={rerun} />}
+        next={<NextSteps event={event} change={change} />}
       />
-    ) : (
+    );
+  } else if (explanation.data) {
+    body = (
       <>
-        <FallbackStatus explanation={explanation.data} />
+        <NotWrittenNote explanation={explanation.data} action={writeButton(true, 'Try again')} />
         {progress}
         {explainError}
-        {resultCard(
-          <>
-            <Button size="sm" loading={explain.isPending} onClick={() => write(true)}>
-              Try writing the explanation again
-            </Button>
-            <Button size="sm" href={rerun}>
-              Re-run the calculator
-            </Button>
-          </>,
-        )}
+        {savedNumbers(changeButton)}
         <Sources citations={explanation.data.citations} taxYear={taxYearOf(current)} />
       </>
     );
@@ -174,8 +151,8 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
             No explanation yet
           </h2>
           <p className="m-0 text-small text-ink-3">
-            The AI writes it from the calculator&apos;s numbers and the curated IRS passages, and
-            plain code checks every number before you see it.
+            We write it from the decision you saved and the IRS rules behind it, and check every
+            number before you see it.
           </p>
           {progress}
           <div>
@@ -185,13 +162,16 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
           </div>
         </Card>
         {explainError}
-        {llmUnavailable && resultCard()}
+        {llmUnavailable && savedNumbers()}
       </>
     );
   } else if (explanation.isError) {
     body = (
       <Notice tone="warning" role="alert">
-        {apiErrorMessage(explanation.error, 'Could not load the explanation. Reload to try again.')}
+        {apiErrorMessage(
+          explanation.error,
+          'We could not load the explanation. Reload the page to try again.',
+        )}
       </Notice>
     );
   } else {
@@ -210,9 +190,7 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
         eyebrow={
           current && (
             <>
-              <Badge>
-                {CALCULATOR_LABELS[current.calculator]} · decision v{current.version}
-              </Badge>
+              <Badge>{CALCULATOR_LABELS[current.calculator]}</Badge>
               <span className="text-small text-ink-3">Saved {formatDate(current.created_at)}</span>
             </>
           )
@@ -227,23 +205,21 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
 
 function Verified({
   explanation,
-  status,
-  version,
+  note,
   taxYear,
   next,
 }: {
   explanation: Explanation;
-  status: ReactNode;
-  version: number | null;
+  note: ReactNode;
   taxYear: number | null;
   next: ReactNode;
 }) {
   return (
     <>
-      {status}
+      {note}
       <div className="flex flex-wrap items-start gap-6">
         <div className="flex min-w-0 flex-[1_1_460px] flex-col gap-6">
-          <VerifiedBody explanation={explanation} version={version} />
+          <VerifiedBody explanation={explanation} />
         </div>
         <aside
           className="flex min-w-0 flex-[1_1_300px] flex-col gap-6"
@@ -260,15 +236,14 @@ function Verified({
 function ExplainError({ error, llmUnavailable }: { error: unknown; llmUnavailable: boolean }) {
   if (llmUnavailable) {
     return (
-      <Notice tone="blue" role="status" title="Explanations are not available yet.">
-        The AI that writes them is not set up on this server. Your decision is saved, and its
-        numbers come from the calculator, not the AI.
+      <Notice tone="blue" role="status" title="Explanations are not available right now.">
+        Your decision is still saved.
       </Notice>
     );
   }
   return (
     <Notice tone="warning" role="alert">
-      {apiErrorMessage(error, 'Could not write the explanation. Try again.')}
+      {apiErrorMessage(error, 'We could not write the explanation. Try again.')}
     </Notice>
   );
 }

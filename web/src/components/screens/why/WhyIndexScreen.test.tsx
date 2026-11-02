@@ -20,7 +20,8 @@ describe('WhyIndexScreen', () => {
     const list = await screen.findByRole('list', { name: 'Saved decisions' });
     const [item] = within(list).getAllByRole('listitem');
     expect(item).toHaveTextContent('401(k) match');
-    expect(item).toHaveTextContent('v1 · Saved Oct 17, 2026');
+    expect(item).toHaveTextContent('Saved Oct 17, 2026');
+    expect(item).not.toHaveTextContent(/\bv1\b/);
     expect(within(item!).getByRole('link', { name: '401(k) match' })).toHaveAttribute(
       'href',
       `/why/${DECISION_V1_ID}`,
@@ -33,13 +34,15 @@ describe('WhyIndexScreen', () => {
     renderWithProviders(<WhyIndexScreen />);
     expect(screen.queryByText(/Each saved decision has a plain-language explanation/)).toBeNull();
     expect(
-      screen.getByText(/an emergency fund has no tax rule to explain, so its page shows/),
+      screen.getByText(
+        'What each saved decision means for your money. An emergency fund has no tax rules to explain, so its page shows the numbers you saved.',
+      ),
     ).toBeInTheDocument();
     const list = await screen.findByRole('list', { name: 'Saved decisions' });
     const fund = within(list)
       .getAllByRole('listitem')
       .find((item) => item.textContent?.includes('Emergency fund'));
-    expect(fund).toHaveTextContent('Calculator result, no written explanation');
+    expect(fund).toHaveTextContent('Saved Oct 17, 2026 · No written explanation');
     expect(within(fund!).getByRole('link', { name: 'Emergency fund' })).toHaveAttribute(
       'href',
       `/why/${EMERGENCY_DECISION_ID}`,

@@ -80,13 +80,13 @@ test('09, 10 and 11 the Decisions and Why screens', async ({ page }) => {
   // (verified with a model, the calculator's result if the verifier refused
   // the draft, or "not available" without a model).
   const none = page.getByRole('region', { name: 'No explanation yet' });
-  const verified = page.getByText('Verified against calculator');
-  const fallback = page.getByText('Could not verify the explanation');
+  const verified = page.getByText(/^We checked every number here/);
+  const fallback = page.getByText(/^We could not write an explanation/);
   await expect(verified.or(fallback).or(none)).toBeVisible({ timeout: 60_000 });
   if (await none.isVisible()) {
     await none.getByRole('button', { name: 'Write the explanation' }).click();
     await expect(
-      verified.or(fallback).or(page.getByText('Explanations are not available yet.')),
+      verified.or(fallback).or(page.getByText('Explanations are not available right now.')),
     ).toBeVisible({ timeout: 180_000 });
     await settled(page);
   }

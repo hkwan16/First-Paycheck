@@ -169,9 +169,13 @@ export function KitGallery() {
             Confirm and continue
           </Button>
           <Button href="/plan" variant="primary">
-            See the plan
+            See your plan
           </Button>
-          <Button href="/setup/decisions/401k">Re-run the calculator</Button>
+          <Button href="/setup/decisions/401k">Change this decision</Button>
+        </Row>
+        <Row caption="destructive, beside the safe choice">
+          <Button>Keep my account</Button>
+          <Button variant="destructive">Delete my account</Button>
         </Row>
         <div className="max-w-sm">
           <Button variant="primary" block>
@@ -184,9 +188,9 @@ export function KitGallery() {
         <Row caption="tones">
           <Badge>Not saved</Badge>
           <Badge tone="confirmed" icon={<CheckIcon />}>
-            Saved v1 · Oct 20
+            Saved Oct 20
           </Badge>
-          <Badge tone="warning">Changed since v1</Badge>
+          <Badge tone="warning">Changed since you saved it</Badge>
           <Badge tone="off">25% of plan</Badge>
           <Badge tone="blue">Read · 96%</Badge>
           <Badge tone="coral" icon={<CheckIcon />}>
@@ -197,10 +201,10 @@ export function KitGallery() {
         </Row>
         <Row caption="solid, link">
           <Badge tone="confirmed" solid icon={<CheckIcon />}>
-            Verified against calculator
+            Numbers checked
           </Badge>
           <Badge tone="warning" solid icon={<AlertIcon size={12} strokeWidth={1.4} />}>
-            Could not verify the explanation
+            Needs a look
           </Badge>
           <Badge tone="plum" href="/setup/decisions/401k">
             Affects: 401(k) match
@@ -226,22 +230,21 @@ export function KitGallery() {
           </Card>
           <Card as="div" tint="confirmed" gap={12}>
             <Badge tone="confirmed" solid icon={<CheckIcon />}>
-              Verified against calculator
+              Numbers checked
             </Badge>
             <span className="text-small">tint confirmed</span>
           </Card>
           <Card as="div" tint="warning" gap={12}>
             <Badge tone="warning" solid>
-              Could not verify the explanation
+              Needs a look
             </Badge>
             <span className="text-small">tint warning</span>
           </Card>
           <Card as="div" inset gap={12}>
-            <div className="flex items-center justify-between gap-3">
-              <strong>401(k) match calculator result</strong>
-              <Badge>Fallback</Badge>
-            </div>
-            <span className="text-small text-ink-3">inset, for fallback content</span>
+            <strong>Your saved numbers</strong>
+            <span className="text-small text-ink-3">
+              inset, for the numbers shown in place of an explanation
+            </span>
           </Card>
         </div>
       </Section>
@@ -349,9 +352,9 @@ export function KitGallery() {
           />
         </div>
         <div className="grid grid-cols-3 gap-3 max-wide:grid-cols-1">
-          <StatTile label="Numbers checked" value="6 of 6 match" />
-          <StatTile label="Citations" value="3 of 3 resolve" />
-          <StatTile label="Retries" value="0" />
+          <StatTile label="Still to save" value={<Money cents={332975} />} />
+          <StatTile label="Months to reach it" value="12" />
+          <StatTile label="Saved so far" value="39%" />
         </div>
       </Section>
 
@@ -417,21 +420,13 @@ export function KitGallery() {
       <Section id="kit-kv" title="Key and value rows">
         <div className="grid grid-cols-2 gap-6 max-wide:grid-cols-1">
           <KVList spacing="comfortable">
-            <KV label="Salary" value={<Money cents={6500000} decimals={0} />} verified />
-            <KV
-              label="4% of salary, per year"
-              value={<Money cents={260000} decimals={0} />}
-              verified
-            />
-            <KV label="Per paycheck, before tax" value={<Money cents={10833} />} verified />
-            <KV
-              label="Per paycheck, after tax at your 12% marginal rate"
-              value={<Money cents={9533} />}
-              verified
-            />
+            <KV label="Salary" value={<Money cents={6500000} decimals={0} />} />
+            <KV label="4% of salary, per year" value={<Money cents={260000} decimals={0} />} />
+            <KV label="Per paycheck, before tax" value={<Money cents={10833} />} />
+            <KV label="Per paycheck, after federal income tax" value={<Money cents={9533} />} />
           </KVList>
           <KVList>
-            <KV label="Inputs" value="Salary $65,000 · contribution 4%" />
+            <KV label="Based on" value="Salary $65,000 · your rate 4%" />
             <KV label="Contribution for full match" value={<Num value={4} percent />} />
             <KV label="Employer match, per year" value={<Money cents={260000} decimals={0} />} />
           </KVList>
@@ -530,8 +525,8 @@ export function KitGallery() {
       </Section>
 
       <Section id="kit-notices" title="Notices">
-        <Notice title="Before any AI sees a page, SSNs and account numbers are blacked out.">
-          Text PDFs are redacted as text; scanned pages are redacted in the image itself.
+        <Notice title="We black out your Social Security and account numbers first.">
+          That happens before anything else reads the page, on scans and photos too.
         </Notice>
         <Notice tone="confirmed" compact title="The math checks out.">
           Gross minus every deduction equals net pay, to the cent.
@@ -540,7 +535,7 @@ export function KitGallery() {
           Gross minus deductions is off from net pay by $0.02. Check the edited field.
         </Notice>
         <Notice tone="confirmed" compact role="status">
-          Saved as a rule. These merchants will never go back to the AI for you.
+          Saved. We will sort these merchants this way from now on.
         </Notice>
       </Section>
 
@@ -614,7 +609,7 @@ export function KitGallery() {
         <DropZone
           accept=".pdf,.png,.jpg,.jpeg"
           title="Add another document"
-          hint="PDF, PNG or JPEG. Scanned pages are read with OCR."
+          hint="PDF, PNG or JPEG. Scans and photos work too."
           onFiles={(files) => setLastFile(files[0]?.name)}
         />
         <div className="text-small text-ink-3" aria-live="polite">

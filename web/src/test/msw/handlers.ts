@@ -432,7 +432,7 @@ async function explain(request: Request) {
   const verified = rows.filter((r) => r.verified).at(-1);
   if (!force && verified && !verified.stale) return HttpResponse.json(verified);
   if (!db.llmConfigured) {
-    return appError(503, 'llm_unavailable', 'Explanations are not available right now');
+    return appError(503, 'llm_unavailable', 'Explanations are not available right now.');
   }
   const run = explainRun(decisionId);
   db.explanations.set(decisionId, [...rows, ...run]);
@@ -740,7 +740,7 @@ export const handlers = [
   http.get<{ id: string }>(apiUrl('/decisions/:id/explanation'), ({ params }) => {
     if (!db.decisions.some((d) => d.id === params.id)) return notFound('Decision not found');
     const latest = db.explanations.get(params.id)?.at(-1);
-    return latest ? HttpResponse.json(latest) : notFound('This decision has no explanation yet');
+    return latest ? HttpResponse.json(latest) : notFound('This decision has no explanation yet.');
   }),
 
   http.post(apiUrl('/explain'), ({ request }) => explain(request)),

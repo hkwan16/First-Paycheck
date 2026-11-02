@@ -17,7 +17,7 @@ import { CALCULATOR_CARDS } from '../decisions/DecisionCard';
 
 /**
  * `/why`: every current decision, each linking to its page: its explanation,
- * or for an emergency fund, which is never explained, its calculator result
+ * or for an emergency fund, which is never explained, its saved numbers
  * (spec 011 rule 18).
  */
 export function WhyIndexScreen() {
@@ -28,11 +28,14 @@ export function WhyIndexScreen() {
     <>
       <PageTitle
         title="Why each decision"
-        lead="Why each decision came out the way it did. Explanations are checked against the calculator before you see them; an emergency fund has no tax rule to explain, so its page shows the calculator's result."
+        lead="What each saved decision means for your money. An emergency fund has no tax rules to explain, so its page shows the numbers you saved."
       />
       {decisions.isError ? (
         <Notice tone="warning" role="alert">
-          {apiErrorMessage(decisions.error, 'Could not load your decisions. Reload to try again.')}
+          {apiErrorMessage(
+            decisions.error,
+            'We could not load your decisions. Reload the page to try again.',
+          )}
         </Notice>
       ) : !items ? (
         <Card aria-label="Loading your decisions" aria-busy="true">
@@ -64,8 +67,8 @@ export function WhyIndexScreen() {
                       {CALCULATOR_LABELS[calculator]}
                     </Link>
                     <div className="text-small text-ink-3">
-                      v{current.version} · Saved {formatDate(current.created_at)}
-                      {!isExplained(calculator) && ' · Calculator result, no written explanation'}
+                      Saved {formatDate(current.created_at)}
+                      {!isExplained(calculator) && ' · No written explanation'}
                     </div>
                   </div>
                 </li>

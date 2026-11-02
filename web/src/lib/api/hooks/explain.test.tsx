@@ -32,7 +32,7 @@ describe('useExplanation', () => {
     const { result } = renderHookWithClient(() => useExplanation(DECISION_V1_ID));
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toMatchObject({
-      error: { code: 'not_found', message: 'This decision has no explanation yet' },
+      error: { code: 'not_found', message: 'This decision has no explanation yet.' },
     });
   });
 });
