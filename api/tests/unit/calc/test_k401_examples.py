@@ -381,7 +381,9 @@ def test_tax_year_without_constants_is_invalid() -> None:
 def test_tiers_out_of_order_are_refused_in_words() -> None:
     """Spec 008 rule 22a: typed match tiers reach this, and the API shows it."""
     tiers = [{"employee_pct_upto": "5", "employer_pct": "50"}] * 2
-    with pytest.raises(ValidationError, match="Each match tier must reach a higher"):
+    with pytest.raises(
+        ValidationError, match="Each tier of the match must go up to a higher share of your pay"
+    ):
         K401MatchInput.model_validate(
             {
                 "salary_cents": 6_000_000,

@@ -264,7 +264,7 @@ function benefitsProblem(values: BenefitsValues): string | null {
       (t, i) => i > 0 && Number(t.employee_pct_upto) <= Number(tiers[i - 1]!.employee_pct_upto),
     )
   ) {
-    return 'Each match tier must reach a higher contribution rate than the one before it';
+    return 'Each tier of the match must go up to a higher share of your pay than the one before it';
   }
   return null;
 }
