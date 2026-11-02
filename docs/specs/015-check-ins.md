@@ -16,7 +16,7 @@ Code: pure finders in `api/checkin/findings.py` (one function per kind, `f(facts
 |---|---|---|
 | `period` | date | First day of the check-in's month |
 | `today` | date | The job clock's UTC date, capped at the period's last day |
-| `pay_stubs` | list, newest first, at most 2 | The two newest confirmed `pay_stubs` by `pay_date`, then `created_at`, then `id` (descending): `id`, `pay_date`, `period_start`, `period_end`, `gross_cents`, the seven deduction columns, `net_cents` |
+| `pay_stubs` | list, newest first, at most 2 | The two newest current confirmed `pay_stubs` (superseded copies left out, spec 005 rule 22d) by `pay_date`, then `created_at`, then `id` (descending): `id`, `pay_date`, `period_start`, `period_end`, `gross_cents`, the seven deduction columns, `net_cents` |
 | `k401` | object or null | The current `k401_match` decision: `decision_id`, `decided_on` (its `created_at` as a UTC date), `contribution_pct` (Decimal) |
 | `health` | object or null | The current `health_plans` decision: `decision_id`, `decided_on`, `plan_name` and `premium_per_period_cents` of `inputs.plans[selected_plan_index]` |
 | `w4_decision_id` | uuid or null | The current `w4` decision, when there is one |

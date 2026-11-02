@@ -29,7 +29,7 @@ The data read, all under the user's RLS session: `current_decisions` and `decisi
 | `decisions` | list of `PlanDecision` | One per saved calculator, in enum order: `id`, `calculator`, `version`, `created_at`, `inputs`, `result` (as stored, spec 007 rule 3), `figures` and `explanation`. |
 | `goals` | list of `GoalOut` | Exactly what `GET /goals` returns (spec 011 rule 15). |
 | `calendar` | list of `CalendarEventOut` | Upcoming events due from `as_of` to `calendar_through`, inclusive. |
-| `pay_stub` | `PlanPayStub` or null | The newest confirmed pay stub: `id`, `employer_name`, `pay_frequency`, `pay_date`, `gross_cents`, `federal_withholding_cents`, `social_security_cents`, `medicare_cents`, `state_tax_cents`, `retirement_contribution_cents`, `medical_premium_cents`, `other_deductions_cents`, `net_cents`. |
+| `pay_stub` | `PlanPayStub` or null | The newest current confirmed pay stub (spec 005 rule 22d): `id`, `employer_name`, `pay_frequency`, `pay_date`, `gross_cents`, `federal_withholding_cents`, `social_security_cents`, `medicare_cents`, `state_tax_cents`, `retirement_contribution_cents`, `medical_premium_cents`, `other_deductions_cents`, `net_cents`. |
 
 `PlanFigure`: `key` (where the value comes from: `inputs.<field>` or `result.<field>`, with `[i]` for a list item), `label` (plain words), `kind` (`money`, `percent`, `count` or `text`) and `value` (integer cents, a two-place percentage string, an integer, a string, or null).
 

@@ -11,7 +11,7 @@ Explain a saved decision in plain words from the calculator's own numbers, the c
 - `POST /explain`: `decision_id` (uuid) and `force` (bool, default false).
 - `GET /decisions/{id}/explanation`: the decision id.
 - The decision's `inputs` and `result` (spec 007 rule 3), the `irs_citations` rows for its calculator and `tax_year`, and up to three of the user's `benefits_chunks` that match the calculator's search query.
-- The user's newest confirmed pay stub's `retirement_contribution_pct` (spec 005 rule 24b), or null when no stub is confirmed (rule 7a). It is read when the explanation runs and never stored on the decision.
+- The user's newest current confirmed pay stub's (spec 005 rule 22d) `retirement_contribution_pct` (spec 005 rule 24b), or null when no stub is confirmed (rule 7a). It is read when the explanation runs and never stored on the decision.
 - The same stub's `federal_withholding_cents` when the stub is on the decision's pay schedule, or null (rule 7b). It is read when the explanation runs and never stored on the decision.
 
 ## Outputs
