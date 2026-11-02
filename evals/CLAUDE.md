@@ -85,7 +85,9 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   model, so `extraction-smoke` scores it, at zero tolerance. Raises
   `SuiteUnavailable` (exit 2) without `ANTHROPIC_API_KEY`. Its baseline is
   measured: 1.0 on both in every live run on October 29, about 55 cents a run
-  (spec 005 targets 0.95, 0.70).
+  (spec 005 targets 0.95, 0.70), and again with `extract_pay_stub/v2` over the
+  34 stubs on November 1, about 63 cents a run (v1 scored 0.9118 there: it
+  read a printed dash as null, issue 195).
 - `suites/extraction_smoke.py` (`extraction-smoke`, free): the same pipeline
   with `FakeGateway`; checks every stub yields a proposal, SSNs are redacted,
   and neither the SSN nor an unmasked account number reaches the model input
