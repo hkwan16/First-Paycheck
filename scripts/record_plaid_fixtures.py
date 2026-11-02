@@ -115,7 +115,9 @@ def _first_page(
             if exc.code != "PRODUCT_NOT_READY":
                 raise
         else:
-            if body.get("transactions_update_status") != "NOT_READY":
+            # An empty cursor is "not available yet" under any update status
+            # (spec 002 rule 9a).
+            if body["next_cursor"]:
                 return body
         sleep(READY_WAIT_SECONDS)
     raise TimeoutError("Plaid did not finish preparing sandbox transactions")

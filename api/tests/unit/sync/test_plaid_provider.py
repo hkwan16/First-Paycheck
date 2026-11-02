@@ -15,7 +15,7 @@ from db.enums import AccountKind
 from jobs.errors import RetryLater
 from sync.plaid.client import PlaidError
 from sync.plaid.provider import PlaidProvider, account_kind, to_cents
-from sync.provider import ItemLoginRequired, PaginationMutated
+from sync.provider import ItemLoginRequired, PaginationMutated, TransactionsNotReady
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "plaid"
 TOKEN = SecretStr("access-sandbox-test-token")
@@ -156,6 +156,7 @@ def test_transaction_pages() -> None:
     starbucks = first.added[2]
     assert (starbucks.amount_cents, starbucks.pending) == (434, True)
     assert first.added[3].amount_cents == -50000
+    assert first.update_status == "HISTORICAL_UPDATE_COMPLETE"
 
     second = plaid.fetch_transactions(first.next_cursor)
     assert second.has_more is False
@@ -196,11 +197,28 @@ def test_product_not_ready_retries_later() -> None:
         provider(client).fetch_transactions(None)
 
 
-def test_first_sync_before_data_is_ready_retries_later() -> None:
+@pytest.mark.parametrize(
+    "status",
+    [
+        "NOT_READY",
+        "INITIAL_UPDATE_COMPLETE",
+        "HISTORICAL_UPDATE_COMPLETE",
+        "TRANSACTIONS_UPDATE_STATUS_UNKNOWN",
+        None,
+    ],
+)
+@pytest.mark.parametrize("cursor", [None, "c1"])
+def test_an_empty_cursor_means_not_available_yet(status: str | None, cursor: str | None) -> None:
+    """Spec 002 rule 9a, example 10: Plaid's empty ``next_cursor`` is "not yet
+    available" whatever ``transactions_update_status`` says (issue #213)."""
     empty = fixture("transactions_sync_page1")
-    empty.update(added=[], has_more=False, transactions_update_status="NOT_READY")
-    with pytest.raises(RetryLater):
-        provider(FakeClient(transactions_sync=empty)).fetch_transactions(None)
+    empty.update(added=[], modified=[], removed=[], has_more=False, next_cursor="")
+    empty.pop("transactions_update_status")
+    if status is not None:
+        empty["transactions_update_status"] = status
+    with pytest.raises(TransactionsNotReady) as raised:
+        provider(FakeClient(transactions_sync=empty)).fetch_transactions(cursor)
+    assert raised.value.update_status == status
 
 
 def test_mutation_during_pagination_is_typed() -> None:
@@ -268,6 +286,15 @@ def test_recorded_sandbox_transactions_parse_as_one_complete_page() -> None:
     assert {t.provider_account_id for t in first.added} <= {
         account["account_id"] for account in page["accounts"]
     }
+
+
+def test_recorded_sandbox_answer_before_the_rows_arrive_is_not_ready() -> None:
+    """What the sandbox sent seconds after linking ``user_good`` on 2026-11-01:
+    no rows, no cursor, and a status that says the initial pull is done."""
+    client = FakeClient(transactions_sync=recorded("transactions_sync_not_ready"))
+    with pytest.raises(TransactionsNotReady) as raised:
+        provider(client).fetch_transactions(None)
+    assert raised.value.update_status == "INITIAL_UPDATE_COMPLETE"
 
 
 def test_recorded_sandbox_holdings_parse() -> None:

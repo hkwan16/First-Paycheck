@@ -59,10 +59,12 @@ export async function unlinkAll(page: Page) {
 }
 
 /*
- * When Plaid has not pulled a new sandbox item's transactions yet, the API's
- * sync job waits 120 s before trying again (NOT_READY_RETRY_SECONDS in
- * api/sync/plaid/provider.py), and the screen shows the queued job meanwhile.
- * A link may take two such waits before its first sync runs.
+ * When Plaid has no transactions for a new sandbox item yet (its first answers
+ * carry no cursor for a few seconds, spec 002 rule 9a), the API's sync job
+ * waits 120 s before trying again (NOT_READY_RETRY_SECONDS in
+ * api/sync/provider.py), and the screen shows the queued job meanwhile. So
+ * "Linked" means the first sync brought the transactions. A link may take two
+ * such waits before its first sync runs.
  */
 const SYNC_BUDGET_MS = 300_000;
 

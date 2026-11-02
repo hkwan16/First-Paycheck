@@ -18,7 +18,11 @@ from jobs.errors import RetryLater
 
 Cents = Annotated[int, Field(strict=True)]
 
+# How long to wait before retrying a sync whose data the provider is still preparing.
+NOT_READY_RETRY_SECONDS = 120
+
 __all__ = [
+    "NOT_READY_RETRY_SECONDS",
     "Cents",
     "ItemLoginRequired",
     "PaginationMutated",
@@ -31,6 +35,7 @@ __all__ = [
     "RetryLater",
     "SyncProvider",
     "TransactionPage",
+    "TransactionsNotReady",
 ]
 
 
@@ -66,6 +71,9 @@ class TransactionPage(_Frozen):
     removed: list[RemovedTransaction]
     next_cursor: str
     has_more: bool
+    # The provider's own word for how far its pull has got (Plaid's
+    # transactions_update_status); logged, never used to decide (rule 9a).
+    update_status: str | None = None
 
 
 class ProviderBalance(_Frozen):
@@ -95,6 +103,19 @@ class PaginationMutated(ProviderError):
 
 class ItemLoginRequired(ProviderError):
     """The institution needs the user to sign in again (Plaid update mode)."""
+
+
+class TransactionsNotReady(ProviderError):
+    """The provider has no transactions to give for this item yet (rule 9a).
+
+    Said both while it is still pulling a new item's history and, for good,
+    by an item that has no transactions; ``pipeline.run_sync`` tells the two
+    apart by the item's age (rule 11a).
+    """
+
+    def __init__(self, update_status: str | None) -> None:
+        super().__init__(f"transactions are not available yet (update status {update_status})")
+        self.update_status = update_status
 
 
 class SyncProvider(Protocol):

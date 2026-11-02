@@ -28,6 +28,7 @@ from jobs import queue
 from jobs.errors import RetryLater
 from sync.categorize import normalize_merchant
 from sync.provider import (
+    NOT_READY_RETRY_SECONDS,
     ItemLoginRequired,
     PaginationMutated,
     ProviderAccount,
@@ -36,12 +37,16 @@ from sync.provider import (
     ProviderTransaction,
     SyncProvider,
     TransactionPage,
+    TransactionsNotReady,
 )
 
 logger = logging.getLogger(__name__)
 
 MAX_PAGINATION_RESTARTS = 3
 WRITE_BATCH = 500
+# How long after a link a sync waits for the provider's transactions before it
+# takes the item to have none (spec 002 rule 11a).
+TRANSACTIONS_READY_WINDOW = dt.timedelta(minutes=5)
 
 Outcome = Literal["synced", "stale", "item_missing", "login_required"]
 SessionFactory = Callable[[], AbstractContextManager[Session]]
@@ -90,6 +95,9 @@ class _Fetched:
     balances: list[ProviderBalance]
     holdings: list[ProviderHolding]
     pages: list[TransactionPage]
+    # The cursor to store: the last page's, or the starting one when the
+    # provider had no transactions to give (rule 11a).
+    cursor: str | None
 
 
 def run_sync(
@@ -106,6 +114,7 @@ def run_sync(
         if item is None:
             return SyncResult(outcome="item_missing")
         start_cursor = item.cursor
+        awaiting_transactions = now - item.created_at < TRANSACTIONS_READY_WINDOW
         secrets = SyncItemSecrets(
             id=item.id,
             provider=item.provider,
@@ -115,7 +124,7 @@ def run_sync(
 
     provider = provider_for(secrets)
     try:
-        fetched = _fetch(provider, start_cursor)
+        fetched = _fetch(provider, item_id, start_cursor, awaiting_transactions)
     except ItemLoginRequired:
         with sessions() as session:
             session.execute(
@@ -136,7 +145,7 @@ def run_sync(
             logger.info("sync item %s was advanced by another sync; discarding", item_id)
             return SyncResult(outcome="stale")
         result = _write(session, user_id, item_id, fetched, now)
-        locked.cursor = fetched.pages[-1].next_cursor
+        locked.cursor = fetched.cursor
         locked.last_synced_at = now
         locked.status = SyncStatus.ACTIVE
         for kind in (JobKind.CATEGORIZE_RUN, JobKind.RECURRING_DETECT):
@@ -144,25 +153,65 @@ def run_sync(
     return result
 
 
-def _fetch(provider: SyncProvider, cursor: str | None) -> _Fetched:
+def _fetch(
+    provider: SyncProvider, item_id: uuid.UUID, cursor: str | None, awaiting_transactions: bool
+) -> _Fetched:
     accounts = provider.fetch_accounts()
     balances = provider.fetch_balances()
     holdings = provider.fetch_holdings()
     for _ in range(MAX_PAGINATION_RESTARTS + 1):
         try:
-            pages = _pages(provider, cursor)
+            pages = _pages(provider, item_id, cursor)
         except PaginationMutated:
             logger.info("transactions changed during pagination; restarting from %r", cursor)
             continue
-        return _Fetched(accounts=accounts, balances=balances, holdings=holdings, pages=pages)
+        except TransactionsNotReady as not_ready:
+            logger.info(
+                "transactions not available yet",
+                extra={
+                    "sync_item_id": str(item_id),
+                    "update_status": not_ready.update_status,
+                    "retry": awaiting_transactions,
+                },
+            )
+            if awaiting_transactions:
+                raise RetryLater(str(not_ready), after_seconds=NOT_READY_RETRY_SECONDS) from None
+            pages = []
+        return _Fetched(
+            accounts=accounts,
+            balances=balances,
+            holdings=holdings,
+            pages=pages,
+            cursor=pages[-1].next_cursor if pages else cursor,
+        )
     raise RetryLater("transactions kept changing during pagination", after_seconds=60)
 
 
-def _pages(provider: SyncProvider, cursor: str | None) -> list[TransactionPage]:
-    pages = [provider.fetch_transactions(cursor)]
+def _pages(provider: SyncProvider, item_id: uuid.UUID, cursor: str | None) -> list[TransactionPage]:
+    pages = [_page(provider, item_id, cursor, 1)]
     while pages[-1].has_more:
-        pages.append(provider.fetch_transactions(pages[-1].next_cursor))
+        pages.append(_page(provider, item_id, pages[-1].next_cursor, len(pages) + 1))
     return pages
+
+
+def _page(
+    provider: SyncProvider, item_id: uuid.UUID, cursor: str | None, number: int
+) -> TransactionPage:
+    """Fetch one page and log what the provider reported (rule 11b)."""
+    page = provider.fetch_transactions(cursor)
+    logger.info(
+        "transactions page",
+        extra={
+            "sync_item_id": str(item_id),
+            "page": number,
+            "added": len(page.added),
+            "modified": len(page.modified),
+            "removed": len(page.removed),
+            "has_more": page.has_more,
+            "update_status": page.update_status,
+        },
+    )
+    return page
 
 
 def _write(
