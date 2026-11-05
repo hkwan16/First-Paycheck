@@ -63,8 +63,7 @@
         align-items: center;
         justify-content: center;
       }
-      #stage img,
-      #stage video {
+      #stage img {
         max-width: 100%;
         max-height: 100%;
         border: 1px solid var(--line);
@@ -133,8 +132,6 @@
         border: 2px solid var(--line);
         border-radius: 5px;
         background: var(--card) center / cover no-repeat;
-        color: var(--muted);
-        font-size: 16px;
         cursor: pointer;
       }
       .thumb[aria-current="true"] {
@@ -166,18 +163,12 @@
     <nav id="thumbs" aria-label="All slides"></nav>
 
     <noscript>
-      This slideshow needs JavaScript. The recording is alpha-demo.mp4 and the screenshots are in
-      the screenshots folder beside this page.
+      This slideshow needs JavaScript. The screenshots are in the screenshots folder beside this
+      page.
     </noscript>
 
     <script>
       const slides = [
-        {
-          video: "alpha-demo.mp4",
-          step: "Recording",
-          title: "The whole path in two minutes",
-          detail: "A recording of the deployed app, with a caption naming each step. All data is synthetic.",
-        },
         {
           image: "screenshots/01-link-accounts.jpg",
           step: "Step 1: Link a bank",
@@ -263,11 +254,7 @@
         button.type = "button";
         button.className = "thumb";
         button.setAttribute("aria-label", `Slide ${index + 1}: ${slide.title}`);
-        if (slide.image) {
-          button.style.backgroundImage = `url("${slide.image}")`;
-        } else {
-          button.textContent = "▶";
-        }
+        button.style.backgroundImage = `url("${slide.image}")`;
         button.addEventListener("click", () => show(index));
         thumbs.appendChild(button);
         return button;
@@ -285,18 +272,10 @@
         current = index;
         const slide = slides[index];
 
-        let media;
-        if (slide.video) {
-          media = document.createElement("video");
-          media.src = slide.video;
-          media.controls = true;
-          media.preload = "metadata";
-        } else {
-          media = document.createElement("img");
-          media.src = slide.image;
-          media.alt = `${slide.title}. ${slide.detail}`;
-        }
-        stage.replaceChildren(media);
+        const image = document.createElement("img");
+        image.src = slide.image;
+        image.alt = `${slide.title}. ${slide.detail}`;
+        stage.replaceChildren(image);
 
         document.getElementById("counter").textContent = `${index + 1} of ${slides.length}`;
         document.getElementById("step").textContent = slide.step;
@@ -315,9 +294,6 @@
       next.addEventListener("click", () => show(current + 1));
       window.addEventListener("hashchange", () => show(slideFromHash()));
       document.addEventListener("keydown", (event) => {
-        if (event.target instanceof HTMLVideoElement) {
-          return;
-        }
         if (event.key === "ArrowRight") {
           show(current + 1);
         } else if (event.key === "ArrowLeft") {
