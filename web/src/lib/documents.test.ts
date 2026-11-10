@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   documentBadge,
   documentStatusBadge,
+  documentSubject,
   documentTypeLabel,
   hiddenText,
   statusReasonText,
@@ -91,5 +92,33 @@ describe('reasons as past events (spec 004 rule 37, issue 163)', () => {
     for (const reason of ['no_model', 'budget', 'extraction_failed'] as const) {
       expect(statusReasonText(reason)).not.toMatch(/right now|is used up|is off/);
     }
+  });
+});
+
+describe('documentSubject', () => {
+  const nothing = { employer_name: null, pay_date: null, plan_names: [] };
+
+  it('names a confirmed pay stub by its employer and pay date (issue 243)', () => {
+    expect(
+      documentSubject({ ...nothing, employer_name: 'Acme Corp', pay_date: '2026-10-15' }),
+    ).toBe('Acme Corp, paid Oct 15, 2026');
+  });
+
+  it('names only the pay date when the stub shows no employer', () => {
+    expect(documentSubject({ ...nothing, pay_date: '2026-10-15' })).toBe('paid Oct 15, 2026');
+  });
+
+  it('names a confirmed summary by its plans, in order', () => {
+    expect(documentSubject({ ...nothing, plan_names: ['Gold PPO'] })).toBe('Gold PPO');
+    expect(documentSubject({ ...nothing, plan_names: ['Gold PPO', 'Silver HMO'] })).toBe(
+      'Gold PPO and Silver HMO',
+    );
+    expect(
+      documentSubject({ ...nothing, plan_names: ['Gold PPO', 'Silver HMO', 'Bronze HDHP'] }),
+    ).toBe('Gold PPO, Silver HMO and Bronze HDHP');
+  });
+
+  it('names nothing for a document nothing was confirmed from', () => {
+    expect(documentSubject(nothing)).toBeNull();
   });
 });

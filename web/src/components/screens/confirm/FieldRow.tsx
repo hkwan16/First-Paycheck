@@ -9,8 +9,8 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { cn } from '@/lib/cn';
 import { cancelOnEscape } from '@/lib/escape-cancel';
-import type { ConfirmAction, ReviewField } from './confirmReducer';
-import { confidenceBadge, fieldDisplay } from './field-format';
+import { canBeNone, type ConfirmAction, type ReviewField } from './confirmReducer';
+import { fieldDisplay, fieldNote, valueBadge } from './field-format';
 
 export interface FieldRowProps {
   field: ReviewField;
@@ -49,7 +49,10 @@ export const FieldRow = memo(function FieldRow({
   const input = useRef<HTMLInputElement & HTMLSelectElement>(null);
   const editButton = useRef<HTMLButtonElement>(null);
   const focusNext = useRef<'input' | 'edit' | null>(null);
-  const badge = confidenceBadge(field.confidence, manual);
+  const badge = valueBadge(field, manual);
+  const note = fieldNote(field, editing);
+  // A deduction nothing was read for is a line the stub may not print (spec 005 rule 23b).
+  const none = field.value === null && canBeNone(field);
   const { key } = field;
   const label = field.group ? `${field.group}: ${field.label}` : field.label;
 
@@ -86,7 +89,7 @@ export const FieldRow = memo(function FieldRow({
     }
   };
 
-  const describedBy = [field.error ? errorId : null, field.note ? noteId : null]
+  const describedBy = [field.error ? errorId : null, note ? noteId : null]
     .filter(Boolean)
     .join(' ');
   const control = {
@@ -146,9 +149,9 @@ export const FieldRow = memo(function FieldRow({
             />
           )}
           <FieldError id={errorId}>{field.error}</FieldError>
-          {field.note && (
+          {note && (
             <div id={noteId} className="mt-1 text-tiny text-ink-3">
-              {field.note}
+              {note}
             </div>
           )}
         </div>
@@ -169,12 +172,12 @@ export const FieldRow = memo(function FieldRow({
           >
             {fieldDisplay(field, manual)}
           </span>
-          {field.note && <span className="block text-tiny text-ink-3">{field.note}</span>}
+          {note && <span className="block text-tiny text-ink-3">{note}</span>}
         </button>
       )}
 
       {badge ? (
-        <Badge tone={badge.tone} title="How clearly we read it">
+        <Badge tone={badge.tone} title="Where this value came from">
           {badge.label}
         </Badge>
       ) : (
@@ -212,6 +215,16 @@ export const FieldRow = memo(function FieldRow({
               >
                 <CheckIcon size={14} />
                 Confirmed
+              </Button>
+            ) : none ? (
+              <Button
+                size="sm"
+                pressed={false}
+                aria-label={`Confirm none for ${label}`}
+                onClick={() => dispatch({ type: 'confirmNone', key })}
+              >
+                <CheckIcon size={14} />
+                Confirm none
               </Button>
             ) : (
               <Button

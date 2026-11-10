@@ -4,6 +4,7 @@ import type {
   DocumentSummary,
   DocumentType,
 } from '@/lib/api/types';
+import { formatDate } from '@/lib/dates';
 import type { Tone } from '@/lib/design/tone';
 import { formatNumber } from '@/lib/money';
 
@@ -41,6 +42,27 @@ export const documentBadge = (document: Pick<DocumentSummary, 'status' | 'supers
   document.superseded ? SUPERSEDED_BADGE : STATUS_BADGE[document.status];
 
 /** The sentence under a superseded copy's row and on its Confirm page. */
+/** "A", "A and B", "A, B and C". */
+function andList(words: readonly string[]): string {
+  if (words.length <= 1) return words.join('');
+  return `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
+}
+
+/**
+ * What was confirmed from a document, so a list of them tells them apart (spec
+ * 005 rule 22g, issue 243): "Acme Corp, paid Oct 15, 2026" for a pay stub,
+ * "Gold PPO and Silver HMO" for a benefits summary; null before a confirm.
+ */
+export function documentSubject(
+  document: Pick<DocumentSummary, 'employer_name' | 'pay_date' | 'plan_names'>,
+): string | null {
+  if (document.pay_date !== null) {
+    const paid = `paid ${formatDate(document.pay_date)}`;
+    return document.employer_name ? `${document.employer_name}, ${paid}` : paid;
+  }
+  return document.plan_names.length > 0 ? andList(document.plan_names) : null;
+}
+
 export const SUPERSEDED_TEXT = 'You confirmed this paycheck again, so the newer copy counts.';
 
 /** "2 numbers hidden": what redaction blacked out before the document was read. */

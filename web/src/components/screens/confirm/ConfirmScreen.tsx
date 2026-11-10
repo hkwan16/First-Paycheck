@@ -16,6 +16,7 @@ import { formatNumber } from '@/lib/money';
 import { pageTitle } from '@/lib/page-title';
 import { confirmRoute, decisionRouteFor } from '@/lib/routes';
 import { BenefitsReview } from './BenefitsReview';
+import { ConfirmedPayStub, ConfirmedPlans } from './ConfirmedValues';
 import { ConfirmReview } from './ConfirmReview';
 import { ReadAgain } from './ReadAgain';
 
@@ -157,6 +158,7 @@ function NotReviewable({ document }: { document: DocumentDetail }) {
               Your health plan comparison and 401(k) match use what you checked. We deleted the
               file.
             </Notice>
+            {document.plans.length > 0 && <ConfirmedPlans plans={document.plans} />}
             <ToDecisions label="Continue to decisions" />
           </Status>
         );
@@ -166,6 +168,7 @@ function NotReviewable({ document }: { document: DocumentDetail }) {
         return (
           <Status title="A newer copy replaced this pay stub">
             <Notice>{SUPERSEDED_TEXT}</Notice>
+            {document.pay_stub && <ConfirmedPayStub stub={document.pay_stub} />}
             <BackToDocuments />
           </Status>
         );
@@ -175,6 +178,7 @@ function NotReviewable({ document }: { document: DocumentDetail }) {
           <Notice tone="confirmed">
             Your plan now uses the amounts you checked. We deleted the file.
           </Notice>
+          {document.pay_stub && <ConfirmedPayStub stub={document.pay_stub} />}
           <div>
             <Button href="/setup/spending" variant="primary">
               Continue to spending

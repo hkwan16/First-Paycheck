@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  confidenceBadge,
   fieldDisplay,
+  fieldNote,
   FIELD_CHOICES,
   PAY_FREQUENCY_CHOICES,
   redactionParts,
   splitSourceLine,
+  valueBadge,
 } from './field-format';
 
 describe('fieldDisplay', () => {
@@ -35,17 +36,89 @@ describe('fieldDisplay', () => {
   });
 });
 
-describe('confidenceBadge', () => {
+/** A money deduction as read: 401(k) contribution at the given confidence and value. */
+const deduction = (
+  value: number | null,
+  confidence: number | null = 0.97,
+  proposed: number | null = value,
+) => ({
+  kind: 'money' as const,
+  role: 'deduction' as const,
+  value,
+  proposed,
+  confidence,
+  note: value === null ? 'Type it if the document shows it.' : null,
+});
+
+describe('valueBadge', () => {
   it('asks for a check below 0.9 and says it read clearly otherwise, with no score', () => {
-    expect(confidenceBadge(0.74, false)).toEqual({ label: 'Check this', tone: 'warning' });
-    expect(confidenceBadge(0.899, false)).toEqual({ label: 'Check this', tone: 'warning' });
-    expect(confidenceBadge(0.9, false)).toEqual({ label: 'Read clearly', tone: 'blue' });
-    expect(confidenceBadge(0.99, false)).toEqual({ label: 'Read clearly', tone: 'blue' });
+    expect(valueBadge(deduction(100, 0.74), false)).toEqual({
+      label: 'Check this',
+      tone: 'warning',
+    });
+    expect(valueBadge(deduction(100, 0.899), false)).toEqual({
+      label: 'Check this',
+      tone: 'warning',
+    });
+    expect(valueBadge(deduction(100, 0.9), false)).toEqual({ label: 'Read clearly', tone: 'blue' });
+    expect(valueBadge(deduction(100, 0.99), false)).toEqual({
+      label: 'Read clearly',
+      tone: 'blue',
+    });
   });
 
   it('marks a computed field, and shows nothing for typed fields', () => {
-    expect(confidenceBadge(null, false)).toEqual({ label: 'Added up', tone: 'neutral' });
-    expect(confidenceBadge(null, true)).toBeNull();
+    expect(valueBadge(deduction(4_670, null), false)).toEqual({
+      label: 'Added up',
+      tone: 'neutral',
+    });
+    expect(valueBadge(deduction(4_670, null, null), true)).toBeNull();
+  });
+
+  it('never says a field nothing was read for was read clearly (issue 230)', () => {
+    expect(valueBadge(deduction(null, 0.97), false)).toEqual({
+      label: 'Check this',
+      tone: 'warning',
+    });
+  });
+
+  it('labels a value the person typed or confirmed as none as theirs (issue 230)', () => {
+    expect(valueBadge(deduction(0, 0.97, null), false)).toEqual({
+      label: 'Your entry',
+      tone: 'neutral',
+    });
+    expect(valueBadge(deduction(270_834, 0.99, 270_833), false)).toEqual({
+      label: 'Your entry',
+      tone: 'neutral',
+    });
+    expect(valueBadge(deduction(4_000, null, 4_670), false)).toEqual({
+      label: 'Your entry',
+      tone: 'neutral',
+    });
+  });
+});
+
+describe('fieldNote', () => {
+  it("keeps the proposal's note for a value as read", () => {
+    expect(fieldNote({ ...deduction(4_670, null), note: 'From CA SDI' }, false)).toBe(
+      'From CA SDI',
+    );
+  });
+
+  it('says how to confirm a deduction the stub does not print as none (issue 230)', () => {
+    expect(fieldNote(deduction(null), false)).toBe('If your stub has no such line, confirm none.');
+    expect(fieldNote(deduction(null), true)).toBe('Leave it empty if your stub has no such line.');
+  });
+
+  it('keeps the note for a missing field that cannot be none', () => {
+    expect(fieldNote({ ...deduction(null), role: 'gross' }, false)).toBe(
+      'Type it if the document shows it.',
+    );
+  });
+
+  it('drops the note once the person entered the value', () => {
+    expect(fieldNote(deduction(0, 0.97, null), false)).toBeNull();
+    expect(fieldNote({ ...deduction(4_000, null, 4_670), note: 'From CA SDI' }, false)).toBeNull();
   });
 });
 

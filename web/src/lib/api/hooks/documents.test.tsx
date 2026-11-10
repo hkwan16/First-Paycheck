@@ -26,6 +26,7 @@ import {
   useDocument,
   useDocuments,
   useExtractDocument,
+  useSaveReview,
   useUploadDocument,
 } from './documents';
 import { JOB_POLL_MS, useJob } from './jobs';
@@ -309,5 +310,105 @@ describe('useConfirmDocument', () => {
     act(() => result.current.mutate({ documentId: BENEFITS_DOC_ID, values: sampleValues }));
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).not.toBeInstanceOf(PayStubUnbalanced);
+  });
+});
+
+describe('useSaveReview (spec 005 rules 23c-23e, issue 229)', () => {
+  const draft = (cents: number, confirmed = true) => ({
+    fields: [{ key: 'gross_cents', value: cents, confirmed }],
+  });
+
+  /** Each PUT body in the order sent, and a way to hold the next answer back. */
+  function recordPuts() {
+    const sent: unknown[] = [];
+    let hold = Promise.resolve();
+    let release: () => void = () => {};
+    server.use(
+      http.put(apiUrl('/docs/:id/review'), async ({ request }) => {
+        sent.push(await request.json());
+        await hold;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    return {
+      sent,
+      holdNext: () => {
+        hold = new Promise((resolve) => (release = resolve));
+      },
+      release: () => release(),
+    };
+  }
+
+  type Props = { draft: ReturnType<typeof draft> };
+  const render = (start: ReturnType<typeof draft>) =>
+    renderHookWithClient(
+      ({ draft: current }: Props) => useSaveReview(PAY_STUB_DOC_ID, current, start),
+      {
+        initialProps: { draft: start },
+      },
+    );
+
+  it('sends nothing while the draft is the one the review started from', async () => {
+    const puts = recordPuts();
+    const { result } = render(draft(1));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+    expect(puts.sent).toEqual([]);
+    expect(result.current).toBe('unchanged');
+  });
+
+  it('saves one draft at a time, the newest last, and says when it is saved', async () => {
+    const puts = recordPuts();
+    puts.holdNext();
+    const { result, rerender } = render(draft(1));
+    rerender({ draft: draft(2) });
+    // Saving from the render that shows the change, never a frame later.
+    expect(result.current).toBe('saving');
+    await waitFor(() => expect(puts.sent).toHaveLength(1));
+    rerender({ draft: draft(3) });
+    rerender({ draft: draft(4) });
+    puts.release();
+    await waitFor(() => expect(result.current).toBe('saved'));
+    expect(puts.sent).toEqual([draft(2), draft(4)]);
+    rerender({ draft: draft(4) });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+    expect(puts.sent).toHaveLength(2);
+  });
+
+  it('writes what it saved into the cached document, so coming back restores it', async () => {
+    recordPuts();
+    const { result, rerender, queryClient } = renderHookWithClient(
+      ({ draft: current }: Props) => ({
+        document: useDocument(PAY_STUB_DOC_ID),
+        review: useSaveReview(PAY_STUB_DOC_ID, current, draft(1)),
+      }),
+      { initialProps: { draft: draft(1) } },
+    );
+    await waitFor(() => expect(result.current.document.isSuccess).toBe(true));
+    rerender({ draft: draft(5) });
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData<{ review: unknown }>(queryKeys.document(PAY_STUB_DOC_ID))?.review,
+      ).toEqual(draft(5)),
+    );
+  });
+
+  it('says when a save failed, and the next change tries again', async () => {
+    let refuse = true;
+    const sent: unknown[] = [];
+    server.use(
+      http.put(apiUrl('/docs/:id/review'), async ({ request }) => {
+        sent.push(await request.json());
+        return refuse
+          ? HttpResponse.json({ error: { code: 'internal', message: 'x' } }, { status: 500 })
+          : new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const { result, rerender } = render(draft(0));
+    rerender({ draft: draft(1) });
+    await waitFor(() => expect(result.current).toBe('failed'));
+    refuse = false;
+    rerender({ draft: draft(1, false) });
+    await waitFor(() => expect(result.current).toBe('saved'));
+    expect(sent).toEqual([draft(1), draft(1, false)]);
   });
 });

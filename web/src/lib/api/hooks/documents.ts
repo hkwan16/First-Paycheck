@@ -1,14 +1,17 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { $api, fetchClient } from '../client';
 import { ApiError, apiErrorCode, isApiErrorBody, type ApiErrorBody } from '../errors';
-import { invalidateAfterConfirm, invalidateDocuments } from '../keys';
+import { invalidateAfterConfirm, invalidateDocuments, queryKeys } from '../keys';
 import type {
   BenefitsValues,
   Confirmed,
+  DocumentDetail,
   DocumentStatus,
   DocumentSummary,
   DocumentType,
   PayStubValues,
+  ReviewDraft,
 } from '../types';
 import { uploadDocument } from '../upload';
 import { JOB_POLL_MS } from './jobs';
@@ -106,6 +109,82 @@ export function useExtractDocument() {
       ),
     onSettled: () => invalidateDocuments(queryClient),
   });
+}
+
+/**
+ * Where the review's progress stands: `unchanged` (nothing changed since the
+ * page opened), `saving` (the draft on screen is not stored yet), `saved`, or
+ * `failed` (the last save of this draft failed; a reload would lose it).
+ */
+export type ReviewSaveState = 'unchanged' | 'saving' | 'saved' | 'failed';
+
+/**
+ * `PUT /docs/{id}/review`: keeps progress through a Confirm review with the
+ * document, so a reload loses nothing (spec 005 rules 23c-23e, issue 229).
+ * `draft` is the review as it is on screen, `start` the one it opened with
+ * (restored from the document, or the proposal itself), which is never sent.
+ * Saves go one at a time, each the whole draft, and only the newest waiting
+ * draft is sent next, so the last one sent is what is stored. The state is
+ * worked out while rendering, so the render that shows a change already says
+ * `saving`. A failed save is tried again with the next change. Each saved
+ * draft is written into the cached document, so coming back to the page
+ * without a reload restores it too.
+ */
+export function useSaveReview(
+  documentId: string,
+  draft: ReviewDraft,
+  start: ReviewDraft,
+): ReviewSaveState {
+  const queryClient = useQueryClient();
+  const key = JSON.stringify(draft);
+  const [startKey] = useState(() => JSON.stringify(start));
+  const [storedKey, setStoredKey] = useState(startKey);
+  const [failedKey, setFailedKey] = useState<string | null>(null);
+  const stored = useRef(startKey);
+  const waiting = useRef<{ draft: ReviewDraft; key: string } | null>(null);
+  const sending = useRef(false);
+  const latest = useRef(draft);
+
+  const send = useCallback(async () => {
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      for (let next = waiting.current; next; next = waiting.current) {
+        waiting.current = null;
+        if (next.key === stored.current) continue;
+        try {
+          await unwrap(
+            fetchClient.PUT('/docs/{document_id}/review', {
+              params: { path: { document_id: documentId } },
+              body: next.draft,
+            }),
+          );
+          stored.current = next.key;
+          setStoredKey(next.key);
+          const saved = next.draft;
+          queryClient.setQueryData<DocumentDetail>(queryKeys.document(documentId), (current) =>
+            current ? { ...current, review: saved } : current,
+          );
+        } catch {
+          setFailedKey(next.key);
+        }
+      }
+    } finally {
+      sending.current = false;
+    }
+  }, [documentId, queryClient]);
+
+  // Keyed by the draft's text, so a keystroke in an open editor sends nothing.
+  useEffect(() => {
+    latest.current = draft;
+  });
+  useEffect(() => {
+    waiting.current = { draft: latest.current, key };
+    void send();
+  }, [key, send]);
+
+  if (key === storedKey) return storedKey === startKey ? 'unchanged' : 'saved';
+  return key === failedKey ? 'failed' : 'saving';
 }
 
 /** `details` of a 422 `pay_stub_unbalanced` (`api/calc/pay_stub.py` Balance). */

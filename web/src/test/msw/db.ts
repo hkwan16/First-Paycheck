@@ -8,6 +8,7 @@ import type {
   PayStub,
   Profile,
   Proposal,
+  ReviewDraft,
   Transaction,
 } from '@/lib/api/types';
 import {
@@ -43,6 +44,8 @@ export interface TestDb {
   documents: DocumentSummary[];
   /** Each document's proposal, by id; `GET /docs/{id}` shows it while reviewable. */
   proposals: Map<string, Proposal>;
+  /** Each document's review draft, by id (`PUT /docs/{id}/review`); cleared as the API clears it. */
+  reviews: Map<string, ReviewDraft>;
   /** The proposal an extraction job writes when it succeeds. */
   nextProposal: Proposal;
   payStubs: PayStub[];
@@ -66,6 +69,7 @@ export const db: TestDb = {
   pendingAccounts: new Map(),
   documents: [],
   proposals: new Map(),
+  reviews: new Map(),
   nextProposal: sampleProposal,
   payStubs: [],
   profile: emptyProfile,
@@ -91,6 +95,7 @@ export function resetDb() {
   const stub = sampleDocument();
   db.documents = [stub];
   db.proposals = new Map([[stub.id, clone(sampleProposal)]]);
+  db.reviews = new Map();
   db.nextProposal = clone(sampleProposal);
   db.payStubs = [];
   db.profile = clone(emptyProfile);
@@ -139,6 +144,7 @@ export function emptyDb() {
 export function emptyDocuments() {
   db.documents = [];
   db.proposals = new Map();
+  db.reviews = new Map();
   db.payStubs = [];
 }
 
