@@ -62,8 +62,12 @@ const appError = (status: number, code: string, message: string, details?: objec
   HttpResponse.json({ error: { code, message, ...(details ? { details } : {}) } }, { status });
 
 let sequence = 0;
+/**
+ * A new row's id. Fixture ids use the `8000` group, so a generated one never
+ * takes a fixture row's id, whichever test in a file saves first.
+ */
 const nextId = (prefix: string) =>
-  `${prefix}-0000-4000-8000-${String(++sequence).padStart(12, '0')}`;
+  `${prefix}-0000-4000-9000-${String(++sequence).padStart(12, '0')}`;
 
 /**
  * Script the states `GET /jobs/{id}` returns, one per poll; the last state
@@ -290,10 +294,11 @@ const CALCULATOR_ORDER: readonly CalculatorKind[] = [
 ];
 
 /** A decision as the API reads it: current when no other version supersedes it. */
-const withCurrent = (decision: Decision): Decision => ({
-  ...decision,
-  is_current: !db.decisions.some((d) => d.supersedes_id === decision.id),
-});
+const withCurrent = (decision: Decision): Decision => {
+  const current = !db.decisions.some((d) => d.supersedes_id === decision.id);
+  // Only a current decision can need review (spec 007 rule 19b).
+  return { ...decision, is_current: current, review: current ? decision.review : [] };
+};
 
 function listDecisions(): CalculatorDecisions[] {
   return CALCULATOR_ORDER.flatMap((calculator) => {
@@ -385,6 +390,7 @@ async function saveDecision(request: Request) {
     result: { ...computed },
     created_at: SAMPLE_NOW,
     is_current: true,
+    review: [],
   };
   const chainIds = new Set(chain.map((d) => d.id));
   for (const event of db.calendar) {
@@ -450,6 +456,21 @@ async function explain(request: Request) {
 }
 
 /** `GET /profile` and `PUT /profile`: the saved profile with the pay schedule read now (rule 25a). */
+/**
+ * The salary question after a save (spec 005 rule 24c), as the API would
+ * answer it for the question a test seeded: answered once the save names its
+ * stub or takes its figure, else asked about the salary saved now.
+ */
+function salaryReviewAfter(
+  question: Profile['salary_review'],
+  salary: number | null,
+  stubId: string | null,
+): Profile['salary_review'] {
+  if (!question || salary === null) return null;
+  if (stubId === question.pay_stub_id || salary === question.annual_salary_cents) return null;
+  return { ...question, salary_cents: salary };
+}
+
 export const profileOut = (): Profile => ({
   ...db.profile,
   pay_schedule: payScheduleOf(db.payStubs[0], db.profile),
@@ -708,6 +729,11 @@ export const handlers = [
 
   http.put<never, ProfileIn>(apiUrl('/profile'), async ({ request }) => {
     const body = await request.json();
+    const salary = body.salary_cents ?? null;
+    const stubId = body.salary_pay_stub_id ?? null;
+    if (stubId !== null && !db.payStubs.some((stub) => stub.id === stubId)) {
+      return notFound('Pay stub not found');
+    }
     db.profile = {
       birth_year: body.birth_year ?? null,
       dependents: body.dependents ?? 0,
@@ -719,7 +745,9 @@ export const handlers = [
       })),
       other_jobs: body.other_jobs ?? [],
       pay_frequency: body.pay_frequency ?? null,
-      salary_cents: body.salary_cents ?? null,
+      salary_cents: salary,
+      salary_pay_stub_id: stubId,
+      salary_review: salaryReviewAfter(db.profile.salary_review, salary, stubId),
       start_date: body.start_date ?? null,
       updated_at: SAMPLE_NOW,
       vesting_years: body.vesting_years ?? null,

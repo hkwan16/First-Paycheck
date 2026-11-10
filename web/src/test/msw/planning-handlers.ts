@@ -62,8 +62,12 @@ const appError = (status: number, code: string, message: string, details?: objec
 const invalid = (message: string) => appError(422, 'validation_error', message);
 
 let sequence = 0;
+/**
+ * A new row's id. Fixture ids use the `8000` group, so a generated one never
+ * takes a fixture row's id, whichever test in a file saves first.
+ */
 const nextId = (prefix: string) =>
-  `${prefix}-0000-4000-8000-${String(++sequence).padStart(12, '0')}`;
+  `${prefix}-0000-4000-9000-${String(++sequence).padStart(12, '0')}`;
 
 /** The sample benefits summary read and waiting on the Confirm screen. */
 export function benefitsWaiting() {

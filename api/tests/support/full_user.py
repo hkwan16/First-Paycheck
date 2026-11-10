@@ -148,7 +148,10 @@ def populate_every_table(connection: Connection, user_id: uuid.UUID) -> FullUser
     queued = make_job(connection, user_id, kind=JobKind.PLAN_EXPORT)
 
     with user_session_for(user_id, bind=connection) as session:
-        session.add(Profile(user_id=user_id, salary_cents=6_500_000))
+        # Compared with the superseded stub (spec 005 rule 24c): that key must cascade too.
+        session.add(
+            Profile(user_id=user_id, salary_cents=6_500_000, salary_pay_stub_id=superseded_stub)
+        )
         session.add(
             CategoryRule(
                 user_id=user_id,

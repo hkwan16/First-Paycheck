@@ -19,7 +19,7 @@ import { ExportCard } from './ExportCard';
 import { GoalsCard } from './GoalsCard';
 import { PaycheckCard } from './PaycheckCard';
 import { PlanCalendarCard } from './PlanCalendarCard';
-import { completenessText } from './plan-format';
+import { completenessText, completenessTone } from './plan-format';
 import { decisionKindRoute, firstDecisionRoute, lastDecisionRoute } from '@/lib/routes';
 
 const TITLE = 'Your plan, on one page';
@@ -100,14 +100,13 @@ export function PlanScreen() {
     );
   }
 
-  const complete = data.completeness.missing.length === 0;
   return (
     <>
       <PageTitle
         title={TITLE}
         lead={`${LEAD} As of ${formatDate(data.as_of)}.`}
         aside={
-          <Badge tone={complete ? 'confirmed' : 'neutral'}>
+          <Badge tone={completenessTone(data.completeness)}>
             {completenessText(data.completeness)}
           </Badge>
         }

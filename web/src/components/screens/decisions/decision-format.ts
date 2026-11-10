@@ -3,18 +3,83 @@ import { ResultMismatch } from '@/lib/api/hooks';
 import { percentInput, type DecisionSaveState } from '@/lib/decisions';
 import type {
   CalendarEvent,
+  Decision,
   K401MatchInput,
   K401MatchResult,
   MatchTier,
   MatchTierIn,
+  SalaryReview,
 } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import type { Tone } from '@/lib/design/tone';
 import { formatMoney, formatRate, parseMoney } from '@/lib/money';
 
-/** The save badge: not saved yet, changed since the saved version, or saved. */
+/** The save badge: not saved yet, changed since the saved version or needing review, or saved. */
 export function saveBadgeTone(status: DecisionSaveState['status']): Tone {
-  return status === 'saved' ? 'confirmed' : status === 'dirty' ? 'warning' : 'neutral';
+  switch (status) {
+    case 'saved':
+      return 'confirmed';
+    case 'dirty':
+    case 'review':
+      return 'warning';
+    case 'unsaved':
+      return 'neutral';
+  }
+}
+
+export interface ReviewChanges {
+  /** "Since you saved this on Oct 21, 2026:" */
+  since: string;
+  /** The API's sentence for each input that changed (spec 007 rule 19d), in its order. */
+  changes: string[];
+}
+
+/**
+ * What a card's "What changed" notice lists for a saved decision that needs
+ * review (spec 018 rule 5c): the reasons of kind `changed`, in the API's
+ * words. Null when none changed: an open salary question is the card's own
+ * question (rule 5d), not a change to list.
+ */
+export function reviewChanges(decision: Decision): ReviewChanges | null {
+  const changes = decision.review
+    .filter((reason) => reason.kind === 'changed')
+    .map((reason) => reason.text);
+  if (changes.length === 0) return null;
+  return { since: `Since you saved this on ${formatDate(decision.created_at)}:`, changes };
+}
+
+/** How often a stub pays, inside a sentence: "twice a month". */
+const PAYS: Record<SalaryReview['frequency'], string> = {
+  weekly: 'every week',
+  biweekly: 'every two weeks',
+  semimonthly: 'twice a month',
+  monthly: 'once a month',
+};
+
+export interface SalaryQuestionText {
+  lead: string;
+  /** The primary action: take the stub's yearly pay. */
+  use: string;
+  /** Keep the salary in the plan details. */
+  keep: string;
+}
+
+/**
+ * The salary question's words (spec 005 rule 24c, spec 018 rule 5d), every
+ * figure a field the API sent: the stub's gross and its yearly pay, and the
+ * saved salary. Nothing is multiplied here.
+ */
+export function salaryQuestionText(question: SalaryReview): SalaryQuestionText {
+  const yearly = formatMoney(question.annual_salary_cents);
+  const saved = formatMoney(question.salary_cents);
+  return {
+    lead:
+      `Your ${formatDate(question.pay_stub_date)} pay stub pays ${formatMoney(question.gross_cents)}` +
+      ` ${PAYS[question.frequency]}, which comes to ${yearly} a year.` +
+      ` The salary in your plan details is ${saved}.`,
+    use: `Use ${yearly}`,
+    keep: `Keep ${saved}`,
+  };
 }
 
 const dollars = (cents: number) => formatMoney(cents, { decimals: 0 });

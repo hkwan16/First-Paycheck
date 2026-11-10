@@ -48,6 +48,7 @@ td.gap { width: 6%; border-top: 0; }
 .status { font-size: 7.5pt; color: #3F4650; margin: 2pt 0 0; }
 .status::before { content: ""; display: inline-block; width: 5pt; height: 5pt; border: 0.75pt solid #16181D; border-radius: 50%; margin-right: 4pt; vertical-align: 0; }
 .status.verified::before { background: #16181D; }
+.review { font-weight: bold; margin: 2pt 0; }
 .calendar td.date { width: 76pt; font-weight: bold; white-space: nowrap; }
 .calendar td.what { color: #3F4650; }
 .calendar .overdue { font-weight: bold; }
@@ -89,11 +90,16 @@ td.gap { width: 6%; border-top: 0; }
 {% for decision in plan.decisions %}
   <div class="decision">
     <div class="decision-head"><span class="name">{{ loop.index }}. {{ calculator_titles[decision.calculator] }}</span><span class="muted">Version {{ decision.version }}</span></div>
+{% if decision.review %}
+    <p class="review">Needs review: {% for reason in decision.review %}{{ reason.text }}{% if not loop.last %} {% endif %}{% endfor %}</p>
+    <p class="muted">{{ review_note }}</p>
+{% else %}
     <table>
 {% for pair in decision.figures | batch(2) %}
       <tr>{% for figure in pair %}{% if not loop.first %}<td class="gap"></td>{% endif %}<td class="label">{{ figure.label }}</td><td class="num">{{ figure | figure }}</td>{% endfor %}{% if pair | length == 1 %}<td class="gap"></td><td></td><td></td>{% endif %}</tr>
 {% endfor %}
     </table>
+{% endif %}
 {% if decision.explanation.stale %}
     <p class="status stale">{{ stale_label }}</p>
 {% else %}

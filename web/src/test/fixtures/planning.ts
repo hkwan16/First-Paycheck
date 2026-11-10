@@ -189,6 +189,7 @@ export function sampleEmergencyDecision(overrides: Partial<Decision> = {}): Deci
     result: { ...result },
     created_at: SAMPLE_SAVED_AT,
     is_current: true,
+    review: [],
     ...overrides,
   };
 }
@@ -206,6 +207,7 @@ export function sampleHealthDecision(overrides: Partial<Decision> = {}): Decisio
     result: structuredClone(result),
     created_at: SAMPLE_SAVED_AT,
     is_current: true,
+    review: [],
     ...overrides,
   };
 }

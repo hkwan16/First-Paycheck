@@ -308,6 +308,8 @@ def test_playwright_environment_points_the_web_at_the_stack() -> None:
     assert env["E2E_USER_PASSWORD"] == users.shared.password
     assert env["E2E_ALPHA_USER_EMAIL"] == users.alpha.email
     assert env["E2E_ALPHA_USER_PASSWORD"] == users.alpha.password
+    assert env["E2E_SCHEDULE_USER_EMAIL"] == users.schedule.email
+    assert env["E2E_SCHEDULE_USER_PASSWORD"] == users.schedule.password
     assert env["E2E_PLAID_SANDBOX"] == "0"
 
     with_plaid = e2e_stack.playwright_environment(
@@ -323,8 +325,8 @@ def test_playwright_environment_points_the_web_at_the_stack() -> None:
 
 def test_fixture_users_are_distinct_and_get_fresh_passwords() -> None:
     first, second = e2e_stack.fixture_users(), e2e_stack.fixture_users()
-    assert first.shared.id != first.alpha.id
-    assert first.shared.email != first.alpha.email
+    assert len({user.id for user in first}) == len(first)
+    assert len({user.email for user in first}) == len(first)
     assert first.shared.id == second.shared.id
     assert first.shared.password != second.shared.password
     assert len(first.alpha.password) >= 20
