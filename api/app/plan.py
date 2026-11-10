@@ -1,4 +1,4 @@
-"""The user's plan in one read (spec 016 rules 1-8).
+"""The user's plan in one read (spec 016 rules 1-8 and 3a).
 
 ``build_plan`` is shared by ``GET /plan`` and the ``plan.export`` job, so the
 screen and the PDF always show the same thing. It copies fields and does no
@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from sqlalchemy import column, select, table
 from sqlalchemy.orm import Session
 
+from app.decision_review import ReviewContext, ReviewReason, load_context, review
 from app.routers.calendar import CalendarEventOut
 from app.routers.explain import CitationOut, current_setup, is_explainable, is_stale
 from app.routers.goals import GoalOut, goal_out
@@ -80,11 +81,16 @@ class PlanDecision(BaseModel):
     result: dict[str, Any]
     figures: list[PlanFigure]
     explanation: PlanExplanation
+    # Spec 007 rule 19b, as GET /decisions reports it: a decision with reasons is
+    # not shown as current (rule 3a).
+    review: list[ReviewReason]
 
 
 class PlanCompleteness(BaseModel):
     saved: list[CalculatorKind]
     missing: list[CalculatorKind]
+    # The saved ones that need review (rule 3a).
+    needs_review: list[CalculatorKind]
 
 
 class PlanPayStub(BaseModel):
@@ -271,7 +277,7 @@ def _explanation(session: Session, decision: Decision) -> PlanExplanation:
     )
 
 
-def _decision(session: Session, decision: Decision) -> PlanDecision:
+def _decision(session: Session, decision: Decision, context: ReviewContext) -> PlanDecision:
     kind = CalculatorKind(decision.calculator)
     return PlanDecision(
         id=decision.id,
@@ -282,6 +288,7 @@ def _decision(session: Session, decision: Decision) -> PlanDecision:
         result=decision.result,
         figures=figures(kind, decision.inputs, decision.result),
         explanation=_explanation(session, decision),
+        review=review(kind, decision.inputs, context),
     )
 
 
@@ -291,7 +298,8 @@ def _decisions(session: Session) -> list[PlanDecision]:
         select(Decision).where(Decision.id.in_(select(_current_decisions.c.id)))
     ).all()
     rows = sorted(rows, key=lambda row: order[CalculatorKind(row.calculator)])
-    return [_decision(session, row) for row in rows]
+    context = load_context(session)
+    return [_decision(session, row, context) for row in rows]
 
 
 def _calendar(session: Session, start: dt.date, end: dt.date) -> list[CalendarEventOut]:
@@ -348,7 +356,9 @@ def build_plan(session: Session, today: dt.date) -> PlanOut:
         as_of=today,
         calendar_through=through,
         completeness=PlanCompleteness(
-            saved=saved, missing=[kind for kind in CalculatorKind if kind not in saved]
+            saved=saved,
+            missing=[kind for kind in CalculatorKind if kind not in saved],
+            needs_review=[decision.calculator for decision in decisions if decision.review],
         ),
         decisions=decisions,
         goals=[goal_out(session, goal) for goal in goals],

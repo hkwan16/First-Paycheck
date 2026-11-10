@@ -136,7 +136,7 @@ The next pay date is 2026-10-31 (semimonthly, anchored on the 15th, spec 007 rul
 |---|---|---|---|
 | 17 | `test_export_queues_one_job` | Plan user posts twice | 202 twice, the same `job_id`; one queued `plan.export` job with payload `{}` |
 | 18 | `test_download_is_404_until_the_job_succeeds` | Queued job | 404; after the worker runs it, 200 |
-| 19a | `test_a_decision_that_needs_review_prints_the_note` (`api/tests/unit/export/test_html.py`, rule 3a) | The plan user's plan with the health plan's `review` set to the schedule reason | Its block prints "Needs review: Your pay schedule changed from 24 to 26 paychecks a year." and the note, and none of its figures; the other decisions print theirs |
+| 19a | `test_a_decision_that_needs_review_prints_the_note` (`api/tests/integration/export/test_plan_html.py`, rule 3a) | The plan user's plan with the health plan's `review` set to the schedule reason | Its block prints "Needs review: Your pay schedule changed from 24 to 26 paychecks a year." and the note, and none of its figures; the other decisions print theirs |
 | 19 | `test_html_matches_the_fixture` | Plan user, export time 2026-10-21 15:00 UTC | `render_html` equals `api/tests/fixtures/export/plan.html` byte for byte |
 | 20 | `test_pdf_has_two_pages_and_the_plan_text` | Plan user, the worker runs the job | 200, `filename="first-paycheck-plan-2026-10-21.pdf"`, 2 pages; page 1 has "Acme Corp", "$5,469.00", "Bronze HSA"; page 2 has the citation URLs |
 | 21 | `test_export_job_reads_as_its_user` | A is the plan user; B exports | B's row belongs to B; B's PDF has none of A's figures; B can download it, A cannot |

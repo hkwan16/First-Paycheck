@@ -1202,6 +1202,13 @@
             "title": "Result",
             "type": "object"
           },
+          "review": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewReason"
+            },
+            "title": "Review",
+            "type": "array"
+          },
           "supersedes_id": {
             "anyOf": [
               {
@@ -1228,7 +1235,8 @@
           "check_in_id",
           "inputs",
           "result",
-          "is_current"
+          "is_current",
+          "review"
         ],
         "title": "DecisionOut",
         "type": "object"
@@ -4102,6 +4110,13 @@
             "title": "Missing",
             "type": "array"
           },
+          "needs_review": {
+            "items": {
+              "$ref": "#/components/schemas/CalculatorKind"
+            },
+            "title": "Needs Review",
+            "type": "array"
+          },
           "saved": {
             "items": {
               "$ref": "#/components/schemas/CalculatorKind"
@@ -4112,7 +4127,8 @@
         },
         "required": [
           "saved",
-          "missing"
+          "missing",
+          "needs_review"
         ],
         "title": "PlanCompleteness",
         "type": "object"
@@ -4241,6 +4257,13 @@
             "title": "Result",
             "type": "object"
           },
+          "review": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewReason"
+            },
+            "title": "Review",
+            "type": "array"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -4254,7 +4277,8 @@
           "inputs",
           "result",
           "figures",
-          "explanation"
+          "explanation",
+          "review"
         ],
         "title": "PlanDecision",
         "type": "object"
@@ -4928,6 +4952,18 @@
             ],
             "title": "Salary Cents"
           },
+          "salary_pay_stub_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Pay Stub Id"
+          },
           "start_date": {
             "anyOf": [
               {
@@ -5049,6 +5085,29 @@
             ],
             "title": "Salary Cents"
           },
+          "salary_pay_stub_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Pay Stub Id"
+          },
+          "salary_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SalaryReview"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when the newest confirmed stub's yearly pay differs from salary_cents and from the stub salary_pay_stub_id names (spec 005 rule 24c): the person chooses which salary to use. Computed on read."
+          },
           "start_date": {
             "anyOf": [
               {
@@ -5089,7 +5148,8 @@
         },
         "required": [
           "updated_at",
-          "pay_schedule"
+          "pay_schedule",
+          "salary_review"
         ],
         "title": "ProfileOut",
         "type": "object"
@@ -5534,6 +5594,44 @@
         "title": "RetirementValues",
         "type": "object"
       },
+      "ReviewReason": {
+        "description": "One reason a saved decision needs review (rule 19b).",
+        "properties": {
+          "input": {
+            "enum": [
+              "pay_periods_per_year",
+              "salary_cents",
+              "tax_year",
+              "filing_status",
+              "age",
+              "match_tiers",
+              "k401_contribution_pct",
+              "health_premium_per_paycheck_cents"
+            ],
+            "title": "Input",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "changed",
+              "salary_unconfirmed"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "input",
+          "text"
+        ],
+        "title": "ReviewReason",
+        "type": "object"
+      },
       "RoleTotals": {
         "properties": {
           "health_cents": {
@@ -5602,6 +5700,60 @@
           "category"
         ],
         "title": "RuleOut",
+        "type": "object"
+      },
+      "SalaryReview": {
+        "description": "The newest stub's yearly pay beside the saved salary, for the question.",
+        "properties": {
+          "annual_salary_cents": {
+            "description": "The stub's gross pay times its pay periods a year (spec 005 rule 24a)",
+            "title": "Annual Salary Cents",
+            "type": "integer"
+          },
+          "frequency": {
+            "$ref": "#/components/schemas/PayFrequency"
+          },
+          "gross_cents": {
+            "title": "Gross Cents",
+            "type": "integer"
+          },
+          "pay_stub_date": {
+            "format": "date",
+            "title": "Pay Stub Date",
+            "type": "string"
+          },
+          "pay_stub_id": {
+            "description": "The newest current stub, which the answer names",
+            "format": "uuid",
+            "title": "Pay Stub Id",
+            "type": "string"
+          },
+          "periods_per_year": {
+            "enum": [
+              12,
+              24,
+              26,
+              52
+            ],
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "salary_cents": {
+            "description": "The salary saved in the profile",
+            "title": "Salary Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pay_stub_id",
+          "pay_stub_date",
+          "frequency",
+          "periods_per_year",
+          "gross_cents",
+          "annual_salary_cents",
+          "salary_cents"
+        ],
+        "title": "SalaryReview",
         "type": "object"
       },
       "SourceLine": {
@@ -8915,6 +9067,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "content": {
