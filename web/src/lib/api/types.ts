@@ -120,7 +120,7 @@ export type GoalOffPacePayload = Schemas['GoalOffPacePayload'];
 export type RecurringPayload = Schemas['RecurringPayload'];
 export type PayChangePayload = Schemas['PayChangePayload'];
 export type DeductionLine = Schemas['DeductionLine'];
-export type UpcomingDeadlinePayload = Schemas['UpcomingDeadlinePayload'];
+export type DeadlinePayload = Schemas['DeadlinePayload'];
 /** The part of the plan a finding affects (`payload.affects`). */
 export type FindingAffects = NonNullable<FindingPayload['affects']>;
 export type NetWorth = Schemas['NetWorthOut'];

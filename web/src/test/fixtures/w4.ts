@@ -109,6 +109,7 @@ export function sampleW4Event(overrides: Partial<CalendarEvent> = {}): CalendarE
     due_at: '2026-10-31',
     decision_id: W4_DECISION_ID,
     status: 'upcoming',
+    overdue: false,
     ...overrides,
   };
 }

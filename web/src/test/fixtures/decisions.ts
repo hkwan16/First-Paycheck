@@ -251,6 +251,7 @@ export function sampleCalendarEvent(overrides: Partial<CalendarEvent> = {}): Cal
     due_at: '2026-10-31',
     decision_id: DECISION_V1_ID,
     status: 'upcoming',
+    overdue: false,
     ...overrides,
   };
 }
