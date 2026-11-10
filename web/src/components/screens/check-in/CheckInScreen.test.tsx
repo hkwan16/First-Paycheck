@@ -9,6 +9,7 @@ import {
   NOVEMBER_ID,
   novemberCalendar,
   novemberCheckIn,
+  OCTOBER_ID,
 } from '@/test/fixtures/checkins';
 import { checkinDb } from '@/test/msw/checkin-handlers';
 import { db } from '@/test/msw/db';
@@ -248,8 +249,16 @@ describe('CheckInScreen', () => {
     expect(await within(card).findByRole('table', { name: 'Investments' })).toBeInTheDocument();
   });
 
-  it('lists the dates due from the first of the month to the end of the next', async () => {
+  it('lists the open dates due by the end of next month, overdue ones first', async () => {
     db.calendar = [
+      {
+        ...novemberCalendar()[0]!,
+        id: 'ca000000-0000-4000-8000-000000000041',
+        kind: 'w4_submit',
+        title: 'Give your employer your updated Form W-4',
+        due_at: '2026-10-31',
+        overdue: true,
+      },
       ...novemberCalendar(),
       {
         ...novemberCalendar()[0]!,
@@ -265,8 +274,73 @@ describe('CheckInScreen', () => {
     await open();
     const card = await screen.findByRole('region', { name: 'Coming up' });
     await within(card).findByText('Health plan enrollment deadline');
-    expect(within(card).getAllByRole('listitem')).toHaveLength(3);
-    expect(asked).toEqual(['?from=2026-11-01&to=2026-12-31']);
+    const items = within(card).getAllByRole('listitem');
+    expect(items).toHaveLength(4);
+    // Issue 233: a date that passed with nothing done says so.
+    expect(items[0]).toHaveTextContent('Give your employer your updated Form W-4');
+    expect(within(items[0]!).getByText('Overdue')).toBeVisible();
+    expect(items[0]).toHaveTextContent('Was due Oct 31, 2026');
+    expect(items[1]).not.toHaveTextContent('Overdue');
+    expect(items[1]).toHaveTextContent('Due Nov 20, 2026');
+    expect(asked).toEqual(['?to=2026-12-31']);
+  });
+
+  it('calls the deposits Income deposited, as Spending does (issue 235)', async () => {
+    await open();
+    const card = await screen.findByRole('region', {
+      name: 'November cash flow against your plan',
+    });
+    expect(within(card).getByRole('row', { name: /^Income deposited/ })).toHaveTextContent(
+      '$2,058.92',
+    );
+    expect(card).not.toHaveTextContent('Take-home');
+    expect(card).toHaveTextContent('This month counts up to today.');
+  });
+
+  it('says a pay stub line waits for the month’s first stub', async () => {
+    const checkIn = novemberCheckIn();
+    checkIn.cash_flow.plan = checkIn.cash_flow.plan.map((line) =>
+      line.key === 'retirement'
+        ? {
+            ...line,
+            actual_cents: 0,
+            plan_cents: null,
+            difference_cents: null,
+            status: null,
+            needs_pay_stub: true,
+          }
+        : line,
+    );
+    checkinDb.checkIns[0] = checkIn;
+    await open();
+    const card = await screen.findByRole('region', {
+      name: 'November cash flow against your plan',
+    });
+    const row = within(card).getByRole('row', { name: /^401\(k\) from pay stubs/ });
+    expect(row).toHaveTextContent('No pay stub yet');
+    expect(row).not.toHaveTextContent(/On plan|No target/);
+    expect(within(card).getByRole('row', { name: /^Flexible/ })).toHaveTextContent('No target');
+  });
+
+  it('reads a past check-in as a record of its date (spec 015 rule 9b, issue 233)', async () => {
+    render(<CheckInScreen checkInId={OCTOBER_ID} />);
+    await screen.findByRole('heading', { level: 1, name: 'October check-in' });
+    expect(
+      screen.getByText(
+        'This is October’s record: we compared your pay stubs and spending with your plan on Oct 20, 2026, and it is not checked again. You can still mark each finding done.',
+      ),
+    ).toBeInTheDocument();
+    const findings = await screen.findByRole('region', { name: 'What changed' });
+    expect(within(findings).getByText('Hulu had stopped charging.')).toBeInTheDocument();
+    const card = await screen.findByRole('region', {
+      name: 'October cash flow against your plan',
+    });
+    expect(card).toHaveTextContent(
+      'Targets come from the choices you have saved now. October counts in full.',
+    );
+    expect(card).not.toHaveTextContent('up to today');
+    // The dates coming up are today's, not the record's.
+    expect(screen.queryByRole('region', { name: 'Coming up' })).toBeNull();
   });
 
   it('says a check-in it cannot find is not there, and links to the list', async () => {

@@ -51,6 +51,7 @@ td.gap { width: 6%; border-top: 0; }
 .review { font-weight: bold; margin: 2pt 0; }
 .calendar td.date { width: 76pt; font-weight: bold; white-space: nowrap; }
 .calendar td.what { color: #3F4650; }
+.calendar .overdue { font-weight: bold; }
 .why { margin: 0 0 9pt; page-break-inside: avoid; }
 .why .concept { font-style: italic; color: #3F4650; }
 .sources { margin: 3pt 0 0; padding: 0; list-style: none; }
@@ -135,7 +136,7 @@ td.gap { width: 6%; border-top: 0; }
 {% if plan.calendar %}
   <table class="calendar">
 {% for event in plan.calendar %}
-    <tr><td class="date">{{ event.due_at | long_date }}</td><td>{{ event.title }}{% if event.decision_id in decision_calculators %} <span class="what">&#183; {{ calculator_titles[decision_calculators[event.decision_id]] }}</span>{% endif %}</td></tr>
+    <tr><td class="date">{{ event.due_at | long_date }}</td><td>{{ event.title }}{% if event.overdue %} <span class="overdue">Overdue</span>{% endif %}{% if event.decision_id in decision_calculators %} <span class="what">&#183; {{ calculator_titles[decision_calculators[event.decision_id]] }}</span>{% endif %}</td></tr>
 {% endfor %}
   </table>
   <p class="muted">Upcoming through {{ plan.calendar_through | long_date }}.</p>

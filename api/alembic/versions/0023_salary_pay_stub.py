@@ -17,8 +17,8 @@ second copy of the same stub, does not ask again.
 
 No new table, grant or function. The downgrade drops the column.
 
-Revision ID: 0022_salary_pay_stub
-Revises: 0021_paycheck_change
+Revision ID: 0023_salary_pay_stub
+Revises: 0022_deadline_dates
 Create Date: 2026-11-09
 """
 
@@ -27,8 +27,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0022_salary_pay_stub"
-down_revision: str | None = "0021_paycheck_change"
+revision: str = "0023_salary_pay_stub"
+down_revision: str | None = "0022_deadline_dates"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

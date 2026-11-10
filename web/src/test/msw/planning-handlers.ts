@@ -126,6 +126,7 @@ const event = (decision: Decision, kind: CalendarEvent['kind'], title: string, d
     due_at: due,
     decision_id: decision.id,
     status: 'upcoming',
+    overdue: false,
   };
   db.calendar.push(row);
   return row;

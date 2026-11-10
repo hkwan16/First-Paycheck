@@ -14,7 +14,8 @@ calc/       calculators: f(Input) -> Result, Pydantic models, integer cents, Dec
             data/<year>.json (federal constants), data/pub15t_<year>.json (withholding
             tables), registry.py, pay_dates.py, spending.py,
             cashflow.py, recurring.py (amount arithmetic for detection)
-db/         models.py (Base), rls.py (enable_rls), enums.py, seed/ (load.py, data files)
+db/         models.py (Base), rls.py (enable_rls), enums.py, seed/ (load.py, data files),
+            calendar.py (open and overdue dates, the one day count)
 alembic/    env.py, versions/NNNN_name.py
 sync/       provider.py (protocol), pipeline.py, crypto.py, categorize.py, categories.py,
             plaid/ (client, provider, webhook), csv_provider.py, recurring.py
@@ -209,8 +210,9 @@ Rules:
   `0013_plan_export_job`, `0014_delete_account_fn`, `0015_loan_account_kind`,
   `0016_rule_match_contains`, `0017_document_replaced_by`,
   `0018_check_in_last_run_at`, `0019_explanation_context_digest`,
-  `0020_pay_stub_superseded_by`, `0021_paycheck_change`, `0022_salary_pay_stub`
-  (each revises the one before it); the head is `0022_salary_pay_stub`.
+  `0020_pay_stub_superseded_by`, `0021_paycheck_change`, `0022_deadline_dates`,
+  `0023_salary_pay_stub` (each revises the one before it); the head is
+  `0023_salary_pay_stub`.
 - Adding an enum label is `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with
   `AFTER` when the order means something, as `by_kind` does for
   `account_kind`); the downgrade maps the rows that use it and rebuilds the
@@ -617,7 +619,9 @@ with your plan on" reads it, never `updated_at`, which moves only when the row
 itself changes (issue #171). `0021_paycheck_change` folds the stored
 `deduction_change` findings into their paycheck's `pay_change`, merges the
 duplicates a newer copy of a stub made, and drops the label (rule 13a, issues
-194 and 202).
+194 and 202). `0022_deadline_dates` adds `overdue_deadline` and keys each date
+finding by its day, folding a reminder a newer decision version repeated
+(rule 13b, issues 233 and 234).
 
 - **Finders** (`checkin/findings.py`) are pure, one per `finding_kind`,
   `f(Facts) -> list[Finding]`; `all_findings` runs them in rule order. Facts
@@ -629,17 +633,31 @@ duplicates a newer copy of a stub made, and drops the label (rule 13a, issues
   (`checkin/engine.py`) reconciles a refresh by key: a key on another of the
   user's check-ins is dropped (reported once), a key already here is updated
   in place (the user's action stays), a condition (`election_mismatch`,
-  `goal_off_pace`, `upcoming_deadline`) nobody produces any more is retracted
+  `goal_off_pace`, `upcoming_deadline`, `overdue_deadline`) nobody produces any more is retracted
   unless handled, events are kept unless their subject is gone (a recurring
   finding whose charge an unlink removed, a `pay_change` about a stub that is no
   longer current). Pay stub keys name the paycheck, not the row: `paycheck_id`
   is the first copy of a paycheck (`db/pay_stubs.py:paycheck_ids`), so a newer
   copy updates the same finding in place (issue 194). One `pay_change` per
   paycheck carries gross pay and every deduction line that moved
-  (`deductions`, issue 202). Surfacing sets `new`/`changed` recurring
+  (`deductions`, issue 202). Date keys name the date, never the event row:
+  `{kind}:{calendar_kind}:{due_at}`, so a newer decision version's reminder on
+  the same day updates the finding in place (issue 234). Surfacing sets `new`/`changed` recurring
   charges `active`; the engine holds `checkin:{user}` then
   `recurring.detect:{user}` advisory locks so it never interleaves with
   detection.
+- **Dates** (`db/calendar.py`, spec 015 rule 24). An event is open while its
+  status is `upcoming` and no date finding about its kind and day has a user
+  action (`open_events`, `settled_by_finding`); nothing writes the event's
+  status from a finding. The facts, `GET /calendar` and the plan's calendar
+  read open events only, the facts and the plan with no lower bound, so a
+  passed date is an `overdue_deadline` finding (`alert`) and `overdue: true`
+  on `CalendarEventOut` (`routers/calendar.py:event_out`). `days_until` is the
+  one count of days; callers pass their own today.
+- **Records** (rule 9b). No run reaches a check-in after its month, so its
+  findings are a record of `as_of` (the last run's UTC date, capped at the
+  month's last day); `past` says the month ended. `FindingOut.charge_gone` marks a
+  recurring finding whose charge row is gone (`checkin.engine.charge_gone`).
 - **Jobs.** `checkin.monthly` (`jobs/handlers/checkin.py`), payload `{"period":
   "YYYY-MM-01", "trigger": "schedule" | "sync"}`, dated `min(clock, last day of
   period)`. `schedule.tick` queues one per `auth.users` row and UTC month with
@@ -650,7 +668,9 @@ duplicates a newer copy of a stub made, and drops the label (rule 13a, issues
   `cash_flow`: `GET /cashflow`'s body for the month to date via
   `routers/cashflow.py:cash_flow_for`, plus `calc/cashflow.py:against_plan`
   lines, each with a `status` `on_plan | over | under` within
-  `max(5% of plan, $25)` from `plan_status`, null without a plan), `POST
+  `max(5% of plan, $25)` from `plan_status`, null without a plan; the deposits
+  line is `income`, "Income deposited", and with no stub in the period the
+  `retirement` and `health` plans are null with `needs_pay_stub`), `POST
   /check-ins` (`check_in_now`, 202 `{job_id, check_in_id}`: queues the
   month's keyed job, or once it has started a refresh shared by repeated
   requests; `checkin/engine.py:queue_check_in_now`; the scheduler and the
@@ -662,7 +682,9 @@ duplicates a newer copy of a stub made, and drops the label (rule 13a, issues
   `GET /calendar?from=&to=`.
 - Tests: `tests/unit/checkin/` (finders from the spec table, reconcile),
   `tests/integration/checkin/` (job, tick, refresh, routes, check in now) on
-  the November user in `tests/support/november.py`, with the worker and job
+  the November user in `tests/support/november.py`, and `test_check_in_records.py`
+  (spec 015's October user: decisions saved through the API, Check in now on
+  three days, records, overdue dates, settling a date, a new version's reminder), with the worker and job
   readers in `tests/support/checkin_jobs.py`; factories `make_decision` (with a
   chosen `created_at`), `make_goal`, `make_check_in`, `make_finding`,
   `make_calendar_event`.
@@ -678,8 +700,8 @@ table `plan_exports` (`enable_rls`, SELECT and INSERT only).
   their path, `inputs.x` or `result.plans[i].y`; no arithmetic, a test follows
   every key), the explanation status from the latest row (`verified`,
   `fallback`, `none`) with its citations and `stale`, `GET /goals`'s goals (`goal_out`),
-  upcoming events from today to today + 90 days ordered by `due_at`, `kind`,
-  `id`, the newest pay stub and `completeness`. A total the plan needs belongs
+  open events (`db/calendar.py`) due by today + 90 days, the overdue ones
+  included and marked, ordered by `due_at`, `kind`, `id`, the newest pay stub and `completeness`. A total the plan needs belongs
   in `calc/`, not here.
 - **`GET /plan/calendar.ics`** (`export/calendar.py`, standard library):
   every event in any status, `UID` = event id, all-day `DTSTART;VALUE=DATE`,

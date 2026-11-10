@@ -201,6 +201,18 @@ describe('PlanScreen with every decision saved', () => {
     expect(items[3]).toHaveTextContent('Due Nov 14, 2026');
   });
 
+  it('marks a date the API says is overdue (issue 233)', async () => {
+    const plan = samplePlan();
+    plan.calendar = plan.calendar.map((event, index) => ({ ...event, overdue: index === 2 }));
+    planDb.plan = plan;
+    await open();
+    const items = within(region('Next 90 days')).getAllByRole('listitem');
+    expect(items[2]).toHaveTextContent('Overdue');
+    expect(items[2]).toHaveTextContent('Was due Oct 31, 2026');
+    expect(items[3]).not.toHaveTextContent('Overdue');
+    expect(items[3]).toHaveTextContent('Due Nov 14, 2026');
+  });
+
   it("links each date's badge to its decision's step (spec 018 rule 4)", async () => {
     await open();
     const calendar = region('Next 90 days');

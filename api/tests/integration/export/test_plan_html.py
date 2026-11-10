@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 from pathlib import Path
 
 from sqlalchemy import Connection, text
@@ -47,6 +48,18 @@ def test_a_paused_goal_has_no_pace(
     html = plan_html(db_connection, user_a)
     assert '<td class="num">Paused</td>' in html
     assert "On pace for" not in html
+
+
+def test_an_overdue_date_is_marked(
+    plan_user: PlanUser, db_connection: Connection, user_a: FixtureUser
+) -> None:
+    """Spec 016 rules 6 and 11 (issue 233): printed on 2026-11-02, the three
+    2026-10-31 dates nobody settled are listed and marked Overdue."""
+    with user_session_for(user_a.id, bind=db_connection) as session:
+        html = render_html(build_plan(session, dt.date(2026, 11, 2)), NOW)
+    assert html.count('<span class="overdue">Overdue</span>') == 3
+    assert "Oct 31, 2026" in html
+    assert 'class="overdue"' not in plan_html(db_connection, user_a)
 
 
 def test_an_empty_plan_says_nothing_is_saved(
