@@ -10,6 +10,8 @@ interface Screen {
   heading: string | RegExp;
   /** Rendered from src/test/fixtures/sample.ts: freeze the clock, keep Plaid off the network. */
   sample?: boolean;
+  /** The page's own HTTP status, when it is not 200 (the not-found page's 404). */
+  status?: number;
 }
 
 const SCREENS: readonly Screen[] = [
@@ -20,6 +22,8 @@ const SCREENS: readonly Screen[] = [
     heading: /Your first month's money decisions/,
   },
   { path: '/dev/kit', name: 'kit', heading: 'Component kit' },
+  // Any address with no page (issue 237); signed out here, so the header has no account.
+  { path: '/no-such-page', name: 'not-found', heading: 'Page not found', status: 404 },
   {
     path: '/dev/screens/link',
     name: 'link',
@@ -163,16 +167,22 @@ const SCREENS: readonly Screen[] = [
 ];
 
 /** Collect console errors and uncaught exceptions for the life of the page. */
-function watchErrors(page: Page) {
+function watchErrors(page: Page, screen?: Screen) {
   const errors: string[] = [];
   page.on('console', (message) => {
-    if (message.type() === 'error') errors.push(message.text());
+    if (message.type() !== 'error') return;
+    // Chromium logs a page's own non-200 status as a failed resource; that status is the point.
+    const ownStatus =
+      screen?.status !== undefined &&
+      new URL(message.location().url).pathname === screen.path &&
+      message.text().includes(`status of ${screen.status}`);
+    if (!ownStatus) errors.push(message.text());
   });
   page.on('pageerror', (error) => errors.push(error.message));
   return errors;
 }
 
-async function open(page: Page, { path, heading, sample }: Screen) {
+async function open(page: Page, { path, heading, sample, status = 200 }: Screen) {
   if (sample) {
     await page.clock.setFixedTime(SAMPLE_NOW);
     // Plaid Link's script loads on mount unless Plaid is already on the page
@@ -184,7 +194,8 @@ async function open(page: Page, { path, heading, sample }: Screen) {
       Object.assign(window, { Plaid: { create: () => undefined } });
     });
   }
-  await page.goto(path);
+  const response = await page.goto(path);
+  expect(response?.status(), `${path} answers ${status}`).toBe(status);
   // Interacting or screenshotting before hydration races React (Playwright's
   // caret hiding, for one, would cause a hydration mismatch).
   await page.locator('html[data-hydrated="true"]').waitFor();
@@ -233,7 +244,7 @@ async function settled(locator: Locator) {
 for (const screen of SCREENS) {
   test.describe(screen.path, () => {
     test('renders cleanly with no axe violations', async ({ page }) => {
-      const errors = watchErrors(page);
+      const errors = watchErrors(page, screen);
       await open(page, screen);
       expect(await blockingViolations(page)).toEqual([]);
       expect(errors).toEqual([]);

@@ -46,7 +46,7 @@ export default defineConfig({
     { name: 'setup', testMatch: 'auth.setup.ts', use: desktop },
     {
       name: 'authenticated',
-      testMatch: 'auth.spec.ts',
+      testMatch: ['auth.spec.ts', 'not-found.spec.ts'],
       dependencies: ['setup'],
       use: { ...desktop, storageState: STORAGE_STATE },
     },
