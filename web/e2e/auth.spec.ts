@@ -77,7 +77,7 @@ test.describe('signing in and out', () => {
     await signIn(page, user);
     await waitForHydration(page);
     await page.getByRole('button', { name: user.email }).click();
-    await page.getByRole('button', { name: 'Sign out' }).click();
+    await page.getByRole('menuitem', { name: 'Sign out' }).click();
     await expect(page).toHaveURL('/sign-in');
 
     await page.goto('/setup/link');
