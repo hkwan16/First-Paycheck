@@ -57,6 +57,19 @@ class AccountRole(StrEnum):
     RETIREMENT = "retirement"
 
 
+# The roles each account kind can have, in ``account_role`` order (spec 002 rule
+# 31a, issue 241). ``ck_accounts_role_fits_kind`` (migration 0023) holds the
+# database to the same table; tests/integration/test_accounts.py checks they agree.
+ROLES_BY_KIND: dict[AccountKind, tuple[AccountRole, ...]] = {
+    AccountKind.CHECKING: (AccountRole.SPENDING, AccountRole.EMERGENCY_FUND),
+    AccountKind.SAVINGS: (AccountRole.EMERGENCY_FUND,),
+    AccountKind.CREDIT: (AccountRole.SPENDING,),
+    AccountKind.LOAN: (),
+    AccountKind.INVESTMENT: (AccountRole.RETIREMENT,),
+    AccountKind.RETIREMENT: (AccountRole.RETIREMENT,),
+}
+
+
 class CategorySource(StrEnum):
     RULE = "rule"
     USER = "user"

@@ -12,7 +12,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, Form, UploadFile
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Select, select, true, update
+from sqlalchemy import Select, func, select, true, update
 from sqlalchemy.orm import Session
 
 from app import ratelimit
@@ -20,8 +20,8 @@ from app.auth import CurrentUser
 from app.deps import Now, UserSession
 from app.errors import AppError, NotFound, error_responses
 from app.types import UtcDateTime
-from db.enums import AccountKind, AccountRole, JobKind, SyncProvider
-from db.models import Account, BalanceSnapshot, SyncItem
+from db.enums import ROLES_BY_KIND, AccountKind, AccountRole, JobKind, SyncProvider
+from db.models import Account, BalanceSnapshot, SyncItem, Transaction
 from jobs import queue
 from sync.csv_provider import (
     PROVIDER_ACCOUNT_ID,
@@ -47,12 +47,34 @@ class AccountOut(BaseModel):
     kind: AccountKind
     mask: str | None
     role: AccountRole | None
+    # The roles the account's kind can have, in account_role order (spec 002 rule 31a).
+    allowed_roles: list[AccountRole]
     is_active: bool
     # The account's sync item's provider: only a Plaid item syncs on demand.
     provider: SyncProvider
     # The latest balance snapshot; null before the first sync.
     balance_cents: int | None
     balance_as_of: UtcDateTime | None
+    # How many transactions it holds, pending ones included, and the oldest one's
+    # date (null with none), spec 002 rule 30a.
+    transaction_count: int
+    first_posted_at: dt.date | None
+
+
+# Kinds and roles in words, for messages (spec 008 rule 22a).
+_KIND_NAMES: dict[AccountKind, str] = {
+    AccountKind.CHECKING: "A checking account",
+    AccountKind.SAVINGS: "A savings account",
+    AccountKind.CREDIT: "A credit card",
+    AccountKind.LOAN: "A loan",
+    AccountKind.INVESTMENT: "An investment account",
+    AccountKind.RETIREMENT: "A retirement account",
+}
+_ROLE_NAMES: dict[AccountRole, str] = {
+    AccountRole.SPENDING: "Spending",
+    AccountRole.EMERGENCY_FUND: "Emergency fund",
+    AccountRole.RETIREMENT: "Retirement",
+}
 
 
 class AccountPatch(BaseModel):
@@ -64,13 +86,27 @@ class AccountPatch(BaseModel):
     is_active: bool = True
 
 
-def _accounts_query() -> Select[Account, str | None, SyncProvider, int | None, dt.datetime | None]:
+AccountRow = Select[
+    Account, str | None, SyncProvider, int | None, dt.datetime | None, int, dt.date | None
+]
+
+
+def _accounts_query() -> AccountRow:
     latest = (
         select(BalanceSnapshot.balance_cents, BalanceSnapshot.as_of)
         .where(BalanceSnapshot.account_id == Account.id)
         .order_by(BalanceSnapshot.as_of.desc())
         .limit(1)
         .lateral("latest")
+    )
+    # An aggregate with no GROUP BY: always one row, a count of 0 for none.
+    transactions = (
+        select(
+            func.count(Transaction.id).label("count"),
+            func.min(Transaction.posted_at).label("first_posted_at"),
+        )
+        .where(Transaction.account_id == Account.id)
+        .lateral("transactions")
     )
     return (
         select(
@@ -79,9 +115,12 @@ def _accounts_query() -> Select[Account, str | None, SyncProvider, int | None, d
             SyncItem.provider,
             latest.c.balance_cents,
             latest.c.as_of,
+            transactions.c.count,
+            transactions.c.first_posted_at,
         )
         .join(SyncItem, SyncItem.id == Account.sync_item_id)
         .outerjoin(latest, true())
+        .join(transactions, true())
         .order_by(SyncItem.institution_name.nulls_last(), Account.name, Account.id)
     )
 
@@ -92,6 +131,8 @@ def _out(
     provider: SyncProvider,
     balance_cents: int | None,
     balance_as_of: dt.datetime | None,
+    transaction_count: int,
+    first_posted_at: dt.date | None,
 ) -> AccountOut:
     return AccountOut(
         id=account.id,
@@ -101,10 +142,13 @@ def _out(
         kind=account.kind,
         mask=account.mask,
         role=account.role,
+        allowed_roles=list(ROLES_BY_KIND[account.kind]),
         is_active=account.is_active,
         provider=provider,
         balance_cents=balance_cents,
         balance_as_of=balance_as_of,
+        transaction_count=transaction_count,
+        first_posted_at=first_posted_at,
     )
 
 
@@ -116,11 +160,18 @@ def list_accounts(session: UserSession) -> list[AccountOut]:
 
 @router.patch("/{account_id}", responses=error_responses(401, 404, 422))
 def update_account(account_id: uuid.UUID, body: AccountPatch, session: UserSession) -> AccountOut:
-    """Set an account's role or active flag. Making an account the emergency
-    fund takes the role from the user's previous one."""
+    """Set an account's role or active flag. Only a role the account's kind
+    allows; making an account the emergency fund takes the role from the user's
+    previous one."""
     account = session.get(Account, account_id)
     if account is None:
         raise NotFound("Account not found")
+    if body.role is not None and body.role not in ROLES_BY_KIND[account.kind]:
+        raise AppError(
+            f"{_KIND_NAMES[account.kind]} cannot have the role {_ROLE_NAMES[body.role]}",
+            code="role_not_allowed",
+            status_code=422,
+        )
     if "role" in body.model_fields_set:
         if body.role is AccountRole.EMERGENCY_FUND:
             session.execute(
@@ -143,8 +194,10 @@ def update_account(account_id: uuid.UUID, body: AccountPatch, session: UserSessi
 
 class CsvImport(BaseModel):
     account: AccountOut
-    # Data rows written, new or updated.
-    imported: int
+    # The file's rows the account did not have: new transactions (spec 010 rule 15a).
+    added: int
+    # The file's rows the account already had from an earlier import, left as they were.
+    already_present: int
     # The queued follow-up jobs, for the client to poll.
     categorize_job_id: uuid.UUID
     recurring_job_id: uuid.UUID
@@ -200,6 +253,19 @@ def _target(
     return item.id, display or default, kind
 
 
+def _already_present(session: Session, item_id: uuid.UUID, txn_ids: list[str]) -> int:
+    """How many of the file's rows the CSV item's account already has (spec 010
+    rule 15a), read in the import's transaction before the write."""
+    existing = set(
+        session.scalars(
+            select(Transaction.provider_txn_id)
+            .join(Account, Account.id == Transaction.account_id)
+            .where(Account.sync_item_id == item_id)
+        )
+    )
+    return sum(1 for txn_id in txn_ids if txn_id in existing)
+
+
 @router.post("/import", responses=error_responses(401, 404, 409, 413, 422, 429))
 def import_csv(
     file: Annotated[UploadFile, File(description="A CSV export of at most 10 MB")],
@@ -243,6 +309,10 @@ def import_csv(
     def provider_for(_: SyncItemSecrets) -> CsvProvider:
         return CsvProvider(parsed, name=account_name, kind=account_kind)
 
+    already_present = _already_present(
+        session, item_id, [row.provider_txn_id for row in parsed.rows]
+    )
+
     result = run_sync(
         user_id=user.id,
         item_id=item_id,
@@ -270,7 +340,8 @@ def import_csv(
     ).one()
     return CsvImport(
         account=_out(*row),
-        imported=result.added,
+        added=len(parsed.rows) - already_present,
+        already_present=already_present,
         categorize_job_id=categorize_job,
         recurring_job_id=recurring_job,
     )

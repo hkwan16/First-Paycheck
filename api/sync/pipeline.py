@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from db.enums import CategorySource, JobKind, SyncStatus
 from db.enums import SyncProvider as SyncProviderKind
-from db.models import Account, BalanceSnapshot, Holding, SyncItem, Transaction
+from db.models import Account, BalanceSnapshot, Holding, SyncItem, Transaction, role_fits_kind
 from jobs import queue
 from jobs.errors import RetryLater
 from sync.categorize import normalize_merchant
@@ -270,6 +270,11 @@ def _upsert_accounts(
             "name": stmt.excluded.name,
             "kind": stmt.excluded.kind,
             "mask": stmt.excluded.mask,
+            # A new kind that does not allow the user's role clears it (spec 002
+            # rule 31a), so ck_accounts_role_fits_kind never fails a sync.
+            "role": case(
+                (role_fits_kind(stmt.excluded.kind, Account.role), Account.role), else_=None
+            ),
         },
     ).returning(Account.provider_account_id, Account.id)
     return dict(session.execute(upsert).all())

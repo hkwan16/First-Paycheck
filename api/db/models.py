@@ -33,15 +33,18 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    and_,
     column,
     func,
+    or_,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, QueryableAttribute, mapped_column
 from sqlalchemy.sql.elements import ColumnElement
 
 from db.enums import (
+    ROLES_BY_KIND,
     AccountKind,
     AccountRole,
     CalculatorKind,
@@ -190,6 +193,28 @@ class SyncItem(Base):
     updated_at: Mapped[dt.datetime] = _updated_at()
 
 
+def _role_fits_kind_sql() -> str:
+    """``ck_accounts_role_fits_kind``: no role, or one ``ROLES_BY_KIND`` gives the kind
+    (spec 002 rule 31a). Migration 0023 writes the same text."""
+    allowed = [
+        f"(kind = '{kind.value}' AND role IN ({', '.join(f"'{r.value}'" for r in roles)}))"
+        for kind, roles in ROLES_BY_KIND.items()
+        if roles
+    ]
+    return " OR ".join(["role IS NULL", *allowed])
+
+
+def role_fits_kind(
+    kind: ColumnElement[Any] | QueryableAttribute[Any],
+    role: ColumnElement[Any] | QueryableAttribute[Any],
+) -> ColumnElement[bool]:
+    """The same rule as an expression, for the sync's account upsert."""
+    return or_(
+        role.is_(None),
+        *(and_(kind == k, role.in_(roles)) for k, roles in ROLES_BY_KIND.items() if roles),
+    )
+
+
 class Account(Base):
     __tablename__ = "accounts"
     __table_args__ = (
@@ -201,6 +226,7 @@ class Account(Base):
             ondelete="CASCADE",
         ),
         CheckConstraint("mask ~ '^[0-9]{2,4}$'", name="mask_digits"),
+        CheckConstraint(_role_fits_kind_sql(), name="role_fits_kind"),
         Index(
             "uq_accounts_one_emergency_fund",
             "user_id",

@@ -742,3 +742,59 @@ def test_0021_folds_paycheck_findings(scratch_database: tuple[str, Engine]) -> N
         ("deduction_change", "dismissed")
     ] * 3
     upgrade(url, "head")
+
+
+def test_0023_clears_roles_the_kind_does_not_allow(scratch_database: tuple[str, Engine]) -> None:
+    """Spec 002 rule 31a (issue 241): a role set before 0023 that its account's
+    kind does not allow is cleared; every allowed role stays."""
+    url, engine = scratch_database
+    upgrade(url, "0022_document_review_draft")
+    user = "00000000-0000-4000-8000-0000000000c4"
+    rows = [
+        ("Checking", "checking", "spending"),
+        ("Savings", "savings", "emergency_fund"),
+        ("Card", "credit", "spending"),
+        ("Brokerage", "investment", "retirement"),
+        ("401k", "retirement", "retirement"),
+        ("Mortgage", "loan", "spending"),
+        ("Car loan", "loan", "retirement"),
+        # One emergency fund per user (uq_accounts_one_emergency_fund): the savings.
+        ("Card fund", "credit", "retirement"),
+        ("Saved spend", "savings", "spending"),
+        ("Brokerage spend", "investment", "spending"),
+        ("Unset", "loan", None),
+    ]
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO auth.users (id) VALUES (:u)"), {"u": user})
+        item = connection.execute(
+            text("INSERT INTO sync_items (user_id, provider) VALUES (:u, 'csv') RETURNING id"),
+            {"u": user},
+        ).scalar_one()
+        for name, kind, role in rows:
+            connection.execute(
+                text(
+                    "INSERT INTO accounts (user_id, sync_item_id, provider_account_id, kind, name,"
+                    " role) VALUES (:u, :i, :name, CAST(:kind AS account_kind), :name,"
+                    " CAST(:role AS account_role))"
+                ),
+                {"u": user, "i": item, "name": name, "kind": kind, "role": role},
+            )
+
+    upgrade(url, "0023_account_role_fits_kind")
+    with engine.connect() as connection:
+        roles: dict[str, str | None] = dict(
+            connection.execute(text("SELECT name, role::text FROM accounts")).all()
+        )
+    assert roles == {
+        "Checking": "spending",
+        "Savings": "emergency_fund",
+        "Card": "spending",
+        "Brokerage": "retirement",
+        "401k": "retirement",
+        "Mortgage": None,
+        "Car loan": None,
+        "Card fund": None,
+        "Saved spend": None,
+        "Brokerage spend": None,
+        "Unset": None,
+    }
