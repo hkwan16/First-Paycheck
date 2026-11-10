@@ -2,6 +2,7 @@ import { Suspense, type ReactNode } from 'react';
 import { AppSideNav } from '@/components/chrome/AppSideNav';
 import { Header } from '@/components/chrome/Header';
 import { HeaderAccount } from '@/components/chrome/HeaderAccount';
+import { SessionProblemNotice } from '@/components/chrome/SessionProblemNotice';
 import { Shell } from '@/components/chrome/Shell';
 import { SideNav } from '@/components/chrome/SideNav';
 import { AuthGate } from './auth-gate';
@@ -34,6 +35,8 @@ export default function AppLayout({ children }: Readonly<{ children: ReactNode }
         </Suspense>
       }
     >
+      {/* Why nothing loads, when the browser cannot read its session (issue 225). */}
+      <SessionProblemNotice />
       <Suspense fallback={null}>
         <AuthGate>{children}</AuthGate>
       </Suspense>
