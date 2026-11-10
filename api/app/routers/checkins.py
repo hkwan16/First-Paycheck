@@ -198,7 +198,7 @@ def _cash_flow(session: Session, check_in: CheckIn, today: dt.date) -> CheckInCa
     )
 
 
-@router.get("/{check_in_id}", responses=error_responses(401, 404, 422))
+@router.get("/{check_in_id}", responses=error_responses(401, 404))
 def get_check_in(check_in_id: uuid.UUID, session: UserSession, now: Now) -> CheckInDetail:
     """One check-in: its findings and the month's cash flow against the plan."""
     check_in = session.get(CheckIn, check_in_id)

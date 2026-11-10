@@ -58,6 +58,8 @@ Rules:
   `enqueue_sync_for_plaid_item(text)` (the webhook) and
   `delete_user_account(uuid)` (`DELETE /me`).
 - A row owned by someone else is invisible under RLS, so the route returns 404.
+  A path id that does not parse is a 404 `not_found` as well (`errors._names_no_row`,
+  spec 001 rule 12a); `tests/integration/test_malformed_path_ids.py` sends one to every id route.
 - `app_api` is `NOINHERIT` and owns nothing; without the role switch it cannot
   read user data. Turn off Supabase's Data API exposure of `public` (Project
   Settings, API): `authenticated` holds table grants, so PostgREST would
