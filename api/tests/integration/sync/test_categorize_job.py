@@ -126,6 +126,7 @@ def test_rules_first_and_only_unknowns_reach_the_gateway(
     assert found["zz local bakery"] == [("dining", "llm", Decimal("0.813"))]
     assert result == {
         "rule_labeled": 2,
+        "relabeled": 0,
         "reused": 0,
         "llm_labeled": 1,
         "unresolved": 0,
@@ -376,6 +377,72 @@ def test_labeled_and_empty_merchants_are_left_alone(
     assert found["safeway"] == [("shopping", "user", None)]
     assert found[""] == [(None, None, None)]
     assert result["unresolved"] == 1
+
+
+def test_a_guess_a_rule_now_decides_is_relabeled(
+    seeded_rules: Connection, user_a: FixtureUser, account: uuid.UUID
+) -> None:
+    """Spec 003 rule 7: a rule outranks the model (rule 4), so a guess written
+    before a rule knew the merchant takes the rule's label on the next run.
+    A guess no rule decides and a category the user chose stay as they are."""
+    make_transaction(
+        seeded_rules,
+        user_a.id,
+        account,
+        merchant_raw="Rocket Money",
+        amount_cents=2_154,
+        category="savings_investment",
+        category_source=CategorySource.LLM,
+        confidence=Decimal("0.900"),
+    )
+    make_transaction(
+        seeded_rules,
+        user_a.id,
+        account,
+        merchant_raw="ZZ BAKERY",
+        category="dining",
+        category_source=CategorySource.LLM,
+        confidence=Decimal("0.700"),
+    )
+    make_transaction(
+        seeded_rules,
+        user_a.id,
+        account,
+        merchant_raw="SAFEWAY #1",
+        category="shopping",
+        category_source=CategorySource.USER,
+    )
+    labeler = SpyLabeler()
+
+    result = run(seeded_rules, user_a, labeler)
+
+    assert labeler.batches == []
+    found = labels(seeded_rules, user_a)
+    assert found["rocket money"] == [("subscriptions", "rule", None)]
+    assert found["zz bakery"] == [("dining", "llm", Decimal("0.700"))]
+    assert found["safeway"] == [("shopping", "user", None)]
+    assert (result["rule_labeled"], result["relabeled"], result["reused"]) == (0, 1, 0)
+
+
+def test_a_guess_the_rule_agrees_with_becomes_the_rules(
+    seeded_rules: Connection, user_a: FixtureUser, account: uuid.UUID
+) -> None:
+    """A guess equal to the rule's category still becomes the rule's label: the
+    Spending list then says the rule decided it, not "Our guess"."""
+    make_transaction(
+        seeded_rules,
+        user_a.id,
+        account,
+        merchant_raw="SAFEWAY #1",
+        category="groceries",
+        category_source=CategorySource.LLM,
+        confidence=Decimal("0.950"),
+    )
+
+    result = run(seeded_rules, user_a, SpyLabeler())
+
+    assert labels(seeded_rules, user_a)["safeway"] == [("groceries", "rule", None)]
+    assert result["relabeled"] == 1
 
 
 def test_llm_labels_never_become_rules(
@@ -654,6 +721,7 @@ def test_without_a_model_the_rules_still_label_and_the_job_succeeds(
     assert found["zz local bakery"] == [(None, None, None)]
     assert result == {
         "rule_labeled": 1,
+        "relabeled": 0,
         "reused": 0,
         "llm_labeled": 0,
         "unresolved": 1,
@@ -716,6 +784,7 @@ def test_a_rejected_key_or_model_stops_at_no_model_without_retrying(
     assert (job_status, attempts, last_error) == ("succeeded", 1, None)
     assert result == {
         "rule_labeled": 1,
+        "relabeled": 0,
         "reused": 0,
         "llm_labeled": 0,
         "unresolved": 51,

@@ -178,7 +178,11 @@ Rules:
   `jobs/registry.py`.
 - `sync/categorize.py`: normalization, the `RuleBook`, the `categorize.run`
   job (rules, reuse of earlier LLM labels, then 50 merchants per gateway call)
-  and `record_user_label` for `PATCH /transactions/{id}` (spec 003).
+  and `record_user_label` for `PATCH /transactions/{id}` (spec 003). The
+  rules pass also relabels an earlier LLM guess that a rule now decides (rule
+  7, issue #226: a seed rule added after the guess reaches it on the next
+  sync); a guess no rule decides keeps its label, and user labels are never
+  touched. A budgeting app's plan is `subscriptions` by seed rule (rule 9c).
   Matching takes the amount and the precedence depends on the direction
   (rule 4): money out goes user exact, user prefix, seed exact, seed prefix;
   money in goes user exact, user prefix, seed `contains` (income and transfer

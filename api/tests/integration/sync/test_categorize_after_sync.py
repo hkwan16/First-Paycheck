@@ -9,6 +9,7 @@ back through ``GET /transactions`` as the user sees them.
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from collections.abc import Callable, Sequence
 
@@ -82,8 +83,18 @@ def sync_and_categorize(
             payload={"sync_item_id": str(item)},
         )
 
+    run_worker(
+        connection,
+        FakeProvider(accounts=[CHECKING], pages={None: page("c1", added=added)}),
+        labeler,
+    )
+
+
+def run_worker(connection: Connection, provider: SyncProvider, labeler: CategoryLabeler) -> None:
+    """Run every queued job, as the worker does, and check they all succeeded."""
+
     def provider_for(secrets: SyncItemSecrets) -> SyncProvider:
-        return FakeProvider(accounts=[CHECKING], pages={None: page("c1", added=added)})
+        return provider
 
     worker = Worker(
         handlers=default_handlers(),
@@ -196,3 +207,95 @@ def test_a_tax_refund_deposit_is_income_and_a_tax_payment_is_taxes(
         "irs treas tax pymt": ("taxes", "rule"),
     }
     assert labeler.merchants == []
+
+
+BUDGETING_APPS = {"rocket money", "truebill", "ynab", "monarch money", "copilot money", "simplifi"}
+
+
+def test_an_earlier_guess_follows_a_seed_rule_added_later(
+    no_seed_rules: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Issue #226: on October 29 the model guessed Rocket Money, a $21.54
+    budgeting app charge, was a savings transfer, and it was the whole of the
+    month's savings. Rules only ever labeled uncategorized rows and an earlier
+    guess was copied to the merchant's new rows, so the guess stayed after the
+    model and the rules changed. Spec 003 rules 7 and 9c: the seed rule now
+    names the app, and the categorize run every sync queues relabels a guess a
+    rule decides, leaving the user's own choice alone."""
+    no_seed_rules.execute(text("DELETE FROM jobs"))
+    from db.seed.load import load_category_rules, read_seed_rules
+
+    seed = read_seed_rules()
+    load_category_rules(no_seed_rules, [r for r in seed if r.merchant_norm not in BUDGETING_APPS])
+    item = make_item(no_seed_rules, user_a.id)
+    with user_session_for(user_a.id, bind=no_seed_rules) as session:
+        queue.enqueue(
+            session,
+            user_id=user_a.id,
+            kind=JobKind.SYNC_INITIAL,
+            payload={"sync_item_id": str(item)},
+        )
+    october = [
+        txn("t1", -199_604, "ACME CORP PAYROLL", posted_at=dt.date(2026, 10, 15)),
+        txn("t2", 2_154, "Rocket Money", posted_at=dt.date(2026, 10, 28)),
+        txn("t3", 4_200, "SAFEWAY #1234", posted_at=dt.date(2026, 10, 20)),
+    ]
+    provider = FakeProvider(
+        accounts=[CHECKING],
+        pages={
+            None: page("c1", added=october),
+            # The next sync brings the app's November charge.
+            "c1": page(
+                "c2", added=[txn("t4", 2_154, "Rocket Money", posted_at=dt.date(2026, 11, 28))]
+            ),
+        },
+    )
+    run_worker(no_seed_rules, provider, ScriptedLabeler({"rocket money": "savings_investment"}))
+    client = client_as(user_a)
+    # The user puts Safeway under shopping themselves.
+    safeway = next(
+        row
+        for row in client.get("/transactions").json()["items"]
+        if row["merchant_norm"] == "safeway"
+    )
+    assert (
+        client.patch(f"/transactions/{safeway['id']}", json={"category": "shopping"}).status_code
+        == 200
+    )
+    october_summary = client.get(
+        "/spending/summary", params={"start": "2026-10-01", "end": "2026-10-31"}
+    )
+    assert october_summary.json()["savings_cents"] == 2_154
+
+    # A deploy loads the new seed rules; the next sync runs the categorize job.
+    load_category_rules(no_seed_rules, seed)
+    with user_session_for(user_a.id, bind=no_seed_rules) as session:
+        queue.enqueue(
+            session,
+            user_id=user_a.id,
+            kind=JobKind.SYNC_INCREMENTAL,
+            payload={"sync_item_id": str(item)},
+        )
+    later = ScriptedLabeler({"rocket money": "savings_investment"})
+    run_worker(no_seed_rules, provider, later)
+
+    rows = client.get("/transactions").json()["items"]
+    assert sorted(
+        (r["merchant_norm"], r["posted_at"], r["category"], r["category_source"]) for r in rows
+    ) == [
+        ("acme corp payroll", "2026-10-15", "income", "rule"),
+        ("rocket money", "2026-10-28", "subscriptions", "rule"),
+        ("rocket money", "2026-11-28", "subscriptions", "rule"),
+        ("safeway", "2026-10-20", "shopping", "user"),
+    ]
+    assert later.merchants == []
+    october_summary = client.get(
+        "/spending/summary", params={"start": "2026-10-01", "end": "2026-10-31"}
+    )
+    body = october_summary.json()
+    assert (body["savings_cents"], body["flexible_cents"]) == (0, 2_154 + 4_200)
+    # Every run's result (one transaction, so their created_at is the same).
+    results = no_seed_rules.execute(
+        text("SELECT result FROM jobs WHERE kind = 'categorize.run' AND status = 'succeeded'")
+    ).scalars()
+    assert sorted(r["relabeled"] for r in results) == [0, 1]
