@@ -96,6 +96,7 @@ export function sampleW4Decision(overrides: Partial<Decision> = {}): Decision {
     result: structuredClone(result),
     created_at: SAMPLE_SAVED_AT,
     is_current: true,
+    review: [],
     ...overrides,
   };
 }

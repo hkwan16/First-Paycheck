@@ -15,6 +15,7 @@ import {
   sampleDecision,
   sampleExplanation,
   sampleProfile,
+  sampleSalaryReview,
   stub01Profile,
 } from '../fixtures/decisions';
 import {
@@ -126,6 +127,15 @@ export function savedDecision() {
   db.decisions = [decision];
   db.explanations = new Map([[decision.id, [sampleExplanation()]]]);
   db.calendar = [sampleCalendarEvent()];
+}
+
+/**
+ * Ready for decisions with the salary question open (spec 005 rule 24c): the
+ * profile's $65,000.00 against the sample stub's $64,999.92 a year.
+ */
+export function salaryQuestionOpen() {
+  decisionsReady();
+  db.profile.salary_review = sampleSalaryReview();
 }
 
 /** A user who has linked and uploaded nothing yet. */

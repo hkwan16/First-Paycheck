@@ -39,6 +39,7 @@ describe('usePlan', () => {
     expect(plan.completeness).toEqual({
       saved: ['emergency_fund', 'k401_match', 'health_plans', 'w4'],
       missing: [],
+      needs_review: [],
     });
     const k401 = plan.decisions.find((d) => d.calculator === 'k401_match')!;
     expect(k401.figures.map((f) => [f.label, f.value])).toEqual([

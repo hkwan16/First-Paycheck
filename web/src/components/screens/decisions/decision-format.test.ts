@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ResultMismatch } from '@/lib/api/hooks';
 import { parseMoney } from '@/lib/money';
-import { cappedK401, sampleK401 } from '@/test/fixtures/decisions';
+import { cappedK401, sampleDecision, sampleK401 } from '@/test/fixtures/decisions';
 import { sampleW4Event } from '@/test/fixtures/w4';
 import {
   amountText,
@@ -9,6 +9,8 @@ import {
   examplePlaceholder,
   matchHeadline,
   readAmount,
+  reviewChanges,
+  salaryQuestionText,
   saveBadgeTone,
   saveErrorText,
   tiersText,
@@ -85,6 +87,74 @@ describe('saveBadgeTone', () => {
     expect(saveBadgeTone('unsaved')).toBe('neutral');
     expect(saveBadgeTone('dirty')).toBe('warning');
     expect(saveBadgeTone('saved')).toBe('confirmed');
+  });
+
+  it('warns while a saved decision needs review (spec 018 rule 5c)', () => {
+    expect(saveBadgeTone('review')).toBe('warning');
+  });
+});
+
+describe('reviewChanges (spec 018 rule 5c)', () => {
+  const schedule = {
+    kind: 'changed' as const,
+    input: 'pay_periods_per_year' as const,
+    text: 'Your pay schedule changed from 26 to 24 paychecks a year.',
+  };
+  const question = {
+    kind: 'salary_unconfirmed' as const,
+    input: 'salary_cents' as const,
+    text: 'Your newest pay stub comes to $64,999.92 a year, not the $95,000.10 in your plan details. Choose which salary to use.',
+  };
+
+  it("says when the decision was saved and lists the API's words for what changed", () => {
+    const decision = sampleDecision({
+      created_at: '2026-10-21T15:00:00Z',
+      review: [schedule, question],
+    });
+    expect(reviewChanges(decision)).toEqual({
+      since: 'Since you saved this on Oct 21, 2026:',
+      changes: [schedule.text],
+    });
+  });
+
+  it('is null when nothing changed: an open salary question is asked on its own', () => {
+    expect(reviewChanges(sampleDecision())).toBeNull();
+    expect(reviewChanges(sampleDecision({ review: [question] }))).toBeNull();
+  });
+});
+
+describe('salaryQuestionText (spec 018 rule 5d)', () => {
+  it("issue 221's account: the Acme stub against the saved $95,000.10", () => {
+    expect(
+      salaryQuestionText({
+        pay_stub_id: 'stub-acme',
+        pay_stub_date: '2026-10-15',
+        frequency: 'semimonthly',
+        periods_per_year: 24,
+        gross_cents: 270_833,
+        annual_salary_cents: 6_499_992,
+        salary_cents: 9_500_010,
+      }),
+    ).toEqual({
+      lead: 'Your Oct 15, 2026 pay stub pays $2,708.33 twice a month, which comes to $64,999.92 a year. The salary in your plan details is $95,000.10.',
+      use: 'Use $64,999.92',
+      keep: 'Keep $95,000.10',
+    });
+  });
+
+  it('names each schedule as a person says it', () => {
+    const question = {
+      pay_stub_id: 'stub-01',
+      pay_stub_date: '2026-04-10',
+      frequency: 'biweekly' as const,
+      periods_per_year: 26 as const,
+      gross_cents: 365_385,
+      annual_salary_cents: 9_500_010,
+      salary_cents: 6_500_000,
+    };
+    expect(salaryQuestionText(question).lead).toBe(
+      'Your Apr 10, 2026 pay stub pays $3,653.85 every two weeks, which comes to $95,000.10 a year. The salary in your plan details is $65,000.00.',
+    );
   });
 });
 
