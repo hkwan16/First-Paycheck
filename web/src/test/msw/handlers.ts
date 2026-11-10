@@ -62,8 +62,12 @@ const appError = (status: number, code: string, message: string, details?: objec
   HttpResponse.json({ error: { code, message, ...(details ? { details } : {}) } }, { status });
 
 let sequence = 0;
+/**
+ * A new row's id. Fixture ids use the `8000` group, so a generated one never
+ * takes a fixture row's id, whichever test in a file saves first.
+ */
 const nextId = (prefix: string) =>
-  `${prefix}-0000-4000-8000-${String(++sequence).padStart(12, '0')}`;
+  `${prefix}-0000-4000-9000-${String(++sequence).padStart(12, '0')}`;
 
 /**
  * Script the states `GET /jobs/{id}` returns, one per poll; the last state
