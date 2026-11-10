@@ -205,7 +205,24 @@ export function profileInput(profile: Profile): ProfileIn {
     other_jobs: profile.other_jobs ?? [],
     pay_frequency: profile.pay_frequency ?? null,
     salary_cents: profile.salary_cents ?? null,
+    salary_pay_stub_id: profile.salary_pay_stub_id ?? null,
     start_date: profile.start_date ?? null,
     vesting_years: profile.vesting_years ?? null,
   };
+}
+
+/**
+ * The stub a salary saved with the plan details was compared with (spec 005
+ * rule 24c): the newest stub once the person saves a salary other than the
+ * saved one, since they typed it (or took the stub's) with that stub on hand;
+ * otherwise the stub compared before, so saving another field never answers
+ * an open salary question for them.
+ */
+export function salaryStubId(
+  profile: Profile,
+  payStub: PayStub | undefined,
+  salaryCents: ProfileIn['salary_cents'],
+): string | null {
+  if (payStub && (salaryCents ?? null) !== (profile.salary_cents ?? null)) return payStub.id;
+  return profile.salary_pay_stub_id ?? null;
 }

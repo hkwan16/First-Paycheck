@@ -19,8 +19,8 @@ table; this text is a snapshot of it, as a migration must be.
 No new table or function. The downgrade drops the check; cleared roles stay
 cleared (nothing records what they were, and none of them was allowed).
 
-Revision ID: 0023_account_role_fits_kind
-Revises: 0022_document_review_draft
+Revision ID: 0025_account_role_fits_kind
+Revises: 0024_document_review_draft
 Create Date: 2026-11-09
 """
 
@@ -28,8 +28,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0023_account_role_fits_kind"
-down_revision: str | None = "0022_document_review_draft"
+revision: str = "0025_account_role_fits_kind"
+down_revision: str | None = "0024_document_review_draft"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

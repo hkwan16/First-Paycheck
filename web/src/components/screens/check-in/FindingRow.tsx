@@ -27,6 +27,7 @@ const KIND_ICONS: Record<FindingKind, ReactNode> = {
   recurring_stopped: <ClockIcon />,
   pay_change: <GrowthIcon size={18} />,
   upcoming_deadline: <CalendarSmallIcon />,
+  overdue_deadline: <CalendarSmallIcon />,
 };
 
 const SEVERITY_WORDS: Record<FindingSeverity, string> = {
@@ -37,6 +38,8 @@ const SEVERITY_WORDS: Record<FindingSeverity, string> = {
 
 export interface FindingRowProps {
   finding: Finding;
+  /** The finding is on a past check-in, a record of its date (spec 015 rule 9b). */
+  past: boolean;
   /** Mark it done or dismissed, or undo that; `title` is the row's title as shown. */
   onAction: (variables: UpdateFindingVariables, title: string) => void;
   /** Called with this row's action button (Mark as done, or Undo once handled) and which it is. */
@@ -50,7 +53,7 @@ export interface FindingRowProps {
  * buttons at full size: a page can hold several findings, and none of their
  * buttons is the page's one primary action (issue 202).
  */
-export function FindingRow({ finding, onAction, actionRef }: FindingRowProps) {
+export function FindingRow({ finding, past, onAction, actionRef }: FindingRowProps) {
   const titleId = useId();
   const tone = findingTone(finding);
   const affects = affectsView(finding.payload.affects ?? null);
@@ -81,7 +84,7 @@ export function FindingRow({ finding, onAction, actionRef }: FindingRowProps) {
           {finding.user_action === 'done' && <Badge tone="confirmed">Done</Badge>}
           {finding.user_action === 'dismissed' && <Badge>Dismissed</Badge>}
         </div>
-        <FindingText finding={finding} titleId={titleId} />
+        <FindingText finding={finding} titleId={titleId} past={past} />
         <div className="mt-1 flex flex-wrap items-center gap-2">
           {affects && (
             <Badge tone={affects.tone} href={affects.href}>

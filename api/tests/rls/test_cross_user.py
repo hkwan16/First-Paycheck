@@ -611,6 +611,22 @@ def spending_summary(
     return Case("GET", "/spending/summary?start=2026-09-01&end=2026-09-30", 200, body=body)
 
 
+def spending_months(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    account = a_account(connection)
+    make_transaction(connection, USER_A.id, account, posted_at=dt.date(2026, 9, 10))
+    make_pay_stub(
+        connection,
+        USER_A.id,
+        a_document(connection, with_blob=False),
+        pay_date=dt.date(2026, 8, 15),
+    )
+
+    def body(data: Any) -> None:
+        assert data == {"months": []}
+
+    return Case("GET", "/spending/months", 200, body=body)
+
+
 def get_cashflow(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
     account = a_account(connection)
     make_transaction(connection, USER_A.id, account, posted_at=dt.date(2026, 9, 10))
@@ -813,6 +829,7 @@ ROUTE_CASES: dict[tuple[str, str], Builder] = {
     ("GET", "/goals"): list_goals,
     ("PATCH", "/goals/{goal_id}"): update_goal,
     ("GET", "/spending/summary"): spending_summary,
+    ("GET", "/spending/months"): spending_months,
     ("POST", "/docs"): upload_document,
     ("GET", "/docs"): list_documents,
     ("GET", "/docs/{document_id}"): get_document,
@@ -864,6 +881,23 @@ def test_user_b_cannot_reach_user_a_finding_through_own_check_in(
         text("SELECT count(*) FROM check_in_findings WHERE user_action IS NOT NULL")
     ).scalar_one()
     assert actions == 0
+
+
+def test_user_b_cannot_check_a_salary_against_user_a_stub(
+    db_connection: Connection,
+    client_as: Callable[[FixtureUser], TestClient],
+    user_a: FixtureUser,
+    user_b: FixtureUser,
+) -> None:
+    """``PUT /profile`` with ``salary_pay_stub_id`` naming A's stub (spec 005 rule
+    24c): 404, and B's profile is not saved."""
+    stub = make_pay_stub(db_connection, USER_A.id, a_document(db_connection, with_blob=False))
+    response = client_as(user_b).put(
+        "/profile", json={"salary_cents": 6_500_000, "salary_pay_stub_id": str(stub)}
+    )
+    assert response.status_code == 404, response.text
+    assert response.json()["error"]["code"] == "not_found"
+    assert count(db_connection, "profiles", USER_B) == 0
 
 
 def test_user_b_cannot_replace_user_a_document(

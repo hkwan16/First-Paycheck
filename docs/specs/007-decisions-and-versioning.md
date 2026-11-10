@@ -1,6 +1,6 @@
 # 007: Decisions, versioning, the calendar and the spending summary
 
-Status: Implemented, M3. Part B (`GET /spending/summary`) is pulled forward from M5 because the Spending tiles need it. Rule 22a (income counts money in only) added in M10 after the October 22 production walkthrough showed negative income on a Plaid sandbox history. Rule 21a (cash accounts only) and the share limit of rule 25 added after the same walkthrough with Plaid's `user_transactions_dynamic` sandbox user, whose loan ledgers drove the summary (`uncategorized_cents` -5,498,010) and whose 12 cents of income gave an `essentials_pct` of 304000.0.
+Status: Implemented, M3. Part B (`GET /spending/summary`) is pulled forward from M5 because the Spending tiles need it. Rule 22a (income counts money in only) added in M10 after the October 22 production walkthrough showed negative income on a Plaid sandbox history. Rule 21a (cash accounts only) and the share limit of rule 25 added after the same walkthrough with Plaid's `user_transactions_dynamic` sandbox user, whose loan ledgers drove the summary (`uncategorized_cents` -5,498,010) and whose 12 cents of income gave an `essentials_pct` of 304000.0. Rules 19a-19e (a saved decision whose context changed needs review) added for issue 222.
 
 ## Goal
 
@@ -24,10 +24,10 @@ Save the calculator result a user picks as an immutable, versioned `decisions` r
 ## Outputs
 
 - `POST /decisions` is 201 with `DecisionSaved`: `decision_id`, `calculator`, `version`, `supersedes_id`, `created_at`, `calendar_event_id` (null when the decision implies none) and `goal_id` (always null for `k401_match`).
-- `DecisionOut`: `id`, `calculator`, `version`, `supersedes_id`, `check_in_id`, `inputs`, `result`, `created_at`, `is_current`.
+- `DecisionOut`: `id`, `calculator`, `version`, `supersedes_id`, `check_in_id`, `inputs`, `result`, `created_at`, `is_current`, `review` (what changed since it was saved, rules 19a-19e).
 - `GET /decisions` returns `DecisionList`: `items`, one `CalculatorDecisions` per calculator the user has saved, in `calculator_kind` order: `calculator`, `current` (a `DecisionOut`) and `versions` (every version, newest first, as `DecisionVersion`: `id`, `version`, `supersedes_id`, `created_at`).
 - `GET /decisions/{id}` returns `DecisionOut` for any version the user owns; another user's id is 404.
-- `GET /calendar` returns `CalendarEventOut` items (`id`, `kind`, `title`, `due_at`, `decision_id`, `status`) with status `upcoming`, ordered by `due_at`, then `created_at`.
+- `GET /calendar` returns `CalendarEventOut` items (`id`, `kind`, `title`, `due_at`, `decision_id`, `status`) with status `upcoming`, ordered by `due_at`, then `created_at`; spec 015 rule 22 leaves out the dates a check-in finding settled and adds `overdue`.
 - `GET /spending/summary`: see Part B.
 
 ## Rules
@@ -65,7 +65,43 @@ Save the calculator result a user picks as an immutable, versioned `decisions` r
 
 17. `GET /decisions` lists only calculators with at least one decision. `current` is the `current_decisions` row; `versions` holds every row of the chain, newest first.
 18. `GET /decisions/{id}` sets `is_current` from `current_decisions`.
-19. `GET /calendar` returns only `upcoming` events; done and dismissed events stay in the table for the plan export (M9).
+19. `GET /calendar` returns only `upcoming` events; done and dismissed events stay in the table for the plan export (M9). Spec 015 rule 24 narrows this to open events: an `upcoming` one whose date the person settled from a check-in finding is left out too.
+
+### A decision that needs review (issue 222)
+
+Some of a decision's inputs are not what the person chose but what its step read when it was saved: the pay schedule, the salary, the tax year. When one of those changes (issue 222: a newer stub moved the account from 26 to 24 paychecks a year), the saved result is figured for a paycheck that no longer exists, yet before this rule the steps opened as "Changes not saved" with nothing touched, the side nav ticked them done, and the plan and its PDF printed the old per-paycheck figures as current. The API decides it, once, so the steps, the side nav, the Plan page and the PDF agree.
+
+19a. **Context inputs.** For each calculator, the inputs a step reads rather than asks, and where the step reads each now:
+
+    | Calculator | Input | Now |
+    |---|---|---|
+    | every calculator | `pay_periods_per_year` | the pay schedule's `periods_per_year` (spec 005 rule 25a) |
+    | `k401_match`, `health_plans`, `w4` | `salary_cents` | the profile's `salary_cents` |
+    | `k401_match`, `health_plans`, `w4` | `tax_year` | the newest current stub's `tax_year` |
+    | `k401_match`, `health_plans` | `filing_status` | the profile's `filing_status` |
+    | `k401_match`, `w4` | `age` | `tax_year - birth_year` from the profile; for the W-4, null without a birth year or with one after the tax year |
+    | `k401_match` | `match_tiers` | the profile's `match_tiers` |
+    | `w4` | `k401_contribution_pct` | the current `k401_match` decision's `contribution_pct`, else 0 |
+    | `w4` | `health_premium_per_paycheck_cents` | the current `health_plans` decision's selected plan's `premium_per_period_cents`, else 0 |
+
+    Everything else is the person's choice and never makes a decision need review: the contribution, the plans compared, the plan chosen, the HSA amount, the usage and the enrollment deadline, the W-4's filing status and entries, and the emergency fund's essentials, months, savings and transfer. So is the W-4's `current_withholding_per_paycheck_cents`, which describes payroll today (spec 014 rule 17a).
+19b. **Review reasons.** `DecisionOut.review` (`GET /decisions`, `GET /decisions/{id}`) and `PlanDecision.review` (spec 016) are a list of `ReviewReason`: `kind` (`changed` or `salary_unconfirmed`), `input` (the input it is about) and `text`. It is empty when nothing needs review, and always empty for a version that is not current. For a current decision, `app/decision_review.py:review` validates the stored inputs with the calculator's registered input model (so a field an older row lacks reads as its default) and compares each context input of rule 19a with its value now, read once per request (`load_context`: the profile, its pay schedule, the newest current stub, its salary check and the current 401(k) and health plan decisions). Values compare by value: cents and counts as integers, percentages as `Decimal` (`"5"` equals `"5.00"`), tiers by their two percentages. Each input that differs is one `changed` reason, in rule 19a's order. An input whose value now is unknown (no salary, no pay schedule, no confirmed stub, no birth year for the 401(k)) is not compared: the step cannot calculate then either, and says what it needs instead.
+19c. **An open salary question.** While spec 005 rule 24c's `salary_review` is set, a current `k401_match`, `health_plans` or `w4` decision also has one reason of kind `salary_unconfirmed` (input `salary_cents`) after its changed ones, whatever its inputs: its numbers rest on a salary and a pay schedule that may come from different stubs, which the person has not settled.
+19d. **Words.** Each reason's `text` is one plain sentence (spec 008 rule 22a), written once by the API so every surface says the same, with money in `verify.format.dollars` and percentages in `verify.format.percent`:
+
+    | Reason | Text |
+    |---|---|
+    | `pay_periods_per_year` | Your pay schedule changed from 26 to 24 paychecks a year. |
+    | `salary_cents` | Your yearly salary changed from $95,000.10 to $64,999.92. |
+    | `tax_year` | The tax year changed from 2026 to 2027. |
+    | `filing_status` | Your filing status changed from single to married filing jointly. |
+    | `age` | Your age at the end of the tax year changed from 24 to 25. (For the W-4 without a birth year then or now: "Your birth year was added." or "Your birth year was removed.") |
+    | `match_tiers` | Your employer match changed from 100% of the first 3%, then 50% up to 5% to 100% of the first 4%. |
+    | `k401_contribution_pct` | Your 401(k) decision changed from 5% to 6%. |
+    | `health_premium_per_paycheck_cents` | Your health plan's premium changed from $4.00 to $62.50 a paycheck. |
+    | `salary_unconfirmed` | Your newest pay stub comes to $64,999.92 a year, not the $95,000.10 in your plan details. Choose which salary to use. |
+
+19e. **Nothing is stored.** The reasons are computed on every read; the decision stays immutable (rule 9). A decision stops needing review when a new version is saved from the inputs of now, or when what changed changes back.
 
 ## Part B: `GET /spending/summary`
 
@@ -106,6 +142,25 @@ Save the calculator result a user picks as an immutable, versioned `decisions` r
 | 8 | `test_result_mismatch_is_422` | `result.missed_cents` off by one cent | 422 `result_mismatch`, `details.fields == ["missed_cents"]`; no row |
 | 9 | `test_calendar_event_created` | Biweekly profile, latest stub paid 2026-10-16, today 2026-10-21 | One `election_check` event due 2026-10-30 |
 | 10 | `test_superseded_event_dismissed` | Save v1 then v2 | v1's event `dismissed`, v2's `upcoming`; `GET /calendar` lists only v2's |
+
+### Needs review (`api/tests/integration/test_decision_review.py`, rules 19a-19e; the texts in `api/tests/unit/test_decision_review.py`)
+
+Issue 222's account: stub-01 confirmed (biweekly, paid 2026-04-10), plan details saved at $95,000.10 against it (single, 100% of the first 3% then 50% up to 5%, born 2002), and three decisions saved through `POST /decisions` on 26 paychecks: the 401(k) at 5%, the health plan with Value HMO at $4.00 a paycheck chosen, and the W-4 of spec 014 example 11 (5%, $4.00). Then the Acme stub is confirmed (semimonthly, paid 2026-10-15).
+
+| # | Test | Then | `review` of each current decision |
+|---|---|---|---|
+| 1 | `test_every_decision_is_current_before_the_new_stub` | nothing more | 401(k), health plan and W-4: `[]` |
+| 2 | `test_issue_222_a_newer_stub_on_another_schedule` | the Acme stub confirmed | each: `changed` `pay_periods_per_year` "Your pay schedule changed from 26 to 24 paychecks a year.", then `salary_unconfirmed` (spec 005 rule 24c: 6,499,992 against 9,500,010) |
+| 3 | `test_keeping_the_salary_leaves_the_schedule` | row 2, then "Keep $95,000.10" | each: the schedule only |
+| 4 | `test_using_the_stubs_salary_changes_it_too` | row 2, then "Use $64,999.92" | each: the schedule, then `salary_cents` "Your yearly salary changed from $95,000.10 to $64,999.92." |
+| 5 | `test_saving_again_clears_it` | row 4, then each saved again with the inputs of now | each `[]`; the earlier versions `[]` too, as versions that are not current |
+| 6 | `test_the_w4_follows_the_other_decisions` | row 1, then the 401(k) saved at 6% | the W-4: `k401_contribution_pct` "Your 401(k) decision changed from 5% to 6%."; the 401(k) `[]` |
+| 7 | `test_a_new_tax_year` | row 1, then a stub-01 copy paid 2027-01-08 | 401(k) and W-4: `tax_year` 2026 to 2027 and `age` 24 to 25; health plan: `tax_year` |
+| 8 | `test_plan_details_changes` | row 1, then the profile at married filing jointly with 100% of the first 4% | 401(k): `filing_status` and `match_tiers`; health plan: `filing_status`; the W-4 (whose filing status is its own entry): `[]` |
+| 9 | `test_the_emergency_fund_reads_the_schedule_only` | an emergency fund saved on 26 paychecks, then the Acme stub, salary kept | `pay_periods_per_year` only, never `salary_unconfirmed` |
+| 10 | `test_nothing_known_nothing_compared` | a 401(k) decision with no stub and no profile | `[]` |
+
+`GET /decisions/{id}` reports the same `review` as `GET /decisions` for the current version (row 2) and `[]` for a superseded one (row 5).
 
 ### Next pay date (`api/tests/unit/calc/test_pay_dates.py`)
 

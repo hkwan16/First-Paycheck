@@ -12,8 +12,9 @@ import {
   SAVER_HDHP,
   SILVER_HMO,
 } from '@/test/fixtures/planning';
+import { SCHEDULE_CHANGED } from '@/test/fixtures/decisions';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
-import { db, decisionsReady } from '@/test/msw/db';
+import { db, decisionsReady, salaryQuestionOpen } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
 import { benefitsConfirmed, planningDb, savedHealthPlan } from '@/test/msw/planning-handlers';
 import { server } from '@/test/msw/server';
@@ -370,6 +371,42 @@ describe('HealthPlanCard saving', () => {
     await user.click(saveButton());
     expect(await within(card()).findByText(/saved in another tab or window/)).toBeInTheDocument();
     await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
+  });
+});
+
+describe('HealthPlanCard and what changed since the save (spec 018 rules 5c and 5d)', () => {
+  it('says what changed and saves again (issue 222)', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    db.decisions.at(-1)!.review = [SCHEDULE_CHANGED];
+    const seen = requests();
+    const { user } = await renderReady();
+    expect(within(card()).getByText('Needs review')).toBeInTheDocument();
+    expect(within(card()).getByRole('group', { name: 'What changed' })).toHaveTextContent(
+      SCHEDULE_CHANGED.text,
+    );
+    const again = within(card()).getByRole('button', { name: 'Save again' });
+    await user.click(again);
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
+    expect(seen.save[0]).toMatchObject({ supersedes_id: HEALTH_DECISION_ID });
+  });
+
+  it('asks which salary to use before it compares anything (issue 221)', async () => {
+    salaryQuestionOpen();
+    benefitsConfirmed();
+    const seen = requests();
+    const { user } = renderCard();
+    const region = await screen.findByRole('region', { name: 'Health plan' });
+    const question = await within(region).findByRole('group', {
+      name: 'Which yearly salary should we use?',
+    });
+    expect(within(region).queryByRole('group', { name: 'Expected healthcare use' })).toBeNull();
+    await settle();
+    expect(seen.calc).toEqual([]);
+
+    await user.click(within(question).getByRole('button', { name: 'Keep $65,000.00' }));
+    await within(region).findByRole('group', { name: 'Expected healthcare use' });
   });
 });
 

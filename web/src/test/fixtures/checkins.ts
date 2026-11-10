@@ -15,7 +15,7 @@ import type {
   SpendingSummary,
   WithholdingLine,
 } from '@/lib/api/types';
-import { ACCOUNT_KINDS_COUNTED, CATEGORY_BUCKETS, emptyCashflow } from './cashflow';
+import { ACCOUNT_KINDS_COUNTED, CATEGORY_BUCKETS, diagramOf, emptyCashflow } from './cashflow';
 import { DECISION_V1_ID } from './decisions';
 import { CHECKING_ID, sampleJob, SAVINGS_ID } from './sample';
 
@@ -65,6 +65,7 @@ function finding(
     user_action_at: null,
     created_at: CREATED_AT,
     updated_at: CREATED_AT,
+    charge_gone: false,
   };
 }
 
@@ -159,21 +160,27 @@ export const netflixFinding = (): Finding =>
 
 /** Finder row 17, the event due in 4 days. */
 export const deadlineFinding = (): Finding =>
-  finding(
-    5,
-    'warning',
-    'upcoming_deadline:ca000000-0000-4000-8000-000000000031',
-    FUND_DECISION_ID,
-    {
-      kind: 'upcoming_deadline',
-      affects: 'emergency_fund',
-      calendar_event_id: 'ca000000-0000-4000-8000-000000000031',
-      calendar_kind: 'goal_contribution',
-      title: 'Make your first emergency fund contribution',
-      due_at: '2026-11-20',
-      days_until: 4,
-    },
-  );
+  finding(5, 'warning', 'upcoming_deadline:goal_contribution:2026-11-20', FUND_DECISION_ID, {
+    kind: 'upcoming_deadline',
+    affects: 'emergency_fund',
+    calendar_event_id: 'ca000000-0000-4000-8000-000000000031',
+    calendar_kind: 'goal_contribution',
+    title: 'Make your first emergency fund contribution',
+    due_at: '2026-11-20',
+    days_until: 4,
+  });
+
+/** Finder row 20's kind: the W-4 hand-in, due Nov 6, open ten days later. */
+export const overdueFinding = (): Finding =>
+  finding(9, 'alert', 'overdue_deadline:w4_submit:2026-11-06', W4_DECISION_ID, {
+    kind: 'overdue_deadline',
+    affects: 'w4',
+    calendar_event_id: 'ca000000-0000-4000-8000-000000000041',
+    calendar_kind: 'w4_submit',
+    title: 'Give your employer your updated Form W-4',
+    due_at: '2026-11-06',
+    days_until: -10,
+  });
 
 /** Finder row 12. */
 export const huluFinding = (): Finding =>
@@ -365,6 +372,7 @@ export const novemberCashflow = (): CashFlow => ({
     paycheck_count: 1,
   },
   spending: structuredClone(NOVEMBER_SPENDING),
+  diagram: diagramOf('november'),
 });
 
 const line = (
@@ -374,7 +382,8 @@ const line = (
   plan_cents: number | null,
   difference_cents: number | null,
   status: PlanLine['status'] = null,
-): PlanLine => ({ key, label, actual_cents, plan_cents, difference_cents, status });
+  needs_pay_stub = false,
+): PlanLine => ({ key, label, actual_cents, plan_cents, difference_cents, status, needs_pay_stub });
 
 /**
  * Spec 015 rule 19 for November: essentials 182,300 from the emergency fund
@@ -382,7 +391,7 @@ const line = (
  * (10,833) and the HDHP premium for one paycheck (3,125).
  */
 export const novemberPlan = (): PlanLine[] => [
-  line('take_home', 'Take-home pay', 205_892, null, null),
+  line('income', 'Income deposited', 205_892, null, null),
   line('essentials', 'Essentials', 25_860, 182_300, -156_440, 'under'),
   line('flexible', 'Flexible', 22_349, null, null),
   line('other', 'Other spending', 0, null, null),
@@ -406,6 +415,8 @@ export function novemberCheckIn(overrides: Partial<CheckInDetail> = {}): CheckIn
     created_at: '2026-11-01T08:00:00Z',
     updated_at: CREATED_AT,
     last_run_at: CREATED_AT,
+    as_of: CHECKIN_TODAY,
+    past: false,
     findings,
     cash_flow: { cash_flow: novemberCashflow(), plan: novemberPlan() },
     ...overrides,
@@ -458,6 +469,8 @@ export function octoberCheckIn(): CheckInDetail {
     created_at: '2026-10-01T08:00:00Z',
     updated_at: '2026-10-20T15:00:00Z',
     last_run_at: '2026-10-20T15:00:00Z',
+    as_of: '2026-10-20',
+    past: true,
     findings,
     cash_flow: { cash_flow: emptyCashflow('2026-10-01', '2026-10-31'), plan: [] },
   };
@@ -478,6 +491,7 @@ export const novemberCalendar = (): CalendarEvent[] => [
     due_at: '2026-11-20',
     decision_id: FUND_DECISION_ID,
     status: 'upcoming',
+    overdue: false,
   },
   {
     id: 'ca000000-0000-4000-8000-000000000032',
@@ -486,6 +500,7 @@ export const novemberCalendar = (): CalendarEvent[] => [
     due_at: '2026-11-30',
     decision_id: DECISION_V1_ID,
     status: 'upcoming',
+    overdue: false,
   },
   {
     id: 'ca000000-0000-4000-8000-000000000033',
@@ -494,6 +509,7 @@ export const novemberCalendar = (): CalendarEvent[] => [
     due_at: '2026-12-16',
     decision_id: HEALTH_DECISION_ID,
     status: 'upcoming',
+    overdue: false,
   },
 ];
 

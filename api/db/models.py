@@ -134,12 +134,20 @@ class Profile(Base):
         CheckConstraint("vesting_years >= 0", name="vesting_years_non_negative"),
         # The upper bound (the current year) is the route's: a CHECK cannot read the clock.
         CheckConstraint("birth_year >= 1900", name="birth_year_after_1900"),
+        # The stub the salary was last compared with (spec 005 rule 24c). The
+        # column list keeps user_id; migration 0023 writes it by hand.
+        ForeignKeyConstraint(
+            ["salary_pay_stub_id", "user_id"],
+            ["pay_stubs.id", "pay_stubs.user_id"],
+            ondelete="SET NULL (salary_pay_stub_id)",
+        ),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("auth.users.id", ondelete="CASCADE"), primary_key=True
     )
     salary_cents: Mapped[int | None] = mapped_column(BigInteger)
+    salary_pay_stub_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     pay_frequency: Mapped[PayFrequency | None] = mapped_column(
         pg_enum(PayFrequency, "pay_frequency")
     )
@@ -195,7 +203,7 @@ class SyncItem(Base):
 
 def _role_fits_kind_sql() -> str:
     """``ck_accounts_role_fits_kind``: no role, or one ``ROLES_BY_KIND`` gives the kind
-    (spec 002 rule 31a). Migration 0023 writes the same text."""
+    (spec 002 rule 31a). Migration 0025 writes the same text."""
     allowed = [
         f"(kind = '{kind.value}' AND role IN ({', '.join(f"'{r.value}'" for r in roles)}))"
         for kind, roles in ROLES_BY_KIND.items()

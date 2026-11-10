@@ -46,7 +46,7 @@ export default defineConfig({
     { name: 'setup', testMatch: 'auth.setup.ts', use: desktop },
     {
       name: 'authenticated',
-      testMatch: 'auth.spec.ts',
+      testMatch: ['auth.spec.ts', 'sign-out.spec.ts', 'session.spec.ts', 'not-found.spec.ts'],
       dependencies: ['setup'],
       use: { ...desktop, storageState: STORAGE_STATE },
     },
@@ -92,6 +92,15 @@ export default defineConfig({
       dependencies: ['authenticated-decisions'],
       use: { ...desktop, storageState: STORAGE_STATE },
     },
+    // Saves two more 401(k) versions and opens the replaced one's Why page
+    // (issue 227). After Plan and Check-in, which read the saved decisions, so
+    // its saves never change what they are reading.
+    {
+      name: 'authenticated-why',
+      testMatch: 'why.spec.ts',
+      dependencies: ['authenticated-plan', 'authenticated-check-in'],
+      use: { ...desktop, storageState: STORAGE_STATE },
+    },
     // Spending reads the bank Link linked, so it needs Plaid's sandbox.
     ...(plaidSandbox
       ? [
@@ -112,6 +121,9 @@ export default defineConfig({
       : []),
     // The whole alpha path as a new user signing in through the form (E2E_ALPHA_USER_*).
     { name: 'alpha', testMatch: 'alpha.spec.ts', use: desktop },
+    // A new user whose newer pay stub changes schedule under saved decisions
+    // (E2E_SCHEDULE_USER_*; issues 221 and 222).
+    { name: 'schedule-change', testMatch: 'schedule-change.spec.ts', use: desktop },
   ],
   webServer: {
     command: `next dev --port ${PORT}`,

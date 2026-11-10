@@ -9,14 +9,15 @@ What it starts, in order:
 1. A disposable Postgres database, ``E2E_DATABASE_URL`` (default
    ``postgresql://localhost:5432/first_paycheck_e2e``; its name must contain
    ``e2e``): dropped and recreated, the test auth shim installed, migrated to
-   head, seeded (as ``make seed``), and two fixture users added to
+   head, seeded (as ``make seed``), and four fixture users added to
    ``auth.users``. ``app_api`` gets a login password made for this run.
 2. ``FakeSupabaseAuth`` on 127.0.0.1:``E2E_AUTH_PORT``: a stand-in for
    Supabase Auth with the routes supabase-js uses (password and refresh-token
    grants, ``/user``, ``/logout``, the JWKS). It signs ES256 tokens with a key
    pair made for this run. The web signs in through its real form against it
    and the API verifies the same tokens through the JWKS, exactly as with the
-   hosted project, so no app code knows it is under test.
+   hosted project, so no app code knows it is under test. Specs make it fail
+   for one user through ``FAULTS_PATH`` (``E2E_AUTH_FAULTS_URL``).
 3. The API and the worker together (``python -m app.serve``, as on Render) on
    ``E2E_API_PORT``, with ``APP_ENV=test`` (the API ignores the developer's
    ``.env``), ``LLM_FAKE=true``, CORS for the web origin, and the Plaid
@@ -49,12 +50,12 @@ import threading
 import time
 import uuid
 from collections.abc import Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, NamedTuple, TextIO, cast
+from typing import Any, Literal, NamedTuple, TextIO, cast
 from urllib.parse import parse_qs, urlsplit
 
 import jwt
@@ -108,14 +109,20 @@ class FixtureUser:
 
 class FixtureUsers(NamedTuple):
     """``shared``: the e2e user every saved-session spec uses (E2E_USER_*).
-    ``alpha``: a fresh account for ``alpha.spec.ts``, which signs in itself."""
+    ``alpha``: a fresh account for ``alpha.spec.ts``, which signs in itself.
+    ``schedule``: a fresh account for ``schedule-change.spec.ts``, whose pay
+    stubs change schedule under saved decisions (issues 221 and 222).
+    ``session``: the account the session specs inject Auth faults for
+    (E2E_SESSION_USER_*), so no fault reaches another spec's user."""
 
     shared: FixtureUser
     alpha: FixtureUser
+    schedule: FixtureUser
+    session: FixtureUser
 
 
 def fixture_users() -> FixtureUsers:
-    """The two synthetic users, with passwords made for this run."""
+    """The three synthetic users, with passwords made for this run."""
     return FixtureUsers(
         shared=FixtureUser(
             uuid.UUID("00000000-0000-4000-8000-0000000000e2"),
@@ -125,6 +132,16 @@ def fixture_users() -> FixtureUsers:
         alpha=FixtureUser(
             uuid.UUID("00000000-0000-4000-8000-0000000000a1"),
             "alpha@example.com",
+            secrets.token_urlsafe(24),
+        ),
+        schedule=FixtureUser(
+            uuid.UUID("00000000-0000-4000-8000-0000000000c2"),
+            "schedule@example.com",
+            secrets.token_urlsafe(24),
+        ),
+        session=FixtureUser(
+            uuid.UUID("00000000-0000-4000-8000-0000000000c5"),
+            "session@example.com",
             secrets.token_urlsafe(24),
         ),
     )
@@ -143,13 +160,32 @@ class AuthError(Exception):
         self.message = message
 
 
+@dataclass
+class AuthFaults:
+    """How the stand-in misbehaves for one user, set by a spec through ``FAULTS_PATH``.
+
+    ``refresh="hang"``: a refresh-token grant gets no answer until the fault is
+    cleared (issue 225: a session read that never resolved).
+    ``logout="unavailable"``: a sign-out is a 503, as Supabase once answered (issue 224).
+    """
+
+    refresh: Literal["ok", "hang"] = "ok"
+    logout: Literal["ok", "unavailable"] = "ok"
+
+
+# Test control, not a Supabase route: POST {"email", "refresh"?, "logout"?}.
+FAULTS_PATH = "/__e2e__/faults"
+_FAULT_VALUES = {"refresh": ("ok", "hang"), "logout": ("ok", "unavailable")}
+
+
 class FakeSupabaseAuth:
     """The Supabase Auth routes supabase-js calls, for synthetic fixture users.
 
     Tokens are shaped like Supabase's (ES256 with a ``kid``, audience
     ``authenticated``, issuer ``<url>/auth/v1``), so the API verifies them with
     its production code path. Refresh tokens are single use. Sign-up and email
-    links are refused: fixture users are made by the harness.
+    links are refused: fixture users are made by the harness. ``FAULTS_PATH``
+    makes it fail for one user the way the hosted project has (``AuthFaults``).
     """
 
     def __init__(
@@ -159,7 +195,11 @@ class FakeSupabaseAuth:
         self._key = ec.generate_private_key(ec.SECP256R1())
         self._kid = f"e2e-{secrets.token_hex(4)}"
         self._refresh_tokens: dict[str, FixtureUser] = {}
+        self._faults: dict[uuid.UUID, AuthFaults] = {}
+        self._stopping = False
         self._lock = threading.Lock()
+        # Wakes a hanging refresh when its fault is cleared or the server stops.
+        self._faults_changed = threading.Condition(self._lock)
         self._log = log
         self._server = _AuthHTTPServer((HOST, port), _AuthHandler, self)
         self._thread: threading.Thread | None = None
@@ -180,6 +220,9 @@ class FakeSupabaseAuth:
         self._thread.start()
 
     def stop(self) -> None:
+        with self._faults_changed:
+            self._stopping = True
+            self._faults_changed.notify_all()
         self._server.shutdown()
         self._server.server_close()
         if self._thread is not None:
@@ -205,7 +248,16 @@ class FakeSupabaseAuth:
 
     def refresh_grant(self, body: Mapping[str, Any]) -> dict[str, Any]:
         token = str(body.get("refresh_token", ""))
-        with self._lock:
+        with self._faults_changed:
+            # A hanging refresh holds no lock while it waits (wait() releases it).
+            while (
+                (waiting := self._refresh_tokens.get(token)) is not None
+                and self._faults_for(waiting).refresh == "hang"
+                and not self._stopping
+            ):
+                self._faults_changed.wait()
+            if self._stopping:
+                raise AuthError(HTTPStatus.SERVICE_UNAVAILABLE, "stopping", "Shutting down")
             user = self._refresh_tokens.pop(token, None)
         if user is None:
             raise AuthError(
@@ -214,6 +266,41 @@ class FakeSupabaseAuth:
         return self._session(user)
 
     def user_for(self, authorization: str | None) -> dict[str, Any]:
+        return _user_json(self._verified_user(authorization))
+
+    def logout(self, authorization: str | None) -> None:
+        """Tokens are stateless here; the client clears its own session."""
+        try:
+            user = self._verified_user(authorization)
+        except AuthError:
+            return  # Supabase signs out an expired or unknown token without complaint.
+        with self._lock:
+            unavailable = self._faults_for(user).logout == "unavailable"
+        if unavailable:
+            raise AuthError(
+                HTTPStatus.SERVICE_UNAVAILABLE, "unexpected_failure", "Service Unavailable"
+            )
+
+    def set_faults(self, body: Mapping[str, Any]) -> dict[str, str]:
+        user = self._users.get(str(body.get("email", "")).strip().lower())
+        if user is None:
+            raise AuthError(HTTPStatus.BAD_REQUEST, "unknown_user", "Name a fixture user")
+        changes = {name: body[name] for name in _FAULT_VALUES if name in body}
+        for name, value in changes.items():
+            if value not in _FAULT_VALUES[name]:
+                raise AuthError(HTTPStatus.BAD_REQUEST, "bad_fault", f"Unknown {name} fault")
+        with self._faults_changed:
+            faults = self._faults_for(user)
+            self._faults[user.id] = replace(faults, **changes)
+            self._faults_changed.notify_all()
+            current = self._faults[user.id]
+        return {"email": user.email, "refresh": current.refresh, "logout": current.logout}
+
+    def _faults_for(self, user: FixtureUser) -> AuthFaults:
+        """Call with the lock held."""
+        return self._faults.get(user.id, AuthFaults())
+
+    def _verified_user(self, authorization: str | None) -> FixtureUser:
         token = (authorization or "").removeprefix("Bearer ").strip()
         try:
             claims = jwt.decode(
@@ -228,7 +315,7 @@ class FakeSupabaseAuth:
         user = self._users.get(str(claims.get("email", "")).lower())
         if user is None or str(user.id) != claims.get("sub"):
             raise AuthError(HTTPStatus.UNAUTHORIZED, "bad_jwt", "invalid JWT")
-        return _user_json(user)
+        return user
 
     def log(self, line: str) -> None:
         if self._log is not None:
@@ -348,8 +435,10 @@ class _AuthHandler(BaseHTTPRequestHandler):
                         HTTPStatus.BAD_REQUEST, "validation_failed", "Unsupported grant type"
                     )
             elif parts.path == "/auth/v1/logout":
-                # Tokens are stateless here; the client clears its own session.
+                self.auth.logout(self.headers.get("Authorization"))
                 self._respond(HTTPStatus.NO_CONTENT, None)
+            elif parts.path == FAULTS_PATH:
+                self._respond(HTTPStatus.OK, self.auth.set_faults(body))
             elif parts.path == "/auth/v1/signup":
                 raise AuthError(
                     HTTPStatus.UNPROCESSABLE_ENTITY, "signup_disabled", "Signups not allowed"
@@ -522,6 +611,11 @@ def playwright_environment(
             "NEXT_PUBLIC_E2E_USER_EMAIL": users.shared.email,
             "E2E_ALPHA_USER_EMAIL": users.alpha.email,
             "E2E_ALPHA_USER_PASSWORD": users.alpha.password,
+            "E2E_SCHEDULE_USER_EMAIL": users.schedule.email,
+            "E2E_SCHEDULE_USER_PASSWORD": users.schedule.password,
+            "E2E_SESSION_USER_EMAIL": users.session.email,
+            "E2E_SESSION_USER_PASSWORD": users.session.password,
+            "E2E_AUTH_FAULTS_URL": f"{auth_url}{FAULTS_PATH}",
             "E2E_PLAID_SANDBOX": "1" if config.plaid_configured else "0",
         }
     )

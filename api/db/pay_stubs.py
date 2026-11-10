@@ -14,7 +14,7 @@ import datetime as dt
 import uuid
 from collections.abc import Collection
 
-from sqlalchemy import Select, Text, Update, and_, func, literal, or_, select, text, update
+from sqlalchemy import Date, Select, Text, Update, and_, func, literal, or_, select, text, update
 from sqlalchemy.orm import Session, aliased
 
 from db.models import Document, PayStub, employer_key
@@ -24,9 +24,11 @@ __all__ = [
     "add_confirmed",
     "confirmed_from",
     "current_pay_stubs",
+    "find_pay_stub",
     "latest_pay_date",
     "newest_pay_stub",
     "paid_between_count",
+    "paid_months",
     "paycheck_ids",
 ]
 
@@ -75,6 +77,14 @@ def newest_pay_stub(session: Session) -> PayStub | None:
     return session.scalars(current_pay_stubs().order_by(*NEWEST_FIRST).limit(1)).first()
 
 
+def find_pay_stub(session: Session, stub_id: uuid.UUID) -> PayStub | None:
+    """One of the user's stubs by id, current or superseded; None for one they cannot
+    see. The profile names the stub its salary was compared with (spec 005 rule
+    24c), which a later copy may have superseded since: its figures still say what
+    the person answered for."""
+    return session.get(PayStub, stub_id)
+
+
 def paycheck_ids(session: Session) -> dict[uuid.UUID, uuid.UUID]:
     """Each current stub's paycheck id (spec 015, Inputs): the first copy of its
     paycheck, the one among it and the stubs it superseded, directly or through
@@ -119,6 +129,15 @@ def paid_between_count(session: Session, first: dt.date, last: dt.date) -> int:
         .with_only_columns(func.count(), maintain_column_froms=True)
     )
     return int(count or 0)
+
+
+def paid_months(session: Session) -> set[dt.date]:
+    """The first day of each month a current stub was paid in (spec 010 rule 5d)."""
+    month = func.date_trunc("month", PayStub.pay_date).cast(Date)
+    rows = session.scalars(
+        current_pay_stubs().with_only_columns(month, maintain_column_froms=True).distinct()
+    )
+    return set(rows)
 
 
 def confirmed_from(

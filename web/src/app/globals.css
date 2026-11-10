@@ -206,6 +206,11 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* A signed-in page kept by the back/forward cache comes back blank and reloads (RestoredPageGuard). */
+  html[data-restoring] body {
+    visibility: hidden;
+  }
+
   h1 {
     font-size: var(--text-title);
     line-height: 1.15;

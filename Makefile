@@ -38,12 +38,13 @@ test-api: ## API tests only
 	uv run pytest api/tests -m "$(PYTEST_DEFAULT_MARKS)"
 
 .PHONY: lint
-lint: ## ruff, ruff format, mypy, the em-dash check, eslint and tsc
+lint: ## ruff, ruff format, mypy, the em-dash check, eslint, prettier and tsc
 	uv run ruff check .
 	uv run ruff format --check .
 	uv run mypy
 	uv run python scripts/check_no_em_dash.py
 	@$(call in_web,pnpm --dir web lint)
+	@$(call in_web,pnpm --dir web format:check)
 	@$(call in_web,pnpm --dir web typecheck)
 
 .PHONY: e2e-full

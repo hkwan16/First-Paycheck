@@ -142,6 +142,7 @@ def test_passing_verification_has_no_feedback_and_serializes() -> None:
         "citations_checked": 1,
         "citations_unknown": [],
         "has_citation": True,
+        "zero_cost_claims": [],
     }
 
 

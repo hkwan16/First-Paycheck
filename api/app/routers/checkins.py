@@ -25,8 +25,8 @@ from app.errors import NotFound, error_responses
 from app.routers.cashflow import CashFlow, cash_flow_for
 from app.types import UtcDateTime
 from calc.cashflow import PlanLine, SpendingActuals, against_plan
-from checkin.engine import month_end, queue_check_in_now, settle_status
-from checkin.facts import plan_targets
+from checkin.engine import charge_gone, month_end, queue_check_in_now, settle_status
+from checkin.facts import plan_targets, utc_date
 from checkin.findings import FindingPayload
 from db.enums import (
     CheckinStatus,
@@ -35,7 +35,7 @@ from db.enums import (
     FindingKind,
     FindingSeverity,
 )
-from db.models import CheckIn, CheckInFinding
+from db.models import CheckIn, CheckInFinding, RecurringCharge
 
 router = APIRouter(prefix="/check-ins", tags=["check-ins"])
 
@@ -63,6 +63,11 @@ class CheckInSummary(BaseModel):
     # refreshed it, also one that changed nothing; updated_at moves only when
     # the check-in's own row changes.
     last_run_at: UtcDateTime
+    # The date its findings were judged as of: the last run's UTC date, capped at
+    # the month's last day as the job caps it (spec 015 rules 9b and 16).
+    as_of: dt.date
+    # The month has ended: no run reaches it again, so it is a record of as_of.
+    past: bool
 
 
 class FindingOut(BaseModel):
@@ -79,6 +84,8 @@ class FindingOut(BaseModel):
     user_action_at: UtcDateTime | None
     created_at: UtcDateTime
     updated_at: UtcDateTime
+    # A recurring finding whose charge Spending no longer lists (spec 015 rule 9b).
+    charge_gone: bool
 
 
 class CheckInCashFlow(BaseModel):
@@ -110,7 +117,8 @@ class FindingPatch(BaseModel):
     user_action: Annotated[FindingAction | None, Field(description="null undoes the action")]
 
 
-def _summary(check_in: CheckIn, total: int, handled: int) -> CheckInSummary:
+def _summary(check_in: CheckIn, total: int, handled: int, today: dt.date) -> CheckInSummary:
+    last_day = month_end(check_in.period)
     return CheckInSummary(
         id=check_in.id,
         period=check_in.period,
@@ -122,10 +130,12 @@ def _summary(check_in: CheckIn, total: int, handled: int) -> CheckInSummary:
         created_at=check_in.created_at,
         updated_at=check_in.updated_at,
         last_run_at=check_in.last_run_at,
+        as_of=min(utc_date(check_in.last_run_at), last_day),
+        past=today > last_day,
     )
 
 
-def _finding_out(row: CheckInFinding) -> FindingOut:
+def _finding_out(row: CheckInFinding, charge_ids: set[uuid.UUID]) -> FindingOut:
     return FindingOut.model_validate(
         {
             "id": row.id,
@@ -139,12 +149,17 @@ def _finding_out(row: CheckInFinding) -> FindingOut:
             "user_action_at": row.user_action_at,
             "created_at": row.created_at,
             "updated_at": row.updated_at,
+            "charge_gone": charge_gone(row.kind, row.payload, charge_ids),
         }
     )
 
 
+def _charge_ids(session: Session) -> set[uuid.UUID]:
+    return set(session.scalars(select(RecurringCharge.id)))
+
+
 @router.get("", responses=error_responses(401))
-def list_check_ins(session: UserSession) -> list[CheckInSummary]:
+def list_check_ins(session: UserSession, now: Now) -> list[CheckInSummary]:
     """The user's check-ins, newest month first, with finding counts."""
     rows = session.execute(
         select(
@@ -160,7 +175,7 @@ def list_check_ins(session: UserSession) -> list[CheckInSummary]:
         .group_by(CheckIn.id)
         .order_by(CheckIn.period.desc(), CheckIn.created_at.desc(), CheckIn.id)
     ).all()
-    return [_summary(check_in, total, handled) for check_in, total, handled in rows]
+    return [_summary(check_in, total, handled, now.date()) for check_in, total, handled in rows]
 
 
 @router.post("", status_code=status.HTTP_202_ACCEPTED, responses=error_responses(401, 429))
@@ -183,7 +198,7 @@ def _cash_flow(session: Session, check_in: CheckIn, today: dt.date) -> CheckInCa
     flow = cash_flow_for(session, check_in.period, end)
     spending = flow.spending
     actuals = SpendingActuals(
-        take_home_cents=spending.income_cents,
+        income_cents=spending.income_cents,
         essentials_cents=spending.essentials_cents,
         flexible_cents=spending.flexible_cents,
         other_cents=spending.other_cents,
@@ -198,7 +213,7 @@ def _cash_flow(session: Session, check_in: CheckIn, today: dt.date) -> CheckInCa
     )
 
 
-@router.get("/{check_in_id}", responses=error_responses(401, 404, 422))
+@router.get("/{check_in_id}", responses=error_responses(401, 404))
 def get_check_in(check_in_id: uuid.UUID, session: UserSession, now: Now) -> CheckInDetail:
     """One check-in: its findings and the month's cash flow against the plan."""
     check_in = session.get(CheckIn, check_in_id)
@@ -215,10 +230,13 @@ def get_check_in(check_in_id: uuid.UUID, session: UserSession, now: Now) -> Chec
             str(row.id),
         )
     )
-    summary = _summary(check_in, len(rows), sum(row.user_action is not None for row in rows))
+    summary = _summary(
+        check_in, len(rows), sum(row.user_action is not None for row in rows), now.date()
+    )
+    charge_ids = _charge_ids(session)
     return CheckInDetail(
         **summary.model_dump(),
-        findings=[_finding_out(row) for row in rows],
+        findings=[_finding_out(row, charge_ids) for row in rows],
         cash_flow=_cash_flow(session, check_in, now.date()),
     )
 
@@ -247,4 +265,4 @@ def update_finding(
         session.flush()
         settle_status(session, check_in, now)
     session.refresh(finding)  # updated_at comes from the trigger
-    return _finding_out(finding)
+    return _finding_out(finding, _charge_ids(session))

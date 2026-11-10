@@ -61,4 +61,4 @@ def test_unknown_and_system_jobs_are_404(
     client = client_as(user_a)
     assert client.get(f"/jobs/{tick}").status_code == 404
     assert client.get(f"/jobs/{uuid.uuid4()}").status_code == 404
-    assert client.get("/jobs/not-a-uuid").status_code == 422
+    assert client.get("/jobs/not-a-uuid").status_code == 404

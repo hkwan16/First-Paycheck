@@ -170,18 +170,29 @@ export function RecurringCard() {
                   className={cn('font-semibold', ignored ? 'text-ink-3' : 'text-ink')}
                 />
                 <Badge tone={badge.tone}>{badge.text}</Badge>
+                {/* Each name says which charge it acts on (issue 242), starting
+                    with the words on the button. */}
                 {ignored ? (
-                  <Button size="sm" onClick={() => save(charge, { user_status: null })}>
+                  <Button
+                    size="sm"
+                    aria-label={`Undo not recurring for ${charge.merchant_clean}`}
+                    onClick={() => save(charge, { user_status: null })}
+                  >
                     Undo
                   </Button>
                 ) : (
-                  <Button size="sm" onClick={() => save(charge, { user_status: 'ignored' })}>
+                  <Button
+                    size="sm"
+                    aria-label={`Not recurring: ${charge.merchant_clean}`}
+                    onClick={() => save(charge, { user_status: 'ignored' })}
+                  >
                     Not recurring
                   </Button>
                 )}
                 {editing !== charge.id && (
                   <Button
                     size="sm"
+                    aria-label={`Rename ${charge.merchant_clean}`}
                     ref={(el: HTMLButtonElement | null) => {
                       // Back from renaming: focus returns to this button.
                       if (el && focusAfterEdit.current === charge.id) {

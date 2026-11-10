@@ -502,5 +502,43 @@
     },
     "pay_stub_contribution_pct": "5.00",
     "benefits_passages": []
+  },
+  {
+    "id": "issue-223-above-full-match",
+    "note": "Issue 223: 6% chosen where 5% earns the full match, 24 paychecks, the stub at 0%. 6% costs $237.50 a paycheck against the stub and $39.58 for the point above the match, never nothing.",
+    "inputs": {
+      "salary_cents": 9500010,
+      "pay_periods_per_year": 24,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "6",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 24
+    },
+    "pay_stub_contribution_pct": "0.00",
+    "benefits_passages": [
+      "Acme matches 100% of the first 3% of pay you contribute and 50% of the next 2%. Matching contributions are made each pay period."
+    ]
+  },
+  {
+    "id": "issue-223-at-full-match",
+    "note": "Issue 223 at 5%, the full-match rate, against the stub's 0%: $197.92 a paycheck, and no cost of reaching the match to describe.",
+    "inputs": {
+      "salary_cents": 9500010,
+      "pay_periods_per_year": 24,
+      "match_tiers": [
+        {"employee_pct_upto": "3", "employer_pct": "100"},
+        {"employee_pct_upto": "5", "employer_pct": "50"}
+      ],
+      "contribution_pct": "5",
+      "tax_year": 2026,
+      "filing_status": "single",
+      "age": 24
+    },
+    "pay_stub_contribution_pct": "0.00",
+    "benefits_passages": []
   }
 ]

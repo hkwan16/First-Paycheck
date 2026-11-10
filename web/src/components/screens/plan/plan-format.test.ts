@@ -3,6 +3,7 @@ import type { PlanFigure } from '@/lib/api/types';
 import { samplePlan } from '@/test/fixtures/plan';
 import {
   completenessText,
+  completenessTone,
   eventHue,
   explanationView,
   figureText,
@@ -82,8 +83,40 @@ describe('completenessText', () => {
       completenessText({
         saved: ['k401_match'],
         missing: ['emergency_fund', 'health_plans', 'w4'],
+        needs_review: [],
       }),
     ).toBe('1 of 4 decisions saved');
+  });
+
+  it('adds how many need review (spec 016 rule 3a)', () => {
+    expect(
+      completenessText({
+        saved: ['k401_match', 'health_plans', 'w4'],
+        missing: ['emergency_fund'],
+        needs_review: ['k401_match', 'health_plans', 'w4'],
+      }),
+    ).toBe('3 of 4 decisions saved, 3 need review');
+    expect(
+      completenessText({
+        saved: ['emergency_fund', 'k401_match', 'health_plans', 'w4'],
+        missing: [],
+        needs_review: ['w4'],
+      }),
+    ).toBe('4 of 4 decisions saved, 1 needs review');
+  });
+});
+
+describe('completenessTone', () => {
+  const all = ['emergency_fund', 'k401_match', 'health_plans', 'w4'] as const;
+
+  it('is confirmed only when nothing is missing and nothing needs review', () => {
+    expect(completenessTone({ saved: [...all], missing: [], needs_review: [] })).toBe('confirmed');
+    expect(
+      completenessTone({ saved: ['k401_match'], missing: ['emergency_fund'], needs_review: [] }),
+    ).toBe('neutral');
+    expect(completenessTone({ saved: [...all], missing: [], needs_review: ['w4'] })).toBe(
+      'warning',
+    );
   });
 });
 

@@ -744,11 +744,153 @@ def test_0021_folds_paycheck_findings(scratch_database: tuple[str, Engine]) -> N
     upgrade(url, "head")
 
 
-def test_0023_clears_roles_the_kind_does_not_allow(scratch_database: tuple[str, Engine]) -> None:
-    """Spec 002 rule 31a (issue 241): a role set before 0023 that its account's
+# ---------------------------------------------------------------- 0022 (spec 015 rule 13b)
+
+
+def _date(event: str, kind: str, due: str) -> dict[str, object]:
+    return {
+        "kind": "upcoming_deadline",
+        "affects": "w4",
+        "calendar_event_id": _uid(event),
+        "calendar_kind": kind,
+        "title": "A reminder",
+        "due_at": due,
+        "days_until": 3,
+    }
+
+
+def _seed_0022(engine: Engine, user: str) -> None:
+    """Spec 015's migration rows 1-3 for 0022, one check-in each, as 0021 stored them."""
+    # (finding, check-in, payload, action, minute written and handled)
+    findings: list[tuple[str, str, dict[str, object], str | None, int]] = [
+        ("w4", "d1", _date("e:w4", "w4_submit", "2026-11-06"), None, 0),
+        ("v1", "d2", _date("e:v1", "election_check", "2026-11-15"), "done", 0),
+        ("v2", "d2", _date("e:v2", "election_check", "2026-11-15"), None, 5),
+        ("a", "d3", _date("e:a", "goal_contribution", "2026-11-15"), "done", 1),
+        ("b", "d3", _date("e:b", "goal_review", "2027-02-15"), "done", 2),
+    ]
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO auth.users (id) VALUES (:u)"), {"u": user})
+        for check_in, period, completed in (
+            ("d1", "2026-09-01", None),
+            ("d2", "2026-10-01", None),
+            ("d3", "2026-11-01", "2026-11-20 09:02+00"),
+        ):
+            connection.execute(
+                text(
+                    "INSERT INTO check_ins (id, user_id, period, triggered_by, status,"
+                    " completed_at) VALUES (:id, :u, :period, 'schedule',"
+                    " CAST(:status AS checkin_status), CAST(:completed AS timestamptz))"
+                ),
+                {
+                    "id": _uid(check_in),
+                    "u": user,
+                    "period": period,
+                    "status": "completed" if completed else "open",
+                    "completed": completed,
+                },
+            )
+        for name, check_in, payload, action, minute in findings:
+            connection.execute(
+                text(
+                    "INSERT INTO check_in_findings (id, user_id, check_in_id, kind, severity, key,"
+                    " payload, user_action, user_action_at, created_at) VALUES"
+                    " (:id, :u, :c, 'upcoming_deadline', 'info', :key, CAST(:payload AS jsonb),"
+                    " CAST(:action AS finding_action), CASE WHEN CAST(:action AS text) IS NULL"
+                    " THEN NULL ELSE CAST(:at AS timestamptz) END, :at)"
+                ),
+                {
+                    "id": _uid(name),
+                    "u": user,
+                    "c": _uid(check_in),
+                    # Before 0022 the key named the event's row.
+                    "key": f"upcoming_deadline:{payload['calendar_event_id']}",
+                    "payload": json.dumps(payload),
+                    "action": action,
+                    "at": f"2026-11-20 09:{minute:02d}+00",
+                },
+            )
+
+
+def _status_of(engine: Engine, check_in: str) -> tuple[str, Any]:
+    with engine.connect() as connection:
+        status, completed_at = connection.execute(
+            text("SELECT status::text, completed_at FROM check_ins WHERE id = :c"),
+            {"c": _uid(check_in)},
+        ).one()
+    return str(status), completed_at
+
+
+def test_0022_keys_dates_by_day(scratch_database: tuple[str, Engine]) -> None:
+    """Spec 015 rule 13b (issues 233 and 234): a date finding is keyed by its day,
+    and a reminder a newer decision version repeated becomes one."""
+    url, engine = scratch_database
+    upgrade(url, "0021_paycheck_change")
+    user = "00000000-0000-4000-8000-0000000000d4"
+    _seed_0022(engine, user)
+
+    upgrade(url, "head")
+
+    # Row 1: the same row, keyed by the date.
+    [one] = _findings_of(engine, "d1")
+    assert (one["id"], one["key"]) == (_uid("w4"), "upcoming_deadline:w4_submit:2026-11-06")
+    # Row 2: the newer version's reminder stays, open (not every one was handled).
+    [two] = _findings_of(engine, "d2")
+    assert (two["id"], two["key"], two["user_action"]) == (
+        _uid("v2"),
+        "upcoming_deadline:election_check:2026-11-15",
+        None,
+    )
+    assert two["payload"]["calendar_event_id"] == _uid("e:v2")
+    # Row 3: both kept and handled; the check-in is still completed.
+    assert [(row["key"], row["user_action"]) for row in _findings_of(engine, "d3")] == [
+        ("upcoming_deadline:goal_contribution:2026-11-15", "done"),
+        ("upcoming_deadline:goal_review:2027-02-15", "done"),
+    ]
+    assert _status_of(engine, "d3")[0] == "completed"
+
+    # A finding of the new kind, the only open one on row 3's check-in.
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO check_in_findings (user_id, check_in_id, kind, severity, key,"
+                " payload) VALUES (:u, :c, 'overdue_deadline', 'alert',"
+                " 'overdue_deadline:goal_contribution:2026-11-15', CAST(:payload AS jsonb))"
+            ),
+            {
+                "u": user,
+                "c": _uid("d3"),
+                "payload": json.dumps(
+                    {
+                        **_date("e:a", "goal_contribution", "2026-11-15"),
+                        "kind": "overdue_deadline",
+                        "days_until": -1,
+                    }
+                ),
+            },
+        )
+        connection.execute(
+            text("UPDATE check_ins SET status = 'open', completed_at = NULL WHERE id = :c"),
+            {"c": _uid("d3")},
+        )
+
+    downgrade(url, "0021_paycheck_change")
+
+    [one_back] = _findings_of(engine, "d1")
+    assert one_back["key"] == f"upcoming_deadline:{_uid('e:w4')}"
+    assert [row["kind"] for row in _findings_of(engine, "d3")] == ["upcoming_deadline"] * 2
+    # Rule 13 again: every finding left on it is handled, the newest at 9:02.
+    status, completed_at = _status_of(engine, "d3")
+    assert status == "completed"
+    assert completed_at.minute == 2
+    upgrade(url, "head")
+
+
+def test_0025_clears_roles_the_kind_does_not_allow(scratch_database: tuple[str, Engine]) -> None:
+    """Spec 002 rule 31a (issue 241): a role set before 0025 that its account's
     kind does not allow is cleared; every allowed role stays."""
     url, engine = scratch_database
-    upgrade(url, "0022_document_review_draft")
+    upgrade(url, "0024_document_review_draft")
     user = "00000000-0000-4000-8000-0000000000c4"
     rows = [
         ("Checking", "checking", "spending"),
@@ -780,7 +922,7 @@ def test_0023_clears_roles_the_kind_does_not_allow(scratch_database: tuple[str, 
                 {"u": user, "i": item, "name": name, "kind": kind, "role": role},
             )
 
-    upgrade(url, "0023_account_role_fits_kind")
+    upgrade(url, "0025_account_role_fits_kind")
     with engine.connect() as connection:
         roles: dict[str, str | None] = dict(
             connection.execute(text("SELECT name, role::text FROM accounts")).all()

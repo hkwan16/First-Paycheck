@@ -14,8 +14,8 @@ No new table or function: ``documents`` keeps the owner policy and grants of
 downgrade drops the column; a review in progress then starts again from the
 proposal, as it did before this revision.
 
-Revision ID: 0022_document_review_draft
-Revises: 0021_paycheck_change
+Revision ID: 0024_document_review_draft
+Revises: 0023_salary_pay_stub
 Create Date: 2026-11-09
 """
 
@@ -25,8 +25,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0022_document_review_draft"
-down_revision: str | None = "0021_paycheck_change"
+revision: str = "0024_document_review_draft"
+down_revision: str | None = "0023_salary_pay_stub"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

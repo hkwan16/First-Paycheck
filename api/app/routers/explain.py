@@ -16,7 +16,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -65,6 +65,9 @@ class VerificationOut(BaseModel):
     citations_checked: int
     citations_unknown: list[str]
     has_citation: bool
+    # Sentences that said a cost is zero where none may be (rule 14a); rows
+    # written before it have none.
+    zero_cost_claims: list[str] = Field(default_factory=list)
 
 
 class ExplanationOut(BaseModel):

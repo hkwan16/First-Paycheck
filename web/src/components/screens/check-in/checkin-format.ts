@@ -53,6 +53,7 @@ export const KIND_LABELS: Record<FindingKind, string> = {
   recurring_stopped: 'Charge stopped',
   pay_change: 'Paycheck changed',
   upcoming_deadline: 'Coming up',
+  overdue_deadline: 'Overdue',
 };
 
 export interface AffectsView {
@@ -138,7 +139,7 @@ export const handledText = ({
  * premium off the plan means the election is not the one saved.
  */
 const NEEDS_A_LOOK: Record<PlanLine['key'], ReadonlySet<'over' | 'under'>> = {
-  take_home: new Set(['under']),
+  income: new Set(['under']),
   essentials: new Set(['over']),
   flexible: new Set(['over']),
   other: new Set(['over']),
@@ -195,12 +196,14 @@ export const offersCheckInNow = (
 const iso = (date: Date) => date.toISOString().slice(0, 10);
 
 /**
- * The calendar dates a check-in shows: from the first of its month to the
- * last day of the next, so the month's dates and what comes right after.
+ * The calendar dates this month's check-in shows: every open date (spec 015
+ * rule 24) due by the last day of next month. There is no start, so a date
+ * that passed with nothing done, in this month or an earlier one, is listed
+ * as overdue rather than left out (issue 233).
  */
-export function checkInWindow(period: string): { from: string; to: string } {
+export function checkInWindow(period: string): { to: string } {
   const start = parseISODate(period);
   // Day 0 of the month after next is the last day of next month.
   const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 2, 0));
-  return { from: period, to: iso(end) };
+  return { to: iso(end) };
 }

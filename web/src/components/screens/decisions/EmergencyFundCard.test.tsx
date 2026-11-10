@@ -8,8 +8,9 @@ import {
   sampleEmergencyDecision,
   sampleEmergencyFund,
 } from '@/test/fixtures/planning';
+import { SCHEDULE_CHANGED } from '@/test/fixtures/decisions';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
-import { db, decisionsReady } from '@/test/msw/db';
+import { db, decisionsReady, salaryQuestionOpen } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
 import { planningDb, savedEmergencyFund } from '@/test/msw/planning-handlers';
 import { server } from '@/test/msw/server';
@@ -365,6 +366,31 @@ describe('EmergencyFundCard saving', () => {
     await user.click(saveButton());
     expect(await within(card()).findByText(/saved in another tab or window/)).toBeInTheDocument();
     await waitFor(() => expect(saveButton()).toHaveTextContent('Save changes'));
+  });
+});
+
+describe('EmergencyFundCard and what changed since the save (spec 018 rules 5c and 5d)', () => {
+  it('says the pay schedule changed and saves again (issue 222)', async () => {
+    decisionsReady();
+    savedEmergencyFund();
+    db.decisions[0]!.review = [SCHEDULE_CHANGED];
+    const seen = requests();
+    const { user } = await renderReady();
+    expect(within(card()).getByText('Needs review')).toBeInTheDocument();
+    expect(within(card()).getByRole('group', { name: 'What changed' })).toHaveTextContent(
+      SCHEDULE_CHANGED.text,
+    );
+    await user.click(within(card()).getByRole('button', { name: 'Save again' }));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
+    expect(seen.save[0]).toMatchObject({ supersedes_id: EMERGENCY_DECISION_ID });
+  });
+
+  it('reads no salary, so it never asks which one to use', async () => {
+    salaryQuestionOpen();
+    await renderLoaded();
+    expect(
+      within(card()).queryByRole('group', { name: 'Which yearly salary should we use?' }),
+    ).toBeNull();
   });
 });
 

@@ -316,6 +316,8 @@ export const emptyProfile: Profile = {
   pay_frequency: null,
   pay_schedule: null,
   salary_cents: null,
+  salary_pay_stub_id: null,
+  salary_review: null,
   start_date: null,
   updated_at: null,
   vesting_years: null,

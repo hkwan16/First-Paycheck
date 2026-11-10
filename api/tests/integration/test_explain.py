@@ -19,6 +19,7 @@ from app.deps import get_llm_gateway, get_now
 from llm.gateway import REFUSAL_REPLY, Gateway, ScriptedGateway, ScriptStep, reply_with
 from llm.schemas import ExplanationDraft
 from retrieval.context import (
+    FULL_MATCH_EARNED_NOTE,
     NO_STUB_NOTE,
     STUB_DIFFERS_NOTE,
     STUB_SAME_NOTE,
@@ -134,14 +135,14 @@ def test_pass_first_try(
     out = explain(client_as(user_a), decision)
     assert (out["attempt"], out["retries"], out["verified"], out["fallback"]) == (1, 0, True, False)
     assert out["decision_id"] == decision
-    assert out["prompt_version"] == "explain/v4"
+    assert out["prompt_version"] == "explain/v5"
     assert out["verification"]["numbers_unmatched"] == []
     assert out["verification"]["has_citation"] is True
     [citation] = out["citations"]
     assert citation["key"] == script.sent[0]["context"]["citations"][0]["key"]
     assert citation["url"].startswith("https://www.irs.gov/")
     assert citation["passage"]
-    assert rows(db_connection, decision) == [(1, 0, True, False, "explain/v4")]
+    assert rows(db_connection, decision) == [(1, 0, True, False, "explain/v5")]
     # The model saw the decision's facts and no feedback.
     context = script.sent[0]["context"]
     missed = {"label": "Match you miss per year at the rate you chose", "value": "$600.00"}
@@ -158,8 +159,8 @@ def test_fail_then_pass(
     out = explain(client_as(user_a), decision)
     assert (out["attempt"], out["retries"], out["verified"], out["fallback"]) == (2, 1, True, False)
     assert rows(db_connection, decision) == [
-        (1, 0, False, False, "explain/v4"),
-        (2, 1, True, False, "explain/v4"),
+        (1, 0, False, False, "explain/v5"),
+        (2, 1, True, False, "explain/v5"),
     ]
     assert "$123,456.78" in script.sent[1]["feedback"]
 
@@ -170,7 +171,7 @@ def test_fail_twice_falls_back(
     script(BAD, BAD)
     out = explain(client_as(user_a), decision)
     assert (out["attempt"], out["retries"], out["verified"], out["fallback"]) == (3, 1, False, True)
-    assert out["prompt_version"] == "fallback/v4"
+    assert out["prompt_version"] == "fallback/v5"
     # The plain calculator result, cited.
     assert "$1,800.00" in out["text"]
     assert "$600.00" in out["text"]
@@ -182,9 +183,9 @@ def test_fail_twice_falls_back(
         "k401.federal_brackets",
     ]
     assert rows(db_connection, decision) == [
-        (1, 0, False, False, "explain/v4"),
-        (2, 1, False, False, "explain/v4"),
-        (3, 1, False, True, "fallback/v4"),
+        (1, 0, False, False, "explain/v5"),
+        (2, 1, False, False, "explain/v5"),
+        (3, 1, False, True, "fallback/v5"),
     ]
 
 
@@ -220,7 +221,8 @@ def test_context_has_the_pay_stub_rate(
         {"label": "Contribution rate you chose", "value": "5%"},
         {"label": "401(k) contribution rate your latest pay stub shows", "value": "3%"},
     ]
-    assert context["notes"] == [STUB_DIFFERS_NOTE]
+    # 5% is the full-match rate, so there is no cost of reaching it (rule 7c).
+    assert context["notes"] == [STUB_DIFFERS_NOTE, FULL_MATCH_EARNED_NOTE]
     # The fake's draft states the stub's 3%, which the verifier allows.
     assert "your latest pay stub shows: 3%." in out["text"]
 
@@ -248,7 +250,7 @@ def test_the_newest_stub_gives_the_rate(
         "label": "401(k) contribution rate your latest pay stub shows",
         "value": "5%",
     }
-    assert context["notes"] == [STUB_SAME_NOTE]
+    assert context["notes"] == [STUB_SAME_NOTE, FULL_MATCH_EARNED_NOTE]
 
 
 def test_fallback_states_the_pay_stub_rate(
@@ -258,9 +260,103 @@ def test_fallback_states_the_pay_stub_rate(
     decision_id = save(client_as(user_a), ISSUE_132)
     script(REFUSAL_REPLY)
     out = explain(client_as(user_a), decision_id)
-    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v4")
+    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v5")
     assert "Your latest pay stub shows 3% going to your 401(k)" in out["text"]
     assert "already" not in out["text"]
+
+
+# Issue 223 (spec 008 rules 7c and 14a): 6% chosen where 5% earns the full match,
+# 24 paychecks, and the newest stub shows no 401(k) line, 0%.
+ISSUE_223: dict[str, Any] = {
+    **EXAMPLE_1,
+    "salary_cents": 9_500_010,
+    "pay_periods_per_year": 24,
+    "contribution_pct": "6",
+}
+# The sentences the live explanations wrote at 6% and at 5%.
+ABOVE_THE_MATCH_COSTS_NOTHING = (
+    "Going from the full-match rate to 6% would cost no extra per paycheck, before or after"
+    " federal income tax."
+)
+REACHING_THE_MATCH_COSTS_NOTHING = (
+    "Switching from the 5% you chose to the full-match rate costs no extra per paycheck."
+)
+
+
+def zero_cost_draft(sentence: str) -> ScriptStep:
+    return reply_with(
+        ExplanationDraft(
+            concept="Your employer's 401(k) match.",
+            text=f"Your employer matches what you put in. {sentence}",
+            numbers=[],
+            what_ifs=[],
+            citation_keys=["k401.employer_match"],
+        )
+    )
+
+
+def confirm_stub_without_a_401k_line(connection: Connection, user: FixtureUser) -> None:
+    confirm_stub(
+        connection,
+        user,
+        retirement_contribution_cents=0,
+        net_cents=STUB_01["net_cents"] + STUB_01["retirement_contribution_cents"],
+    )
+
+
+@pytest.mark.parametrize(
+    ("chosen", "sentence", "stub_costs"),
+    [
+        ("6", ABOVE_THE_MATCH_COSTS_NOTHING, ("$237.50", "$185.25")),
+        ("5", REACHING_THE_MATCH_COSTS_NOTHING, ("$197.92", "$154.38")),
+    ],
+)
+def test_a_choice_that_costs_nothing_is_not_verified(
+    script: Script,
+    client_as: Client,
+    user_a: FixtureUser,
+    db_connection: Connection,
+    chosen: str,
+    sentence: str,
+    stub_costs: tuple[str, str],
+) -> None:
+    """Issue 223, end to end: the draft that says the choice costs nothing per
+    paycheck is not shown as checked; the retry is told why, and the model is
+    given what the rate chosen costs against the stub's 0%."""
+    confirm_stub_without_a_401k_line(db_connection, user_a)
+    decision_id = save(client_as(user_a), {**ISSUE_223, "contribution_pct": chosen})
+    script(zero_cost_draft(sentence), GOOD)
+    out = explain(client_as(user_a), decision_id)
+    assert rows(db_connection, decision_id) == [
+        (1, 0, False, False, "explain/v5"),
+        (2, 1, True, False, "explain/v5"),
+    ]
+    assert sentence not in out["text"]
+    first = db_connection.execute(
+        text("SELECT verification FROM explanations WHERE decision_id = :d AND attempt = 1"),
+        {"d": decision_id},
+    ).scalar_one()
+    assert first["zero_cost_claims"] == [sentence]
+    assert first["numbers_unmatched"] == []
+    assert sentence in script.sent[1]["feedback"]
+    facts = {fact["label"]: fact["value"] for fact in script.sent[0]["context"]["facts"]}
+    assert "Extra per paycheck before tax at the full-match rate" not in facts
+    assert (
+        facts[
+            "More taken per paycheck before tax at the rate you chose than at the rate your"
+            " latest pay stub shows"
+        ],
+        facts[
+            "Less take-home pay per paycheck after federal income tax at the rate you chose than"
+            " at the rate your latest pay stub shows"
+        ],
+    ) == stub_costs
+    above = facts.get(
+        "More taken per paycheck before tax by the part of the rate you chose above the"
+        " full-match rate"
+    )
+    assert above == ("$39.58" if chosen == "6" else None)
+    assert out["verification"]["zero_cost_claims"] == []
 
 
 def test_gateway_error_falls_back(
@@ -269,7 +365,7 @@ def test_gateway_error_falls_back(
     script(REFUSAL_REPLY)
     out = explain(client_as(user_a), decision)
     assert (out["attempt"], out["retries"], out["fallback"]) == (1, 0, True)
-    assert rows(db_connection, decision) == [(1, 0, False, True, "fallback/v4")]
+    assert rows(db_connection, decision) == [(1, 0, False, True, "fallback/v5")]
     # The refusal is in the ledger.
     statuses = db_connection.execute(
         text("SELECT status::text FROM llm_calls WHERE user_id = :u AND purpose = 'explain'"),
@@ -509,7 +605,7 @@ def test_health_plan_fallback_is_cited(
     decision_id = save_other(client, "health_plans", "/calc/health-plans", inputs)
     script(BAD, BAD)
     out = explain(client, decision_id)
-    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v4")
+    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v5")
     assert [c["key"] for c in out["citations"]] == [
         "health.hdhp_definition",
         "health.hsa_limit",
@@ -568,7 +664,7 @@ def test_w4_decision_is_explained_with_its_citations(
     ]
     facts = {fact["label"]: fact["value"] for fact in context["facts"]}
     assert facts["Projected balance due with these entries"] == "$2,360.08"
-    assert rows(db_connection, decision_id) == [(1, 0, True, False, "explain/v4")]
+    assert rows(db_connection, decision_id) == [(1, 0, True, False, "explain/v5")]
 
 
 def test_w4_fallback_is_cited(script: Script, client_as: Client, user_a: FixtureUser) -> None:
@@ -576,7 +672,7 @@ def test_w4_fallback_is_cited(script: Script, client_as: Client, user_a: Fixture
     decision_id = save_other(client, "w4", "/calc/w4", W4_EXAMPLE_5)
     script(BAD, BAD)
     out = explain(client, decision_id)
-    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v4")
+    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v5")
     assert out["verification"]["numbers_unmatched"] == []
     assert [c["key"] for c in out["citations"]] == [
         "w4.percentage_method",
@@ -649,7 +745,7 @@ def test_w4_context_has_the_pay_stub_withholding(
     assert context["notes"][0] == W4_STUB_DIFFERS_NOTE
     # The fake's draft states the stub's $272.44, which the verifier allows.
     assert "your latest pay stub withholds per paycheck: $272.44." in out["text"]
-    assert rows(db_connection, decision_id) == [(1, 0, True, False, "explain/v4")]
+    assert rows(db_connection, decision_id) == [(1, 0, True, False, "explain/v5")]
 
 
 def test_w4_fallback_states_the_pay_stub_withholding(
@@ -660,7 +756,7 @@ def test_w4_fallback_states_the_pay_stub_withholding(
     decision_id = save_other(client, "w4", "/calc/w4", W4_ISSUE_181)
     script(REFUSAL_REPLY)
     out = explain(client, decision_id)
-    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v4")
+    assert (out["fallback"], out["prompt_version"]) == (True, "fallback/v5")
     assert out["verification"]["numbers_unmatched"] == []
     assert "These Form W-4 entries would withhold $423.16" in out["text"]
     assert "Your latest pay stub withholds $272.44 a paycheck now." in out["text"]

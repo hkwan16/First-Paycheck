@@ -10,6 +10,8 @@ interface Screen {
   heading: string | RegExp;
   /** Rendered from src/test/fixtures/sample.ts: freeze the clock, keep Plaid off the network. */
   sample?: boolean;
+  /** The page's own HTTP status, when it is not 200 (the not-found page's 404). */
+  status?: number;
 }
 
 const SCREENS: readonly Screen[] = [
@@ -20,6 +22,8 @@ const SCREENS: readonly Screen[] = [
     heading: /Your first month's money decisions/,
   },
   { path: '/dev/kit', name: 'kit', heading: 'Component kit' },
+  // Any address with no page (issue 237); signed out here, so the header has no account.
+  { path: '/no-such-page', name: 'not-found', heading: 'Page not found', status: 404 },
   {
     path: '/dev/screens/link',
     name: 'link',
@@ -134,6 +138,12 @@ const SCREENS: readonly Screen[] = [
     heading: 'Why contribute 4% to your 401(k)',
     sample: true,
   },
+  {
+    path: '/dev/screens/why/replaced',
+    name: 'why-replaced',
+    heading: 'Why contribute 4% to your 401(k)',
+    sample: true,
+  },
   { path: '/dev/screens/why-index', name: 'why-index', heading: 'Why each decision', sample: true },
   {
     path: '/dev/screens/check-in',
@@ -163,16 +173,22 @@ const SCREENS: readonly Screen[] = [
 ];
 
 /** Collect console errors and uncaught exceptions for the life of the page. */
-function watchErrors(page: Page) {
+function watchErrors(page: Page, screen?: Screen) {
   const errors: string[] = [];
   page.on('console', (message) => {
-    if (message.type() === 'error') errors.push(message.text());
+    if (message.type() !== 'error') return;
+    // Chromium logs a page's own non-200 status as a failed resource; that status is the point.
+    const ownStatus =
+      screen?.status !== undefined &&
+      new URL(message.location().url).pathname === screen.path &&
+      message.text().includes(`status of ${screen.status}`);
+    if (!ownStatus) errors.push(message.text());
   });
   page.on('pageerror', (error) => errors.push(error.message));
   return errors;
 }
 
-async function open(page: Page, { path, heading, sample }: Screen) {
+async function open(page: Page, { path, heading, sample, status = 200 }: Screen) {
   if (sample) {
     await page.clock.setFixedTime(SAMPLE_NOW);
     // Plaid Link's script loads on mount unless Plaid is already on the page
@@ -184,7 +200,8 @@ async function open(page: Page, { path, heading, sample }: Screen) {
       Object.assign(window, { Plaid: { create: () => undefined } });
     });
   }
-  await page.goto(path);
+  const response = await page.goto(path);
+  expect(response?.status(), `${path} answers ${status}`).toBe(status);
   // Interacting or screenshotting before hydration races React (Playwright's
   // caret hiding, for one, would cause a hydration mismatch).
   await page.locator('html[data-hydrated="true"]').waitFor();
@@ -233,7 +250,7 @@ async function settled(locator: Locator) {
 for (const screen of SCREENS) {
   test.describe(screen.path, () => {
     test('renders cleanly with no axe violations', async ({ page }) => {
-      const errors = watchErrors(page);
+      const errors = watchErrors(page, screen);
       await open(page, screen);
       expect(await blockingViolations(page)).toEqual([]);
       expect(errors).toEqual([]);
@@ -292,6 +309,7 @@ test.describe('the Why page (issue 204)', () => {
     '/dev/screens/why/stale',
     '/dev/screens/why/fallback',
     '/dev/screens/why/emergency-fund',
+    '/dev/screens/why/replaced',
     '/dev/screens/why-index',
   ]) {
     test(`${path} names none of the app's internals`, async ({ page }) => {
@@ -306,6 +324,27 @@ test.describe('the Why page (issue 204)', () => {
     await expect(note).toContainText('has changed since');
     await expect(note.getByRole('button', { name: 'Write it again' })).toBeVisible();
     await expect(page.getByText('Out of date', { exact: true })).toHaveCount(0);
+  });
+
+  test('a replaced decision says so and links to the current one (issue 227)', async ({ page }) => {
+    await open(page, screenAt('/dev/screens/why/replaced'));
+    const note = page.getByRole('region', { name: 'About this decision' });
+    await expect(note).toContainText('You saved a newer version of this decision on');
+    await expect(note.getByRole('link', { name: 'See the current decision' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'About this explanation' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Change this decision' })).toHaveCount(0);
+  });
+
+  test('the index says the state of each explanation (issue 227)', async ({ page }) => {
+    await open(page, screenAt('/dev/screens/why-index'));
+    const list = page.getByRole('list', { name: 'Saved decisions' });
+    for (const state of [
+      'Explanation up to date',
+      'Explanation out of date',
+      'Explanation could not be written',
+    ]) {
+      await expect(list.getByText(state, { exact: true })).toBeVisible();
+    }
   });
 
   test('the side nav calls it what the page does', async ({ page }) => {
@@ -332,16 +371,16 @@ test('the plan and the sign-in page name none of the app internals (issue 209)',
 test('the account menu sets deleting apart from signing out (issue 205)', async ({ page }) => {
   await open(page, screenAt('/dev/screens/account'));
   await page.getByRole('button', { name: 'J. Rivera' }).click();
-  const signOut = page.getByRole('button', { name: 'Sign out' });
-  const remove = page.getByRole('button', { name: 'Delete account' });
-  await expect(page.getByRole('separator')).toBeVisible();
+  const signOut = page.getByRole('menuitem', { name: 'Sign out' });
+  const remove = page.getByRole('menuitem', { name: 'Delete account' });
+  await expect(page.getByRole('menu').getByRole('separator')).toBeVisible();
   const color = (locator: Locator) =>
     locator.evaluate((element) => getComputedStyle(element).color);
   const removeColor = await color(remove);
   expect(removeColor).not.toBe(await color(signOut));
 
   await remove.click();
-  const confirm = page.getByRole('group', { name: 'Delete your account?' });
+  const confirm = page.getByRole('dialog', { name: 'Delete your account?' });
   await confirm.getByRole('textbox', { name: 'Type delete to confirm' }).fill('delete');
   // The final step is drawn as the destructive action, the way the menu drew it.
   expect(await color(confirm.getByRole('button', { name: 'Delete my account' }))).toBe(removeColor);
@@ -526,7 +565,37 @@ test('unlinking asks in the page, keeps focus on the safe choice, and stays acce
   expect(errors).toEqual([]);
 });
 
-test('deleting the account asks for the word in the page and stays accessible', async ({
+test('the account menu is a menu the keyboard drives (issue 242)', async ({ page }) => {
+  const errors = watchErrors(page);
+  await open(page, screenAt('/dev/screens/account'));
+  const chip = page.getByRole('button', { name: 'J. Rivera' });
+  await expect(chip).toHaveAttribute('aria-haspopup', 'menu');
+  await chip.focus();
+  await page.keyboard.press('ArrowDown');
+  const menu = page.getByRole('menu', { name: 'J. Rivera' });
+  await expect(menu.getByRole('menuitem', { name: 'Sign out' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Delete account' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Sign out' })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(menu.getByRole('menuitem', { name: 'Delete account' })).toBeFocused();
+  expect(await blockingViolations(page)).toEqual([]);
+
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(chip).toBeFocused();
+  await expect(chip).toHaveAttribute('aria-expanded', 'false');
+
+  // Tab leaves the menu and closes it, so it never stays open behind the focus.
+  await page.keyboard.press('Enter');
+  await expect(menu.getByRole('menuitem', { name: 'Sign out' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(menu).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('deleting the account asks in a modal dialog that holds the focus (issue 242)', async ({
   page,
 }) => {
   const errors = watchErrors(page);
@@ -534,14 +603,12 @@ test('deleting the account asks for the word in the page and stays accessible', 
   await open(page, screenAt('/dev/screens/account'));
   const chip = page.getByRole('button', { name: 'J. Rivera' });
   await chip.focus();
-  await page.keyboard.press('Enter');
-  await page.keyboard.press('Tab');
-  await page.keyboard.press('Tab');
-  const remove = page.getByRole('button', { name: 'Delete account' });
-  await expect(remove).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('menuitem', { name: 'Delete account' })).toBeFocused();
   await page.keyboard.press('Enter');
 
-  const confirm = page.getByRole('group', { name: 'Delete your account?' });
+  const confirm = page.getByRole('dialog', { name: 'Delete your account?' });
+  await expect(page.getByRole('menu')).toHaveCount(0);
   const field = confirm.getByRole('textbox', { name: 'Type delete to confirm' });
   await expect(field).toBeFocused();
   const button = confirm.getByRole('button', { name: 'Delete my account' });
@@ -551,9 +618,26 @@ test('deleting the account asks for the word in the page and stays accessible', 
   expect(await blockingViolations(page)).toEqual([]);
   await expect(confirm).toHaveScreenshot('account-delete-confirm.png');
 
-  await confirm.getByRole('button', { name: 'Keep my account' }).click();
-  await expect(remove).toBeFocused();
+  // The page behind is inert: Tab only cycles the dialog's own controls.
+  const keep = confirm.getByRole('button', { name: 'Keep my account' });
+  for (let step = 0; step < 6; step += 1) {
+    await page.keyboard.press('Tab');
+    const inside = await confirm.evaluate((dialog) => dialog.contains(document.activeElement));
+    const atBrowser = await page.evaluate(() => document.activeElement === document.body);
+    expect(inside || atBrowser, `Tab ${step + 1} stays in the dialog`).toBe(true);
+  }
+
+  await keep.focus();
+  await page.keyboard.press('Enter');
+  await expect(confirm).toBeHidden();
+  await expect(chip).toBeFocused();
+
+  // Escape closes it too, and starts over next time.
+  await chip.press('ArrowUp');
+  await page.keyboard.press('Enter');
+  await expect(field).toHaveValue('');
   await page.keyboard.press('Escape');
+  await expect(confirm).toBeHidden();
   await expect(chip).toBeFocused();
   await expect(chip).toHaveAttribute('aria-expanded', 'false');
   expect(errors).toEqual([]);

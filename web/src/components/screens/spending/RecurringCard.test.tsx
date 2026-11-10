@@ -4,7 +4,7 @@ import { sampleRecurring } from '@/test/fixtures/cashflow';
 import { apiUrl } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { spendingDb } from '@/test/msw/spending-handlers';
-import { renderWithProviders, screen, waitFor, within } from '@/test/render';
+import { renderWithProviders, screen, within } from '@/test/render';
 import { RecurringCard } from './RecurringCard';
 
 const card = () => screen.getByRole('region', { name: 'Recurring charges' });
@@ -23,6 +23,24 @@ function patches() {
     if (request.method === 'PATCH') bodies.push(await request.clone().json());
   });
   return bodies;
+}
+
+/**
+ * Resolves once the stand-in API has answered `count` requests of `method`
+ * to `/recurring...` from now on. Awaiting the answer itself, instead of
+ * polling for its effect inside `waitFor`'s one second, keeps a test right on
+ * a loaded machine, where the click, the optimistic update and the request
+ * can take longer than that.
+ */
+function answered(method: 'GET' | 'PATCH', count = 1) {
+  let seen = 0;
+  const done = Promise.withResolvers<void>();
+  server.events.on('response:mocked', ({ request }) => {
+    if (request.method !== method || !new URL(request.url).pathname.includes('/recurring')) return;
+    seen += 1;
+    if (seen === count) done.resolve();
+  });
+  return done.promise;
 }
 
 /** Answer PATCHes slowly, so the optimistic state can be seen first. */
@@ -58,34 +76,71 @@ describe('RecurringCard', () => {
     expect(within(card()).getByText('5 found')).toBeInTheDocument();
   });
 
+  it('names each control after the charge it acts on (issue 242)', async () => {
+    const { user } = await renderCard();
+    const names = within(card())
+      .getAllByRole('button')
+      .map((button) => button.getAttribute('aria-label') ?? button.textContent);
+    expect(new Set(names).size).toBe(names.length);
+    expect(
+      within(row('Spotify')).getByRole('button', { name: 'Not recurring: Spotify' }),
+    ).toHaveTextContent('Not recurring');
+    expect(
+      within(row('Spotify')).getByRole('button', { name: 'Rename Spotify' }),
+    ).toHaveTextContent('Rename');
+    await user.click(
+      within(row('Spotify')).getByRole('button', { name: 'Not recurring: Spotify' }),
+    );
+    expect(
+      within(row('Spotify')).getByRole('button', { name: 'Undo not recurring for Spotify' }),
+    ).toHaveTextContent('Undo');
+  });
+
   it('marks a charge not recurring at once, then offers to undo it', async () => {
     slowPatches();
     const sent = patches();
     const { user } = await renderCard();
-    await user.click(within(row('Spotify')).getByRole('button', { name: 'Not recurring' }));
+    const first = answered('PATCH');
+    await user.click(
+      within(row('Spotify')).getByRole('button', { name: 'Not recurring: Spotify' }),
+    );
 
     expect(within(row('Spotify')).getByText('Not recurring')).toBeInTheDocument();
-    const undo = within(row('Spotify')).getByRole('button', { name: 'Undo' });
-    await waitFor(() => expect(sent).toEqual([{ user_status: 'ignored' }]));
+    const undo = within(row('Spotify')).getByRole('button', {
+      name: 'Undo not recurring for Spotify',
+    });
+    await first;
+    expect(sent).toEqual([{ user_status: 'ignored' }]);
 
+    const second = answered('PATCH');
     await user.click(undo);
-    await waitFor(() => expect(sent).toEqual([{ user_status: 'ignored' }, { user_status: null }]));
+    await second;
+    expect(sent).toEqual([{ user_status: 'ignored' }, { user_status: null }]);
     expect(
-      await within(row('Spotify')).findByRole('button', { name: 'Not recurring' }),
+      await within(row('Spotify')).findByRole('button', { name: 'Not recurring: Spotify' }),
     ).toBeInTheDocument();
   });
 
   it('says only what the person decided once they mark a charge, and the detector again on Undo', async () => {
     // Issue 182: Spotify kept "Active" beside "Not recurring".
     const { user } = await renderCard();
-    await user.click(within(row('Spotify')).getByRole('button', { name: 'Not recurring' }));
+    const stored = answered('PATCH');
+    const reread = answered('GET');
+    await user.click(
+      within(row('Spotify')).getByRole('button', { name: 'Not recurring: Spotify' }),
+    );
 
     expect(within(row('Spotify')).getByText('Not recurring')).toBeInTheDocument();
     expect(within(row('Spotify')).queryByText('Active')).not.toBeInTheDocument();
-    await waitFor(() => expect(spendingDb.recurring[3]!.user_status).toBe('ignored'));
+    // Still so once the server has stored it and the list has been read again.
+    await stored;
+    expect(spendingDb.recurring[3]!.user_status).toBe('ignored');
+    await reread;
     expect(within(row('Spotify')).queryByText('Active')).not.toBeInTheDocument();
 
-    await user.click(within(row('Spotify')).getByRole('button', { name: 'Undo' }));
+    await user.click(
+      within(row('Spotify')).getByRole('button', { name: 'Undo not recurring for Spotify' }),
+    );
     expect(await within(row('Spotify')).findByText('Active')).toBeInTheDocument();
     // The only "Not recurring" left is the button that marks it again.
     expect(within(row('Spotify')).getByText('Not recurring').closest('button')).not.toBeNull();
@@ -95,7 +150,8 @@ describe('RecurringCard', () => {
     slowPatches();
     const sent = patches();
     const { user } = await renderCard();
-    await user.click(within(row('Spotify')).getByRole('button', { name: 'Rename' }));
+    const renamed = answered('PATCH');
+    await user.click(within(row('Spotify')).getByRole('button', { name: 'Rename Spotify' }));
     const input = within(card()).getByRole('textbox', { name: 'New name for Spotify' });
     expect(input).toHaveValue('Spotify');
     expect(input).toHaveFocus();
@@ -103,14 +159,17 @@ describe('RecurringCard', () => {
     await user.type(input, ' Spotify Family {Enter}');
 
     expect(row('Spotify Family')).toBeInTheDocument();
-    await waitFor(() => expect(sent).toEqual([{ merchant_clean: 'Spotify Family' }]));
-    expect(within(row('Spotify Family')).getByRole('button', { name: 'Rename' })).toHaveFocus();
+    await renamed;
+    expect(sent).toEqual([{ merchant_clean: 'Spotify Family' }]);
+    expect(
+      within(row('Spotify Family')).getByRole('button', { name: 'Rename Spotify Family' }),
+    ).toHaveFocus();
   });
 
   it('refuses an empty name without asking the server', async () => {
     const sent = patches();
     const { user } = await renderCard();
-    await user.click(within(row('Hulu')).getByRole('button', { name: 'Rename' }));
+    await user.click(within(row('Hulu')).getByRole('button', { name: 'Rename Hulu' }));
     const input = within(card()).getByRole('textbox', { name: 'New name for Hulu' });
     await user.clear(input);
     await user.click(within(card()).getByRole('button', { name: 'Save' }));
@@ -121,14 +180,14 @@ describe('RecurringCard', () => {
 
   it('cancels a rename with Escape, keeping the old name', async () => {
     const { user } = await renderCard();
-    await user.click(within(row('Hulu')).getByRole('button', { name: 'Rename' }));
+    await user.click(within(row('Hulu')).getByRole('button', { name: 'Rename Hulu' }));
     await user.type(
       within(card()).getByRole('textbox', { name: 'New name for Hulu' }),
       'x{Escape}',
     );
     expect(within(card()).queryByRole('textbox')).not.toBeInTheDocument();
     expect(row('Hulu')).toBeInTheDocument();
-    expect(within(row('Hulu')).getByRole('button', { name: 'Rename' })).toHaveFocus();
+    expect(within(row('Hulu')).getByRole('button', { name: 'Rename Hulu' })).toHaveFocus();
   });
 
   it('puts the charge back and says so when the server refuses', async () => {
@@ -143,7 +202,9 @@ describe('RecurringCard', () => {
     );
     const { user } = await renderCard();
     await user.click(
-      within(row('Verizon Wireless')).getByRole('button', { name: 'Not recurring' }),
+      within(row('Verizon Wireless')).getByRole('button', {
+        name: 'Not recurring: Verizon Wireless',
+      }),
     );
     expect(within(row('Verizon Wireless')).getByText('Not recurring')).toBeInTheDocument();
 
@@ -152,7 +213,9 @@ describe('RecurringCard', () => {
       'Could not save Verizon Wireless. It is back to how it was. Recurring charge not found',
     );
     expect(
-      within(row('Verizon Wireless')).getByRole('button', { name: 'Not recurring' }),
+      within(row('Verizon Wireless')).getByRole('button', {
+        name: 'Not recurring: Verizon Wireless',
+      }),
     ).toBeInTheDocument();
   });
 
@@ -185,6 +248,8 @@ describe('RecurringCard', () => {
     await renderCard();
     expect(within(row('Hulu')).getByText('Not recurring')).toBeInTheDocument();
     expect(within(row('Hulu')).queryByText('Stopped')).not.toBeInTheDocument();
-    expect(within(row('Hulu')).getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+    expect(
+      within(row('Hulu')).getByRole('button', { name: 'Undo not recurring for Hulu' }),
+    ).toBeInTheDocument();
   });
 });

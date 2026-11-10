@@ -55,6 +55,7 @@ function decision(overrides: Partial<Decision> = {}): Decision {
     result,
     created_at: '2026-10-20T19:12:00Z',
     is_current: true,
+    review: [],
     ...overrides,
   };
 }
@@ -101,6 +102,22 @@ describe('decisionSaveState (spec 018 rules 5a and 5b)', () => {
   it('cannot be saved before there are inputs to save', () => {
     expect(decisionSaveState(decision(), null).status).toBe('dirty');
     expect(decisionSaveState(undefined, null).status).toBe('unsaved');
+  });
+
+  it('a decision that needs review, whatever is on screen (spec 018 rule 5c)', () => {
+    const review = [
+      {
+        kind: 'changed' as const,
+        input: 'pay_periods_per_year' as const,
+        text: 'Your pay schedule changed from 26 to 24 paychecks a year.',
+      },
+    ];
+    const needsReview = { status: 'review', action: 'Save again', label: 'Needs review' };
+    expect(decisionSaveState(decision({ review }), inputs)).toEqual(needsReview);
+    expect(
+      decisionSaveState(decision({ review }), { ...inputs, pay_periods_per_year: 24 }),
+    ).toEqual(needsReview);
+    expect(decisionSaveState(decision({ review }), null)).toEqual(needsReview);
   });
 
   it('ignores what describes, not decides: on either side and absent or not', () => {

@@ -1,4 +1,3 @@
-import { AuthRetryableFetchError } from '@supabase/supabase-js';
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/test/msw/db';
@@ -30,14 +29,16 @@ const blockButton = (variant: 'default' | 'destructive') =>
 const LABEL = 'alex@example.com';
 
 function setup() {
-  const { user } = renderWithProviders(
+  const rendered = renderWithProviders(
     <>
       <UserMenu label={LABEL} />
       <p>Elsewhere on the page</p>
     </>,
   );
-  return { user, trigger: screen.getByRole('button', { name: LABEL }) };
+  return { ...rendered, trigger: screen.getByRole('button', { name: LABEL }) };
 }
+
+const item = (name: string) => screen.getByRole('menuitem', { name });
 
 beforeEach(() => {
   mocks.auth.signOut.mockResolvedValue({ error: null });
@@ -51,98 +52,145 @@ afterEach(() => {
   server.events.removeAllListeners();
 });
 
-describe('UserMenu', () => {
-  it('is a chip-styled disclosure button, closed at first', () => {
+describe('UserMenu, the account menu (issue 242)', () => {
+  it('is a chip-styled menu button, closed at first', () => {
     const { trigger } = setup();
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(trigger).toHaveClass('rounded-full', 'bg-fill', 'text-tiny');
-    expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 
-  it('opens a panel with the sign-out action', async () => {
+  it('opens a menu named for the account and focuses its first item', async () => {
     const { user, trigger } = setup();
     await user.click(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    const panel = document.getElementById(trigger.getAttribute('aria-controls') ?? '');
-    expect(panel).toContainElement(screen.getByRole('button', { name: 'Sign out' }));
+    const menu = screen.getByRole('menu', { name: LABEL });
+    expect(trigger).toHaveAttribute('aria-controls', menu.id);
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((element) => element.textContent),
+    ).toEqual(['Sign out', 'Delete account']);
+    expect(item('Sign out')).toHaveFocus();
   });
 
   it('sets deleting the account apart from signing out (issue 205)', async () => {
     const { user, trigger } = setup();
     await user.click(trigger);
-    const signOut = screen.getByRole('button', { name: 'Sign out' });
-    const remove = screen.getByRole('button', { name: 'Delete account' });
-    const separator = screen.getByRole('separator');
+    const separator = within(screen.getByRole('menu')).getByRole('separator');
     // Sign out, then a rule, then the destructive action.
-    expect(signOut.compareDocumentPosition(separator)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(separator.compareDocumentPosition(remove)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(remove.className).toBe(blockButton('destructive'));
-    expect(signOut.className).toBe(blockButton('default'));
+    expect(item('Sign out').compareDocumentPosition(separator)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(separator.compareDocumentPosition(item('Delete account'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(item('Delete account').className).toBe(blockButton('destructive'));
+    expect(item('Sign out').className).toBe(blockButton('default'));
+  });
+
+  it('moves between items with the arrow keys, Home and End, and wraps', async () => {
+    const { user, trigger } = setup();
+    await user.click(trigger);
+    await user.keyboard('{ArrowDown}');
+    expect(item('Delete account')).toHaveFocus();
+    await user.keyboard('{ArrowDown}');
+    expect(item('Sign out')).toHaveFocus();
+    await user.keyboard('{ArrowUp}');
+    expect(item('Delete account')).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(item('Sign out')).toHaveFocus();
+    await user.keyboard('{End}');
+    expect(item('Delete account')).toHaveFocus();
+  });
+
+  it('keeps the items out of the Tab order, so the menu is one stop', async () => {
+    const { user, trigger } = setup();
+    await user.click(trigger);
+    for (const element of screen.getAllByRole('menuitem')) {
+      expect(element).toHaveAttribute('tabindex', '-1');
+    }
+  });
+
+  it('opens from the keyboard: Enter or ArrowDown at the first item, ArrowUp at the last', async () => {
+    const { user, trigger } = setup();
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    expect(item('Sign out')).toHaveFocus();
+    await user.keyboard('{Escape}');
+
+    await user.keyboard('{ArrowDown}');
+    expect(item('Sign out')).toHaveFocus();
+    await user.keyboard('{Escape}');
+
+    await user.keyboard('{ArrowUp}');
+    expect(item('Delete account')).toHaveFocus();
   });
 
   it('closes on Escape and returns focus to the chip', async () => {
     const { user, trigger } = setup();
     await user.click(trigger);
-    await user.tab();
-    expect(screen.getByRole('button', { name: 'Sign out' })).toHaveFocus();
     await user.keyboard('{Escape}');
-    expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();
+    expect(screen.queryByRole('menu')).toBeNull();
     expect(trigger).toHaveFocus();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('closes when Tab moves focus on', async () => {
+    const { user, trigger } = setup();
+    await user.click(trigger);
+    await user.tab();
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('closes when the person clicks elsewhere', async () => {
     const { user, trigger } = setup();
     await user.click(trigger);
     await user.click(screen.getByText('Elsewhere on the page'));
-    expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();
+    expect(screen.queryByRole('menu')).toBeNull();
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('signs out of this browser only, then goes to sign in', async () => {
-    let finish!: (value: { error: null }) => void;
-    mocks.auth.signOut.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
-    const { user, trigger } = setup();
-    await user.click(trigger);
-    await user.click(screen.getByRole('button', { name: 'Sign out' }));
-
-    expect(mocks.auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: 'local' });
-    expect(screen.getByRole('button', { name: 'Sign out' })).toHaveAttribute('aria-busy', 'true');
-    finish({ error: null });
-    await waitFor(() => expect(mocks.hardNavigate).toHaveBeenCalledExactlyOnceWith('/sign-in'));
-  });
-
-  it('keeps the person signed in and says why when sign-out fails', async () => {
-    mocks.auth.signOut.mockResolvedValueOnce({
-      error: new AuthRetryableFetchError('Failed to fetch', 0),
-    });
-    const { user, trigger } = setup();
-    await user.click(trigger);
-    await user.click(screen.getByRole('button', { name: 'Sign out' }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'We could not sign you out. Check your connection and try again.',
-    );
-    expect(screen.getByRole('button', { name: 'Sign out' })).not.toHaveAttribute('aria-busy');
-    expect(mocks.hardNavigate).not.toHaveBeenCalled();
-  });
-
-  it('goes straight to sign in when Supabase is not configured', async () => {
-    mocks.getSupabaseBrowserClient.mockReturnValueOnce(null);
-    const { user, trigger } = setup();
-    await user.click(trigger);
-    await user.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(mocks.hardNavigate).toHaveBeenCalledWith('/sign-in');
   });
 });
 
-describe('UserMenu, deleting the account', () => {
-  /** Opens the menu and the in-page confirmation. */
+describe('UserMenu, signing out (issue 224)', () => {
+  it('posts to the sign-out route, a full navigation, and drops every cached read first', async () => {
+    const { user, trigger, queryClient } = setup();
+    queryClient.setQueryData(['get', '/accounts'], { items: [{ id: 'chase' }] });
+    await user.click(trigger);
+    const signOut = item('Sign out') as HTMLButtonElement;
+    expect(signOut).toHaveAttribute('type', 'submit');
+    const form = signOut.form!;
+    expect(form.method).toBe('post');
+    expect(new URL(form.action).pathname).toBe('/auth/sign-out');
+
+    // jsdom cannot navigate; the browser would leave the page on this submit.
+    let submitted = 0;
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      submitted += 1;
+    });
+    await user.click(signOut);
+
+    expect(submitted).toBe(1);
+    expect(queryClient.getQueryCache().getAll()).toEqual([]);
+    // Busy while the page unloads; a second click sends nothing more.
+    expect(signOut).toHaveAttribute('aria-busy', 'true');
+    await user.click(signOut);
+    expect(submitted).toBe(1);
+    expect(mocks.auth.signOut).not.toHaveBeenCalled();
+  });
+});
+
+describe('UserMenu, deleting the account (issue 242)', () => {
+  /** Opens the menu and the confirmation dialog. */
   async function confirmation() {
     const context = setup();
     await context.user.click(context.trigger);
-    await context.user.click(screen.getByRole('button', { name: 'Delete account' }));
-    const group = screen.getByRole('group', { name: 'Delete your account?' });
-    return { ...context, group };
+    await context.user.click(item('Delete account'));
+    const dialog = screen.getByRole('dialog', { name: 'Delete your account?' });
+    return { ...context, dialog };
   }
 
   function deletes() {
@@ -153,22 +201,25 @@ describe('UserMenu, deleting the account', () => {
     return paths;
   }
 
-  it('asks in the page, says what goes, and focuses the confirmation field', async () => {
+  it('asks in a modal dialog that says what goes, closing the menu and focusing the field', async () => {
     const confirm = vi.spyOn(window, 'confirm');
-    const { group } = await confirmation();
-    expect(group).toHaveTextContent(
+    const { dialog } = await confirmation();
+    expect(dialog.tagName).toBe('DIALOG');
+    expect(dialog).toHaveAttribute('open');
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(dialog).toHaveTextContent(
       'This deletes your account and everything in it: linked banks, transactions, documents, decisions, goals and check-ins. It cannot be undone.',
     );
-    expect(within(group).getByRole('textbox', { name: 'Type delete to confirm' })).toHaveFocus();
-    expect(within(group).getByRole('button', { name: 'Delete my account' })).toBeDisabled();
+    expect(within(dialog).getByRole('textbox', { name: 'Type delete to confirm' })).toHaveFocus();
+    expect(within(dialog).getByRole('button', { name: 'Delete my account' })).toBeDisabled();
     expect(confirm).not.toHaveBeenCalled();
   });
 
   it('deletes only once the word delete is typed, then signs out and says so on sign in', async () => {
     const paths = deletes();
-    const { user, group } = await confirmation();
-    const field = within(group).getByRole('textbox', { name: 'Type delete to confirm' });
-    const button = within(group).getByRole('button', { name: 'Delete my account' });
+    const { user, dialog } = await confirmation();
+    const field = within(dialog).getByRole('textbox', { name: 'Type delete to confirm' });
+    const button = within(dialog).getByRole('button', { name: 'Delete my account' });
 
     await user.type(field, 'delet');
     expect(button).toBeDisabled();
@@ -184,15 +235,17 @@ describe('UserMenu, deleting the account', () => {
     expect(paths).toEqual(['/me']);
     expect(db.accounts).toEqual([]);
     expect(mocks.auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: 'local' });
-    // Busy while the page unloads.
+    // Busy while the page unloads, and Escape cannot close it under the request.
     expect(button).toHaveAttribute('aria-busy', 'true');
+    await user.keyboard('{Escape}');
+    expect(dialog).toHaveAttribute('open');
   });
 
   it('accepts the word typed with capitals or spaces, and submits with Enter', async () => {
     const paths = deletes();
-    const { user, group } = await confirmation();
+    const { user, dialog } = await confirmation();
     await user.type(
-      within(group).getByRole('textbox', { name: 'Type delete to confirm' }),
+      within(dialog).getByRole('textbox', { name: 'Type delete to confirm' }),
       '  DELETE {Enter}',
     );
     await waitFor(() => expect(paths).toEqual(['/me']));
@@ -200,20 +253,29 @@ describe('UserMenu, deleting the account', () => {
 
   it('does nothing on Enter before the word is typed', async () => {
     const paths = deletes();
-    const { user, group } = await confirmation();
+    const { user, dialog } = await confirmation();
     await user.type(
-      within(group).getByRole('textbox', { name: 'Type delete to confirm' }),
+      within(dialog).getByRole('textbox', { name: 'Type delete to confirm' }),
       'remove{Enter}',
     );
     expect(paths).toEqual([]);
   });
 
-  it('keeps the account on Keep my account and returns focus to Delete account', async () => {
+  it('keeps the account on Keep my account and gives focus back to the chip', async () => {
     const paths = deletes();
-    const { user, group } = await confirmation();
-    await user.click(within(group).getByRole('button', { name: 'Keep my account' }));
-    expect(screen.queryByRole('group', { name: 'Delete your account?' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Delete account' })).toHaveFocus();
+    const { user, dialog, trigger } = await confirmation();
+    await user.click(within(dialog).getByRole('button', { name: 'Keep my account' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(trigger).toHaveFocus();
+    expect(paths).toEqual([]);
+  });
+
+  it('closes on Escape, keeps the account and gives focus back to the chip', async () => {
+    const paths = deletes();
+    const { user, trigger } = await confirmation();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(trigger).toHaveFocus();
     expect(paths).toEqual([]);
   });
 
@@ -226,29 +288,28 @@ describe('UserMenu, deleting the account', () => {
         ),
       ),
     );
-    const { user, group } = await confirmation();
+    const { user, dialog } = await confirmation();
     await user.type(
-      within(group).getByRole('textbox', { name: 'Type delete to confirm' }),
+      within(dialog).getByRole('textbox', { name: 'Type delete to confirm' }),
       'delete',
     );
-    await user.click(within(group).getByRole('button', { name: 'Delete my account' }));
-    expect(await within(group).findByRole('alert')).toHaveTextContent(
+    await user.click(within(dialog).getByRole('button', { name: 'Delete my account' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       'Your account was not deleted. Database is busy',
     );
     expect(mocks.auth.signOut).not.toHaveBeenCalled();
     expect(mocks.hardNavigate).not.toHaveBeenCalled();
   });
 
-  it('starts over when the menu is closed and opened again', async () => {
-    const { user, trigger, group } = await confirmation();
+  it('starts over when it is closed and opened again', async () => {
+    const { user, trigger, dialog } = await confirmation();
     await user.type(
-      within(group).getByRole('textbox', { name: 'Type delete to confirm' }),
+      within(dialog).getByRole('textbox', { name: 'Type delete to confirm' }),
       'delete',
     );
     await user.keyboard('{Escape}');
-    expect(trigger).toHaveFocus();
     await user.click(trigger);
-    expect(screen.queryByRole('group', { name: 'Delete your account?' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Delete account' })).toBeInTheDocument();
+    await user.click(item('Delete account'));
+    expect(screen.getByRole('textbox', { name: 'Type delete to confirm' })).toHaveValue('');
   });
 });

@@ -287,7 +287,7 @@ const SURFACES: readonly Surface[] = [
     ui: () => <RecurringCard />,
     act: async (user) => {
       const [row] = await screen.findAllByRole('listitem', { name: /Spotify/ });
-      await user.click(within(row!).getByRole('button', { name: 'Not recurring' }));
+      await user.click(within(row!).getByRole('button', { name: 'Not recurring: Spotify' }));
     },
     lead: 'Could not save Spotify.',
   },

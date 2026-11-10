@@ -58,7 +58,7 @@ class AccountRole(StrEnum):
 
 
 # The roles each account kind can have, in ``account_role`` order (spec 002 rule
-# 31a, issue 241). ``ck_accounts_role_fits_kind`` (migration 0023) holds the
+# 31a, issue 241). ``ck_accounts_role_fits_kind`` (migration 0025) holds the
 # database to the same table; tests/integration/test_accounts.py checks they agree.
 ROLES_BY_KIND: dict[AccountKind, tuple[AccountRole, ...]] = {
     AccountKind.CHECKING: (AccountRole.SPENDING, AccountRole.EMERGENCY_FUND),
@@ -238,6 +238,7 @@ class FindingKind(StrEnum):
     RECURRING_STOPPED = "recurring_stopped"
     PAY_CHANGE = "pay_change"
     UPCOMING_DEADLINE = "upcoming_deadline"
+    OVERDUE_DEADLINE = "overdue_deadline"
 
 
 class FindingSeverity(StrEnum):

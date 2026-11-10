@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -13,7 +14,7 @@ from sqlalchemy import Connection, text
 
 from app.deps import get_now
 from tests.conftest import FixtureUser
-from tests.support.pay_stub_copies import confirm_stub, replaced_late_october
+from tests.support.pay_stub_copies import STUB_01, confirm_stub, replaced_late_october
 
 Client = Callable[[FixtureUser], TestClient]
 
@@ -28,9 +29,11 @@ DEFAULTS: dict[str, Any] = {
     "match_tiers": [],
     "vesting_years": None,
     "birth_year": None,
+    "salary_pay_stub_id": None,
 }
-# What GET and PUT add on read: the pay schedule (rule 25a), none without a stub or an entry.
-OUT_DEFAULTS: dict[str, Any] = {**DEFAULTS, "pay_schedule": None}
+# What GET and PUT add on read: the pay schedule (rule 25a), none without a stub or an
+# entry, and the salary check (rule 24c), none without a salary and a stub that disagree.
+OUT_DEFAULTS: dict[str, Any] = {**DEFAULTS, "pay_schedule": None, "salary_review": None}
 FULL: dict[str, Any] = {
     "salary_cents": 6_500_000,
     "pay_frequency": "semimonthly",
@@ -111,6 +114,7 @@ def test_put_replaces_the_whole_profile(client_as: Client, user_a: FixtureUser) 
         {"birth_year": 1899},
         {"birth_year": 3000},
         {"birth_year": "2001"},
+        {"salary_pay_stub_id": "not-a-uuid"},
         {"surprise": True},
     ],
 )
@@ -195,3 +199,65 @@ def test_pay_schedule_from_a_stub_before_any_profile(
         "source": "pay_stub",
         "pay_stub_date": "2026-10-15",
     }
+
+
+# ---------------------------------------------------------------- salary check (rule 24c)
+
+# Issue 221's account: plan details saved from stub-01, then the Acme stub confirmed.
+ISSUE_221_PROFILE: dict[str, Any] = {**FULL, "salary_cents": 9_500_010, "pay_frequency": None}
+
+
+def test_salary_review_after_a_newer_stub(
+    db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    client = client_as(user_a)
+    stub_01 = confirm_stub(client, db_connection, user_a, **STUB_01)
+    saved = client.put("/profile", json={**ISSUE_221_PROFILE, "salary_pay_stub_id": str(stub_01)})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["salary_pay_stub_id"] == str(stub_01)
+    assert saved.json()["salary_review"] is None
+
+    acme = confirm_stub(client, db_connection, user_a)
+    review = {
+        "pay_stub_id": str(acme),
+        "pay_stub_date": "2026-10-15",
+        "frequency": "semimonthly",
+        "periods_per_year": 24,
+        "gross_cents": 270_833,
+        "annual_salary_cents": 6_499_992,
+        "salary_cents": 9_500_010,
+    }
+    assert client.get("/profile").json()["salary_review"] == review
+
+    # Keep $95,000.10: the salary stays, the stub it was compared with is the Acme stub.
+    kept = client.put("/profile", json={**ISSUE_221_PROFILE, "salary_pay_stub_id": str(acme)})
+    assert kept.status_code == 200, kept.text
+    assert (kept.json()["salary_cents"], kept.json()["salary_review"]) == (9_500_010, None)
+
+    # Use $64,999.92 instead.
+    used = client.put(
+        "/profile",
+        json={**ISSUE_221_PROFILE, "salary_cents": 6_499_992, "salary_pay_stub_id": str(acme)},
+    )
+    assert used.status_code == 200, used.text
+    assert client.get("/profile").json()["salary_review"] is None
+
+
+def test_salary_review_survives_a_copy_of_the_stub(
+    db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Kept against the Acme stub; a second copy of it (rule 22b) asks nothing."""
+    client = client_as(user_a)
+    acme = confirm_stub(client, db_connection, user_a)
+    saved = client.put("/profile", json={**ISSUE_221_PROFILE, "salary_pay_stub_id": str(acme)})
+    assert saved.status_code == 200, saved.text
+    confirm_stub(client, db_connection, user_a)
+    assert client.get("/profile").json()["salary_review"] is None
+
+
+def test_salary_pay_stub_must_exist(client_as: Client, user_a: FixtureUser) -> None:
+    client = client_as(user_a)
+    response = client.put("/profile", json={**FULL, "salary_pay_stub_id": str(uuid.uuid4())})
+    assert response.status_code == 404, response.text
+    assert response.json()["error"]["code"] == "not_found"
+    assert client.get("/profile").json()["updated_at"] is None

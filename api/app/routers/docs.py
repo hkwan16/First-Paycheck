@@ -376,7 +376,7 @@ def list_documents(session: UserSession) -> list[DocumentOut]:
     return [confirmations.out(document) for document in documents]
 
 
-@router.get("/{document_id}", responses=error_responses(401, 404, 422))
+@router.get("/{document_id}", responses=error_responses(401, 404))
 def get_document(document_id: uuid.UUID, session: UserSession) -> DocumentDetail:
     """One document, with its proposal while it is being reviewed."""
     document = session.get(Document, document_id)

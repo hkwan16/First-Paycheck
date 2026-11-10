@@ -450,6 +450,7 @@ def test_calendar_event_created(
             "due_at": "2026-10-30",
             "decision_id": saved["decision_id"],
             "status": "upcoming",
+            "overdue": False,
         }
     ]
 

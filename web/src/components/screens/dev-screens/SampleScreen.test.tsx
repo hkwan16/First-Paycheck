@@ -1,8 +1,8 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { act, render, renderHook, screen, within } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JOB_POLL_MS, useAccounts, useCalc } from '@/lib/api/hooks';
-import { sampleK401, sampleK401Inputs } from '@/test/fixtures/decisions';
+import { DECISION_V2_ID, sampleK401, sampleK401Inputs } from '@/test/fixtures/decisions';
 import { SAMPLE_NOW, sampleAccounts } from '@/test/fixtures/sample';
 import { server } from '@/test/msw/server';
 import { SampleScreen, seededClient } from './SampleScreen';
@@ -58,6 +58,9 @@ describe('SampleScreen', () => {
     expect(within(flow).getByRole('button', { name: 'Take-home $3,992.08' })).toBeInTheDocument();
     const recurring = screen.getByRole('region', { name: 'Recurring charges' });
     expect(within(recurring).getAllByRole('listitem')).toHaveLength(5);
+    // The months GET /spending/months lists (spec 010 rule 5d), not just the one shown.
+    const picker = screen.getByRole('combobox', { name: 'Period' });
+    await waitFor(() => expect(within(picker).getAllByRole('option')).toHaveLength(6));
     expect(requests).toEqual([]);
   });
 
@@ -227,6 +230,25 @@ describe('SampleScreen after Confirm', () => {
       'aria-current',
       'page',
     );
+    // Spec 008 rule 19c: each explained decision's row says its explanation's state.
+    expect(list).toHaveTextContent('Explanation up to date');
+    expect(list).toHaveTextContent('Explanation out of date');
+    expect(list).toHaveTextContent('Explanation could not be written');
+    expect(requests).toEqual([]);
+  });
+
+  it('renders a decision a newer version replaced, with no requests', async () => {
+    const requests = countRequests();
+    render(<SampleScreen screen="why-replaced" />);
+    const note = await screen.findByRole('region', { name: 'About this decision' });
+    expect(note).toHaveTextContent('You saved a newer version of this decision on Oct 17, 2026.');
+    expect(within(note).getByRole('link', { name: 'See the current decision' })).toHaveAttribute(
+      'href',
+      `/why/${DECISION_V2_ID}`,
+    );
+    expect(screen.getByText('Replaced', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Change this decision' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'What happens next' })).toBeNull();
     expect(requests).toEqual([]);
   });
 
@@ -305,6 +327,7 @@ describe('seededClient', () => {
     'why-stale',
     'why-emergency-fund',
     'why-index',
+    'why-replaced',
   ] as const)('seeds every %s query at the sample time without reading the clock', (name) => {
     // It runs while the page renders: next dev prerenders the route to
     // validate it, and reports a Date.now() there as an unstable value.
