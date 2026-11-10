@@ -532,6 +532,20 @@ def test_fake_extracts_from_fixtures(db_connection: Connection, user_a: FixtureU
     ]
 
 
+def test_fake_answers_the_stub_whose_employer_line_it_reads(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    """The e2e stack reads two synthetic stubs (web/e2e/fixtures): the Acme one,
+    and one that prints no 401(k) line (issue 230). A stub whose employer line
+    no fixture names gets the Acme answer, as before."""
+    birch = [TextPage(number=1, text="BIRCH LANE CLINIC PAY STATEMENT\nGross Pay 2,615.38")]
+    stub = fake(db_connection).extract_pay_stub(user_a.id, birch)
+    assert stub.employer_name.value == "Birch Lane Clinic"
+    assert stub.retirement_contribution_cents.value is None
+    assert stub.net_cents.value == 187_804
+    assert fake(db_connection).extract_pay_stub(user_a.id, PAGES).net_cents.value == 199_604
+
+
 def test_a_memory_ledger_needs_no_database(user_a: FixtureUser) -> None:
     memory = MemoryLedger(clock=lambda: NOW)
     gateway_without_db = FakeGateway(settings(llm_fake=True), ledger=memory, clock=lambda: NOW)
