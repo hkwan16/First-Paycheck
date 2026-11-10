@@ -160,4 +160,78 @@ test('confirming the same pay stub again counts it once on Spending (issue 190)'
   await expect(older).toContainText('You confirmed this paycheck again, so the newer copy counts.');
   await expect(older.getByText('Confirmed', { exact: true })).toHaveCount(0);
   await expect(older.getByRole('button', { name: 'Replace pay stub' })).toHaveCount(0);
+
+  // Each confirmed copy is named by its employer and pay date and opens what was
+  // confirmed from it, read-only (issue 243).
+  const newest = stubs.first();
+  await expect(newest).toHaveAccessibleName('Pay stub · Acme Corp, paid Oct 15, 2026');
+  await newest.getByRole('link', { name: 'View pay stub' }).click();
+  await waitForHydration(page);
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Your pay stub is confirmed' }),
+  ).toBeVisible();
+  const confirmedValues = page.getByRole('region', { name: 'What you confirmed' });
+  await expect(confirmedValues).toContainText('Acme Corp');
+  await expect(confirmedValues).toContainText('$2,708.33');
+  await expect(confirmedValues).toContainText('$1,996.04');
+  await expect(confirmedValues.getByRole('button')).toHaveCount(0);
+});
+
+const NO_401K = path.join(__dirname, 'fixtures', 'no-401k-paystub.pdf');
+
+test('a stub with no 401(k) line confirms it as none, and the review survives a reload (issues 229, 230)', async ({
+  page,
+}) => {
+  test.setTimeout(360_000);
+  await openLink(page);
+  const docs = page.getByRole('region', { name: 'Documents' });
+  await docs.getByLabel('Document type').selectOption('pay_stub');
+  await docs.getByLabel(/Add (another|a) document/).setInputFiles(NO_401K);
+  const row = docs.getByRole('group', { name: /^Pay stub/ }).first();
+  await expect(row.getByText('Review needed')).toBeVisible({ timeout: 180_000 });
+  await row.getByRole('link', { name: 'Review pay stub' }).click();
+  await expect(page).toHaveURL(/\/setup\/confirm\/[^/]+$/);
+  await waitForHydration(page);
+  const fields = page.getByRole('region', { name: 'What we read' });
+  await expect(fields).toContainText('0 of 14 confirmed');
+
+  // Nothing was read for the 401(k): never "Read clearly", and one step says none.
+  const k401 = fields.getByRole('group', { name: '401(k) contribution', exact: true });
+  await expect(k401).toContainText('Not found');
+  await expect(k401).toContainText('If your stub has no such line, confirm none.');
+  await expect(k401.getByText('Read clearly')).toHaveCount(0);
+  await k401.getByRole('button', { name: 'Confirm none for 401(k) contribution' }).click();
+  await expect(k401.getByText('$0.00', { exact: true })).toBeVisible();
+  await expect(k401.getByText('Your entry')).toBeVisible();
+
+  // A typed amount is the person's, not "Read clearly". Gross and net both
+  // one cent up still balance.
+  const gross = fields.getByRole('group', { name: 'Gross pay', exact: true });
+  await gross.getByRole('button', { name: 'Edit Gross pay' }).click();
+  await gross.getByRole('textbox', { name: 'Gross pay' }).fill('2,615.39');
+  await gross.getByRole('textbox', { name: 'Gross pay' }).press('Enter');
+  await expect(gross.getByText('Your entry')).toBeVisible();
+  await expect(gross.getByText('Read clearly')).toHaveCount(0);
+  const net = fields.getByRole('group', { name: 'Net pay', exact: true });
+  await net.getByRole('button', { name: 'Edit Net pay' }).click();
+  await net.getByRole('textbox', { name: 'Net pay' }).fill('1,878.05');
+  await net.getByRole('textbox', { name: 'Net pay' }).press('Enter');
+  await page.getByRole('button', { name: 'Confirm all remaining' }).click();
+  await expect(fields).toContainText('14 of 14 confirmed');
+  await expect(fields.getByText('The math checks out.')).toBeVisible();
+
+  // Every change is kept with the document (issue 229), so a reload loses
+  // nothing. The render that shows a change already says it is saving.
+  await expect(fields).toContainText('14 of 14 confirmed · Progress saved');
+  await page.reload();
+  await waitForHydration(page);
+  await expect(fields).toContainText('14 of 14 confirmed');
+  await expect(gross).toContainText('$2,615.39');
+  await expect(gross.getByText('Your entry')).toBeVisible();
+  await expect(net).toContainText('$1,878.05');
+  await expect(k401.getByText('$0.00', { exact: true })).toBeVisible();
+  await expect(fields.getByText('The math checks out.')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Confirm and continue/ })).toBeEnabled();
+  // Left in review: confirming a September stub would change what the later
+  // projects (decisions, check-in) read as the e2e user's paychecks.
 });

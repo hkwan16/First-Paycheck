@@ -3,7 +3,10 @@
 // data only, never a real document: the SSN is the well-known example
 // 123-45-6789, and the deposit account is printed masked, as stubs do.
 // The lines follow api/tests/fixtures/llm/extract_pay_stub.json, so the
-// API's FakeGateway answer links to them. Run: node e2e/fixtures/make-acme-paystub.mjs
+// API's FakeGateway answer links to them. It also writes no-401k-paystub.pdf,
+// a Birch Lane Clinic stub that prints no 401(k) line at all (issue 230,
+// shaped like evals/fixtures/pay_stubs/stub-07), whose lines follow
+// extract_pay_stub.birch.json. Run: node e2e/fixtures/make-acme-paystub.mjs
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -55,5 +58,28 @@ function textPdf(lines, fontSize = 11) {
   return Buffer.from(out, 'latin1');
 }
 
-const target = fileURLToPath(new URL('./acme-paystub.pdf', import.meta.url));
-writeFileSync(target, textPdf(LINES));
+const NO_401K_LINES = [
+  'BIRCH LANE CLINIC PAY STATEMENT',
+  'Employee Okafor, T',
+  'SSN 123-45-6789',
+  'Direct Deposit Acct ****7310',
+  'Pay Frequency Biweekly',
+  'Pay Date 09/25/2026',
+  'Period 09/12/2026 - 09/25/2026',
+  'Gross Pay 2,615.38',
+  'Federal Income Tax 244.31',
+  'Social Security 162.15',
+  'Medicare 37.92',
+  'CA State Tax 117.69',
+  'CA SDI 31.38',
+  'Medical Pretax 62.50',
+  'Dental/Vision 81.39',
+  'Net Pay 1,878.04',
+];
+
+for (const [name, lines] of [
+  ['acme-paystub.pdf', LINES],
+  ['no-401k-paystub.pdf', NO_401K_LINES],
+]) {
+  writeFileSync(fileURLToPath(new URL(`./${name}`, import.meta.url)), textPdf(lines));
+}
