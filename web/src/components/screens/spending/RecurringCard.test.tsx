@@ -4,7 +4,7 @@ import { sampleRecurring } from '@/test/fixtures/cashflow';
 import { apiUrl } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { spendingDb } from '@/test/msw/spending-handlers';
-import { renderWithProviders, screen, waitFor, within } from '@/test/render';
+import { renderWithProviders, screen, within } from '@/test/render';
 import { RecurringCard } from './RecurringCard';
 
 const card = () => screen.getByRole('region', { name: 'Recurring charges' });
@@ -23,6 +23,24 @@ function patches() {
     if (request.method === 'PATCH') bodies.push(await request.clone().json());
   });
   return bodies;
+}
+
+/**
+ * Resolves once the stand-in API has answered `count` requests of `method`
+ * to `/recurring...` from now on. Awaiting the answer itself, instead of
+ * polling for its effect inside `waitFor`'s one second, keeps a test right on
+ * a loaded machine, where the click, the optimistic update and the request
+ * can take longer than that.
+ */
+function answered(method: 'GET' | 'PATCH', count = 1) {
+  let seen = 0;
+  const done = Promise.withResolvers<void>();
+  server.events.on('response:mocked', ({ request }) => {
+    if (request.method !== method || !new URL(request.url).pathname.includes('/recurring')) return;
+    seen += 1;
+    if (seen === count) done.resolve();
+  });
+  return done.promise;
 }
 
 /** Answer PATCHes slowly, so the optimistic state can be seen first. */
@@ -82,6 +100,7 @@ describe('RecurringCard', () => {
     slowPatches();
     const sent = patches();
     const { user } = await renderCard();
+    const first = answered('PATCH');
     await user.click(
       within(row('Spotify')).getByRole('button', { name: 'Not recurring: Spotify' }),
     );
@@ -90,10 +109,13 @@ describe('RecurringCard', () => {
     const undo = within(row('Spotify')).getByRole('button', {
       name: 'Undo not recurring for Spotify',
     });
-    await waitFor(() => expect(sent).toEqual([{ user_status: 'ignored' }]));
+    await first;
+    expect(sent).toEqual([{ user_status: 'ignored' }]);
 
+    const second = answered('PATCH');
     await user.click(undo);
-    await waitFor(() => expect(sent).toEqual([{ user_status: 'ignored' }, { user_status: null }]));
+    await second;
+    expect(sent).toEqual([{ user_status: 'ignored' }, { user_status: null }]);
     expect(
       await within(row('Spotify')).findByRole('button', { name: 'Not recurring: Spotify' }),
     ).toBeInTheDocument();
@@ -102,13 +124,18 @@ describe('RecurringCard', () => {
   it('says only what the person decided once they mark a charge, and the detector again on Undo', async () => {
     // Issue 182: Spotify kept "Active" beside "Not recurring".
     const { user } = await renderCard();
+    const stored = answered('PATCH');
+    const reread = answered('GET');
     await user.click(
       within(row('Spotify')).getByRole('button', { name: 'Not recurring: Spotify' }),
     );
 
     expect(within(row('Spotify')).getByText('Not recurring')).toBeInTheDocument();
     expect(within(row('Spotify')).queryByText('Active')).not.toBeInTheDocument();
-    await waitFor(() => expect(spendingDb.recurring[3]!.user_status).toBe('ignored'));
+    // Still so once the server has stored it and the list has been read again.
+    await stored;
+    expect(spendingDb.recurring[3]!.user_status).toBe('ignored');
+    await reread;
     expect(within(row('Spotify')).queryByText('Active')).not.toBeInTheDocument();
 
     await user.click(
@@ -123,6 +150,7 @@ describe('RecurringCard', () => {
     slowPatches();
     const sent = patches();
     const { user } = await renderCard();
+    const renamed = answered('PATCH');
     await user.click(within(row('Spotify')).getByRole('button', { name: 'Rename Spotify' }));
     const input = within(card()).getByRole('textbox', { name: 'New name for Spotify' });
     expect(input).toHaveValue('Spotify');
@@ -131,7 +159,8 @@ describe('RecurringCard', () => {
     await user.type(input, ' Spotify Family {Enter}');
 
     expect(row('Spotify Family')).toBeInTheDocument();
-    await waitFor(() => expect(sent).toEqual([{ merchant_clean: 'Spotify Family' }]));
+    await renamed;
+    expect(sent).toEqual([{ merchant_clean: 'Spotify Family' }]);
     expect(
       within(row('Spotify Family')).getByRole('button', { name: 'Rename Spotify Family' }),
     ).toHaveFocus();
