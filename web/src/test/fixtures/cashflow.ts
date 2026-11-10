@@ -4,6 +4,7 @@ import type {
   FlowDiagram,
   PayStubFlow,
   RecurringCharge,
+  SpendingMonths,
   SpendingSummary,
   WithholdingLine,
   WithholdingTotal,
@@ -240,6 +241,14 @@ export const septemberCashflow = (): CashFlow =>
  * income pay for the rest (spec 010 diagram example D1).
  */
 export const beyondCashflow = (): CashFlow => fromResults('beyond', SANDBOX_PERIOD, ['2026-10-15']);
+
+/**
+ * `GET /spending/months` for the sample user: every month the picker can
+ * offer on the sample's October 17, each with something to show.
+ */
+export const sampleSpendingMonths: SpendingMonths = {
+  months: ['2026-10-01', '2026-09-01', '2026-08-01', '2026-07-01', '2026-06-01', '2026-05-01'],
+};
 
 /** One Acme stub with 1,500.00 deposited: part of take-home is not deposited (D4). */
 export const notDepositedCashflow = (): CashFlow =>

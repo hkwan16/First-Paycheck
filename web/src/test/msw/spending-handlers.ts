@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE_URL } from '@/lib/api/base-url';
 import type { CashFlow, RecurringCharge, RecurringPatch } from '@/lib/api/types';
-import { sampleCashflow, sampleRecurring } from '../fixtures/cashflow';
+import { sampleCashflow, sampleRecurring, sampleSpendingMonths } from '../fixtures/cashflow';
 import { SAMPLE_NOW } from '../fixtures/sample';
 
 /*
@@ -20,25 +20,16 @@ export interface SpendingDb {
   months: string[];
 }
 
-const SAMPLE_MONTHS = [
-  '2026-10-01',
-  '2026-09-01',
-  '2026-08-01',
-  '2026-07-01',
-  '2026-06-01',
-  '2026-05-01',
-];
-
 export const spendingDb: SpendingDb = {
   cashflow: sampleCashflow(),
   recurring: structuredClone([...sampleRecurring]),
-  months: [...SAMPLE_MONTHS],
+  months: [...sampleSpendingMonths.months],
 };
 
 export function resetSpendingDb() {
   spendingDb.cashflow = sampleCashflow();
   spendingDb.recurring = structuredClone([...sampleRecurring]);
-  spendingDb.months = [...SAMPLE_MONTHS];
+  spendingDb.months = [...sampleSpendingMonths.months];
 }
 
 const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
