@@ -218,6 +218,11 @@ or checked for a phone.
   `components/screens/link/account-format.ts`). An institution is named by `institutionName`
   (`lib/accounts.ts`: its name, else "Imported CSV" or "Linked bank") everywhere: the Link
   group heading, the account's initials tile and the Spending summary (issue 183).
+  An account's role select (`roleOptions`; `roleSelectName` names it "Role for Plaid Checking ··0000", issue 242)
+  offers "No role", only the roles its kind takes (`account.allowed_roles`, spec 002 rule
+  31a; the API refuses any other with 422 `role_not_allowed`) and "Not used" (issue 241). Its
+  transaction count is `account.transaction_count` and `first_posted_at`
+  (`transactionCountText`), never a page of transactions read to count them.
   Documents: `invalidateDocuments` after an upload or extraction, `invalidateAfterConfirm`
   (documents, pay stubs, benefits plans, the profile and the plan) after a confirm. Decisions: `invalidateDecisions` (the list and every
   `GET /decisions/{id}`) and `invalidateAfterDecision` (also calendar, plan and goals) after a save.
@@ -346,7 +351,11 @@ or checked for a phone.
   `import_conflict`, and follows the two job ids the import returns. It reports an import, and
   keeps an account as the one to import into, only while the account list has that account
   (`useImportCsv` adds the imported account to the list at once), so removing the account clears
-  both (issue 173). `lib/documents.ts` maps a
+  both (issue 173). "Import into" lists only CSV accounts (`csvImportTargets`), and the result
+  says what was new and what was already there (`importResultText` over `added` and
+  `already_present`, spec 010 rule 15a, issue 231); a new file drops the last file's problems.
+  The documents card's upload warnings are superseded by the next upload or Read (issue 240).
+  `lib/documents.ts` maps a
   document's status to its badge and reason text (`documentBadge`: a confirmed pay stub that a
   newer confirm of the same paycheck superseded, `superseded` from the API, reads "Replaced by a
   newer copy" and offers no Replace, issue 199); `isReviewable`/`newestReviewable` pick what
@@ -550,7 +559,25 @@ offer letter states).
   after the document ("Your pay stub", "Your benefits summary"), never with how it was read, so it
   is true whether or not the lines were sent to the model (spec 004 rule 37). The badge counts
   hidden numbers (`hiddenText`). Screen words never name internals (the AI, a pipeline, a
-  confidence score): the confidence badge reads "Check this" or "Read clearly" (issue 209).
+  confidence score): each row's badge says where its value came from (`valueBadge` in
+  `field-format.ts`, spec 005 rule 23a): "Read clearly", "Check this" (read below 0.9, or
+  nothing read), "Added up" or "Your entry" once the value differs from the one read
+  (`isEntered`); manual entry shows none (issues 209, 230).
+- **Confirm none** (rule 23b): a deduction with no value read (`canBeNone`) offers "Confirm
+  none", which confirms $0.00 (`confirmNone`); saving its editor empty does the same. Gross,
+  net and the dates still need a value, and Confirm all never fills one in.
+- **Progress survives a reload** (rules 23c-23e, issue 229): the reducer's fields go to the
+  API as a draft (`reviewDraft`, `PUT /docs/{id}/review`) after every change to a value or
+  a confirmed state, never per keystroke, through `useSaveReview` (one request at a time,
+  the newest draft wins, the state worked out during render). The screen starts from the
+  proposal and applies `document.review` (`withReviewDraft`). The count line adds
+  "Saving your progress" or "Progress saved" (`SaveStatus`), and a failed save shows
+  `ProgressNotSaved`. The draft is not confirmed data; only Confirm stores values.
+- **Confirmed values** (rule 22h, issue 243): a confirmed stub (superseded too) or summary
+  lists what was stored from it read-only under its title (`ConfirmedValues.tsx`, a
+  region named "What you confirmed"), from `document.pay_stub` or `document.plans`.
+  Link names a confirmed row by `documentSubject` ("Pay stub · Acme Corp, paid Oct 15,
+  2026") and offers View.
 - **Nothing to check**: a confirmed pay stub, a confirmed benefits summary, an offer letter and
   `/setup/confirm` with every stub confirmed are titled by their state ("Your pay stub is
   confirmed"), with the next step, never as a review (issue 209). A field opened to type starts

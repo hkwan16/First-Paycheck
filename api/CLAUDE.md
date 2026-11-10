@@ -124,7 +124,10 @@ Rules:
   purpose, so they run on `LLM_MODEL_EXPLAIN` with no setting or
   `llm_purpose` label of their own.
 - `LLM_FAKE=true` swaps in `FakeGateway`, which shares the budget, validation
-  and ledger code and answers from `tests/fixtures/llm/` (categorize, extract);
+  and ledger code and answers from `tests/fixtures/llm/` (categorize, extract: a
+  pay stub from the `extract_pay_stub.*.json` whose `employer_name` source line the
+  redacted text contains, else `extract_pay_stub.json`, so the e2e's no-401(k) Birch
+  stub reads as itself);
   it writes an explanation from the facts and judges every draft "no claim".
   Every API and worker test runs with it. Live calls are marked `llm_live` and never
   run by default.
@@ -209,8 +212,9 @@ Rules:
   `0013_plan_export_job`, `0014_delete_account_fn`, `0015_loan_account_kind`,
   `0016_rule_match_contains`, `0017_document_replaced_by`,
   `0018_check_in_last_run_at`, `0019_explanation_context_digest`,
-  `0020_pay_stub_superseded_by`, `0021_paycheck_change` (each revises the one
-  before it); the head is `0021_paycheck_change`.
+  `0020_pay_stub_superseded_by`, `0021_paycheck_change`,
+  `0022_document_review_draft`, `0023_account_role_fits_kind` (each revises the one
+  before it); the head is `0023_account_role_fits_kind`.
 - Adding an enum label is `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with
   `AFTER` when the order means something, as `by_kind` does for
   `account_kind`); the downgrade maps the rows that use it and rebuilds the
@@ -279,8 +283,9 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   stub of the same paycheck (same `employer_key`, pay date and period) and any
   current stub of a document the confirmed one replaced, along the replace chain.
   Read pay stubs only through `db/pay_stubs.py` (`current_pay_stubs()`,
-  `NEWEST_FIRST`, `latest_pay_date`, `paid_between_count`, `superseded_documents`, which
-  gives `DocumentOut.superseded` for Link, rule 22f): `test_boundaries`
+  `NEWEST_FIRST`, `latest_pay_date`, `paid_between_count`, `confirmed_from`, the stub
+  confirmed from each document, which gives `DocumentOut.superseded`, `employer_name` and
+  `pay_date` for Link and `DocumentDetail.pay_stub`, rules 22f-22h): `test_boundaries`
   fails on a `select`/`select_from`/`get` of `PayStub` or SQL naming `pay_stubs`
   anywhere else. `uq_pay_stubs_current_paycheck` (partial unique index) is the
   backstop; `superseded_by_id` is a deferred same-user self reference, and the
@@ -288,6 +293,18 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   value append-only. Tests confirm copies through the route with
   `tests/support/pay_stub_copies.py`; `make_pay_stub` twice with the same dates
   now hits the index, so give a second stub its own pay date.
+- **Review progress** (spec 005 rules 23c-23e, issue 229): `PUT /docs/{id}/review`
+  (`save_review`, 204) stores the Confirm screen's draft, `{fields: [{key, value,
+  confirmed}]}`, in `documents.review_draft` (migration `0022`); `GET /docs/{id}`
+  returns it as `review` while the document is reviewable. It is not confirmed data:
+  nothing but the Confirm screen reads it, and confirm stores its own body. Confirm,
+  replace, read again (`extract_document`) and retention (`store.expire_unconfirmed`)
+  set it to null.
+- **Confirmed values** (rules 22g and 22h, issue 243): every `DocumentOut` names what
+  was confirmed from it (`employer_name`, `pay_date`, `plan_names`), and `GET
+  /docs/{id}` of a confirmed document returns its `pay_stub` or `plans`, superseded
+  or replaced or not. `routers/docs.py:_Confirmations` reads them for a whole list in
+  one query per table.
 - Refusal, a spent budget, no readable page or no model (no gateway, or
   `LLMMisconfigured`: the API rejected the key or the model id) make the
   document `manual_entry_required` on the first attempt; schema and other API
@@ -488,6 +505,20 @@ Specs 009 and 010. Migration `0005_checkins` adds `recurring_charges`,
   route runs `run_sync` with `CsvProvider` inside the request's own session (no
   network, so one transaction); a stale cursor is 409 `import_conflict`. Its
   10 MB limit is a `BodyRule` of `BodySizeLimit` in `app/main.py`.
+- The import answers `added` (rows new to the account) and `already_present` (rows
+  whose `provider_txn_id` it already had, counted before the sync), so a re-import
+  says it added nothing (spec 010 rule 15a, issue 231).
+- **Roles by kind** (spec 002 rule 31a, issue 241): `db/enums.py:ROLES_BY_KIND` is
+  the one table (checking: spending, emergency fund; savings: emergency fund; credit:
+  spending; loan: none; investment and retirement: retirement). `AccountOut.
+  allowed_roles` gives it to the client, `PATCH /accounts/{id}` refuses another role
+  with 422 `role_not_allowed`, `ck_accounts_role_fits_kind` (migration `0023`, built
+  from the table by `db/models.py:_role_fits_kind_sql`) holds the rows to it, and the
+  sync's account upsert clears a role its new kind does not allow
+  (`role_fits_kind`). A role of null with `is_active` true is "No role".
+- `AccountOut.transaction_count` and `first_posted_at` (spec 002 rule 30a) come from
+  one lateral aggregate in `routers/accounts.py:_accounts_query`; the Link screen
+  reads them instead of a page of transactions per account.
 - `AccountOut.provider` (`plaid` or `csv`, from the account's sync item) lets
   the client tell an imported account from a linked one: `POST
   /sync/items/{id}/sync` on a CSV item is 422 `not_plaid_item` (its sync job
@@ -761,7 +792,8 @@ document), `DELETE /sync/items/{id}` (deletes what links created),
 first, bounded body, deduplicated queueing), the four `POST /calc/*` (pure
 computation on bounded validated bodies) and the small own-row updates
 (`PATCH /accounts/{id}`, `/transactions/{id}`, `/recurring/{id}`,
-`/goals/{id}`, `/check-ins/{id}/findings/{fid}`, `PUT /profile`).
+`/goals/{id}`, `/check-ins/{id}/findings/{fid}`, `PUT /profile`, `PUT
+/docs/{id}/review`).
 
 Bodies: `app/body_limit.py:BodySizeLimit` refuses a declared `Content-Length`
 over the limit before reading, and counts streamed bytes so a chunked body is
