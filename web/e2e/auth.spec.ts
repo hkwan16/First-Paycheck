@@ -38,6 +38,19 @@ test.describe('signed out', () => {
     );
     await expect(page).toHaveURL('/sign-in');
   });
+
+  test('asking for a link instead drops the password message (issue 240)', async ({ page }) => {
+    await page.goto('/sign-in');
+    await waitForHydration(page);
+    const form = page.getByRole('form', { name: 'Sign in' });
+    await form.getByRole('button', { name: 'Sign in' }).click();
+    await expect(form.getByText('Enter your password.')).toBeVisible();
+
+    await form.getByLabel('Email').fill('not-an-email');
+    await form.getByRole('button', { name: 'Email me a sign-in link' }).click();
+    await expect(form.getByText('Enter an email address like you@example.com.')).toBeVisible();
+    await expect(form.getByText('Enter your password.')).toHaveCount(0);
+  });
 });
 
 test.describe('signing in and out', () => {
