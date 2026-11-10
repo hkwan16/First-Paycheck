@@ -2,12 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { e2eApiUrl, NO_E2E_API, openLink } from './support/api';
-import {
-  NO_SCHEDULE_USER,
-  scheduleUser,
-  submitSignIn,
-  waitForHydration,
-} from './support/auth';
+import { NO_SCHEDULE_USER, scheduleUser, submitSignIn, waitForHydration } from './support/auth';
 
 /*
  * Issues 221 and 222, end to end, as the production e2e account met them: a
@@ -131,8 +126,7 @@ async function signInAndAuthorize(page: Page) {
   const user = scheduleUser()!;
   await page.goto('/sign-in');
   const first = page.waitForResponse(
-    (response) =>
-      response.url().startsWith(e2eApiUrl()!) && response.request().method() === 'GET',
+    (response) => response.url().startsWith(e2eApiUrl()!) && response.request().method() === 'GET',
     { timeout: 30_000 },
   );
   await submitSignIn(page, user.email, user.password);
@@ -297,9 +291,7 @@ test("using the stub's salary and saving again settles every step and the plan",
     const card = await openStep(page, slug, name);
     await expect(card.getByText('Needs review', { exact: true })).toBeVisible();
     await expect(card).toContainText(SCHEDULE_CHANGED);
-    await expect(card).toContainText(
-      'Your yearly salary changed from $95,000.10 to $64,999.92.',
-    );
+    await expect(card).toContainText('Your yearly salary changed from $95,000.10 to $64,999.92.');
     const result = card.getByRole('group', { name: 'Your numbers' });
     await expect(result).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
     const save = card.getByRole('button', { name: 'Save again' });
