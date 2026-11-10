@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 from decimal import Decimal
 from typing import get_args
 
@@ -13,6 +14,7 @@ from checkin.findings import (
     FINDERS,
     Affects,
     BalanceFact,
+    DeadlinePayload,
     DeductionLine,
     ElectionMismatchPayload,
     Finding,
@@ -20,11 +22,11 @@ from checkin.findings import (
     GoalOffPacePayload,
     PayChangePayload,
     RecurringPayload,
-    UpcomingDeadlinePayload,
     all_findings,
     calendar_affects,
     election_mismatch,
     goal_off_pace,
+    overdue_deadline,
     pay_change,
     recurring_changed,
     recurring_new,
@@ -362,18 +364,55 @@ def test_upcoming_deadlines() -> None:
     soon = event(CalendarKind.GOAL_CONTRIBUTION, "2026-11-20")
     later = event(CalendarKind.ENROLLMENT_DEADLINE, "2026-12-16")
     found = upcoming_deadline(facts(events=[soon, later]))
+    # Rule 7, issue 234: the key names the date, never the event's row.
     assert [(f.severity, f.key) for f in found] == [
-        (FindingSeverity.WARNING, f"upcoming_deadline:{soon.id}"),
-        (FindingSeverity.INFO, f"upcoming_deadline:{later.id}"),
+        (FindingSeverity.WARNING, "upcoming_deadline:goal_contribution:2026-11-20"),
+        (FindingSeverity.INFO, "upcoming_deadline:enrollment_deadline:2026-12-16"),
     ]
     payloads = [f.payload for f in found]
-    assert all(isinstance(p, UpcomingDeadlinePayload) for p in payloads)
+    assert all(isinstance(p, DeadlinePayload) for p in payloads)
     assert [
-        (p.days_until, p.affects) for p in payloads if isinstance(p, UpcomingDeadlinePayload)
+        (p.calendar_event_id, p.days_until, p.affects)
+        for p in payloads
+        if isinstance(p, DeadlinePayload)
     ] == [
-        (4, "emergency_fund"),
-        (30, "health_plans"),
+        (soon.id, 4, "emergency_fund"),
+        (later.id, 30, "health_plans"),
     ]
+    assert overdue_deadline(facts(events=[soon, later])) == []
+
+
+def test_overdue_date() -> None:
+    """Rule 7, issue 233: an open date that passed is overdue, an alert."""
+    late = event(CalendarKind.W4_SUBMIT, "2026-11-15")
+    found = only(overdue_deadline(facts(events=[late])))
+    assert (found.kind, found.severity, found.key) == (
+        FindingKind.OVERDUE_DEADLINE,
+        FindingSeverity.ALERT,
+        "overdue_deadline:w4_submit:2026-11-15",
+    )
+    assert isinstance(found.payload, DeadlinePayload)
+    assert (found.payload.days_until, found.payload.affects) == (-1, "w4")
+    assert found.payload.calendar_event_id == late.id
+    assert upcoming_deadline(facts(events=[late])) == []
+
+
+def test_due_today_is_not_overdue() -> None:
+    today = event(CalendarKind.ELECTION_CHECK, "2026-11-16")
+    found = only(upcoming_deadline(facts(events=[today])))
+    assert found.severity is FindingSeverity.WARNING
+    assert isinstance(found.payload, DeadlinePayload)
+    assert found.payload.days_until == 0
+    assert overdue_deadline(facts(events=[today])) == []
+
+
+def test_one_finding_per_date() -> None:
+    """Two open events of one kind on one day are one finding, about the last."""
+    first = event(CalendarKind.ELECTION_CHECK, "2026-11-30")
+    second = first.model_copy(update={"id": uuid.uuid4()})
+    found = only(all_findings(facts(events=[first, second])))
+    assert isinstance(found.payload, DeadlinePayload)
+    assert found.payload.calendar_event_id == second.id
 
 
 @pytest.mark.parametrize(
@@ -425,7 +464,10 @@ def test_all_findings_runs_in_rule_order() -> None:
             pay_stubs=[stub(S2), stub(S1)],
             goals=[goal()],
             recurring=[charge("Equinox", RecurringStatus.NEW, 18_500)],
-            events=[event(CalendarKind.GOAL_CONTRIBUTION, "2026-11-20")],
+            events=[
+                event(CalendarKind.W4_SUBMIT, "2026-11-10"),
+                event(CalendarKind.GOAL_CONTRIBUTION, "2026-11-20"),
+            ],
         )
     )
     assert [f.kind for f in found] == [
@@ -434,6 +476,7 @@ def test_all_findings_runs_in_rule_order() -> None:
         FindingKind.RECURRING_NEW,
         FindingKind.PAY_CHANGE,
         FindingKind.UPCOMING_DEADLINE,
+        FindingKind.OVERDUE_DEADLINE,
     ]
 
 

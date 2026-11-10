@@ -1,10 +1,10 @@
 # 010: Cash flow and CSV import
 
-Status: Implemented, M5. Settles spec 001 open question 5 (CSV transaction ids).
+Status: Implemented, M5. Settles spec 001 open question 5 (CSV transaction ids). Rules 5b-5d (the diagram's every node and band from the API, and `GET /spending/months`) added on November 9 (issue #236): on the production e2e account's October the diagram drew "Gross pay, 1 stub $2,708.33" about 157 px tall and "Take-home $1,996.04" about 300 px, because the client sized take-home by the $5,234.98 of spending drawn out of it, which the $3,240.12 deposited could not pay for either; the legend listed the pay stub groups in months with no stub, and the picker offered June 2026, a month with no transaction.
 
 ## Goal
 
-Part A gives the Spending screen's cash-flow diagram every number it draws, so the client never adds money: `GET /cashflow` returns, for a period, the gross-to-net withholding lines of each confirmed pay stub (stage 1 of the diagram) beside the spending summary of spec 007 part B (stages 2 and 3). Code: `api/calc/cashflow.py` (pure), `api/app/routers/cashflow.py`.
+Part A gives the Spending screen's cash-flow diagram every number it draws, so the client never adds money: `GET /cashflow` returns, for a period, the gross-to-net withholding lines of each confirmed pay stub (stage 1 of the diagram) beside the spending summary of spec 007 part B (stages 2 and 3), and the diagram itself: every node's amount and every band's, so that what flows into a node equals what flows out of it (rule 5b). `GET /spending/months` says which months have anything to show, for the period picker (rule 5d). Code: `api/calc/cashflow.py` (pure), `api/app/routers/cashflow.py`, `api/app/routers/spending.py`.
 
 Part B lets a user bring in an account they will not link through Plaid: `POST /accounts/import` takes a bank's CSV export, converts it to the shared sign convention and writes it through the same `pipeline.run_sync` as a Plaid sync, which then queues categorization and recurring detection. Code: `api/sync/csv_provider.py`, the route in `api/app/routers/accounts.py`.
 
@@ -13,6 +13,10 @@ Part B lets a user bring in an account they will not link through Plaid: `POST /
 ### `GET /cashflow`
 
 `start` and `end`, inclusive ISO dates, with exactly the rules of `GET /spending/summary` (spec 007 part B): both or neither, `start <= end`, at most 366 days, and the last complete UTC calendar month by default.
+
+### `GET /spending/months`
+
+No parameters.
 
 ### `POST /accounts/import` (multipart form)
 
@@ -57,6 +61,28 @@ Part B lets a user bring in an account they will not link through Plaid: `POST /
 
 - `roles`: `tax_cents`, `retirement_cents`, `health_cents`, `other_cents`, the sum of the lines of each role.
 - `spending`: the `SpendingSummary` that `GET /spending/summary` returns for the same period (spec 007 part B), so stage 2 (take-home to buckets and what is left over) and stage 3 (buckets to categories) come from one place.
+- `diagram` (`FlowDiagram`, rule 5b): `nodes`, each `{id, kind, key, column, cents, refunds_cents, categories}`, in the order the diagram draws them (column 0 to 3, top to bottom), and `links`, each `{source, target, cents}` with `cents > 0`. Node ids, kinds and columns:
+
+  | `id` | `kind` | `key` | Column | `cents` | When |
+  |---|---|---|---|---|---|
+  | `gross` | `gross` | null | 0 | `withholding.gross_cents` (0 with no stub) | always |
+  | `line:<line key>` | `line` | the line's key | 1 | the line's amount | with a stub, all seven |
+  | `take_home` | `take_home` | null | 1 | `withholding.net_cents` | with a stub |
+  | `income_deposited` | `income_deposited` | null | 1 | `spending.income_cents` | without a stub |
+  | `other_deposits` | `other_deposits` | null | 1 | `income_cents - net_cents` | with a stub, when the deposits are more than take-home |
+  | `refunds` | `refunds` | null | 1 | the money in of the essentials, flexible and other categories that net to money in | when one does |
+  | `savings_withdrawn` | `savings_withdrawn` | null | 1 | the money in of a savings category that nets to money in | when one does |
+  | `beyond_income` | `beyond_income` | null | 1 | `-left_over_cents` | when `left_over_cents < 0` |
+  | `not_deposited` | `not_deposited` | null | 2 | `net_cents - income_cents` | with a stub, when take-home is more than the deposits |
+  | `bucket:<bucket>` | `bucket` | `essentials`, `flexible`, `savings`, `other` | 2 | the sum of the bucket's categories that net to money out | always, all four |
+  | `left_over` | `left_over` | null | 2 | `left_over_cents` | when `left_over_cents >= 0` |
+  | `category:<category>` | `category` | the category | 3 | the category's `total_cents` | each category of the four buckets with `total_cents > 0`, grouped by bucket in the buckets' order (so the bands do not cross), each bucket's in `spending.categories` order |
+
+  A bucket node's `refunds_cents` is the money in its categories that net to money in (so the summary's bucket total is `cents - refunds_cents`), null when there is none; every other node's is null. `categories` lists, for `refunds` and `savings_withdrawn`, the categories behind the amount, in `spending.categories` order, and is empty on every other node.
+
+### `GET /spending/months` (`SpendingMonths`)
+
+- `months`: the first day of each UTC calendar month with at least one posted transaction on an active `checking`, `savings` or `credit` account (the rows the summary reads, spec 007 rule 21a) or a current confirmed pay stub paid in it (rule 1), newest first, each once.
 
 ### `POST /accounts/import` (`CsvImport`)
 
@@ -79,8 +105,11 @@ Part B lets a user bring in an account they will not link through Plaid: `POST /
 2. **Lines.** Each stub's seven deduction columns become the seven lines above. Amounts are the stored non-negative magnitudes (spec 001 rule 23).
 3. **Per stub.** `deductions_cents` is the sum of the seven lines; `roles` sums the lines by role. `calc/cashflow.py` checks `gross_cents - deductions_cents = net_cents` and raises on a stub that does not balance (the `pay_stub_balances` constraint makes that unreachable for stored rows).
 4. **Period totals.** `withholding` sums each line, `gross_cents`, `deductions_cents` and `net_cents` over the period's stubs; with no stubs every amount is 0 and `pay_stubs` is empty.
-5. **Spending.** `spending` is computed by the same code as `GET /spending/summary` with the same period; the two routes never disagree. It reads only rows on `checking`, `savings` and `credit` accounts (spec 007 rule 21a): a loan's, investment's or retirement account's own ledger draws no band and is only counted in `ledger_rows_skipped`. Its shares of income are null when there is no income or too little to compare with (spec 007 rule 25), and a bucket's details then say "Too little income to compare" instead of a percentage. Its `income_cents` counts money in only (spec 007 rule 22a), so the diagram's "Income deposited" node is never negative and its "Spent beyond income" node (a negative `left_over_cents`) appears only when spending really ran past the money that came in. The client draws these amounts as the API gives them; it never adds or flips a sign. Its scale puts the tallest node at 240 px: gross pay (or income without a stub), or a bucket or category when spending outran a small income, as on the sandbox (`web/src/components/sankey/layout.ts:flowScale`). Every column stacks its nodes from the top, so the diagram is as tall as its tallest column (issue 201: the buckets started level with take-home, below seven withholding lines, and the categories level with the first bucket, and with a 400 px target the Acme stub beside the dynamic sandbox's October drew a diagram 1,129 px tall, most of it empty; at 240 px from the top the same month is 707 px).
+5. **Spending.** `spending` is computed by the same code as `GET /spending/summary` with the same period; the two routes never disagree. It reads only rows on `checking`, `savings` and `credit` accounts (spec 007 rule 21a): a loan's, investment's or retirement account's own ledger draws no band and is only counted in `ledger_rows_skipped`. Its shares of income are null when there is no income or too little to compare with (spec 007 rule 25), and a bucket's details then say "Too little income to compare" instead of a percentage. Its `income_cents` counts money in only (spec 007 rule 22a), so the diagram's "Income deposited" node is never negative and its "Spent beyond income" node (`-left_over_cents`, a source beside the deposits since rule 5b) appears only when spending really ran past the money that came in. The client draws these amounts as the API gives them (`diagram`, rule 5b); it never adds or flips a sign. Its scale puts the largest node at 240 px, whichever it is: gross pay, the deposits, or a bucket or category when spending outran a small income, as on the sandbox (`web/src/components/sankey/layout.ts:flowScale`). Every column stacks its nodes from the top, so the diagram is as tall as its tallest column (issue 201: the buckets started level with take-home, below seven withholding lines, and the categories level with the first bucket, and with a 400 px target the Acme stub beside the dynamic sandbox's October drew a diagram 1,129 px tall, most of it empty; at 240 px from the top the same month is 707 px).
 5a. **Words.** Each label says what its number counts (spec 007 rule 26a). Stage 1 is the period's confirmed pay stubs: the first node reads "Gross pay, 2 stubs", and with no stub paid in the period "No pay stub this period" ($0, dashed), never "No confirmed pay stub", which reads as none at all when the user's stub is from another month; its details say no confirmed stub was paid in the period. Without a stub, stage 2 starts from "Income deposited" (the deposits, `spending.income_cents`) rather than "Take-home" (the stubs' `net_cents`). The columns are headed "Pay stubs, October", "Taken out of pay", "Spent and saved" and "Categories", and what is left is "Left over". With a stub, the card's lead names both sources and the deposits' amount: "Gross pay to take-home comes from 1 pay stub. Spending comes from the $4,050.12 deposited in your accounts, which can include pay with no confirmed stub." (issue 200: the summary's income and the diagram's gross pay read as two incomes); without one, "Spending comes from the $4,050.12 of income deposited in your accounts." with a pointer to confirming a stub. Take-home's details give both figures by name: "Take-home on 1 pay stub" (the stubs' `net_cents`) and "Income deposited in your accounts" (`spending.income_cents`). The diagram (desktop) and the stacked bars (`FlowStack`, under 640 px) take these names from the same layout, and the check-in's cash flow heads its table with the period and its pay stubs ("October 1 to 30 · 1 pay stub").
+5b. **The diagram conserves money** (issue #236). Every node's amount is the API's and the client draws each node as tall as its amount (at least tall enough for its words, `MIN_NODE_H`) and each band as thick as its `cents`, so a node is never sized by what flows through it. For every node with bands in, they sum to its `cents`; for every node with bands out, so do they. Stage 1: `gross` flows into each line with a positive amount and into `take_home` (rule 3: `gross = deductions + net`). Stage 2 is where the period's money came from and where it went. The money came in as deposits (`spending.income_cents`), as money back in a spending or savings category (a refund that outweighed the period's purchases in its category, the sale of an investment), and, when spending and saving outran all of that, from money already in the accounts, savings or credit (`beyond_income`, `-left_over_cents`, never a negative node). With a stub the deposits are drawn as `take_home` and, when they are more, `other_deposits` (pay with no confirmed stub, interest, other income); when the deposits are less than take-home, the rest of take-home is `not_deposited` (paid to an account that is not linked, or not deposited yet). The money went to the four buckets, each the sum of its categories that net to money out, and to `left_over`. So the sources, in order `take_home` (or `income_deposited`), `other_deposits`, `refunds`, `savings_withdrawn`, `beyond_income`, sum to the uses, in order `not_deposited`, `bucket:essentials`, `bucket:flexible`, `bucket:savings`, `bucket:other`, `left_over`: with deposits `D`, take-home `N`, money back `R` and the summary's left over `L = D - (P - R)`, where `P` is the buckets' sum, both sides are `max(N, D) + R + max(-L, 0)`. The bands pair them in that order, as two stacks of the same height laid side by side: each band is the overlap of a source's slice with a use's, so take-home pays for `not_deposited` first and the buckets from the top, and the bands never cross. Stage 3: each bucket flows into its categories with `total_cents > 0`. A category that nets to money in is not drawn as a category (a node cannot be negative); it is part of `refunds` or `savings_withdrawn`, and its bucket's node is the bucket's spending before that money back, with `refunds_cents` saying how much the summary nets out. Uncategorized rows are in no node, as they are in no bucket (spec 007 rule 23).
+5c. **The client only draws.** `web/src/components/sankey/layout.ts` takes `diagram` as it comes: nodes in their columns and order, heights from one scale (`TARGET_GROSS_PX` for the largest node, so "1 px is about $N" follows; no scale when every node is zero), bands stacked along each node in the order of `links`. It hides a zero line other than the 401(k) ("401(k), not elected", dashed) and a zero `bucket:other`, and draws any other zero node dashed. Its words: `take_home` "Take-home", `income_deposited` "Income deposited", `other_deposits` "Other deposits", `refunds` "Refunds", `savings_withdrawn` "Taken out of savings", `beyond_income` "Spent beyond income", `not_deposited` "Not deposited", buckets by name and "Left over". The legend lists only the groups drawn as nodes with an amount (`legendFor`), so a period with no stub lists no pay stub group.
+5d. **Months with something to show.** The period picker (`web/src/lib/periods.ts`) offers this month so far, the last complete month and the four before it, each only when `GET /spending/months` lists it; until the months arrive it waits, and if they cannot be read it offers all six. The period the summary shows is always offered.
 6. All arithmetic is in `calc/cashflow.py`: pure, integer cents, no I/O. The route reads rows and maps ids and dates.
 
 ### Part B: parsing the file (`sync/csv_provider.py`)
@@ -132,6 +161,27 @@ Working:
 | 4 | `test_sandbox_income_is_never_negative` | The Plaid sandbox's October (spec 007 part B), no confirmed stub | `spending` equal to `GET /spending/summary` for October: `income_cents` 422 (the GUSTO PAY outflow in `income_outflows_ignored_cents` 585,000), `left_over_cents` -168,541 |
 | 5 | `test_loan_ledgers_draw_no_band` | Spec 007's loan ledger month (rule 21a), no confirmed stub | `spending` equal to `GET /spending/summary` for September: `income_cents` 250,000, `other_cents` 40,000, `left_over_cents` 70,000, `ledger_rows_skipped` count 3, net -38,000 |
 
+### The diagram (`api/tests/unit/calc/test_cashflow.py`, rule 5b)
+
+Amounts in cents. Links are written `source -> target cents`.
+
+| # | Test | Input | Nodes beyond the buckets | Links |
+|---|---|---|---|---|
+| D1 | `test_spending_beyond_take_home_and_deposits` | Issue #236: one stub (example 2's mockup stub: gross 270,833, net 199,604); deposits 324,012; housing 250,000, groceries 60,000, dining 80,000, shopping 131,344, savings_investment 2,154 (essentials 310,000, flexible 211,344, savings 2,154, other 0, left over -199,486) | `take_home` 199,604, `other_deposits` 124,408, `beyond_income` 199,486; `left_over` absent | `take_home -> bucket:essentials` 199,604; `other_deposits -> bucket:essentials` 110,396; `other_deposits -> bucket:flexible` 14,012; `beyond_income -> bucket:flexible` 197,332; `beyond_income -> bucket:savings` 2,154; then each bucket to its categories |
+| D2 | `test_take_home_equal_to_deposits` | Spec 007's September (two mockup stubs, net 399,208; deposits 399,208; housing 150,000, groceries 30,000, dining 8,500, savings_investment 40,000, fees 3,900; left over 166,808) | `take_home` 399,208; `left_over` 166,808 | `take_home ->` essentials 180,000, flexible 8,500, savings 40,000, other 3,900, `left_over` 166,808 |
+| D3 | `test_a_refund_is_money_in` | The Plaid sandbox's October, no stub (example 4): deposits 422; dining 51,633, transport 540, shopping 58,940, entertainment 7,850, travel -50,000, savings_investment 100,000; left over -168,541 | `income_deposited` 422, `refunds` 50,000 (categories `travel`), `beyond_income` 168,541; `bucket:flexible` 118,423 with `refunds_cents` 50,000; no `category:travel` | `income_deposited -> bucket:essentials` 422; `refunds -> bucket:essentials` 118; `refunds -> bucket:flexible` 49,882; `beyond_income -> bucket:flexible` 68,541; `beyond_income -> bucket:savings` 100,000 |
+| D4 | `test_take_home_not_deposited` | One mockup stub (net 199,604); deposits 150,000; housing 100,000; left over 50,000 | `take_home` 199,604, `not_deposited` 49,604, `left_over` 50,000 | `take_home -> not_deposited` 49,604; `take_home -> bucket:essentials` 100,000; `take_home -> left_over` 50,000 |
+| D5 | `test_money_taken_out_of_savings` | No stub; deposits 300,000; housing 150,000; savings_investment -50,000; left over 200,000 | `income_deposited` 300,000, `savings_withdrawn` 50,000 (categories `savings_investment`); `bucket:savings` 0 with `refunds_cents` 50,000; `left_over` 200,000 | `income_deposited -> bucket:essentials` 150,000; `income_deposited -> left_over` 150,000; `savings_withdrawn -> left_over` 50,000 |
+| D6 | `test_an_empty_period` | No stub, no transactions | `gross` 0, `income_deposited` 0, the four buckets 0, `left_over` 0 | none |
+
+Working: D1, the sources stack `take_home` [0, 199,604), `other_deposits` [199,604, 324,012), `beyond_income` [324,012, 523,498); the uses stack essentials [0, 310,000), flexible [310,000, 521,344), savings [521,344, 523,498). Each band is an overlap: `other_deposits` meets essentials over [199,604, 310,000), 110,396, and flexible over [310,000, 324,012), 14,012; `beyond_income` meets flexible over [324,012, 521,344), 197,332, and savings, 2,154; flexible gets `14,012 + 197,332 = 211,344`. Both stacks are 523,498: `max(199,604, 324,012) + 0 + 199,486`. D3: flexible's positive categories are `51,633 + 58,940 + 7,850 = 118,423`, the summary's 68,423 plus the 50,000 refund; the sources are `422 + 50,000 + 168,541 = 218,963 = 540 + 118,423 + 100,000`. D4: `max(199,604, 150,000) = 199,604 = 49,604 + 100,000 + 50,000`. D5: `300,000 + 50,000 = 150,000 + 0 + 200,000`.
+
+### Months (`api/tests/integration/test_cashflow.py`, rule 5d)
+
+| # | Test | Setup | Expected |
+|---|---|---|---|
+| M1 | `test_months_with_something_to_show` | Posted rows on a checking account on 2026-07-14 and 2026-09-02, a pending row on 2026-06-30, a row on a loan account on 2026-05-05, a confirmed stub paid 2026-10-15, and user B's row on 2026-04-01 | `months` = 2026-10-01, 2026-09-01, 2026-07-01 |
+
 ### Parsing (`api/tests/unit/sync/test_csv_provider.py`)
 
 File A:
@@ -170,7 +220,8 @@ Working for row 1: under `negative_is_out`, `-15.49` is 1549 cents out; `1,996.0
 
 ## Edge cases
 
-- A period with stubs but no transactions has withholding lines and an all-zero `spending`; one with transactions but no stubs has zero withholding and `paycheck_count = 0`.
+- A period with stubs but no transactions has withholding lines and an all-zero `spending`, and its diagram sends all of take-home to `not_deposited`; one with transactions but no stubs has zero withholding and `paycheck_count = 0`.
+- A bucket whose categories all net to money in is a zero node; its money in is a source (`refunds`, or `savings_withdrawn` for savings).
 - A stub paid on `end` is included; one paid the day after is not.
 - A CSV whose `amount` cells are all positive is still read under the `sign` option; the client asks the user which way their bank signs amounts when the preview looks wrong.
 - A CSV row with a zero amount is imported (some banks list zero-dollar authorizations).

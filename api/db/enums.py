@@ -225,6 +225,7 @@ class FindingKind(StrEnum):
     RECURRING_STOPPED = "recurring_stopped"
     PAY_CHANGE = "pay_change"
     UPCOMING_DEADLINE = "upcoming_deadline"
+    OVERDUE_DEADLINE = "overdue_deadline"
 
 
 class FindingSeverity(StrEnum):

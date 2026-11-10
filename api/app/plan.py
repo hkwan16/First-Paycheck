@@ -1,4 +1,4 @@
-"""The user's plan in one read (spec 016 rules 1-8).
+"""The user's plan in one read (spec 016 rules 1-8 and 3a).
 
 ``build_plan`` is shared by ``GET /plan`` and the ``plan.export`` job, so the
 screen and the PDF always show the same thing. It copies fields and does no
@@ -17,12 +17,14 @@ from pydantic import BaseModel
 from sqlalchemy import column, select, table
 from sqlalchemy.orm import Session
 
-from app.routers.calendar import CalendarEventOut
+from app.decision_review import ReviewContext, ReviewReason, load_context, review
+from app.routers.calendar import CalendarEventOut, event_out
 from app.routers.explain import CitationOut, current_setup, is_explainable, is_stale
 from app.routers.goals import GoalOut, goal_out
 from app.types import UtcDateTime
 from calc.registry import calculator
-from db.enums import CalculatorKind, CalendarStatus, PayFrequency
+from db.calendar import open_events
+from db.enums import CalculatorKind, PayFrequency
 from db.models import CalendarEvent, Decision, Explanation, Goal
 from db.pay_stubs import NEWEST_FIRST, current_pay_stubs
 from retrieval.citations import by_key, for_calculator
@@ -80,11 +82,16 @@ class PlanDecision(BaseModel):
     result: dict[str, Any]
     figures: list[PlanFigure]
     explanation: PlanExplanation
+    # Spec 007 rule 19b, as GET /decisions reports it: a decision with reasons is
+    # not shown as current (rule 3a).
+    review: list[ReviewReason]
 
 
 class PlanCompleteness(BaseModel):
     saved: list[CalculatorKind]
     missing: list[CalculatorKind]
+    # The saved ones that need review (rule 3a).
+    needs_review: list[CalculatorKind]
 
 
 class PlanPayStub(BaseModel):
@@ -271,7 +278,7 @@ def _explanation(session: Session, decision: Decision) -> PlanExplanation:
     )
 
 
-def _decision(session: Session, decision: Decision) -> PlanDecision:
+def _decision(session: Session, decision: Decision, context: ReviewContext) -> PlanDecision:
     kind = CalculatorKind(decision.calculator)
     return PlanDecision(
         id=decision.id,
@@ -282,6 +289,7 @@ def _decision(session: Session, decision: Decision) -> PlanDecision:
         result=decision.result,
         figures=figures(kind, decision.inputs, decision.result),
         explanation=_explanation(session, decision),
+        review=review(kind, decision.inputs, context),
     )
 
 
@@ -291,30 +299,18 @@ def _decisions(session: Session) -> list[PlanDecision]:
         select(Decision).where(Decision.id.in_(select(_current_decisions.c.id)))
     ).all()
     rows = sorted(rows, key=lambda row: order[CalculatorKind(row.calculator)])
-    return [_decision(session, row) for row in rows]
+    context = load_context(session)
+    return [_decision(session, row, context) for row in rows]
 
 
-def _calendar(session: Session, start: dt.date, end: dt.date) -> list[CalendarEventOut]:
+def _calendar(session: Session, today: dt.date, end: dt.date) -> list[CalendarEventOut]:
+    """Rule 6: open events through ``end``, the overdue ones (before ``today``) first."""
     rows = session.scalars(
-        select(CalendarEvent)
-        .where(
-            CalendarEvent.status == CalendarStatus.UPCOMING,
-            CalendarEvent.due_at >= start,
-            CalendarEvent.due_at <= end,
-        )
+        open_events()
+        .where(CalendarEvent.due_at <= end)
         .order_by(CalendarEvent.due_at, CalendarEvent.kind, CalendarEvent.id)
     )
-    return [
-        CalendarEventOut(
-            id=row.id,
-            kind=row.kind,
-            title=row.title,
-            due_at=row.due_at,
-            decision_id=row.decision_id,
-            status=row.status,
-        )
-        for row in rows
-    ]
+    return [event_out(row, today) for row in rows]
 
 
 def _pay_stub(session: Session) -> PlanPayStub | None:
@@ -348,7 +344,9 @@ def build_plan(session: Session, today: dt.date) -> PlanOut:
         as_of=today,
         calendar_through=through,
         completeness=PlanCompleteness(
-            saved=saved, missing=[kind for kind in CalculatorKind if kind not in saved]
+            saved=saved,
+            missing=[kind for kind in CalculatorKind if kind not in saved],
+            needs_review=[decision.calculator for decision in decisions if decision.review],
         ),
         decisions=decisions,
         goals=[goal_out(session, goal) for goal in goals],

@@ -579,6 +579,10 @@
           "kind": {
             "$ref": "#/components/schemas/CalendarKind"
           },
+          "overdue": {
+            "title": "Overdue",
+            "type": "boolean"
+          },
           "status": {
             "$ref": "#/components/schemas/CalendarStatus"
           },
@@ -593,7 +597,8 @@
           "title",
           "due_at",
           "decision_id",
-          "status"
+          "status",
+          "overdue"
         ],
         "title": "CalendarEventOut",
         "type": "object"
@@ -623,6 +628,9 @@
       },
       "CashFlow": {
         "properties": {
+          "diagram": {
+            "$ref": "#/components/schemas/FlowDiagram"
+          },
           "end": {
             "format": "date",
             "title": "End",
@@ -652,7 +660,8 @@
           "end",
           "pay_stubs",
           "withholding",
-          "spending"
+          "spending",
+          "diagram"
         ],
         "title": "CashFlow",
         "type": "object"
@@ -790,6 +799,11 @@
       },
       "CheckInDetail": {
         "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
           "cash_flow": {
             "$ref": "#/components/schemas/CheckInCashFlow"
           },
@@ -835,6 +849,10 @@
             "title": "Last Run At",
             "type": "string"
           },
+          "past": {
+            "title": "Past",
+            "type": "boolean"
+          },
           "period": {
             "format": "date",
             "title": "Period",
@@ -863,6 +881,8 @@
           "created_at",
           "updated_at",
           "last_run_at",
+          "as_of",
+          "past",
           "findings",
           "cash_flow"
         ],
@@ -898,6 +918,11 @@
       },
       "CheckInSummary": {
         "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
           "completed_at": {
             "anyOf": [
               {
@@ -933,6 +958,10 @@
             "title": "Last Run At",
             "type": "string"
           },
+          "past": {
+            "title": "Past",
+            "type": "boolean"
+          },
           "period": {
             "format": "date",
             "title": "Period",
@@ -960,7 +989,9 @@
           "handled_count",
           "created_at",
           "updated_at",
-          "last_run_at"
+          "last_run_at",
+          "as_of",
+          "past"
         ],
         "title": "CheckInSummary",
         "type": "object"
@@ -1108,6 +1139,70 @@
         "title": "CsvImport",
         "type": "object"
       },
+      "DeadlinePayload": {
+        "additionalProperties": false,
+        "description": "A date coming up (``upcoming_deadline``) or gone past unsettled (``overdue_deadline``).",
+        "properties": {
+          "affects": {
+            "anyOf": [
+              {
+                "enum": [
+                  "k401_match",
+                  "health_plans",
+                  "emergency_fund",
+                  "w4",
+                  "spending"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affects"
+          },
+          "calendar_event_id": {
+            "format": "uuid",
+            "title": "Calendar Event Id",
+            "type": "string"
+          },
+          "calendar_kind": {
+            "$ref": "#/components/schemas/CalendarKind"
+          },
+          "days_until": {
+            "title": "Days Until",
+            "type": "integer"
+          },
+          "due_at": {
+            "format": "date",
+            "title": "Due At",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "upcoming_deadline",
+              "overdue_deadline"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "affects",
+          "kind",
+          "calendar_event_id",
+          "calendar_kind",
+          "title",
+          "due_at",
+          "days_until"
+        ],
+        "title": "DeadlinePayload",
+        "type": "object"
+      },
       "DecisionIn": {
         "additionalProperties": false,
         "properties": {
@@ -1202,6 +1297,13 @@
             "title": "Result",
             "type": "object"
           },
+          "review": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewReason"
+            },
+            "title": "Review",
+            "type": "array"
+          },
           "supersedes_id": {
             "anyOf": [
               {
@@ -1228,7 +1330,8 @@
           "check_in_id",
           "inputs",
           "result",
-          "is_current"
+          "is_current",
+          "review"
         ],
         "title": "DecisionOut",
         "type": "object"
@@ -2082,13 +2185,18 @@
           "recurring_changed",
           "recurring_stopped",
           "pay_change",
-          "upcoming_deadline"
+          "upcoming_deadline",
+          "overdue_deadline"
         ],
         "title": "FindingKind",
         "type": "string"
       },
       "FindingOut": {
         "properties": {
+          "charge_gone": {
+            "title": "Charge Gone",
+            "type": "boolean"
+          },
           "check_in_id": {
             "format": "uuid",
             "title": "Check In Id",
@@ -2128,11 +2236,12 @@
               "mapping": {
                 "election_mismatch": "#/components/schemas/ElectionMismatchPayload",
                 "goal_off_pace": "#/components/schemas/GoalOffPacePayload",
+                "overdue_deadline": "#/components/schemas/DeadlinePayload",
                 "pay_change": "#/components/schemas/PayChangePayload",
                 "recurring_changed": "#/components/schemas/RecurringPayload",
                 "recurring_new": "#/components/schemas/RecurringPayload",
                 "recurring_stopped": "#/components/schemas/RecurringPayload",
-                "upcoming_deadline": "#/components/schemas/UpcomingDeadlinePayload"
+                "upcoming_deadline": "#/components/schemas/DeadlinePayload"
               },
               "propertyName": "kind"
             },
@@ -2150,7 +2259,7 @@
                 "$ref": "#/components/schemas/PayChangePayload"
               },
               {
-                "$ref": "#/components/schemas/UpcomingDeadlinePayload"
+                "$ref": "#/components/schemas/DeadlinePayload"
               }
             ],
             "title": "Payload"
@@ -2197,7 +2306,8 @@
           "user_action",
           "user_action_at",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "charge_gone"
         ],
         "title": "FindingOut",
         "type": "object"
@@ -2232,6 +2342,137 @@
         ],
         "title": "FindingSeverity",
         "type": "string"
+      },
+      "FlowDiagram": {
+        "description": "Every node and band of the cash-flow diagram: the bands into a node and\nthe bands out of it each sum to its ``cents``.",
+        "properties": {
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/FlowLink"
+            },
+            "title": "Links",
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/FlowNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "nodes",
+          "links"
+        ],
+        "title": "FlowDiagram",
+        "type": "object"
+      },
+      "FlowLink": {
+        "properties": {
+          "cents": {
+            "exclusiveMinimum": 0.0,
+            "title": "Cents",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target",
+          "cents"
+        ],
+        "title": "FlowLink",
+        "type": "object"
+      },
+      "FlowNode": {
+        "properties": {
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "cents": {
+            "minimum": 0.0,
+            "title": "Cents",
+            "type": "integer"
+          },
+          "column": {
+            "enum": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "title": "Column",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "kind": {
+            "enum": [
+              "gross",
+              "line",
+              "take_home",
+              "income_deposited",
+              "other_deposits",
+              "refunds",
+              "savings_withdrawn",
+              "beyond_income",
+              "not_deposited",
+              "bucket",
+              "left_over",
+              "category"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "refunds_cents": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refunds Cents"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "key",
+          "column",
+          "cents",
+          "refunds_cents",
+          "categories"
+        ],
+        "title": "FlowNode",
+        "type": "object"
       },
       "GoalKind": {
         "enum": [
@@ -4102,6 +4343,13 @@
             "title": "Missing",
             "type": "array"
           },
+          "needs_review": {
+            "items": {
+              "$ref": "#/components/schemas/CalculatorKind"
+            },
+            "title": "Needs Review",
+            "type": "array"
+          },
           "saved": {
             "items": {
               "$ref": "#/components/schemas/CalculatorKind"
@@ -4112,7 +4360,8 @@
         },
         "required": [
           "saved",
-          "missing"
+          "missing",
+          "needs_review"
         ],
         "title": "PlanCompleteness",
         "type": "object"
@@ -4241,6 +4490,13 @@
             "title": "Result",
             "type": "object"
           },
+          "review": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewReason"
+            },
+            "title": "Review",
+            "type": "array"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -4254,7 +4510,8 @@
           "inputs",
           "result",
           "figures",
-          "explanation"
+          "explanation",
+          "review"
         ],
         "title": "PlanDecision",
         "type": "object"
@@ -4428,7 +4685,7 @@
           },
           "key": {
             "enum": [
-              "take_home",
+              "income",
               "essentials",
               "flexible",
               "other",
@@ -4443,6 +4700,10 @@
           "label": {
             "title": "Label",
             "type": "string"
+          },
+          "needs_pay_stub": {
+            "title": "Needs Pay Stub",
+            "type": "boolean"
           },
           "plan_cents": {
             "anyOf": [
@@ -4478,7 +4739,8 @@
           "actual_cents",
           "plan_cents",
           "difference_cents",
-          "status"
+          "status",
+          "needs_pay_stub"
         ],
         "title": "PlanLine",
         "type": "object"
@@ -4928,6 +5190,18 @@
             ],
             "title": "Salary Cents"
           },
+          "salary_pay_stub_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Pay Stub Id"
+          },
           "start_date": {
             "anyOf": [
               {
@@ -5049,6 +5323,29 @@
             ],
             "title": "Salary Cents"
           },
+          "salary_pay_stub_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Pay Stub Id"
+          },
+          "salary_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SalaryReview"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when the newest confirmed stub's yearly pay differs from salary_cents and from the stub salary_pay_stub_id names (spec 005 rule 24c): the person chooses which salary to use. Computed on read."
+          },
           "start_date": {
             "anyOf": [
               {
@@ -5089,7 +5386,8 @@
         },
         "required": [
           "updated_at",
-          "pay_schedule"
+          "pay_schedule",
+          "salary_review"
         ],
         "title": "ProfileOut",
         "type": "object"
@@ -5534,6 +5832,44 @@
         "title": "RetirementValues",
         "type": "object"
       },
+      "ReviewReason": {
+        "description": "One reason a saved decision needs review (rule 19b).",
+        "properties": {
+          "input": {
+            "enum": [
+              "pay_periods_per_year",
+              "salary_cents",
+              "tax_year",
+              "filing_status",
+              "age",
+              "match_tiers",
+              "k401_contribution_pct",
+              "health_premium_per_paycheck_cents"
+            ],
+            "title": "Input",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "changed",
+              "salary_unconfirmed"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "input",
+          "text"
+        ],
+        "title": "ReviewReason",
+        "type": "object"
+      },
       "RoleTotals": {
         "properties": {
           "health_cents": {
@@ -5604,6 +5940,60 @@
         "title": "RuleOut",
         "type": "object"
       },
+      "SalaryReview": {
+        "description": "The newest stub's yearly pay beside the saved salary, for the question.",
+        "properties": {
+          "annual_salary_cents": {
+            "description": "The stub's gross pay times its pay periods a year (spec 005 rule 24a)",
+            "title": "Annual Salary Cents",
+            "type": "integer"
+          },
+          "frequency": {
+            "$ref": "#/components/schemas/PayFrequency"
+          },
+          "gross_cents": {
+            "title": "Gross Cents",
+            "type": "integer"
+          },
+          "pay_stub_date": {
+            "format": "date",
+            "title": "Pay Stub Date",
+            "type": "string"
+          },
+          "pay_stub_id": {
+            "description": "The newest current stub, which the answer names",
+            "format": "uuid",
+            "title": "Pay Stub Id",
+            "type": "string"
+          },
+          "periods_per_year": {
+            "enum": [
+              12,
+              24,
+              26,
+              52
+            ],
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "salary_cents": {
+            "description": "The salary saved in the profile",
+            "title": "Salary Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pay_stub_id",
+          "pay_stub_date",
+          "frequency",
+          "periods_per_year",
+          "gross_cents",
+          "annual_salary_cents",
+          "salary_cents"
+        ],
+        "title": "SalaryReview",
+        "type": "object"
+      },
       "SourceLine": {
         "additionalProperties": false,
         "properties": {
@@ -5638,6 +6028,23 @@
           "redacted"
         ],
         "title": "SourceLine",
+        "type": "object"
+      },
+      "SpendingMonths": {
+        "properties": {
+          "months": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "title": "Months",
+            "type": "array"
+          }
+        },
+        "required": [
+          "months"
+        ],
+        "title": "SpendingMonths",
         "type": "object"
       },
       "SpendingSummary": {
@@ -6039,66 +6446,6 @@
         "title": "UnlinkedItem",
         "type": "object"
       },
-      "UpcomingDeadlinePayload": {
-        "additionalProperties": false,
-        "properties": {
-          "affects": {
-            "anyOf": [
-              {
-                "enum": [
-                  "k401_match",
-                  "health_plans",
-                  "emergency_fund",
-                  "w4",
-                  "spending"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Affects"
-          },
-          "calendar_event_id": {
-            "format": "uuid",
-            "title": "Calendar Event Id",
-            "type": "string"
-          },
-          "calendar_kind": {
-            "$ref": "#/components/schemas/CalendarKind"
-          },
-          "days_until": {
-            "title": "Days Until",
-            "type": "integer"
-          },
-          "due_at": {
-            "format": "date",
-            "title": "Due At",
-            "type": "string"
-          },
-          "kind": {
-            "const": "upcoming_deadline",
-            "default": "upcoming_deadline",
-            "title": "Kind",
-            "type": "string"
-          },
-          "title": {
-            "title": "Title",
-            "type": "string"
-          }
-        },
-        "required": [
-          "affects",
-          "calendar_event_id",
-          "calendar_kind",
-          "title",
-          "due_at",
-          "days_until"
-        ],
-        "title": "UpcomingDeadlinePayload",
-        "type": "object"
-      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -6165,6 +6512,13 @@
               "type": "string"
             },
             "title": "Numbers Unmatched",
+            "type": "array"
+          },
+          "zero_cost_claims": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Zero Cost Claims",
             "type": "array"
           }
         },
@@ -7103,7 +7457,7 @@
     },
     "/calendar": {
       "get": {
-        "description": "Upcoming events, soonest first; done and dismissed ones stay for the plan export.",
+        "description": "Open events, soonest first; done, dismissed and settled ones stay for the plan export.",
         "operationId": "list_calendar",
         "parameters": [
           {
@@ -8916,6 +9270,16 @@
             },
             "description": "Unauthorized"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -9055,6 +9419,43 @@
         "summary": "Update Recurring",
         "tags": [
           "recurring"
+        ]
+      }
+    },
+    "/spending/months": {
+      "get": {
+        "description": "The months with something to show: the Spending period picker's choices.",
+        "operationId": "spending_months",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpendingMonths"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Spending Months",
+        "tags": [
+          "spending"
         ]
       }
     },

@@ -30,9 +30,9 @@ def test_generation_is_deterministic_and_seed_dependent() -> None:
 def test_rows_are_well_formed() -> None:
     with gen.DEFAULT_CSV.open(newline="") as handle:
         rows = list(csv.DictReader(handle))
-    assert len(rows) == 534
+    assert len(rows) == 540
     assert list(rows[0]) == ["id", "merchant_raw", "amount_cents", "posted_at", "category"]
-    assert len({row["id"] for row in rows}) == 534
+    assert len({row["id"] for row in rows}) == 540
     assert {row["category"] for row in rows} <= set(CATEGORIES)
     income = [int(row["amount_cents"]) for row in rows if row["category"] == "income"]
     assert income
@@ -41,7 +41,7 @@ def test_rows_are_well_formed() -> None:
 
 def test_suite_scores_rules_only() -> None:
     result = categorization_rules.run(Budget(0))
-    assert result.cases == 534
+    assert result.cases == 540
     assert set(result.metrics) == {"rules_precision", "rules_coverage"}
     # Issue #148: no seed rule labels a row wrongly, so none is listed.
     assert result.metrics["rules_precision"] == 1.0
@@ -65,10 +65,11 @@ def test_scoring_on_hand_made_rows() -> None:
 
 def test_the_hand_written_rows_follow_the_seeded_ones() -> None:
     rows = gen.generate()
-    assert [row.id for row in rows] == list(range(1, 535))
+    assert [row.id for row in rows] == list(range(1, 541))
     assert [row.merchant_raw for row in rows[500:515]] == [case[0] for case in gen.SIGN_CASES]
     assert [row.merchant_raw for row in rows[515:528]] == [case[0] for case in gen.NAME_CASES]
-    assert [row.merchant_raw for row in rows[528:]] == [case[0] for case in gen.DEFINITION_CASES]
+    assert [row.merchant_raw for row in rows[528:534]] == [case[0] for case in gen.DEFINITION_CASES]
+    assert [row.merchant_raw for row in rows[534:]] == [case[0] for case in gen.BUDGETING_CASES]
 
 
 def test_rules_follow_the_direction_on_the_hand_written_rows() -> None:
@@ -102,7 +103,16 @@ def test_the_definition_rows_reach_the_model_except_the_tax_refund() -> None:
     """Spec 003 rule 9b: no seed rule names the warehouse clubs, card payments
     or tax preparer, so the model labels them; the seed contains rule
     ``tax ref`` labels the IRS refund deposit income."""
-    rows = gen.generate()[528:]
+    rows = gen.generate()[528:534]
     result = categorization_rules.score(rows)
     assert result.failures == []
     assert result.metrics["rules_coverage"] == 1 / 6
+
+
+def test_the_seed_rules_call_every_budgeting_app_a_subscription() -> None:
+    """Spec 003 rule 9c (issue #226): a budgeting app's plan is a subscription,
+    never savings, and no such charge reaches the model."""
+    rows = gen.generate()[534:]
+    result = categorization_rules.score(rows)
+    assert result.failures == []
+    assert result.metrics == {"rules_precision": 1.0, "rules_coverage": 1.0}

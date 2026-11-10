@@ -14,7 +14,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from sqlalchemy import ColumnElement, case, func, select
+from sqlalchemy import ColumnElement, Date, case, func, select
 from sqlalchemy.orm import Session
 
 from app.deps import Now, UserSession
@@ -28,7 +28,7 @@ from db.accounts import (
 )
 from db.enums import AccountKind
 from db.models import Account, Transaction
-from db.pay_stubs import paid_between_count
+from db.pay_stubs import paid_between_count, paid_months
 from sync.categories import CATEGORIES, CATEGORY_BUCKETS
 
 router = APIRouter(prefix="/spending", tags=["spending"])
@@ -73,6 +73,12 @@ class SpendingSummary(BaseModel):
     category_buckets: dict[str, Bucket]
     # The account kinds whose rows the totals read (rule 21a).
     account_kinds_counted: list[AccountKind]
+
+
+class SpendingMonths(BaseModel):
+    # The first day of each UTC month with a posted row on an active cash
+    # account or a current pay stub, newest first (spec 010 rule 5d).
+    months: list[dt.date]
 
 
 def last_complete_month(today: dt.date) -> tuple[dt.date, dt.date]:
@@ -156,6 +162,20 @@ def spending_summary(
     """Income, spending by bucket and what is left over; the last full UTC month by default."""
     first, last = period(start, end, now.date())
     return summary_for(session, first, last)
+
+
+@router.get("/months", responses=error_responses(401))
+def spending_months(session: UserSession) -> SpendingMonths:
+    """The months with something to show: the Spending period picker's choices."""
+    month = func.date_trunc("month", Transaction.posted_at).cast(Date)
+    with_rows = session.scalars(
+        select(month)
+        .join(Account, transaction_account())
+        .where(Transaction.pending.is_(False) & active_account_of(SPENDING_ACCOUNT_KINDS))
+        .distinct()
+    )
+    months = set(with_rows) | paid_months(session)
+    return SpendingMonths(months=sorted(months, reverse=True))
 
 
 def summary_for(session: Session, first: dt.date, last: dt.date) -> SpendingSummary:

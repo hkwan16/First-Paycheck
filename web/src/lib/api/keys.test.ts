@@ -4,6 +4,7 @@ import { $api } from './client';
 import {
   invalidateAfterConfirm,
   invalidateAfterDecision,
+  invalidateAfterProfile,
   invalidateAfterUnlink,
   invalidateCheckIn,
   invalidateDecisions,
@@ -97,6 +98,8 @@ describe('document keys', () => {
       explanation: $api.queryOptions('get', '/decisions/{decision_id}/explanation', {
         params: { path: { decision_id: 'x1' } },
       }).queryKey,
+      decisions: queryKeys.decisions(),
+      decision: queryKeys.decision('x1'),
     };
     for (const key of Object.values(keys)) client.setQueryData(key, {});
     const invalidated = (key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
@@ -143,7 +146,21 @@ describe('document keys', () => {
     expect(invalidated(keys.plan)).toBe(true);
     // A new stub or summary can leave an explanation out of date (spec 008 rule 19b).
     expect(invalidated(keys.explanation)).toBe(true);
+    // A new stub can leave a saved decision needing review (spec 007 rule 19b, issue 222).
+    expect(invalidated(keys.decisions)).toBe(true);
+    expect(invalidated(keys.decision)).toBe(true);
     expect(invalidated(keys.accounts)).toBe(false);
+  });
+
+  it('saved plan details refresh the decisions and the plan, which read them', async () => {
+    const { client, keys, invalidated } = seededDocs();
+    await invalidateAfterProfile(client);
+    expect(invalidated(keys.decisions)).toBe(true);
+    expect(invalidated(keys.decision)).toBe(true);
+    expect(invalidated(keys.plan)).toBe(true);
+    expect(invalidated(keys.payStubs)).toBe(false);
+    // The saved profile itself is written into its cache, not read again.
+    expect(invalidated(keys.profile)).toBe(false);
   });
 });
 

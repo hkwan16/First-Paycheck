@@ -48,6 +48,8 @@ import {
   W4_CONTEXT_INPUTS,
   type FromDecisions,
 } from './w4-format';
+import { ReviewNotice } from './ReviewNotice';
+import { SalaryQuestion } from './SalaryQuestion';
 import { W4_CALC_PATH, W4Result } from './W4Result';
 
 /** The Form W-4 amounts typed on the card, each sent as integer cents. */
@@ -144,7 +146,8 @@ export function W4Card() {
   // "Anything else on your W-4?" answered Yes; the entries also show while any holds a value.
   const [askedForMore, setAskedForMore] = useState(false);
   // "Apply suggestion" leaves with its suggestion: focus the entry it filled (issue 167).
-  const focus = useFocusHandoff<AmountKey>();
+  // Or, once the salary question is answered, the filing status: the first control.
+  const focus = useFocusHandoff<AmountKey | 'filing'>();
 
   const textOf = (key: TextKey) =>
     texts[key] ??
@@ -168,7 +171,10 @@ export function W4Card() {
   const payStub = payStubs.data?.[0];
   const periods = profile.data?.pay_schedule?.periods_per_year ?? null;
   const salary = profile.data?.salary_cents ?? null;
-  const ready = loaded && payStub !== undefined && periods !== null && salary !== null;
+  // The salary question is open (spec 005 rule 24c): nothing is worked out until it is answered.
+  const question = profile.data?.salary_review ?? null;
+  const ready =
+    loaded && payStub !== undefined && periods !== null && salary !== null && question === null;
 
   let missing: string | null = null;
   if (statusValue === null) missing = 'Choose your filing status';
@@ -291,6 +297,14 @@ export function W4Card() {
         <Link href={decisionStepRoute('401k_match')}>Add them on the 401(k) step</Link>.
       </Notice>
     );
+  } else if (question !== null) {
+    body = (
+      <SalaryQuestion
+        profile={profile.data!}
+        question={question}
+        onAnswered={() => focus.moveTo('filing')}
+      />
+    );
   } else {
     const text = calc.data && inputs !== null && !calc.isError ? suggestionText(calc.data) : null;
     body = (
@@ -303,7 +317,7 @@ export function W4Card() {
 
         <FromYourDecisions id={`${id}-decided`} from={from} />
 
-        <div>
+        <div ref={focus.target('filing')}>
           <div className="mb-1.5 text-small font-semibold text-ink-2">Step 1(c): filing status</div>
           <Seg
             label="Filing status"
@@ -425,6 +439,7 @@ export function W4Card() {
       busy={!loaded && !failed}
       badge={loaded ? <Badge tone={saveBadgeTone(state.status)}>{state.label}</Badge> : undefined}
     >
+      {loaded && !failed && current && <ReviewNotice decision={current} />}
       {body}
     </DecisionCard>
   );

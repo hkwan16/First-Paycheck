@@ -159,6 +159,7 @@ export function planDecision(
     result: structuredClone(decision.result),
     figures: figuresOf(decision),
     explanation,
+    review: [...decision.review],
   };
 }
 
@@ -169,12 +170,13 @@ const CALCULATORS: readonly CalculatorKind[] = [
   'w4',
 ];
 
-/** `completeness` for the decisions given (rule 2), in calculator order. */
-const completenessOf = (decisions: readonly PlanDecision[]) => {
+/** `completeness` for the decisions given (rules 2 and 3a), in calculator order. */
+export const completenessOf = (decisions: readonly PlanDecision[]) => {
   const saved = new Set(decisions.map((d) => d.calculator));
   return {
     saved: CALCULATORS.filter((c) => saved.has(c)),
     missing: CALCULATORS.filter((c) => !saved.has(c)),
+    needs_review: decisions.filter((d) => d.review.length > 0).map((d) => d.calculator),
   };
 };
 

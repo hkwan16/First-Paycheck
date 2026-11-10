@@ -55,6 +55,19 @@ export function periodOptions(today: string, count = 6): PeriodOption[] {
   });
 }
 
+/**
+ * The options for the months the API says have something to show (spec 010
+ * rule 5d), `YYYY-MM-01` each; all of them while that is not known.
+ */
+export function optionsWithin(
+  options: readonly PeriodOption[],
+  months: readonly string[] | null,
+): PeriodOption[] {
+  if (months === null) return [...options];
+  const shown = new Set(months.map(monthKey));
+  return options.filter((option) => shown.has(option.value));
+}
+
 /** The picker's value: the chosen period's month, else the month the API answered for. */
 export function selectedPeriodKey(chosen: Period | null, answered: Period | undefined): string {
   if (chosen) return monthKey(chosen.start);

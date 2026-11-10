@@ -9,7 +9,7 @@ What it starts, in order:
 1. A disposable Postgres database, ``E2E_DATABASE_URL`` (default
    ``postgresql://localhost:5432/first_paycheck_e2e``; its name must contain
    ``e2e``): dropped and recreated, the test auth shim installed, migrated to
-   head, seeded (as ``make seed``), and three fixture users added to
+   head, seeded (as ``make seed``), and four fixture users added to
    ``auth.users``. ``app_api`` gets a login password made for this run.
 2. ``FakeSupabaseAuth`` on 127.0.0.1:``E2E_AUTH_PORT``: a stand-in for
    Supabase Auth with the routes supabase-js uses (password and refresh-token
@@ -110,11 +110,14 @@ class FixtureUser:
 class FixtureUsers(NamedTuple):
     """``shared``: the e2e user every saved-session spec uses (E2E_USER_*).
     ``alpha``: a fresh account for ``alpha.spec.ts``, which signs in itself.
+    ``schedule``: a fresh account for ``schedule-change.spec.ts``, whose pay
+    stubs change schedule under saved decisions (issues 221 and 222).
     ``session``: the account the session specs inject Auth faults for
     (E2E_SESSION_USER_*), so no fault reaches another spec's user."""
 
     shared: FixtureUser
     alpha: FixtureUser
+    schedule: FixtureUser
     session: FixtureUser
 
 
@@ -129,6 +132,11 @@ def fixture_users() -> FixtureUsers:
         alpha=FixtureUser(
             uuid.UUID("00000000-0000-4000-8000-0000000000a1"),
             "alpha@example.com",
+            secrets.token_urlsafe(24),
+        ),
+        schedule=FixtureUser(
+            uuid.UUID("00000000-0000-4000-8000-0000000000c2"),
+            "schedule@example.com",
             secrets.token_urlsafe(24),
         ),
         session=FixtureUser(
@@ -603,6 +611,8 @@ def playwright_environment(
             "NEXT_PUBLIC_E2E_USER_EMAIL": users.shared.email,
             "E2E_ALPHA_USER_EMAIL": users.alpha.email,
             "E2E_ALPHA_USER_PASSWORD": users.alpha.password,
+            "E2E_SCHEDULE_USER_EMAIL": users.schedule.email,
+            "E2E_SCHEDULE_USER_PASSWORD": users.schedule.password,
             "E2E_SESSION_USER_EMAIL": users.session.email,
             "E2E_SESSION_USER_PASSWORD": users.session.password,
             "E2E_AUTH_FAULTS_URL": f"{auth_url}{FAULTS_PATH}",

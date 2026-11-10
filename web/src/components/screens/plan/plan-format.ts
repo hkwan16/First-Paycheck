@@ -7,7 +7,7 @@ import type {
   PlanFigure,
 } from '@/lib/api/types';
 import { calculatorIdOf } from '@/lib/decisions';
-import type { Hue } from '@/lib/design/tone';
+import type { Hue, Tone } from '@/lib/design/tone';
 import { isExplained } from '@/lib/explanations';
 import { formatMoney, formatNetCost, formatNumber, formatRate, formatRefund } from '@/lib/money';
 import { CALCULATOR_CARDS } from '../decisions/DecisionCard';
@@ -69,10 +69,22 @@ export function explanationView(decision: PlanDecision): ExplanationView {
   return status === 'verified' && stale ? 'stale' : status;
 }
 
-/** "3 of 4 decisions saved": counting the API's two lists, not computing a figure. */
-export function completenessText({ saved, missing }: PlanCompleteness): string {
+/**
+ * "3 of 4 decisions saved", with ", 3 need review" while any does (spec 016
+ * rule 3a): counting the API's lists, not computing a figure.
+ */
+export function completenessText({ saved, missing, needs_review }: PlanCompleteness): string {
   const total = saved.length + missing.length;
-  return `${formatNumber(saved.length)} of ${formatNumber(total)} decisions saved`;
+  const text = `${formatNumber(saved.length)} of ${formatNumber(total)} decisions saved`;
+  if (needs_review.length === 0) return text;
+  const verb = needs_review.length === 1 ? 'needs' : 'need';
+  return `${text}, ${formatNumber(needs_review.length)} ${verb} review`;
+}
+
+/** The completeness badge: confirmed only when the plan is whole and nothing in it needs review. */
+export function completenessTone({ missing, needs_review }: PlanCompleteness): Tone {
+  if (needs_review.length > 0) return 'warning';
+  return missing.length === 0 ? 'confirmed' : 'neutral';
 }
 
 const GOAL_LABELS: Record<Goal['kind'], string> = {

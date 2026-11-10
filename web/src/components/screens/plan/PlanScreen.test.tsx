@@ -5,6 +5,7 @@ import { watchDownloads } from '@/test/fake-download';
 import { DECISION_V1_ID } from '@/test/fixtures/decisions';
 import {
   CALENDAR_FILENAME,
+  completenessOf,
   emptyPlan,
   exportJob,
   exportJobId,
@@ -53,7 +54,7 @@ const render = () => renderWithProviders(<PlanScreen />, { advanceTimers: vi.adv
 async function open() {
   const view = render();
   await screen.findByRole('heading', { level: 1, name: 'Your plan, on one page' });
-  await screen.findByText(/decisions saved$/);
+  await screen.findByText(/decisions saved/);
   return view;
 }
 
@@ -200,6 +201,18 @@ describe('PlanScreen with every decision saved', () => {
     expect(items[3]).toHaveTextContent('Due Nov 14, 2026');
   });
 
+  it('marks a date the API says is overdue (issue 233)', async () => {
+    const plan = samplePlan();
+    plan.calendar = plan.calendar.map((event, index) => ({ ...event, overdue: index === 2 }));
+    planDb.plan = plan;
+    await open();
+    const items = within(region('Next 90 days')).getAllByRole('listitem');
+    expect(items[2]).toHaveTextContent('Overdue');
+    expect(items[2]).toHaveTextContent('Was due Oct 31, 2026');
+    expect(items[3]).not.toHaveTextContent('Overdue');
+    expect(items[3]).toHaveTextContent('Due Nov 14, 2026');
+  });
+
   it("links each date's badge to its decision's step (spec 018 rule 4)", async () => {
     await open();
     const calendar = region('Next 90 days');
@@ -221,6 +234,61 @@ describe('PlanScreen with every decision saved', () => {
       'href',
       '/setup/decisions/w4',
     );
+  });
+});
+
+describe('PlanScreen with decisions that need review (spec 016 rule 3a, issue 222)', () => {
+  const schedule = {
+    kind: 'changed' as const,
+    input: 'pay_periods_per_year' as const,
+    text: 'Your pay schedule changed from 26 to 24 paychecks a year.',
+  };
+  const question = {
+    kind: 'salary_unconfirmed' as const,
+    input: 'salary_cents' as const,
+    text: 'Your newest pay stub comes to $64,999.92 a year, not the $95,000.10 in your plan details. Choose which salary to use.',
+  };
+
+  function reviewPlan() {
+    const plan = samplePlan();
+    plan.decisions = plan.decisions.map((decision) =>
+      decision.calculator === 'health_plans' || decision.calculator === 'w4'
+        ? { ...decision, review: [schedule, question] }
+        : decision,
+    );
+    plan.completeness = completenessOf(plan.decisions);
+    planDb.plan = plan;
+  }
+
+  it('counts them beside what is saved', async () => {
+    reviewPlan();
+    await open();
+    expect(screen.getByText('4 of 4 decisions saved, 2 need review')).toBeInTheDocument();
+  });
+
+  it('marks each one, says why, links to its step and shows none of its figures', async () => {
+    reviewPlan();
+    await open();
+    const health = region('Health plan');
+    expect(within(health).getByText('Needs review')).toBeInTheDocument();
+    expect(within(health).queryByText(/^Saved /)).toBeNull();
+    expect(within(health).getByText(schedule.text)).toBeInTheDocument();
+    expect(within(health).getByText(question.text)).toBeInTheDocument();
+    expect(within(health).getByRole('link', { name: 'Review your health plan' })).toHaveAttribute(
+      'href',
+      '/setup/decisions/health-plan',
+    );
+    expect(within(health).queryByText('Premiums a year', { selector: 'dt' })).toBeNull();
+    expect(within(health).queryAllByRole('definition')).toHaveLength(0);
+    const w4 = region('W-4, federal only');
+    expect(within(w4).getByRole('link', { name: 'Review your W-4' })).toHaveAttribute(
+      'href',
+      '/setup/decisions/w4',
+    );
+    expect(within(w4).queryAllByRole('definition')).toHaveLength(0);
+    // The others still show their figures as saved.
+    expect(within(region('401(k) match')).getByText(/^Saved /)).toBeInTheDocument();
+    expect(figure(region('401(k) match'), 'Your contribution')).not.toBeNull();
   });
 });
 

@@ -85,6 +85,28 @@ test('the summary, the diagram and the recurring charges come before the list (i
 const flowCard = (page: Page) =>
   page.getByRole('region', { name: /^Where each dollar of (\w+ )?pay went$/ });
 
+/** "$1,996.04" to 199604: reading a figure off the page to compare, not money math. */
+const centsOf = (text: string) => Number(text.replace(/[$,.]/g, ''));
+
+/** The diagram's node buttons (the Sankey; the stacked bars have none). */
+const flowNodes = (page: Page) => flowCard(page).locator('[data-flow-host] > button');
+
+/** The diagram's nodes as drawn: each one's name, the API's amount and its height. */
+async function drawnNodes(page: Page) {
+  const drawn = [];
+  for (const node of await flowNodes(page).all()) {
+    const label = ((await node.textContent()) ?? '').trim();
+    const amount = /\$([\d,]+\.\d{2})$/.exec(label)?.[0] ?? '$0.00';
+    const box = await node.boundingBox();
+    drawn.push({
+      name: label.replace(/ \$[\d,]+\.\d{2}$/, ''),
+      cents: centsOf(amount),
+      height: box?.height ?? 0,
+    });
+  }
+  return drawn;
+}
+
 test('the cash flow and the summary tiles show the same totals from the API', async ({ page }) => {
   await openSpending(page);
   const summary = await loadedSummary(page);
@@ -94,16 +116,11 @@ test('the cash flow and the summary tiles show the same totals from the API', as
     test.info().annotations.push({ type: 'note', description: 'No money in the default period' });
     return;
   }
-  // The scale comes from gross pay, or from the income deposited when no pay
-  // stub is confirmed (layoutCashFlow). This project depends on Link only, so
-  // whether a stub is confirmed depends on what else ran; and the sandbox
-  // bank may deposit nothing in the period. With neither, every amount is
-  // still drawn, but there is nothing to scale bands by, so no badge.
-  const scale = card.getByText(/^Scale: 1 px is about \$[\d,]+$/);
-  const pay = card.getByRole('button', {
-    name: /^(Gross pay, \d+ stubs?|Income deposited) \$(?!0\.00$)/,
-  });
-  if ((await pay.count()) > 0) await expect(scale).toBeVisible();
+  // The scale comes from the largest node (spec 010 rule 5c): whatever the
+  // period holds, a stub, deposits or only spending, any amount gives one.
+  const scale = card.getByText(/^Scale: 1 px is about \$[\d,.]+$/);
+  const amounts = card.getByRole('button', { name: /\$(?!0\.00$)[\d,]+\.\d{2}$/ });
+  if ((await amounts.count()) > 0) await expect(scale).toBeVisible();
   else await expect(scale).toHaveCount(0);
   // Spec 007 rule 26a and spec 010 rule 5a (issue 164): income is deposits, and
   // the pay stubs are counted for this period only, whatever other months hold.
@@ -118,13 +135,52 @@ test('the cash flow and the summary tiles show the same totals from the API', as
     card.getByRole('button', { name: /^(Gross pay, \d+ stubs?|No pay stub this period) \$/ }),
   ).toHaveCount(1);
   // Both routes compute the period with the same code (spec 010 rule 5):
-  // every bucket the diagram draws matches its tile.
+  // every bucket the diagram draws matches its tile. A bucket with refunds is
+  // drawn before them (rule 5b) and its details give the tile's amount.
   for (const bucket of ['Essentials', 'Flexible', 'Savings']) {
     // Anchored on the amount: "Savings transfer" is a category under Savings.
     const node = card.getByRole('button', { name: new RegExp(`^${bucket} \\$`) });
-    const amount = ((await node.textContent()) ?? '').replace(bucket, '').trim();
+    let amount = ((await node.textContent()) ?? '').replace(bucket, '').trim();
+    await node.focus();
+    const details = card.getByRole('group', { name: bucket });
+    await expect(details).toBeVisible();
+    const after = /The summary counts (\$[\d,]+\.\d{2}) after/.exec(
+      (await details.textContent()) ?? '',
+    );
+    if (after?.[1]) amount = after[1];
+    await page.keyboard.press('Escape');
     expect(amount).toMatch(/^\$[\d,]+\.\d{2}$/);
     await expect(summary).toContainText(amount);
+  }
+});
+
+test('every node is as tall as its own amount, and the legend lists only what is drawn (issue 236)', async ({
+  page,
+}) => {
+  await openSpending(page);
+  await loadedSummary(page);
+  const card = flowCard(page);
+  await expect(card).not.toHaveAttribute('aria-busy', 'true');
+  test.skip((await flowNodes(page).count()) === 0, 'No money to draw');
+  const nodes = await drawnNodes(page);
+  // One scale for every node: a node taller than the words need is its
+  // amount in pixels, so height over amount is the same for all of them.
+  // (Take-home was drawn as tall as the spending linked to it, taller than gross.)
+  const scaled = nodes.filter((n) => n.cents > 0 && n.height > 40);
+  const ratios = scaled.map((n) => n.height / n.cents);
+  const top = Math.max(...ratios);
+  for (const [i, ratio] of ratios.entries()) {
+    expect(Math.abs(ratio - top) * scaled[i]!.cents, scaled[i]!.name).toBeLessThan(2);
+  }
+  const gross = nodes.find((n) => n.name.startsWith('Gross pay'));
+  const takeHome = nodes.find((n) => n.name === 'Take-home');
+  if (gross && takeHome) expect(takeHome.height).toBeLessThanOrEqual(gross.height + 0.5);
+
+  const legend = card.getByRole('list', { name: 'Legend' });
+  const items = await legend.getByRole('listitem').allTextContents();
+  expect(items.length).toBeGreaterThan(0);
+  if (nodes.some((n) => n.name === 'No pay stub this period')) {
+    for (const item of items) expect(item).not.toMatch(/Gross pay|Taxes|Health premiums|401\(k\)/);
   }
 });
 
@@ -144,17 +200,32 @@ test('a node opens its details from the keyboard and Escape returns focus', asyn
   await expect(card.locator(':focus')).toHaveAttribute('aria-expanded', 'false');
 });
 
-test('the transactions follow the period the summary shows', async ({ page }) => {
+test('the transactions follow the period the summary shows, and every month offered has something to show', async ({
+  page,
+}) => {
   await page.goto('/setup/spending');
   await waitForHydration(page);
-  const listed = [await transactionsIn(page, await summaryMonth(await loadedSummary(page)))];
+  const opened = await summaryMonth(await loadedSummary(page));
+  const listed = [await transactionsIn(page, opened)];
   const picker = page.getByRole('combobox', { name: 'Period' });
+  await expect(picker).toBeEnabled();
   for (const label of await picker.locator('option').allTextContents()) {
     await picker.selectOption({ label });
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(
       `Where ${monthOf(label)}'s money went`,
     );
-    listed.push(await transactionsIn(page, monthOf(label)));
+    const rows = await transactionsIn(page, monthOf(label));
+    listed.push(rows);
+    // Issue 236: June 2026 was offered with no transaction and no pay stub.
+    // Only the month it opened on is offered whatever it holds (spec 010 rule 5d).
+    if (monthOf(label) !== opened) {
+      const heading = await (
+        await loadedSummary(page)
+      )
+        .getByRole('heading', { level: 2 })
+        .textContent();
+      expect(rows || !/no pay stub$/.test(heading ?? ''), label).toBe(true);
+    }
   }
   // The sandbox's rows are in some month the picker offers, so some period lists rows.
   expect(listed).toContain(true);

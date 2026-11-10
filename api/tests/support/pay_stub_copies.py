@@ -39,6 +39,25 @@ ACME: dict[str, Any] = {
     "net_cents": 199_604,
 }
 
+# The synthetic stub-01 (tests/support/factories.py:STUB_01) as Confirm sends it:
+# $3,653.85 every two weeks, paid 2026-04-10; 9,500,010 a year (spec 005 rule 24a).
+STUB_01: dict[str, Any] = {
+    "employer_name": "Acme Corp",
+    "pay_frequency": "biweekly",
+    "pay_date": "2026-04-10",
+    "period_start": "2026-03-23",
+    "period_end": "2026-04-05",
+    "gross_cents": 365_385,
+    "federal_withholding_cents": 27_244,
+    "social_security_cents": 22_654,
+    "medicare_cents": 5_298,
+    "state_tax_cents": 16_442,
+    "retirement_contribution_cents": 10_962,
+    "medical_premium_cents": 2_500,
+    "other_deductions_cents": 5_199,
+    "net_cents": 275_086,
+}
+
 # A stub confirmed with the wrong pay period (the second half of October), which
 # a Replace then corrects to ACME; before issue 190 it was the newest of the two.
 LATE_OCTOBER: dict[str, Any] = {

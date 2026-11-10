@@ -39,6 +39,8 @@ import { matchHeadline, saveBadgeTone, saveErrorText, tiersText } from './decisi
 import { K401Notices, K401ResultRows } from './K401Result';
 import { needsPlanDetails } from './plan-details';
 import { PlanDetailsForm } from './PlanDetailsForm';
+import { ReviewNotice } from './ReviewNotice';
+import { SalaryQuestion } from './SalaryQuestion';
 
 const CALC_PATH = '/calc/401k-match';
 const SLIDER_MAX = 15;
@@ -107,8 +109,10 @@ export function Match401kCard() {
   const save = useSaveDecision('k401_match');
 
   const loaded = profile.data !== undefined && payStubs.data !== undefined && decisions.data;
+  // The salary question is open (spec 005 rule 24c): nothing is calculated until it is answered.
+  const question = loaded ? (profile.data.salary_review ?? null) : null;
   const ready: Ready | null =
-    loaded && payStub && !editing && !needsPlanDetails(profile.data)
+    loaded && payStub && !editing && !needsPlanDetails(profile.data) && question === null
       ? { profile: profile.data, payStub }
       : null;
 
@@ -150,6 +154,14 @@ export function Match401kCard() {
           </Button>
         </div>
       </>
+    );
+  } else if (question !== null && !editing && !needsPlanDetails(profile.data)) {
+    body = (
+      <SalaryQuestion
+        profile={profile.data}
+        question={question}
+        onAnswered={() => focus.moveTo('contribution')}
+      />
     );
   } else if (!ready) {
     const complete = !needsPlanDetails(profile.data);
@@ -209,6 +221,7 @@ export function Match401kCard() {
       busy={!loaded && !failed}
       badge={loaded ? <Badge tone={saveBadgeTone(state.status)}>{state.label}</Badge> : undefined}
     >
+      {loaded && !failed && current && <ReviewNotice decision={current} />}
       {body}
     </DecisionCard>
   );

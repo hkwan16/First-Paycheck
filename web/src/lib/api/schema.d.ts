@@ -186,7 +186,7 @@ export interface paths {
     };
     /**
      * List Calendar
-     * @description Upcoming events, soonest first; done and dismissed ones stay for the plan export.
+     * @description Open events, soonest first; done, dismissed and settled ones stay for the plan export.
      */
     get: operations['list_calendar'];
     put?: never;
@@ -762,6 +762,26 @@ export interface paths {
     patch: operations['update_recurring'];
     trace?: never;
   };
+  '/spending/months': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Spending Months
+     * @description The months with something to show: the Spending period picker's choices.
+     */
+    get: operations['spending_months'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/spending/summary': {
     parameters: {
       query?: never;
@@ -1129,6 +1149,8 @@ export interface components {
        */
       id: string;
       kind: components['schemas']['CalendarKind'];
+      /** Overdue */
+      overdue: boolean;
       status: components['schemas']['CalendarStatus'];
       /** Title */
       title: string;
@@ -1153,6 +1175,7 @@ export interface components {
     CalendarStatus: 'upcoming' | 'done' | 'dismissed';
     /** CashFlow */
     CashFlow: {
+      diagram: components['schemas']['FlowDiagram'];
       /**
        * End
        * Format: date
@@ -1232,6 +1255,11 @@ export interface components {
     };
     /** CheckInDetail */
     CheckInDetail: {
+      /**
+       * As Of
+       * Format: date
+       */
+      as_of: string;
       cash_flow: components['schemas']['CheckInCashFlow'];
       /** Completed At */
       completed_at: string | null;
@@ -1256,6 +1284,8 @@ export interface components {
        * Format: date-time
        */
       last_run_at: string;
+      /** Past */
+      past: boolean;
       /**
        * Period
        * Format: date
@@ -1281,6 +1311,11 @@ export interface components {
     };
     /** CheckInSummary */
     CheckInSummary: {
+      /**
+       * As Of
+       * Format: date
+       */
+      as_of: string;
       /** Completed At */
       completed_at: string | null;
       /**
@@ -1302,6 +1337,8 @@ export interface components {
        * Format: date-time
        */
       last_run_at: string;
+      /** Past */
+      past: boolean;
       /**
        * Period
        * Format: date
@@ -1371,6 +1408,34 @@ export interface components {
        */
       recurring_job_id: string;
     };
+    /**
+     * DeadlinePayload
+     * @description A date coming up (``upcoming_deadline``) or gone past unsettled (``overdue_deadline``).
+     */
+    DeadlinePayload: {
+      /** Affects */
+      affects: ('k401_match' | 'health_plans' | 'emergency_fund' | 'w4' | 'spending') | null;
+      /**
+       * Calendar Event Id
+       * Format: uuid
+       */
+      calendar_event_id: string;
+      calendar_kind: components['schemas']['CalendarKind'];
+      /** Days Until */
+      days_until: number;
+      /**
+       * Due At
+       * Format: date
+       */
+      due_at: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'overdue_deadline' | 'upcoming_deadline';
+      /** Title */
+      title: string;
+    };
     /** DecisionIn */
     DecisionIn: {
       calculator: components['schemas']['CalculatorKind'];
@@ -1415,6 +1480,8 @@ export interface components {
       result: {
         [key: string]: unknown;
       };
+      /** Review */
+      review: components['schemas']['ReviewReason'][];
       /** Supersedes Id */
       supersedes_id: string | null;
       /** Version */
@@ -1774,9 +1841,12 @@ export interface components {
       | 'recurring_changed'
       | 'recurring_stopped'
       | 'pay_change'
-      | 'upcoming_deadline';
+      | 'upcoming_deadline'
+      | 'overdue_deadline';
     /** FindingOut */
     FindingOut: {
+      /** Charge Gone */
+      charge_gone: boolean;
       /**
        * Check In Id
        * Format: uuid
@@ -1803,7 +1873,7 @@ export interface components {
         | components['schemas']['GoalOffPacePayload']
         | components['schemas']['RecurringPayload']
         | components['schemas']['PayChangePayload']
-        | components['schemas']['UpcomingDeadlinePayload'];
+        | components['schemas']['DeadlinePayload'];
       severity: components['schemas']['FindingSeverity'];
       /**
        * Updated At
@@ -1827,6 +1897,61 @@ export interface components {
      * @enum {string}
      */
     FindingSeverity: 'info' | 'warning' | 'alert';
+    /**
+     * FlowDiagram
+     * @description Every node and band of the cash-flow diagram: the bands into a node and
+     *     the bands out of it each sum to its ``cents``.
+     */
+    FlowDiagram: {
+      /** Links */
+      links: components['schemas']['FlowLink'][];
+      /** Nodes */
+      nodes: components['schemas']['FlowNode'][];
+    };
+    /** FlowLink */
+    FlowLink: {
+      /** Cents */
+      cents: number;
+      /** Source */
+      source: string;
+      /** Target */
+      target: string;
+    };
+    /** FlowNode */
+    FlowNode: {
+      /** Categories */
+      categories: string[];
+      /** Cents */
+      cents: number;
+      /**
+       * Column
+       * @enum {integer}
+       */
+      column: 0 | 1 | 2 | 3;
+      /** Id */
+      id: string;
+      /** Key */
+      key: string | null;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind:
+        | 'gross'
+        | 'line'
+        | 'take_home'
+        | 'income_deposited'
+        | 'other_deposits'
+        | 'refunds'
+        | 'savings_withdrawn'
+        | 'beyond_income'
+        | 'not_deposited'
+        | 'bucket'
+        | 'left_over'
+        | 'category';
+      /** Refunds Cents */
+      refunds_cents: number | null;
+    };
     /**
      * GoalKind
      * @enum {string}
@@ -2612,6 +2737,8 @@ export interface components {
     PlanCompleteness: {
       /** Missing */
       missing: components['schemas']['CalculatorKind'][];
+      /** Needs Review */
+      needs_review: components['schemas']['CalculatorKind'][];
       /** Saved */
       saved: components['schemas']['CalculatorKind'][];
     };
@@ -2669,6 +2796,8 @@ export interface components {
       result: {
         [key: string]: unknown;
       };
+      /** Review */
+      review: components['schemas']['ReviewReason'][];
       /** Version */
       version: number;
     };
@@ -2730,7 +2859,7 @@ export interface components {
        * @enum {string}
        */
       key:
-        | 'take_home'
+        | 'income'
         | 'essentials'
         | 'flexible'
         | 'other'
@@ -2740,6 +2869,8 @@ export interface components {
         | 'left_over';
       /** Label */
       label: string;
+      /** Needs Pay Stub */
+      needs_pay_stub: boolean;
       /** Plan Cents */
       plan_cents: number | null;
       /** Status */
@@ -2884,6 +3015,8 @@ export interface components {
       pay_frequency?: components['schemas']['PayFrequency'] | null;
       /** Salary Cents */
       salary_cents?: number | null;
+      /** Salary Pay Stub Id */
+      salary_pay_stub_id?: string | null;
       /** Start Date */
       start_date?: string | null;
       /** Vesting Years */
@@ -2909,6 +3042,10 @@ export interface components {
       pay_schedule: components['schemas']['PaySchedule'] | null;
       /** Salary Cents */
       salary_cents?: number | null;
+      /** Salary Pay Stub Id */
+      salary_pay_stub_id?: string | null;
+      /** @description Set when the newest confirmed stub's yearly pay differs from salary_cents and from the stub salary_pay_stub_id names (spec 005 rule 24c): the person chooses which salary to use. Computed on read. */
+      salary_review: components['schemas']['SalaryReview'] | null;
       /** Start Date */
       start_date?: string | null;
       /** Updated At */
@@ -3079,6 +3216,32 @@ export interface components {
       /** Vesting Years */
       vesting_years?: number | null;
     };
+    /**
+     * ReviewReason
+     * @description One reason a saved decision needs review (rule 19b).
+     */
+    ReviewReason: {
+      /**
+       * Input
+       * @enum {string}
+       */
+      input:
+        | 'pay_periods_per_year'
+        | 'salary_cents'
+        | 'tax_year'
+        | 'filing_status'
+        | 'age'
+        | 'match_tiers'
+        | 'k401_contribution_pct'
+        | 'health_premium_per_paycheck_cents';
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'changed' | 'salary_unconfirmed';
+      /** Text */
+      text: string;
+    };
     /** RoleTotals */
     RoleTotals: {
       /** Health Cents */
@@ -3122,6 +3285,41 @@ export interface components {
       /** Merchant Norm */
       merchant_norm: string;
     };
+    /**
+     * SalaryReview
+     * @description The newest stub's yearly pay beside the saved salary, for the question.
+     */
+    SalaryReview: {
+      /**
+       * Annual Salary Cents
+       * @description The stub's gross pay times its pay periods a year (spec 005 rule 24a)
+       */
+      annual_salary_cents: number;
+      frequency: components['schemas']['PayFrequency'];
+      /** Gross Cents */
+      gross_cents: number;
+      /**
+       * Pay Stub Date
+       * Format: date
+       */
+      pay_stub_date: string;
+      /**
+       * Pay Stub Id
+       * Format: uuid
+       * @description The newest current stub, which the answer names
+       */
+      pay_stub_id: string;
+      /**
+       * Periods Per Year
+       * @enum {integer}
+       */
+      periods_per_year: 12 | 24 | 26 | 52;
+      /**
+       * Salary Cents
+       * @description The salary saved in the profile
+       */
+      salary_cents: number;
+    };
     /** SourceLine */
     SourceLine: {
       /** Field Key */
@@ -3132,6 +3330,11 @@ export interface components {
       redacted: boolean;
       /** Text */
       text: string;
+    };
+    /** SpendingMonths */
+    SpendingMonths: {
+      /** Months */
+      months: string[];
     };
     /** SpendingSummary */
     SpendingSummary: {
@@ -3295,31 +3498,6 @@ export interface components {
        */
       recurring_job_id: string;
     };
-    /** UpcomingDeadlinePayload */
-    UpcomingDeadlinePayload: {
-      /** Affects */
-      affects: ('k401_match' | 'health_plans' | 'emergency_fund' | 'w4' | 'spending') | null;
-      /**
-       * Calendar Event Id
-       * Format: uuid
-       */
-      calendar_event_id: string;
-      calendar_kind: components['schemas']['CalendarKind'];
-      /** Days Until */
-      days_until: number;
-      /**
-       * Due At
-       * Format: date
-       */
-      due_at: string;
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      kind: 'upcoming_deadline';
-      /** Title */
-      title: string;
-    };
     /** ValidationError */
     ValidationError: {
       /** Context */
@@ -3345,6 +3523,8 @@ export interface components {
       numbers_checked: number;
       /** Numbers Unmatched */
       numbers_unmatched: string[];
+      /** Zero Cost Claims */
+      zero_cost_claims?: string[];
     };
     /**
      * W4Input
@@ -5232,6 +5412,15 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
       /** @description Unprocessable Entity */
       422: {
         headers: {
@@ -5316,6 +5505,35 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  spending_months: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SpendingMonths'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
         headers: {
           [name: string]: unknown;
         };

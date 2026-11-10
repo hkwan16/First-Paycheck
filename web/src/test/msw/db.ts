@@ -11,10 +11,15 @@ import type {
   Transaction,
 } from '@/lib/api/types';
 import {
+  DECISION_V1_ID,
+  DECISION_V2_ID,
+  REPLACED_AT,
   sampleCalendarEvent,
   sampleDecision,
   sampleExplanation,
+  sampleK401,
   sampleProfile,
+  sampleSalaryReview,
   stub01Profile,
 } from '../fixtures/decisions';
 import {
@@ -126,6 +131,34 @@ export function savedDecision() {
   db.decisions = [decision];
   db.explanations = new Map([[decision.id, [sampleExplanation()]]]);
   db.calendar = [sampleCalendarEvent()];
+}
+
+/**
+ * `savedDecision`, then version 2 at 5% saved over it a day later, with no
+ * explanation (issue 227): v1 is replaced, its explanation and check kept.
+ */
+export function replacedDecision() {
+  savedDecision();
+  const { inputs, result } = sampleK401(5);
+  db.decisions.push(
+    sampleDecision({
+      id: DECISION_V2_ID,
+      version: 2,
+      supersedes_id: DECISION_V1_ID,
+      inputs: { ...inputs },
+      result: { ...result },
+      created_at: REPLACED_AT,
+    }),
+  );
+}
+
+/**
+ * Ready for decisions with the salary question open (spec 005 rule 24c): the
+ * profile's $65,000.00 against the sample stub's $64,999.92 a year.
+ */
+export function salaryQuestionOpen() {
+  decisionsReady();
+  db.profile.salary_review = sampleSalaryReview();
 }
 
 /** A user who has linked and uploaded nothing yet. */

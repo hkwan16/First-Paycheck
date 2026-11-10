@@ -46,4 +46,14 @@ describe('useUpdateProfile', () => {
     });
     expect(queryClient.getQueryData(queryKeys.profile())).toEqual(profileOut());
   });
+
+  it('reads the decisions and the plan again: their review reads the profile (issue 222)', async () => {
+    const { result, queryClient } = renderHookWithClient(() => useUpdateProfile());
+    queryClient.setQueryData(queryKeys.decisions(), { items: [] });
+    queryClient.setQueryData(queryKeys.plan(), {});
+    act(() => result.current.mutate({ dependents: 0 }));
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(queryClient.getQueryState(queryKeys.decisions())?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(queryKeys.plan())?.isInvalidated).toBe(true);
+  });
 });

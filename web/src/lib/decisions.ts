@@ -69,8 +69,12 @@ export function ageAtYearEnd(taxYear: number, birthYear: number | null | undefin
 export const percentInput = (whole: number): string => whole.toFixed(2);
 
 export interface DecisionSaveState {
-  /** unsaved: no decision yet. dirty: the inputs differ from the current version. */
-  status: 'unsaved' | 'dirty' | 'saved';
+  /**
+   * unsaved: no decision yet. dirty: the inputs differ from the current
+   * version. review: what the current version read has changed since it was
+   * saved (its `review`, spec 007 rule 19b).
+   */
+  status: 'unsaved' | 'dirty' | 'review' | 'saved';
   /** The save button's words. */
   action: string;
   /** The card badge's words. */
@@ -87,6 +91,12 @@ export interface DecisionSaveState {
  * W-4's stub withholding describes payroll today (spec 014 rule 17a), and the
  * health plan's usage is a what-if (spec 012 rule 18). They are left out on
  * both sides, present or not.
+ *
+ * A current version the API says needs review (spec 018 rule 5c, issue 222)
+ * reads "Needs review" whatever is on screen: the person changed nothing, so
+ * it is not "Changes not saved", and its numbers were figured for a paycheck
+ * or a year that is no longer theirs, so it is not "Saved". The API decides
+ * it; nothing here compares the context.
  */
 export function decisionSaveState(
   current: Decision | null | undefined,
@@ -94,6 +104,9 @@ export function decisionSaveState(
   { ignore = [] }: { ignore?: readonly string[] } = {},
 ): DecisionSaveState {
   if (!current) return { status: 'unsaved', action: 'Save', label: 'Not saved' };
+  if (current.review.length > 0) {
+    return { status: 'review', action: 'Save again', label: 'Needs review' };
+  }
   const without = (value: unknown) =>
     isRecord(value) && ignore.length > 0
       ? Object.fromEntries(Object.entries(value).filter(([key]) => !ignore.includes(key)))

@@ -20,7 +20,7 @@ def spec_finder_tests() -> list[str]:
 
 def test_every_finder_example_has_a_case() -> None:
     names = spec_finder_tests()
-    assert len(names) == 19
+    assert len(names) == 22
     assert [case.id for case in checkin.load_cases()] == [f"spec-015-{name}" for name in names]
 
 
@@ -28,7 +28,7 @@ def test_the_suite_passes_on_the_committed_fixtures() -> None:
     result = SUITES["checkin"].run(Budget(0))
     assert result.failures == []
     assert result.metrics == {"precision": 1.0, "recall": 1.0, "fields_exact": 1.0}
-    assert result.cases == 19
+    assert result.cases == 22
 
 
 def test_a_missed_finding_lowers_recall() -> None:

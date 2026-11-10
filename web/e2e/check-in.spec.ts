@@ -211,6 +211,53 @@ test('runs this month’s check-in again, then marks a finding done, dismissed a
   await expect(badge).toHaveText(before);
 });
 
+/** Save a new 401(k) version from its step, at a rate other than the saved one. */
+async function saveAnother401k(page: Page) {
+  await page.goto('/setup/decisions/401k');
+  await waitForHydration(page);
+  const card = page.getByRole('region', { name: '401(k) match' });
+  const slider = card.getByRole('slider', { name: /Your contribution/ });
+  await expect(slider).toBeVisible({ timeout: 30_000 });
+  const rate = Number(await slider.inputValue());
+  await slider.fill(String(rate === 5 ? 6 : 5));
+  const result = card.getByRole('group', { name: 'Your numbers' });
+  await expect(result).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
+  const save = card.getByRole('button', { name: /^(Save|Save changes)$/ });
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(card.getByRole('button', { name: 'Saved' })).toBeVisible({ timeout: 15_000 });
+}
+
+test('a new 401(k) version keeps its reminder: nothing new, nothing gone (issue 234)', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await openThisMonth(page);
+  test.skip(!(await checkInNow(page).isVisible()), 'This month’s check-in is completed');
+  // Settle what the earlier specs changed, so the next run sees only the new version.
+  await checkInNow(page).click();
+  await expect(page.getByText(/^Checked again just now\./)).toBeVisible({
+    timeout: RUN_BUDGET_MS,
+  });
+
+  // The new version dismisses the election check and adds one for the same
+  // payday. Before issue 234 the next run said "1 new finding. 1 finding no
+  // longer applies." over cards that read the same.
+  await saveAnother401k(page);
+  await openThisMonth(page);
+  const findings = page.getByRole('region', { name: 'What changed' });
+  const titles = async () =>
+    (await findings.getByRole('listitem').allTextContents()).map((text) => text.trim()).sort();
+  // The new version's election check is a reminder due within 30 days, so the list is not empty.
+  await expect(findings.getByText(/new 401\(k\) contribution/)).toBeVisible({ timeout: 30_000 });
+  const before = await titles();
+  await checkInNow(page).click();
+  await expect(page.getByText('Checked again just now. No new findings.')).toBeVisible({
+    timeout: RUN_BUDGET_MS,
+  });
+  expect(await titles()).toEqual(before);
+});
+
 test('links a finding to the decision step it affects', async ({ page }) => {
   await openIndex(page);
   await list(page).getByRole('link', { name: thisMonth() }).click();

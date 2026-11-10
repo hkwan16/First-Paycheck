@@ -1,4 +1,4 @@
-import type { CashFlow, SpendingBucket, WithholdingLine } from '@/lib/api/types';
+import type { CashFlow, FlowDiagramNode, SpendingBucket, WithholdingLine } from '@/lib/api/types';
 import { categoryLabel } from '@/lib/categories';
 import { isQuietFlow, type FlowColor } from '@/lib/design/tone';
 
@@ -8,15 +8,17 @@ import { isQuietFlow, type FlowColor } from '@/lib/design/tone';
  * nodes joined by one SVG of cubic bands.
  *
  *   0  gross pay            (the period's confirmed pay stubs)
- *   1  withholding lines, then take-home
- *   2  buckets: essentials, flexible, savings, other, left over
+ *   1  withholding lines, take-home, and the other money that came in
+ *   2  where it went: buckets, left over (and take-home not deposited)
  *   3  each bucket's categories
  *
- * Every amount is the API's (`GET /cashflow`), carried in cents and shown
- * as is. This module only turns cents into pixels: heights are cents times
- * one scale, which comes from a target height for the first column's
- * amount, so "1 px is about $N" is computed rather than printed. Nothing it
- * computes is ever shown as money except that scale.
+ * Every node and band is the API's (`GET /cashflow`'s `diagram`, spec 010
+ * rule 5b), carried in cents and shown as is: the API balances them, so the
+ * bands into and out of a node add up to its amount. This module only turns
+ * cents into pixels: a node is as tall as its amount (or tall enough for its
+ * words) and a band as thick as its cents, at one scale that puts the largest
+ * node at a target height, so "1 px is about $N" is computed rather than
+ * printed. Nothing it computes is ever shown as money except that scale.
  */
 
 /** Node width and the narrowest gap between columns. */
@@ -33,7 +35,7 @@ export const NODE_GAP = 8;
 export const TOP = 28;
 const BOTTOM = 12;
 /**
- * How tall the tallest node is drawn; the scale follows from it. Small enough
+ * How tall the largest node is drawn; the scale follows from it. Small enough
  * that the diagram, its seven withholding lines and a dozen categories fit in
  * about one screen (issue 201).
  */
@@ -43,13 +45,10 @@ export const MIN_BAND_PX = 1.5;
 
 export type FlowColumn = 0 | 1 | 2 | 3;
 
-export type FlowNodeKind = 'gross' | 'line' | 'take-home' | 'bucket' | 'category';
-
-/** Bucket nodes: the spending buckets plus what was left over. */
-export type FlowBucket = Exclude<SpendingBucket, 'income' | 'transfer'> | 'left_over';
+export type FlowNodeKind = FlowDiagramNode['kind'];
 
 export interface FlowNode {
-  /** Stable across renders: `gross`, `line:<key>`, `take-home`, `bucket:<b>`, `category:<c>`. */
+  /** The API's id: `gross`, `line:<key>`, `take_home`, `bucket:<b>`, `category:<c>`, ... */
   id: string;
   kind: FlowNodeKind;
   column: FlowColumn;
@@ -57,25 +56,34 @@ export interface FlowNode {
   /** The API's amount, untouched. */
   cents: number;
   color: FlowColor;
-  /** Drawn dashed with no band: nothing (or less than nothing) flowed here. */
+  /** Drawn dashed with no band: nothing flowed here. */
   zero: boolean;
   x: number;
   y: number;
-  /** The node's height: at least MIN_NODE_H, its own band, and its outgoing bands. */
+  /** The node's height: its amount in pixels, at least MIN_NODE_H. */
   h: number;
   /** The node's amount in pixels (0 for a zero node). */
   valuePx: number;
-  /** The withholding line, bucket or category the node stands for. */
-  key: string;
+  /** The withholding line, bucket or category the node stands for; null for the others. */
+  key: string | null;
+  /** A bucket: the money back in its categories that the summary nets out (API's). */
+  refundsCents: number | null;
+  /** Refunds and money taken out of savings: the categories behind the amount. */
+  categories: readonly string[];
+  /** What the node adds to the legend ("Taxes", "Essentials"); null for a category. */
+  legend: string | null;
 }
 
 export interface FlowLink {
   id: string;
   from: string;
   to: string;
+  /** The API's amount for the band. */
+  cents: number;
   color: FlowColor;
   /** A grey band, drawn lighter. */
   quiet: boolean;
+  /** As drawn: its cents in pixels, at least MIN_BAND_PX. */
   thickness: number;
   /** SVG path: two cubic curves closed into a band. */
   d: string;
@@ -108,55 +116,106 @@ const LINE_COLOR: Record<WithholdingLine['role'], FlowColor> = {
   other: 'flow-tax',
 };
 
-interface BucketSpec {
-  bucket: FlowBucket;
+type DrawnBucket = Exclude<SpendingBucket, 'income' | 'transfer'>;
+
+interface Look {
   name: string;
   color: FlowColor;
-  /** Its categories' shade. */
-  categoryColor: FlowColor;
-  cents: (flow: CashFlow) => number;
-  /** Leave the bucket out entirely when it is $0 (instead of a dashed node). */
-  hideWhenZero?: boolean;
+  legend: string | null;
 }
 
-const BUCKETS: readonly BucketSpec[] = [
-  {
-    bucket: 'essentials',
+const BUCKETS: Record<DrawnBucket, Look & { categoryColor: FlowColor }> = {
+  essentials: {
     name: 'Essentials',
     color: 'blue',
     categoryColor: 'blue-soft',
-    cents: (f) => f.spending.essentials_cents,
+    legend: 'Essentials',
   },
-  {
-    bucket: 'flexible',
+  flexible: {
     name: 'Flexible',
     color: 'coral',
     categoryColor: 'coral-soft',
-    cents: (f) => f.spending.flexible_cents,
+    legend: 'Flexible spending',
   },
-  {
-    bucket: 'savings',
-    name: 'Savings',
-    color: 'teal',
-    categoryColor: 'teal',
-    cents: (f) => f.spending.savings_cents,
-  },
-  {
-    bucket: 'other',
-    name: 'Other',
-    color: 'flow-tax',
-    categoryColor: 'flow-tax',
-    cents: (f) => f.spending.other_cents,
-    hideWhenZero: true,
-  },
-  {
-    bucket: 'left_over',
-    name: 'Left over',
-    color: 'flow-idle',
-    categoryColor: 'flow-idle',
-    cents: (f) => f.spending.left_over_cents,
-  },
-];
+  savings: { name: 'Savings', color: 'teal', categoryColor: 'teal', legend: 'Savings' },
+  other: { name: 'Other', color: 'flow-tax', categoryColor: 'flow-tax', legend: 'Other spending' },
+};
+
+const LINE_LEGEND: Record<WithholdingLine['role'], string> = {
+  tax: 'Taxes',
+  retirement: '401(k)',
+  health: 'Health premiums',
+  other: 'Other deductions',
+};
+
+/** The nodes with fixed words and colors (spec 010 rule 5c); each is its own legend part. */
+const FIXED: Partial<Record<FlowNodeKind, { name: string; color: FlowColor }>> = {
+  take_home: { name: 'Take-home', color: 'ink-2' },
+  income_deposited: { name: 'Income deposited', color: 'ink-2' },
+  other_deposits: { name: 'Other deposits', color: 'ink-2' },
+  refunds: { name: 'Refunds', color: 'ink-2' },
+  savings_withdrawn: { name: 'Taken out of savings', color: 'teal' },
+  beyond_income: { name: 'Spent beyond income', color: 'flow-idle' },
+  not_deposited: { name: 'Not deposited', color: 'flow-idle' },
+  left_over: { name: 'Left over', color: 'flow-idle' },
+};
+
+const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
+
+const isBucket = (key: string | null | undefined): key is DrawnBucket =>
+  key != null && key in BUCKETS;
+
+/** What a node is called, drawn in and adds to the legend. */
+function describe(node: FlowDiagramNode, flow: CashFlow): Look {
+  const fixed = FIXED[node.kind];
+  if (fixed) return { ...fixed, legend: fixed.name };
+  switch (node.kind) {
+    case 'gross': {
+      const stubs = flow.withholding.paycheck_count;
+      return {
+        // None paid in this period; the user may have one from another (spec 010 rule 5a).
+        name:
+          stubs > 0
+            ? `Gross pay, ${stubs} ${plural(stubs, 'stub', 'stubs')}`
+            : 'No pay stub this period',
+        color: 'plum',
+        legend: 'Gross pay',
+      };
+    }
+    case 'line': {
+      const line = flow.withholding.lines.find((l) => l.key === node.key);
+      const label = line?.label ?? String(node.key);
+      return {
+        name: node.cents === 0 ? `${label}, not elected` : label,
+        color: line ? LINE_COLOR[line.role] : 'flow-tax',
+        legend: line ? LINE_LEGEND[line.role] : null,
+      };
+    }
+    case 'bucket':
+      return isBucket(node.key)
+        ? BUCKETS[node.key]
+        : { name: String(node.key), color: 'flow-tax', legend: null };
+    default: {
+      const bucket = flow.spending.category_buckets[String(node.key)];
+      return {
+        name: categoryLabel(String(node.key)),
+        color: isBucket(bucket) ? BUCKETS[bucket].categoryColor : 'flow-tax',
+        legend: null,
+      };
+    }
+  }
+}
+
+/**
+ * Whether the diagram draws a node: a $0 withholding line is left out unless
+ * it is the 401(k) ("not elected"), and so is an empty Other bucket; every
+ * other $0 node is drawn dashed.
+ */
+function drawn(node: FlowDiagramNode): boolean {
+  if (node.cents > 0) return true;
+  if (node.kind === 'line') return node.key === 'retirement_contribution';
+  return !(node.kind === 'bucket' && node.key === 'other');
+}
 
 /** One decimal place is plenty for an SVG path and keeps it short. */
 const r = (value: number) => Math.round(value * 10) / 10;
@@ -172,31 +231,14 @@ function bandPath(x1: number, ya: number, x2: number, yb: number, t: number): st
   ].join(' ');
 }
 
-const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
-
-/** The buckets drawn in column 2, whose categories fill column 3. */
-const DRAWN_BUCKETS: ReadonlySet<string> = new Set(BUCKETS.map((spec) => spec.bucket));
-
 /**
- * Pixels per cent, from a target height for the tallest node: gross pay, or
- * the deposits when no pay stub is confirmed for the period, unless a bucket
- * or category the diagram draws is taller. Spending can outrun the income it
- * flows from (the Plaid sandbox deposits 4.22 in a month that spends 1,689.63),
- * and scaled by that income alone a node would be tens of thousands of pixels
- * tall. Picking the largest amount only sizes pixels; nothing is added and no
- * amount shown changes. Null when there is no pay or income to draw from.
+ * Pixels per cent, from a target height for the largest node the API sent.
+ * Picking the largest amount only sizes pixels; nothing is added and no amount
+ * shown changes. Null when every node is $0.
  */
 export function flowScale(flow: CashFlow): FlowScale | null {
-  const pay =
-    flow.withholding.paycheck_count > 0 ? flow.withholding.gross_cents : flow.spending.income_cents;
-  if (pay <= 0) return null;
-  const reference = Math.max(
-    pay,
-    ...BUCKETS.map((spec) => spec.cents(flow)),
-    ...flow.spending.categories
-      .filter((total) => DRAWN_BUCKETS.has(total.bucket))
-      .map((total) => total.total_cents),
-  );
+  const reference = Math.max(0, ...flow.diagram.nodes.map((n) => n.cents));
+  if (reference <= 0) return null;
   return {
     pxPerCent: TARGET_GROSS_PX / reference,
     centsPerPx: Math.round(reference / TARGET_GROSS_PX),
@@ -241,176 +283,74 @@ export function layoutCashFlow(flow: CashFlow, containerWidth: number): FlowLayo
     number,
   ];
 
-  const stubs = flow.withholding.paycheck_count;
   const scale = flowScale(flow);
   const px = (cents: number) => (scale && cents > 0 ? cents * scale.pxPerCent : 0);
 
-  const nodes: FlowNode[] = [];
-  const children = new Map<string, FlowNode[]>();
-  const make = (
-    column: FlowColumn,
-    id: string,
-    kind: FlowNodeKind,
-    key: string,
-    name: string,
-    cents: number,
-    color: FlowColor,
-    parent: FlowNode | null,
-  ): FlowNode => {
-    const valuePx = px(cents);
-    const node: FlowNode = {
-      id,
-      kind,
-      column,
-      key,
+  const columns: FlowLayout['columns'] = [[], [], [], []];
+  for (const api of flow.diagram.nodes) {
+    if (!drawn(api)) continue;
+    const { name, color, legend } = describe(api, flow);
+    const valuePx = px(api.cents);
+    columns[api.column].push({
+      id: api.id,
+      kind: api.kind,
+      column: api.column,
+      key: api.key,
       name,
-      cents,
+      cents: api.cents,
       color,
       zero: valuePx === 0,
-      x: columnX[column],
+      x: columnX[api.column],
       y: 0,
-      h: 0,
+      h: Math.max(MIN_NODE_H, valuePx),
       valuePx,
-    };
-    nodes.push(node);
-    if (parent && !node.zero) children.set(parent.id, [...(children.get(parent.id) ?? []), node]);
-    return node;
-  };
-
-  const gross =
-    stubs > 0
-      ? make(
-          0,
-          'gross',
-          'gross',
-          'gross',
-          `Gross pay, ${stubs} ${plural(stubs, 'stub', 'stubs')}`,
-          flow.withholding.gross_cents,
-          'plum',
-          null,
-        )
-      : // None paid in this period; the user may have one from another (spec 010 rule 5a).
-        make(0, 'gross', 'gross', 'gross', 'No pay stub this period', 0, 'plum', null);
-
-  const lineNodes: FlowNode[] = [];
-  if (stubs > 0) {
-    for (const line of flow.withholding.lines) {
-      const isRetirement = line.key === 'retirement_contribution';
-      if (line.amount_cents <= 0 && !isRetirement) continue;
-      const name = line.amount_cents <= 0 ? `${line.label}, not elected` : line.label;
-      lineNodes.push(
-        make(
-          1,
-          `line:${line.key}`,
-          'line',
-          line.key,
-          name,
-          line.amount_cents,
-          LINE_COLOR[line.role],
-          gross,
-        ),
-      );
-    }
-  }
-  const takeHome =
-    stubs > 0
-      ? make(
-          1,
-          'take-home',
-          'take-home',
-          'take-home',
-          'Take-home',
-          flow.withholding.net_cents,
-          'ink-2',
-          gross,
-        )
-      : make(
-          1,
-          'take-home',
-          'take-home',
-          'take-home',
-          'Income deposited',
-          flow.spending.income_cents,
-          'ink-2',
-          null,
-        );
-
-  const bucketNodes: FlowNode[] = [];
-  const categoryNodes: FlowNode[] = [];
-  for (const spec of BUCKETS) {
-    const cents = spec.cents(flow);
-    if (spec.hideWhenZero && cents === 0) continue;
-    const overspent = spec.bucket === 'left_over' && cents < 0;
-    const bucket = make(
-      2,
-      `bucket:${spec.bucket}`,
-      'bucket',
-      spec.bucket,
-      overspent ? 'Spent beyond income' : spec.name,
-      cents,
-      spec.color,
-      takeHome,
-    );
-    bucketNodes.push(bucket);
-    for (const total of flow.spending.categories) {
-      if (total.bucket !== spec.bucket || total.total_cents <= 0) continue;
-      categoryNodes.push(
-        make(
-          3,
-          `category:${total.category}`,
-          'category',
-          total.category,
-          categoryLabel(total.category),
-          total.total_cents,
-          spec.categoryColor,
-          bucket,
-        ),
-      );
-    }
+      refundsCents: api.refunds_cents,
+      categories: api.categories,
+      legend,
+    });
   }
 
-  const thickness = (node: FlowNode) => Math.max(node.valuePx, MIN_BAND_PX);
-  const outPx = (node: FlowNode) =>
-    (children.get(node.id) ?? []).reduce((total, child) => total + thickness(child), 0);
-  for (const node of nodes) node.h = Math.max(MIN_NODE_H, node.valuePx, outPx(node));
-
-  const stack = (column: FlowNode[], top: number) => {
-    let y = top;
+  // Every column from the top, so the diagram is as tall as its tallest
+  // column; the bands curve up to the buckets (spec 010 rule 5, issue 201).
+  for (const column of columns) {
+    let y = TOP;
     for (const node of column) {
       node.y = y;
       y += node.h + NODE_GAP;
     }
-  };
-  const columns: FlowLayout['columns'] = [
-    [gross],
-    [...lineNodes, takeHome],
-    bucketNodes,
-    categoryNodes,
-  ];
-  // Every column from the top, so the diagram is as tall as its tallest
-  // column; the bands curve up to the buckets (spec 010 rule 5, issue 201).
-  for (const column of columns) stack(column, TOP);
+  }
+
+  const nodes = columns.flat();
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  // Where the next band along each node's right (out) and left (in) edge starts:
+  // the node's amount is centred in it, and its bands fill that amount in order.
+  const start = (node: FlowNode) => node.y + (node.h - node.valuePx) / 2;
+  const outAt = new Map(nodes.map((n) => [n.id, start(n)]));
+  const inAt = new Map(nodes.map((n) => [n.id, start(n)]));
 
   const links: FlowLink[] = [];
-  for (const parent of nodes) {
-    const kids = children.get(parent.id);
-    if (!kids) continue;
-    let ya = parent.y + (parent.h - outPx(parent)) / 2;
-    const x1 = parent.x + NODE_W;
-    for (const child of kids) {
-      const t = thickness(child);
-      const yb = child.y + (child.h - t) / 2;
-      links.push({
-        id: `${parent.id}>${child.id}`,
-        from: parent.id,
-        to: child.id,
-        color: child.color,
-        quiet: isQuietFlow(child.color),
-        thickness: t,
-        d: bandPath(x1, ya, child.x, yb, t),
-      });
-      ya += t;
-    }
+  for (const band of flow.diagram.links) {
+    const from = byId.get(band.source);
+    const to = byId.get(band.target);
+    if (!from || !to) continue;
+    const t = px(band.cents);
+    const ya = outAt.get(from.id)!;
+    const yb = inAt.get(to.id)!;
+    outAt.set(from.id, ya + t);
+    inAt.set(to.id, yb + t);
+    // A band under the minimum is drawn thicker around its own slice.
+    const thickness = Math.max(t, MIN_BAND_PX);
+    const grow = (thickness - t) / 2;
+    links.push({
+      id: `${from.id}>${to.id}`,
+      from: from.id,
+      to: to.id,
+      cents: band.cents,
+      color: to.color,
+      quiet: isQuietFlow(to.color),
+      thickness,
+      d: bandPath(from.x + NODE_W, ya - grow, to.x, yb - grow, thickness),
+    });
   }
 
   const bottom = Math.max(...nodes.map((n) => n.y + n.h));
@@ -419,9 +359,56 @@ export function layoutCashFlow(flow: CashFlow, containerWidth: number): FlowLayo
     hostH: Math.ceil(bottom) + BOTTOM,
     nodeW: NODE_W,
     columnX,
-    nodes: columns.flat(),
+    nodes,
     columns,
     links,
     scale,
   };
+}
+
+/* ------------------------------------------------------------------ legend */
+
+export interface LegendItem {
+  color: FlowColor;
+  label: string;
+}
+
+/** The legend's colors in the order it lists them. */
+const LEGEND_ORDER: readonly FlowColor[] = [
+  'plum',
+  'flow-tax',
+  'coral',
+  'ink-2',
+  'blue',
+  'teal',
+  'flow-idle',
+];
+
+/** "Taxes, other deductions and other spending": every part after the first lower case. */
+function joinParts(parts: readonly string[]): string {
+  const words = parts.map((part, i) =>
+    i === 0 ? part : part.charAt(0).toLowerCase() + part.slice(1),
+  );
+  return words.length < 3
+    ? words.join(' and ')
+    : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
+}
+
+/**
+ * The legend for what the diagram draws with an amount (spec 010 rule 5c):
+ * one item per color, naming each group drawn in it, so a period with no pay
+ * stub lists no pay stub group.
+ */
+export function legendFor(layout: FlowLayout): LegendItem[] {
+  const parts = new Map<FlowColor, string[]>();
+  for (const node of layout.nodes) {
+    if (node.zero || !node.legend) continue;
+    const list = parts.get(node.color) ?? [];
+    if (!list.includes(node.legend)) list.push(node.legend);
+    parts.set(node.color, list);
+  }
+  return LEGEND_ORDER.filter((color) => parts.has(color)).map((color) => ({
+    color,
+    label: joinParts(parts.get(color)!),
+  }));
 }

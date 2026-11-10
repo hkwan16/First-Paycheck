@@ -13,28 +13,47 @@ import { layoutCashFlow, MIN_HOST_W, type FlowLayout, type FlowNode } from './la
 export const STACK_BELOW = 640;
 
 interface Stage {
-  source: FlowNode;
+  id: string;
+  title: string;
+  /** The node the stage starts from, whose amount heads it; null when several do. */
+  source: FlowNode | null;
   items: FlowNode[];
 }
 
 /**
  * The diagram's stages for a narrow screen: gross pay into its lines and
- * take-home, take-home into the buckets, then each bucket into its
- * categories. The same nodes and amounts as the Sankey.
+ * take-home; the money that came in into where it went (one stage headed by
+ * take-home or the deposits when they were all of it, else one list for each
+ * side); then each bucket into its categories. The same nodes and amounts as
+ * the Sankey.
  */
 function stages(layout: FlowLayout): Stage[] {
-  const [[gross], lines, buckets] = layout.columns;
-  const takeHome = lines.find((n) => n.kind === 'take-home');
+  const [[gross], column1, uses] = layout.columns;
+  const lines = column1.filter((n) => n.kind === 'line' || n.kind === 'take_home');
+  const sources = column1.filter((n) => n.kind !== 'line');
   const byId = new Map(layout.nodes.map((n) => [n.id, n]));
   const result: Stage[] = [];
-  if (gross && !gross.zero) result.push({ source: gross, items: lines });
-  if (takeHome) result.push({ source: takeHome, items: buckets });
-  for (const bucket of buckets) {
+  if (gross && !gross.zero) {
+    result.push({ id: gross.id, title: gross.name, source: gross, items: lines });
+  }
+  const [only] = sources;
+  if (sources.length === 1 && only) {
+    result.push({ id: only.id, title: only.name, source: only, items: uses });
+  } else {
+    result.push({
+      id: 'sources',
+      title: 'Where the money came from',
+      source: null,
+      items: sources,
+    });
+    result.push({ id: 'uses', title: 'Where it went', source: null, items: uses });
+  }
+  for (const bucket of uses) {
     const items = layout.links
       .filter((l) => l.from === bucket.id)
       .map((l) => byId.get(l.to))
       .filter((n): n is FlowNode => n !== undefined);
-    if (items.length > 0) result.push({ source: bucket, items });
+    if (items.length > 0) result.push({ id: bucket.id, title: bucket.name, source: bucket, items });
   }
   return result;
 }
@@ -49,15 +68,15 @@ export function FlowStack({ flow }: { flow: CashFlow }) {
   const layout = useMemo(() => layoutCashFlow(flow, MIN_HOST_W), [flow]);
   return (
     <div className="flex flex-col gap-5">
-      {stages(layout).map(({ source, items }) => (
-        <section key={source.id} aria-label={source.name} className="flex flex-col gap-2">
+      {stages(layout).map(({ id, title, source, items }) => (
+        <section key={id} aria-label={title} className="flex flex-col gap-2">
           <h3 className="m-0 flex items-baseline justify-between gap-3 text-small">
-            <span>{source.name}</span>
-            <Money cents={source.cents} className="font-bold" />
+            <span>{title}</span>
+            {source && <Money cents={source.cents} className="font-bold" />}
           </h3>
           <div
             aria-hidden="true"
-            data-flow-bar={source.id}
+            data-flow-bar={id}
             className="flex h-2.5 gap-px overflow-hidden rounded-full bg-line"
           >
             {items

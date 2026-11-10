@@ -32,8 +32,12 @@ export function useSetupFacts(): SetupFacts {
       confirmedPayStubs: payStubs?.length ?? 0,
       categorizationFinished: summary !== undefined && summary.uncategorized_count === 0,
       liveCalculators: features.calculators,
-      savedDecisionCalculators: decisions?.items.map((d) => calculatorIdOf(d.calculator)) ?? [],
+      settledDecisionCalculators:
+        decisions?.items
+          .filter((d) => d.current.review.length === 0)
+          .map((d) => calculatorIdOf(d.calculator)) ?? [],
       planMissingCount: plan ? plan.completeness.missing.length : null,
+      planNeedsReviewCount: plan ? plan.completeness.needs_review.length : null,
     }),
     [accounts, transactions, documents, payStubs, summary, decisions, plan],
   );

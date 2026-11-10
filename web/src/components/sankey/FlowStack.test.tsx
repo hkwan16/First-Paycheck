@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sampleCashflow } from '@/test/fixtures/cashflow';
+import { beyondCashflow, sampleCashflow } from '@/test/fixtures/cashflow';
 import { render, screen, within } from '@/test/render';
 import { FlowStack } from './FlowStack';
 
@@ -37,12 +37,28 @@ describe('FlowStack', () => {
 
   it('draws a decorative stacked bar whose segments the browser sizes from the cents', () => {
     const { container } = render(<FlowStack flow={sampleCashflow()} />);
-    const bar = container.querySelector('[data-flow-bar="take-home"]')!;
+    const bar = container.querySelector('[data-flow-bar="take_home"]')!;
     expect(bar).toHaveAttribute('aria-hidden', 'true');
     const segments = [...bar.children] as HTMLElement[];
     expect(segments.map((s) => s.style.flexGrow)).toEqual(['182325', '24989', '30000', '161894']);
     expect(segments[0]).toHaveClass('bg-blue');
     expect(segments[3]).toHaveClass('bg-flow-idle');
+  });
+
+  it('lists where the money came from and where it went when take-home was not all of it', () => {
+    render(<FlowStack flow={beyondCashflow()} />);
+    const sources = screen.getByRole('region', { name: 'Where the money came from' });
+    expect(
+      within(sources)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Take-home$1,996.04', 'Other deposits$1,244.08', 'Spent beyond income$1,994.86']);
+    const uses = screen.getByRole('region', { name: 'Where it went' });
+    expect(
+      within(uses)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Essentials$3,100.00', 'Flexible$2,113.44', 'Savings$21.54']);
   });
 
   it('lists a $0 item with a dashed swatch and leaves it out of the bar', () => {
