@@ -11,9 +11,13 @@ import type {
   Transaction,
 } from '@/lib/api/types';
 import {
+  DECISION_V1_ID,
+  DECISION_V2_ID,
+  REPLACED_AT,
   sampleCalendarEvent,
   sampleDecision,
   sampleExplanation,
+  sampleK401,
   sampleProfile,
   stub01Profile,
 } from '../fixtures/decisions';
@@ -126,6 +130,25 @@ export function savedDecision() {
   db.decisions = [decision];
   db.explanations = new Map([[decision.id, [sampleExplanation()]]]);
   db.calendar = [sampleCalendarEvent()];
+}
+
+/**
+ * `savedDecision`, then version 2 at 5% saved over it a day later, with no
+ * explanation (issue 227): v1 is replaced, its explanation and check kept.
+ */
+export function replacedDecision() {
+  savedDecision();
+  const { inputs, result } = sampleK401(5);
+  db.decisions.push(
+    sampleDecision({
+      id: DECISION_V2_ID,
+      version: 2,
+      supersedes_id: DECISION_V1_ID,
+      inputs: { ...inputs },
+      result: { ...result },
+      created_at: REPLACED_AT,
+    }),
+  );
 }
 
 /** A user who has linked and uploaded nothing yet. */

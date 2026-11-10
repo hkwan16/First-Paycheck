@@ -123,6 +123,11 @@ export const DECISION_V1_ID = 'dec00000-0000-4000-8000-000000000001';
 /** When the sample decision was saved: just before the sample clock. */
 export const SAMPLE_SAVED_AT = '2026-10-17T15:59:00Z';
 
+/** Version 2 of the sample 401(k), at 5%, saved over version 1 (issue 227). */
+export const DECISION_V2_ID = 'dec00000-0000-4000-8000-000000000002';
+/** When version 2 replaced version 1: after v1's explanation, before the sample clock. */
+export const REPLACED_AT = '2026-10-17T15:59:45Z';
+
 /** The sample's 401(k) decision: version 1, contributing 4% (the full match). */
 export function sampleDecision(overrides: Partial<Decision> = {}): Decision {
   const { inputs, result } = sampleK401(4);

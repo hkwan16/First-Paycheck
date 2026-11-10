@@ -134,6 +134,12 @@ const SCREENS: readonly Screen[] = [
     heading: 'Why contribute 4% to your 401(k)',
     sample: true,
   },
+  {
+    path: '/dev/screens/why/replaced',
+    name: 'why-replaced',
+    heading: 'Why contribute 4% to your 401(k)',
+    sample: true,
+  },
   { path: '/dev/screens/why-index', name: 'why-index', heading: 'Why each decision', sample: true },
   {
     path: '/dev/screens/check-in',
@@ -292,6 +298,7 @@ test.describe('the Why page (issue 204)', () => {
     '/dev/screens/why/stale',
     '/dev/screens/why/fallback',
     '/dev/screens/why/emergency-fund',
+    '/dev/screens/why/replaced',
     '/dev/screens/why-index',
   ]) {
     test(`${path} names none of the app's internals`, async ({ page }) => {
@@ -306,6 +313,27 @@ test.describe('the Why page (issue 204)', () => {
     await expect(note).toContainText('has changed since');
     await expect(note.getByRole('button', { name: 'Write it again' })).toBeVisible();
     await expect(page.getByText('Out of date', { exact: true })).toHaveCount(0);
+  });
+
+  test('a replaced decision says so and links to the current one (issue 227)', async ({ page }) => {
+    await open(page, screenAt('/dev/screens/why/replaced'));
+    const note = page.getByRole('region', { name: 'About this decision' });
+    await expect(note).toContainText('You saved a newer version of this decision on');
+    await expect(note.getByRole('link', { name: 'See the current decision' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'About this explanation' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Change this decision' })).toHaveCount(0);
+  });
+
+  test('the index says the state of each explanation (issue 227)', async ({ page }) => {
+    await open(page, screenAt('/dev/screens/why-index'));
+    const list = page.getByRole('list', { name: 'Saved decisions' });
+    for (const state of [
+      'Explanation up to date',
+      'Explanation out of date',
+      'Explanation could not be written',
+    ]) {
+      await expect(list.getByText(state, { exact: true })).toBeVisible();
+    }
   });
 
   test('the side nav calls it what the page does', async ({ page }) => {

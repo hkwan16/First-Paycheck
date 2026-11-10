@@ -2,13 +2,14 @@ import { http } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DECISION_V1_ID,
+  DECISION_V2_ID,
   sampleCitations,
   sampleExplanation,
   sampleFallbackExplanation,
 } from '@/test/fixtures/decisions';
 import { EMERGENCY_DECISION_ID } from '@/test/fixtures/planning';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
-import { db, savedDecision } from '@/test/msw/db';
+import { db, replacedDecision, savedDecision } from '@/test/msw/db';
 import { savedEmergencyFund } from '@/test/msw/planning-handlers';
 import { apiUrl } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
@@ -331,6 +332,112 @@ describe('WhyScreen, "Your numbers" (spec 008 rule 19d, issue 243)', () => {
       "Acme's match per year",
       'Your marginal rate',
     ]);
+  });
+});
+
+describe('WhyScreen, a replaced decision (spec 008 rule 19c, issue 227)', () => {
+  beforeEach(() => replacedDecision());
+
+  /** The note about the decision, in place of the one about its explanation. */
+  const replacedNote = () => screen.getByRole('region', { name: 'About this decision' });
+
+  const REPLACED =
+    'You saved a newer version of this decision on Oct 17, 2026. This page keeps the one you saved on Oct 17, 2026 as it was.';
+
+  it('says a newer version replaced it and links to the current one', async () => {
+    renderWhy();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Why contribute 4% to your 401(k)' }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(replacedNote()).toHaveTextContent(REPLACED));
+    expect(screen.getByText('Replaced')).toBeInTheDocument();
+    expect(
+      within(replacedNote()).getByRole('link', { name: 'See the current decision' }),
+    ).toHaveAttribute('href', `/why/${DECISION_V2_ID}`);
+    // The checked note would make it look current: the replaced note takes its place.
+    expect(screen.queryByText(new RegExp(CHECKED))).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', { name: 'About this explanation' }),
+    ).not.toBeInTheDocument();
+    // What it said is kept, with its sources.
+    expect(screen.getByRole('region', { name: 'What this means' })).toHaveTextContent(
+      'An employer match is pay you receive only when you contribute',
+    );
+    expect(screen.getByRole('region', { name: 'Sources' })).toBeInTheDocument();
+  });
+
+  it('offers nothing that acts on the current decision', async () => {
+    renderWhy();
+    await waitFor(() => expect(replacedNote()).toHaveTextContent(REPLACED));
+    expect(screen.queryByRole('link', { name: 'Change this decision' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'What happens next' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'See your plan' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('keeps a stale explanation without offering to write it again', async () => {
+    db.explanations = new Map([[DECISION_V1_ID, [sampleExplanation({ stale: true })]]]);
+    renderWhy();
+    await waitFor(() => expect(replacedNote()).toHaveTextContent(REPLACED));
+    expect(screen.queryByRole('button', { name: 'Write it again' })).not.toBeInTheDocument();
+  });
+
+  it('shows the saved numbers of one that could not be written, without Try again', async () => {
+    db.explanations = new Map([[DECISION_V1_ID, [sampleFallbackExplanation()]]]);
+    renderWhy();
+    await waitFor(() => expect(replacedNote()).toHaveTextContent(REPLACED));
+    expect(screen.getByRole('region', { name: 'Your saved numbers' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Change this decision' })).not.toBeInTheDocument();
+  });
+
+  it('says none was written, and offers to write none', async () => {
+    db.explanations = new Map();
+    renderWhy();
+    await waitFor(() => expect(replacedNote()).toHaveTextContent(REPLACED));
+    expect(
+      await screen.findByText(
+        'No explanation was written for this decision before it was replaced.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Write the explanation' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Your saved numbers' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Change this decision' })).not.toBeInTheDocument();
+  });
+
+  it('says an emergency fund was replaced, above its saved numbers', async () => {
+    savedEmergencyFund();
+    const fund = db.decisions.find((d) => d.id === EMERGENCY_DECISION_ID)!;
+    db.decisions.push({
+      ...fund,
+      id: 'dec00000-0000-4000-8000-0000000000e2',
+      version: 2,
+      supersedes_id: EMERGENCY_DECISION_ID,
+      created_at: '2026-10-18T15:00:00Z',
+    });
+    renderWhy(EMERGENCY_DECISION_ID);
+    await waitFor(() =>
+      expect(replacedNote()).toHaveTextContent(
+        'You saved a newer version of this decision on Oct 18, 2026.',
+      ),
+    );
+    expect(
+      within(replacedNote()).getByRole('link', { name: 'See the current decision' }),
+    ).toHaveAttribute('href', '/why/dec00000-0000-4000-8000-0000000000e2');
+    expect(await screen.findByRole('region', { name: 'Your saved numbers' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Change this decision' })).not.toBeInTheDocument();
+  });
+
+  it('shows the current one as current', async () => {
+    renderWhy(DECISION_V2_ID);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Why contribute 5% to your 401(k)' }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Write the explanation' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Replaced')).not.toBeInTheDocument();
+    expect(screen.queryByText(/You saved a newer version/)).not.toBeInTheDocument();
   });
 });
 

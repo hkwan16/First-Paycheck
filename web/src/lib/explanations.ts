@@ -1,4 +1,4 @@
-import type { CalculatorKind } from './api/types';
+import type { CalculatorKind, Explanation } from './api/types';
 
 /**
  * Calculators the API explains (`api/retrieval/context.py:BENEFITS_QUERIES`).
@@ -17,3 +17,17 @@ export const isExplained = (calculator: CalculatorKind): boolean => EXPLAINED.ha
  */
 export const sentenceCase = (label: string): string =>
   label.replace(/^\p{Ll}/u, (first) => first.toUpperCase());
+
+/**
+ * What state a decision's latest explanation is in (spec 008 rules 19a and
+ * 19c): checked and current, checked but written from information that has
+ * changed since, one that could not be written (stale or not), or none (`null`,
+ * the API's 404).
+ */
+export type ExplanationState = 'current' | 'stale' | 'fallback' | 'none';
+
+export function explanationState(explanation: Explanation | null): ExplanationState {
+  if (!explanation) return 'none';
+  if (!explanation.verified) return 'fallback';
+  return explanation.stale ? 'stale' : 'current';
+}

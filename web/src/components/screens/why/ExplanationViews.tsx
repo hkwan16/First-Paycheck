@@ -34,15 +34,51 @@ function Note({
   tone,
   icon,
   action,
+  label = NOTE_LABEL,
   children,
-}: Pick<NoticeProps, 'tone' | 'icon'> & { action?: ReactNode; children: ReactNode }) {
+}: Pick<NoticeProps, 'tone' | 'icon'> & {
+  action?: ReactNode;
+  label?: string;
+  children: ReactNode;
+}) {
   return (
-    <Notice tone={tone} icon={icon} compact role="region" aria-label={NOTE_LABEL}>
+    <Notice tone={tone} icon={icon} compact role="region" aria-label={label}>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <span>{children}</span>
         {action}
       </div>
     </Notice>
+  );
+}
+
+/**
+ * A decision a newer version replaced (spec 008 rule 19c, issue 227): said in
+ * place of the explanation's note, with the way to the current one. `replacedOn`
+ * is the current version's save, unknown until the list of decisions loads.
+ */
+export function ReplacedNote({
+  savedOn,
+  replacedOn,
+  current,
+}: {
+  savedOn: string;
+  replacedOn: string | undefined;
+  current: Route;
+}) {
+  return (
+    <Note
+      tone="blue"
+      label="About this decision"
+      action={
+        <Button size="sm" href={current}>
+          See the current decision
+        </Button>
+      }
+    >
+      You saved a newer version of this decision
+      {replacedOn ? ` on ${formatDate(replacedOn)}` : ''}. This page keeps the one you saved on{' '}
+      {formatDate(savedOn)} as it was.
+    </Note>
   );
 }
 

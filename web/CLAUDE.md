@@ -86,7 +86,8 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     page-hydration.ts, page-title.ts, log-error.ts
 src/app/dev/screens/{link,account,spending,confirm,confirm/manual,confirm/unread,confirm/benefits,confirm/extracting,
                     confirm/failed,confirm/confirmed,decisions/{emergency-fund,401k,health-plan,w4,
-                    after-alpha},why,why/fallback,why/stale,why/emergency-fund,why-index,check-in,
+                    after-alpha},why,why/fallback,why/stale,why/emergency-fund,why/replaced,
+                    why-index,check-in,
                     check-in/complete,check-in-index,plan,plan/empty}  a screen on the sample data, no
                     API (development only); `account` is Link with the header's account menu
 src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, Recharts' batched updates settled
@@ -114,7 +115,7 @@ src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, Recharts' batch
                     fixtures/plan.ts (`GET /plan` built from the decision, goal, calendar and pay
                     stub fixtures; export jobs), msw/plan-handlers.ts (`planDb`)
 e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions,
-                    plan, import, check-in, alpha; capture-setup, capture-screens, capture-demo
+                    plan, import, check-in, why, alpha; capture-setup, capture-screens, capture-demo
                     for the alpha document), support/auth.ts, support/api.ts,
                     support/spending.ts (a period with transactions), support/capture.ts (the
                     capture's upload, confirm and screenshots), support/demo.ts (the demo's
@@ -727,6 +728,22 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
   without `force`: the API runs again only when its stored row is stale, so a second tab gets the
   row the first wrote. A stale fallback adds a sentence to `NotWrittenNote`. Confirming a stub or summary invalidates every explanation read
   (`invalidateAfterConfirm`). Sample: `/dev/screens/why/stale`.
+- **Replaced** (`is_current` false, spec 008 rule 19c, issue 227): the eyebrow adds a "Replaced"
+  badge and the one note is `ReplacedNote`, a blue region named "About this decision" with "See
+  the current decision" (the calculator's `current` in `useDecisions`; `/why` until it loads).
+  It replaces the checked, stale or not-written note, and the page offers nothing that acts on
+  the current decision: no "Change this decision", no "What happens next", no write, Write it
+  again or Try again. What the explanation said, the saved numbers and the sources stay; with no
+  explanation a card says none was written before it was replaced. Sample:
+  `/dev/screens/why/replaced`.
+- **Index states**: each explained row reads its explanation (`useExplanation`) and shows
+  `explanationState` (`lib/explanations.ts`) as a badge in words: "Explanation up to date",
+  "Explanation out of date", "Explanation could not be written" or "Explanation not written yet".
+- **"Your numbers" labels** go through `sentenceCase` (rule 19d, issue 243): only a lowercase
+  first letter changes, so "401(k) ..." and "W-4 ..." stay as written.
+- `e2e/why.spec.ts` (project `authenticated-why`, after plan and check-in) saves two 401(k)
+  rates over each other, writes the first one's explanation, and checks the replaced page, its
+  link to the current one and the index's states against the real API.
 
 ## Check-in screen
 
