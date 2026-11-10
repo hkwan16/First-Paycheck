@@ -37,17 +37,50 @@ test('a role change is saved', async ({ page }) => {
   await openLink(page);
   const checking = page.getByRole('group', { name: 'Plaid Checking' });
   const saving = page.getByRole('group', { name: 'Plaid Saving' });
-  await checking.getByRole('combobox', { name: 'Role' }).selectOption('Spending');
-  await saving.getByRole('combobox', { name: 'Role' }).selectOption('Emergency fund');
-  await expect(saving.getByRole('combobox', { name: 'Role' })).not.toHaveAttribute(
-    'aria-busy',
-    'true',
-  );
+  // Each select is named for its account (issue 242).
+  const checkingRole = checking.getByRole('combobox', { name: /^Role for Plaid Checking/ });
+  const savingRole = saving.getByRole('combobox', { name: /^Role for Plaid Saving/ });
+  await checkingRole.selectOption('Spending');
+  await savingRole.selectOption('Emergency fund');
+  await expect(savingRole).not.toHaveAttribute('aria-busy', 'true');
 
   await page.reload();
   await openLink(page);
-  await expect(checking.getByRole('combobox', { name: 'Role' })).toHaveValue('spending');
-  await expect(saving.getByRole('combobox', { name: 'Role' })).toHaveValue('emergency_fund');
+  await expect(checkingRole).toHaveValue('spending');
+  await expect(savingRole).toHaveValue('emergency_fund');
+});
+
+test('each account offers only the roles its kind takes, and a role can be cleared (issue 241)', async ({
+  page,
+}) => {
+  await openLink(page);
+  const checkingRole = page
+    .getByRole('group', { name: 'Plaid Checking' })
+    .getByRole('combobox', { name: /^Role for Plaid Checking/ });
+  const savingRole = page
+    .getByRole('group', { name: 'Plaid Saving' })
+    .getByRole('combobox', { name: /^Role for Plaid Saving/ });
+  await expect(checkingRole.locator('option')).toHaveText([
+    'No role',
+    'Spending',
+    'Emergency fund',
+    'Not used',
+  ]);
+  // A savings account is never the spending account (spec 002 rule 31a).
+  await expect(savingRole.locator('option')).toHaveText(['No role', 'Emergency fund', 'Not used']);
+
+  await checkingRole.selectOption('No role');
+  await expect(checkingRole).not.toHaveAttribute('aria-busy', 'true');
+  await page.reload();
+  await openLink(page);
+  await expect(checkingRole).toHaveValue('');
+
+  // Back to spending, which the Spending project reads next.
+  await checkingRole.selectOption('Spending');
+  await expect(checkingRole).not.toHaveAttribute('aria-busy', 'true');
+  await page.reload();
+  await openLink(page);
+  await expect(checkingRole).toHaveValue('spending');
 });
 
 test('Sync now says how it went beside the bank it synced (issue 208)', async ({ page }) => {

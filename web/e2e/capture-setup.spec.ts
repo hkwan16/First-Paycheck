@@ -43,7 +43,9 @@ test('03 the linked accounts with the uploaded pay stub', async ({ page }) => {
   await openLink(page);
   // The bank is linked beforehand (the API's sandbox route); its roles are the account's own.
   await expect(
-    page.getByRole('region', { name: 'Bank accounts' }).getByRole('combobox', { name: 'Role' }),
+    page
+      .getByRole('region', { name: 'Bank accounts' })
+      .getByRole('combobox', { name: /^Role for / }),
     'Link a bank for the e2e account first (see playwright.capture.config.ts)',
   ).not.toHaveCount(0);
   documentId = await uploadAcmeStub(page);
