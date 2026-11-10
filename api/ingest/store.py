@@ -78,7 +78,7 @@ _EXPIRE = text(
     """
     WITH expired AS (
       UPDATE documents
-      SET status = 'failed', status_reason = 'expired', deleted_at = :now
+      SET status = 'failed', status_reason = 'expired', deleted_at = :now, review_draft = NULL
       WHERE status <> 'confirmed'
         AND deleted_at IS NULL
         AND created_at < :cutoff

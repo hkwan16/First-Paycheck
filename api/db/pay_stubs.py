@@ -22,12 +22,12 @@ from db.models import Document, PayStub, employer_key
 __all__ = [
     "NEWEST_FIRST",
     "add_confirmed",
+    "confirmed_from",
     "current_pay_stubs",
     "latest_pay_date",
     "newest_pay_stub",
     "paid_between_count",
     "paycheck_ids",
-    "superseded_documents",
 ]
 
 # GET /pay-stubs order (spec 005 rule 24); id breaks a tie inside one transaction.
@@ -121,19 +121,18 @@ def paid_between_count(session: Session, first: dt.date, last: dt.date) -> int:
     return int(count or 0)
 
 
-def superseded_documents(
+def confirmed_from(
     session: Session, document_ids: Collection[uuid.UUID]
-) -> frozenset[uuid.UUID]:
-    """Which of ``document_ids`` were confirmed into a stub a newer confirm has
-    since superseded (rule 22f): what Link shows instead of "Confirmed"."""
+) -> dict[uuid.UUID, PayStub]:
+    """The stub confirmed from each of ``document_ids`` that has one, current or
+    superseded, in one query for a whole list: whether a newer confirm superseded
+    it (rule 22f, what Link shows instead of "Confirmed"), what names the
+    document's row and what its confirmed view shows (rules 22g and 22h). A
+    document is confirmed into at most one stub (``UNIQUE (document_id)``)."""
     if not document_ids:
-        return frozenset()
-    rows = session.scalars(
-        select(PayStub.document_id).where(
-            PayStub.superseded_by_id.is_not(None), PayStub.document_id.in_(document_ids)
-        )
-    )
-    return frozenset(rows)
+        return {}
+    stubs = session.scalars(select(PayStub).where(PayStub.document_id.in_(document_ids)))
+    return {stub.document_id: stub for stub in stubs}
 
 
 def add_confirmed(session: Session, stub: PayStub) -> None:

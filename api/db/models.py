@@ -467,6 +467,7 @@ class Document(Base):
             name="status_reason_when_stuck",
         ),
         CheckConstraint("jsonb_typeof(proposal) = 'object'", name="proposal_object"),
+        CheckConstraint("jsonb_typeof(review_draft) = 'object'", name="review_draft_object"),
         # A replacement is the same user's upload, and replaces at most one
         # document; a replaced document no longer has its file (spec 004 rules 24-25).
         ForeignKeyConstraint(["replaced_by_id", "user_id"], ["documents.id", "documents.user_id"]),
@@ -503,6 +504,10 @@ class Document(Base):
     deleted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     # The upload that replaced this one; GET /docs lists only documents without one.
     replaced_by_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    # Progress through the Confirm review (app/routers/docs.py ReviewDraft, spec
+    # 005 rules 23c-23e): what the person has entered and confirmed so far. Not
+    # confirmed data; cleared with the proposal. None is SQL NULL, never JSON null.
+    review_draft: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
     created_at: Mapped[dt.datetime] = _created_at()
     updated_at: Mapped[dt.datetime] = _updated_at()
 
