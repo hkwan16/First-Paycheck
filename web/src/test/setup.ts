@@ -3,6 +3,7 @@ import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 import { settleChartUpdates } from './animation-frames';
 import { installAsyncWrapper } from './async-wrapper';
+import { installDialog } from './dialog';
 import { resetCheckinDb } from './msw/checkin-handlers';
 import { resetDb } from './msw/db';
 import { resetJobScripts } from './msw/handlers';
@@ -12,6 +13,7 @@ import { server } from './msw/server';
 import { resetSpendingDb } from './msw/spending-handlers';
 
 installAsyncWrapper();
+installDialog();
 
 // Any request without a handler is a test bug, not a network call.
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));

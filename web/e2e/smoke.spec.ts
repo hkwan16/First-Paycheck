@@ -343,16 +343,16 @@ test('the plan and the sign-in page name none of the app internals (issue 209)',
 test('the account menu sets deleting apart from signing out (issue 205)', async ({ page }) => {
   await open(page, screenAt('/dev/screens/account'));
   await page.getByRole('button', { name: 'J. Rivera' }).click();
-  const signOut = page.getByRole('button', { name: 'Sign out' });
-  const remove = page.getByRole('button', { name: 'Delete account' });
-  await expect(page.getByRole('separator')).toBeVisible();
+  const signOut = page.getByRole('menuitem', { name: 'Sign out' });
+  const remove = page.getByRole('menuitem', { name: 'Delete account' });
+  await expect(page.getByRole('menu').getByRole('separator')).toBeVisible();
   const color = (locator: Locator) =>
     locator.evaluate((element) => getComputedStyle(element).color);
   const removeColor = await color(remove);
   expect(removeColor).not.toBe(await color(signOut));
 
   await remove.click();
-  const confirm = page.getByRole('group', { name: 'Delete your account?' });
+  const confirm = page.getByRole('dialog', { name: 'Delete your account?' });
   await confirm.getByRole('textbox', { name: 'Type delete to confirm' }).fill('delete');
   // The final step is drawn as the destructive action, the way the menu drew it.
   expect(await color(confirm.getByRole('button', { name: 'Delete my account' }))).toBe(removeColor);
@@ -537,7 +537,37 @@ test('unlinking asks in the page, keeps focus on the safe choice, and stays acce
   expect(errors).toEqual([]);
 });
 
-test('deleting the account asks for the word in the page and stays accessible', async ({
+test('the account menu is a menu the keyboard drives (issue 242)', async ({ page }) => {
+  const errors = watchErrors(page);
+  await open(page, screenAt('/dev/screens/account'));
+  const chip = page.getByRole('button', { name: 'J. Rivera' });
+  await expect(chip).toHaveAttribute('aria-haspopup', 'menu');
+  await chip.focus();
+  await page.keyboard.press('ArrowDown');
+  const menu = page.getByRole('menu', { name: 'J. Rivera' });
+  await expect(menu.getByRole('menuitem', { name: 'Sign out' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Delete account' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Sign out' })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(menu.getByRole('menuitem', { name: 'Delete account' })).toBeFocused();
+  expect(await blockingViolations(page)).toEqual([]);
+
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(chip).toBeFocused();
+  await expect(chip).toHaveAttribute('aria-expanded', 'false');
+
+  // Tab leaves the menu and closes it, so it never stays open behind the focus.
+  await page.keyboard.press('Enter');
+  await expect(menu.getByRole('menuitem', { name: 'Sign out' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(menu).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('deleting the account asks in a modal dialog that holds the focus (issue 242)', async ({
   page,
 }) => {
   const errors = watchErrors(page);
@@ -545,14 +575,12 @@ test('deleting the account asks for the word in the page and stays accessible', 
   await open(page, screenAt('/dev/screens/account'));
   const chip = page.getByRole('button', { name: 'J. Rivera' });
   await chip.focus();
-  await page.keyboard.press('Enter');
-  await page.keyboard.press('Tab');
-  await page.keyboard.press('Tab');
-  const remove = page.getByRole('button', { name: 'Delete account' });
-  await expect(remove).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('menuitem', { name: 'Delete account' })).toBeFocused();
   await page.keyboard.press('Enter');
 
-  const confirm = page.getByRole('group', { name: 'Delete your account?' });
+  const confirm = page.getByRole('dialog', { name: 'Delete your account?' });
+  await expect(page.getByRole('menu')).toHaveCount(0);
   const field = confirm.getByRole('textbox', { name: 'Type delete to confirm' });
   await expect(field).toBeFocused();
   const button = confirm.getByRole('button', { name: 'Delete my account' });
@@ -562,9 +590,26 @@ test('deleting the account asks for the word in the page and stays accessible', 
   expect(await blockingViolations(page)).toEqual([]);
   await expect(confirm).toHaveScreenshot('account-delete-confirm.png');
 
-  await confirm.getByRole('button', { name: 'Keep my account' }).click();
-  await expect(remove).toBeFocused();
+  // The page behind is inert: Tab only cycles the dialog's own controls.
+  const keep = confirm.getByRole('button', { name: 'Keep my account' });
+  for (let step = 0; step < 6; step += 1) {
+    await page.keyboard.press('Tab');
+    const inside = await confirm.evaluate((dialog) => dialog.contains(document.activeElement));
+    const atBrowser = await page.evaluate(() => document.activeElement === document.body);
+    expect(inside || atBrowser, `Tab ${step + 1} stays in the dialog`).toBe(true);
+  }
+
+  await keep.focus();
+  await page.keyboard.press('Enter');
+  await expect(confirm).toBeHidden();
+  await expect(chip).toBeFocused();
+
+  // Escape closes it too, and starts over next time.
+  await chip.press('ArrowUp');
+  await page.keyboard.press('Enter');
+  await expect(field).toHaveValue('');
   await page.keyboard.press('Escape');
+  await expect(confirm).toBeHidden();
   await expect(chip).toBeFocused();
   await expect(chip).toHaveAttribute('aria-expanded', 'false');
   expect(errors).toEqual([]);
