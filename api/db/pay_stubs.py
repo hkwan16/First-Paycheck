@@ -14,7 +14,7 @@ import datetime as dt
 import uuid
 from collections.abc import Collection
 
-from sqlalchemy import Select, Text, Update, and_, func, literal, or_, select, text, update
+from sqlalchemy import Date, Select, Text, Update, and_, func, literal, or_, select, text, update
 from sqlalchemy.orm import Session, aliased
 
 from db.models import Document, PayStub, employer_key
@@ -26,6 +26,7 @@ __all__ = [
     "latest_pay_date",
     "newest_pay_stub",
     "paid_between_count",
+    "paid_months",
     "paycheck_ids",
     "superseded_documents",
 ]
@@ -119,6 +120,15 @@ def paid_between_count(session: Session, first: dt.date, last: dt.date) -> int:
         .with_only_columns(func.count(), maintain_column_froms=True)
     )
     return int(count or 0)
+
+
+def paid_months(session: Session) -> set[dt.date]:
+    """The first day of each month a current stub was paid in (spec 010 rule 5d)."""
+    month = func.date_trunc("month", PayStub.pay_date).cast(Date)
+    rows = session.scalars(
+        current_pay_stubs().with_only_columns(month, maintain_column_froms=True).distinct()
+    )
+    return set(rows)
 
 
 def superseded_documents(
