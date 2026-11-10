@@ -186,7 +186,7 @@ export interface paths {
     };
     /**
      * List Calendar
-     * @description Upcoming events, soonest first; done and dismissed ones stay for the plan export.
+     * @description Open events, soonest first; done, dismissed and settled ones stay for the plan export.
      */
     get: operations['list_calendar'];
     put?: never;
@@ -1129,6 +1129,8 @@ export interface components {
        */
       id: string;
       kind: components['schemas']['CalendarKind'];
+      /** Overdue */
+      overdue: boolean;
       status: components['schemas']['CalendarStatus'];
       /** Title */
       title: string;
@@ -1232,6 +1234,11 @@ export interface components {
     };
     /** CheckInDetail */
     CheckInDetail: {
+      /**
+       * As Of
+       * Format: date
+       */
+      as_of: string;
       cash_flow: components['schemas']['CheckInCashFlow'];
       /** Completed At */
       completed_at: string | null;
@@ -1256,6 +1263,8 @@ export interface components {
        * Format: date-time
        */
       last_run_at: string;
+      /** Past */
+      past: boolean;
       /**
        * Period
        * Format: date
@@ -1281,6 +1290,11 @@ export interface components {
     };
     /** CheckInSummary */
     CheckInSummary: {
+      /**
+       * As Of
+       * Format: date
+       */
+      as_of: string;
       /** Completed At */
       completed_at: string | null;
       /**
@@ -1302,6 +1316,8 @@ export interface components {
        * Format: date-time
        */
       last_run_at: string;
+      /** Past */
+      past: boolean;
       /**
        * Period
        * Format: date
@@ -1370,6 +1386,34 @@ export interface components {
        * Format: uuid
        */
       recurring_job_id: string;
+    };
+    /**
+     * DeadlinePayload
+     * @description A date coming up (``upcoming_deadline``) or gone past unsettled (``overdue_deadline``).
+     */
+    DeadlinePayload: {
+      /** Affects */
+      affects: ('k401_match' | 'health_plans' | 'emergency_fund' | 'w4' | 'spending') | null;
+      /**
+       * Calendar Event Id
+       * Format: uuid
+       */
+      calendar_event_id: string;
+      calendar_kind: components['schemas']['CalendarKind'];
+      /** Days Until */
+      days_until: number;
+      /**
+       * Due At
+       * Format: date
+       */
+      due_at: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'overdue_deadline' | 'upcoming_deadline';
+      /** Title */
+      title: string;
     };
     /** DecisionIn */
     DecisionIn: {
@@ -1774,9 +1818,12 @@ export interface components {
       | 'recurring_changed'
       | 'recurring_stopped'
       | 'pay_change'
-      | 'upcoming_deadline';
+      | 'upcoming_deadline'
+      | 'overdue_deadline';
     /** FindingOut */
     FindingOut: {
+      /** Charge Gone */
+      charge_gone: boolean;
       /**
        * Check In Id
        * Format: uuid
@@ -1803,7 +1850,7 @@ export interface components {
         | components['schemas']['GoalOffPacePayload']
         | components['schemas']['RecurringPayload']
         | components['schemas']['PayChangePayload']
-        | components['schemas']['UpcomingDeadlinePayload'];
+        | components['schemas']['DeadlinePayload'];
       severity: components['schemas']['FindingSeverity'];
       /**
        * Updated At
@@ -2730,7 +2777,7 @@ export interface components {
        * @enum {string}
        */
       key:
-        | 'take_home'
+        | 'income'
         | 'essentials'
         | 'flexible'
         | 'other'
@@ -2740,6 +2787,8 @@ export interface components {
         | 'left_over';
       /** Label */
       label: string;
+      /** Needs Pay Stub */
+      needs_pay_stub: boolean;
       /** Plan Cents */
       plan_cents: number | null;
       /** Status */
@@ -3294,31 +3343,6 @@ export interface components {
        * Format: uuid
        */
       recurring_job_id: string;
-    };
-    /** UpcomingDeadlinePayload */
-    UpcomingDeadlinePayload: {
-      /** Affects */
-      affects: ('k401_match' | 'health_plans' | 'emergency_fund' | 'w4' | 'spending') | null;
-      /**
-       * Calendar Event Id
-       * Format: uuid
-       */
-      calendar_event_id: string;
-      calendar_kind: components['schemas']['CalendarKind'];
-      /** Days Until */
-      days_until: number;
-      /**
-       * Due At
-       * Format: date
-       */
-      due_at: string;
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      kind: 'upcoming_deadline';
-      /** Title */
-      title: string;
     };
     /** ValidationError */
     ValidationError: {

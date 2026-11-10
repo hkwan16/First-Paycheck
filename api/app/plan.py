@@ -17,12 +17,13 @@ from pydantic import BaseModel
 from sqlalchemy import column, select, table
 from sqlalchemy.orm import Session
 
-from app.routers.calendar import CalendarEventOut
+from app.routers.calendar import CalendarEventOut, event_out
 from app.routers.explain import CitationOut, current_setup, is_explainable, is_stale
 from app.routers.goals import GoalOut, goal_out
 from app.types import UtcDateTime
 from calc.registry import calculator
-from db.enums import CalculatorKind, CalendarStatus, PayFrequency
+from db.calendar import open_events
+from db.enums import CalculatorKind, PayFrequency
 from db.models import CalendarEvent, Decision, Explanation, Goal
 from db.pay_stubs import NEWEST_FIRST, current_pay_stubs
 from retrieval.citations import by_key, for_calculator
@@ -294,27 +295,14 @@ def _decisions(session: Session) -> list[PlanDecision]:
     return [_decision(session, row) for row in rows]
 
 
-def _calendar(session: Session, start: dt.date, end: dt.date) -> list[CalendarEventOut]:
+def _calendar(session: Session, today: dt.date, end: dt.date) -> list[CalendarEventOut]:
+    """Rule 6: open events through ``end``, the overdue ones (before ``today``) first."""
     rows = session.scalars(
-        select(CalendarEvent)
-        .where(
-            CalendarEvent.status == CalendarStatus.UPCOMING,
-            CalendarEvent.due_at >= start,
-            CalendarEvent.due_at <= end,
-        )
+        open_events()
+        .where(CalendarEvent.due_at <= end)
         .order_by(CalendarEvent.due_at, CalendarEvent.kind, CalendarEvent.id)
     )
-    return [
-        CalendarEventOut(
-            id=row.id,
-            kind=row.kind,
-            title=row.title,
-            due_at=row.due_at,
-            decision_id=row.decision_id,
-            status=row.status,
-        )
-        for row in rows
-    ]
+    return [event_out(row, today) for row in rows]
 
 
 def _pay_stub(session: Session) -> PlanPayStub | None:

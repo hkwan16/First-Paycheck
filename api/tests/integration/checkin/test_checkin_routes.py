@@ -190,7 +190,7 @@ def test_cash_flow_against_the_plan(
         for line in flow["plan"]
     }
     assert lines == {
-        "take_home": (399_208, None, None),
+        "income": (399_208, None, None),
         "essentials": (180_000, 250_000, -70_000),
         "flexible": (8_500, None, None),
         "other": (3_900, None, None),
@@ -201,7 +201,7 @@ def test_cash_flow_against_the_plan(
     }
     # Rule 19a: which side of the plan each line is on, null without a plan.
     assert {line["key"]: line["status"] for line in flow["plan"]} == {
-        "take_home": None,
+        "income": None,
         "essentials": "under",
         "flexible": None,
         "other": None,
@@ -216,7 +216,7 @@ def test_cash_flow_skips_loan_ledgers(
     frozen: FastAPI, db_connection: Connection, client_as: Client, user_a: FixtureUser
 ) -> None:
     # Spec 015 route row 2a: the loan's "Monthly payment" is money in on its own
-    # ledger, labeled income; counting it made take-home 291,500.
+    # ledger, labeled income; counting it made income 291,500.
     loan_ledger_month(db_connection, user_a)
     check_in = make_check_in(db_connection, user_a.id, period=dt.date(2026, 9, 1))
 
@@ -225,14 +225,14 @@ def test_cash_flow_skips_loan_ledgers(
     assert response.status_code == 200, response.text
     flow = response.json()["cash_flow"]
     lines = {line["key"]: line["actual_cents"] for line in flow["plan"]}
-    assert (lines["take_home"], lines["other"], lines["left_over"]) == (250_000, 40_000, 70_000)
+    assert (lines["income"], lines["other"], lines["left_over"]) == (250_000, 40_000, 70_000)
     assert flow["cash_flow"]["spending"]["ledger_rows_skipped"] == {
         "count": 3,
         "net_cents": -38_000,
     }
 
 
-def test_take_home_counts_money_in_only(
+def test_income_counts_money_in_only(
     app: FastAPI, seeded_rules: Connection, client_as: Client, user_a: FixtureUser
 ) -> None:
     # Spec 015 route row 13: the Plaid sandbox's October, where GUSTO PAY is an
@@ -245,8 +245,8 @@ def test_take_home_counts_money_in_only(
 
     assert response.status_code == 200, response.text
     lines = {line["key"]: line for line in response.json()["cash_flow"]["plan"]}
-    assert lines["take_home"]["label"] == "Take-home pay"
-    assert (lines["take_home"]["actual_cents"], lines["left_over"]["actual_cents"]) == (
+    assert lines["income"]["label"] == "Income deposited"
+    assert (lines["income"]["actual_cents"], lines["left_over"]["actual_cents"]) == (
         422,
         -168_541,
     )

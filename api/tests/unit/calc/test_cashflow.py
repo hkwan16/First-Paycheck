@@ -143,7 +143,7 @@ def test_totals_are_sums_and_every_stub_balances(deductions: list[list[int]]) ->
 # ---------------------------------------------------------------- against the plan (spec 015)
 
 SEPTEMBER_SPENDING = SpendingActuals(
-    take_home_cents=399_208,
+    income_cents=399_208,
     essentials_cents=180_000,
     flexible_cents=8_500,
     other_cents=3_900,
@@ -171,7 +171,7 @@ def test_cash_flow_against_the_plan() -> None:
         )
     )
     assert lines == {
-        "take_home": (399_208, None, None),
+        "income": (399_208, None, None),
         "essentials": (180_000, 250_000, -70_000),
         "flexible": (8_500, None, None),
         "other": (3_900, None, None),
@@ -186,7 +186,7 @@ def test_without_decisions_every_plan_is_null() -> None:
     lines = plan_lines(PlanTargets())
     assert all(plan is None and difference is None for _, plan, difference in lines.values())
     assert list(lines) == [
-        "take_home",
+        "income",
         "essentials",
         "flexible",
         "other",
@@ -214,7 +214,7 @@ def test_plan_line_status_in_route_row_2() -> None:
         ),
     )
     assert {line.key: line.status for line in lines} == {
-        "take_home": None,
+        "income": None,
         "essentials": "under",
         "flexible": None,
         "other": None,
@@ -223,6 +223,51 @@ def test_plan_line_status_in_route_row_2() -> None:
         "health": "on_plan",
         "left_over": None,
     }
+
+
+def test_deposits_are_income_deposited() -> None:
+    """Issue 235: the line is the deposits Spending calls Income deposited, not
+    take-home pay, which is the pay stub's net."""
+    lines = against_plan(
+        withholding([]).total, 0, SEPTEMBER_SPENDING, PlanTargets(contribution_pct=Decimal("4"))
+    )
+    assert (lines[0].key, lines[0].label) == ("income", "Income deposited")
+
+
+def test_a_period_without_a_pay_stub_has_no_pay_stub_plan_yet() -> None:
+    """Spec 015 rule 19: with no stub the 401(k) and health plans are not known;
+    they read "plan $0.00, On plan" before."""
+    targets = PlanTargets(
+        contribution_pct=Decimal("4"),
+        premium_per_period_cents=6_250,
+        monthly_essentials_cents=250_000,
+    )
+    lines = {
+        line.key: line
+        for line in against_plan(withholding([]).total, 0, SEPTEMBER_SPENDING, targets)
+    }
+    for key in ("retirement", "health"):
+        assert (lines[key].actual_cents, lines[key].plan_cents) == (0, None)
+        assert (lines[key].difference_cents, lines[key].status) == (None, None)
+        assert lines[key].needs_pay_stub is True
+    assert [key for key, line in lines.items() if line.needs_pay_stub] == ["retirement", "health"]
+    assert lines["essentials"].plan_cents == 250_000
+
+
+def test_without_a_decision_a_missing_stub_waits_for_nothing() -> None:
+    lines = against_plan(withholding([]).total, 0, SEPTEMBER_SPENDING, PlanTargets())
+    assert not any(line.needs_pay_stub for line in lines)
+
+
+def test_a_period_with_a_stub_needs_none() -> None:
+    september = withholding([PayStubAmounts.model_validate(MOCKUP)])
+    lines = against_plan(
+        september.total,
+        september.paycheck_count,
+        SEPTEMBER_SPENDING,
+        PlanTargets(contribution_pct=Decimal("4"), premium_per_period_cents=6_250),
+    )
+    assert not any(line.needs_pay_stub for line in lines)
 
 
 @pytest.mark.parametrize(

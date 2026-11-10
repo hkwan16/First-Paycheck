@@ -154,10 +154,10 @@ The November user: semimonthly at Acme, a 4% 401(k) election and the "HDHP + HSA
 | 16 | `test_deduction_changes` | Stubs S2, S1, no decisions | one `pay_change`, `info`, affects `w4`, key `pay_change:{S2}`: gross 270,833, change 0; net 205,892 from 199,604, +6,288; `deductions` federal 21,196 from 29,776 (-8,580), 401(k) 5,417 from 0 (+5,417), medical 3,125 from 6,250 (-3,125) |
 | 17 | `test_upcoming_deadlines` | Events due 2026-11-20 (`goal_contribution`) and 2026-12-16 (`enrollment_deadline`) | `warning` with 4 days, `info` with 30 days; keys `upcoming_deadline:goal_contribution:2026-11-20` and `upcoming_deadline:enrollment_deadline:2026-12-16` |
 | 18 | `test_nothing_to_report` | Period and today only | none |
+| 19 | `test_keys_name_the_paycheck` | 401(k) 4%; stubs S2 (paycheck id S2a, an earlier copy it superseded) and S1 | keys `election_mismatch:k401_match:{K401}:{S2a}` and `pay_change:{S2a}`; both payloads' `pay_stub_id` is S2 |
 | 20 | `test_overdue_date` | Event due 2026-11-15 (`w4_submit`), open | `overdue_deadline`, `alert`, -1 days, affects `w4`, key `overdue_deadline:w4_submit:2026-11-15` |
 | 21 | `test_due_today_is_not_overdue` | Event due 2026-11-16 | `upcoming_deadline`, `warning`, 0 days |
 | 22 | `test_one_finding_per_date` | Two `election_check` events due 2026-11-30, E1 then E2 | one finding, about E2 |
-| 19 | `test_keys_name_the_paycheck` | 401(k) 4%; stubs S2 (paycheck id S2a, an earlier copy it superseded) and S1 | keys `election_mismatch:k401_match:{K401}:{S2a}` and `pay_change:{S2a}`; both payloads' `pay_stub_id` is S2 |
 
 S3 is S1 with a raise to 291,667 gross: Social Security 18,083 and Medicare 4,229, every other line as S1, net 218,845.
 
