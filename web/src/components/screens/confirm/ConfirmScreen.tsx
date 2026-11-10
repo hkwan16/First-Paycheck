@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ArrowRightIcon } from '@/components/icons';
-import { apiErrorMessage } from '@/lib/api/errors';
+import { apiErrorCode, apiErrorMessage } from '@/lib/api/errors';
 import { isReviewable, useDocument } from '@/lib/api/hooks';
 import type { Confirmed, DocumentDetail, DocumentType } from '@/lib/api/types';
 import { documentTypeLabel, statusReasonText, SUPERSEDED_TEXT } from '@/lib/documents';
@@ -256,6 +256,19 @@ function ConfirmContent({ query }: { query: ReturnType<typeof useDocument> }) {
   if (benefitsResult) return <BenefitsConfirmed result={benefitsResult} />;
   if (query.isPending) return <Loading />;
   if (query.isError) {
+    // Any 404 (an unknown id, another person's, or one that is not an id at all)
+    // is the same answer: there is no such document of yours.
+    if (apiErrorCode(query.error) === 'not_found') {
+      return (
+        <Status title="Document not found">
+          <Notice>
+            This is not one of your documents, or it was removed. Your documents are listed on the
+            first setup step.
+          </Notice>
+          <BackToDocuments />
+        </Status>
+      );
+    }
     return (
       <Status title={PAY_STUB_TITLE}>
         <Notice tone="warning" compact role="alert">

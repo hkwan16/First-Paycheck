@@ -706,10 +706,40 @@ describe('ConfirmScreen document states', () => {
 
   it('says so when the document does not exist', async () => {
     renderConfirm('missing');
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Could not load this document. Document not found',
-    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Document not found' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/not one of your documents, or it was removed/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to documents' })).toBeInTheDocument();
+  });
+
+  it('reads the same for any 404, whatever its message (a malformed id)', async () => {
+    // The API answers a path id that is not an id with 404 not_found "Not found".
+    server.use(
+      http.get(apiUrl('/docs/:id'), () =>
+        HttpResponse.json({ error: { code: 'not_found', message: 'Not found' } }, { status: 404 }),
+      ),
+    );
+    renderConfirm('not-a-uuid');
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Document not found' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('still says why when the document could not be loaded for another reason', async () => {
+    server.use(
+      http.get(apiUrl('/docs/:id'), () =>
+        HttpResponse.json(
+          { error: { code: 'service_unavailable', message: 'Database is busy' } },
+          { status: 503 },
+        ),
+      ),
+    );
+    renderConfirm();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not load this document. Database is busy',
+    );
   });
 });
 
