@@ -6,15 +6,15 @@ import { Label } from '@/components/ui/Label';
 import { Money } from '@/components/ui/Money';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { Select } from '@/components/ui/Select';
-import { Skeleton } from '@/components/ui/Skeleton';
-import { useAccountTransactionCount, useUpdateAccount } from '@/lib/api/hooks';
+import { useUpdateAccount } from '@/lib/api/hooks';
 import { apiErrorMessage } from '@/lib/api/errors';
 import type { Account } from '@/lib/api/types';
 import { institutionName, maskLabel } from '@/lib/accounts';
 import {
   institutionInitials,
   patchForRole,
-  ROLE_OPTIONS,
+  roleOptions,
+  roleSelectName,
   roleValue,
   transactionCountText,
   type RoleValue,
@@ -24,7 +24,6 @@ import {
 const SHOWS_ACTIVITY = new Set<Account['kind']>(['checking', 'credit']);
 
 function Activity({ account }: { account: Account }) {
-  const count = useAccountTransactionCount(account.id);
   if (!SHOWS_ACTIVITY.has(account.kind)) {
     return account.balance_cents === null ? (
       'No balance yet'
@@ -34,7 +33,7 @@ function Activity({ account }: { account: Account }) {
       </>
     );
   }
-  return count ? transactionCountText(count) : <Skeleton className="w-40" />;
+  return transactionCountText(account);
 }
 
 /**
@@ -50,10 +49,8 @@ export function AccountRow({ account }: { account: Account }) {
   const update = useUpdateAccount();
   const mask = maskLabel(account.mask);
 
-  const onChange = (value: RoleValue) => {
-    if (value === '') return;
+  const onChange = (value: RoleValue) =>
     update.mutate({ accountId: account.id, patch: patchForRole(value) });
-  };
 
   return (
     <div role="group" aria-labelledby={nameId} className="flex flex-col gap-2">
@@ -81,20 +78,17 @@ export function AccountRow({ account }: { account: Account }) {
           <Label htmlFor={selectId} className="m-0">
             Role
           </Label>
+          {/* Named for its account, starting with the visible label (issue 242). */}
           <Select
             id={selectId}
+            aria-label={roleSelectName(account)}
             className="w-auto min-w-40"
             value={roleValue(account)}
             aria-busy={update.isPending || undefined}
             aria-describedby={update.isError ? errorId : undefined}
             onChange={(event) => onChange(event.currentTarget.value as RoleValue)}
           >
-            {roleValue(account) === '' && (
-              <option value="" disabled>
-                Choose a role
-              </option>
-            )}
-            {ROLE_OPTIONS.map((option) => (
+            {roleOptions(account).map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

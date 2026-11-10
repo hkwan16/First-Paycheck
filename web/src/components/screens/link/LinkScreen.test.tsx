@@ -16,6 +16,8 @@ import {
   CHECKING_ID,
   CREDIT_UNION_ITEM_ID,
   SAMPLE_NOW,
+  SAVINGS_ID,
+  sampleAccounts,
   sampleCsvAccount,
   sampleJob,
 } from '@/test/fixtures/sample';
@@ -133,29 +135,76 @@ describe('LinkScreen accounts', () => {
     const checking = await screen.findByRole('group', { name: 'Chase Total Checking' });
     expect(within(checking).getByText('··4821')).toBeInTheDocument();
     expect(within(checking).getByText('CH')).toBeInTheDocument();
-    await waitFor(() =>
-      expect(checking).toHaveTextContent('Synced 4 minutes ago · 16 transactions since Oct 2026'),
-    );
-    expect(within(checking).getByRole('combobox', { name: 'Role' })).toHaveValue('spending');
+    // The count is the API's (spec 002 rule 30a), not a page of transactions.
+    expect(checking).toHaveTextContent('Synced 4 minutes ago · 16 transactions since Oct 2026');
+    // Each select is named for its account (issue 242).
+    expect(
+      within(checking).getByRole('combobox', { name: 'Role for Chase Total Checking ··4821' }),
+    ).toHaveValue('spending');
 
     const savings = screen.getByRole('group', { name: 'Chase Savings' });
     expect(savings).toHaveTextContent('Synced 4 minutes ago · Balance $2,140.00');
-    expect(within(savings).getByRole('combobox', { name: 'Role' })).toHaveValue('emergency_fund');
+    expect(
+      within(savings).getByRole('combobox', { name: 'Role for Chase Savings ··7730' }),
+    ).toHaveValue('emergency_fund');
 
     expect(within(accountsCard()).getByText('2 linked')).toBeInTheDocument();
+  });
+
+  it('reads no transactions to count them', async () => {
+    const reads = requests('GET', '/transactions');
+    renderLink();
+    await screen.findByRole('group', { name: 'Chase Total Checking' });
+    await act(() => vi.advanceTimersByTimeAsync(100));
+    expect(reads).toEqual([]);
+  });
+
+  it("offers each account only its kind's roles, and a way to clear one (issue 241)", async () => {
+    db.accounts.push({
+      ...sampleAccounts[0]!,
+      id: 'loan-1',
+      name: 'Plaid Mortgage',
+      kind: 'loan',
+      mask: '9002',
+      role: null,
+      allowed_roles: [],
+    });
+    const patches = requests('PATCH', `/accounts/${SAVINGS_ID}`);
+    const { user } = renderLink();
+    const loan = await screen.findByRole('group', { name: 'Plaid Mortgage' });
+    const options = (select: HTMLElement) =>
+      within(select)
+        .getAllByRole('option')
+        .map((o) => [o.textContent, (o as HTMLOptionElement).disabled]);
+    expect(
+      options(within(loan).getByRole('combobox', { name: 'Role for Plaid Mortgage ··9002' })),
+    ).toEqual([
+      ['No role', false],
+      ['Not used', false],
+    ]);
+    const savings = screen.getByRole('group', { name: 'Chase Savings' });
+    const select = within(savings).getByRole('combobox', { name: 'Role for Chase Savings ··7730' });
+    expect(options(select)).toEqual([
+      ['No role', false],
+      ['Emergency fund', false],
+      ['Not used', false],
+    ]);
+    await user.selectOptions(select, ['No role']);
+    await waitFor(() => expect(patches).toEqual(['{"role":null,"is_active":true}']));
+    expect(select).toHaveValue('');
   });
 
   it('saves a new role and shows the server result, including the moved emergency fund', async () => {
     const patches = requests('PATCH', `/accounts/${CHECKING_ID}`);
     const { user } = renderLink();
     const checking = await screen.findByRole('group', { name: 'Chase Total Checking' });
-    await user.selectOptions(within(checking).getByRole('combobox', { name: 'Role' }), [
+    await user.selectOptions(within(checking).getByRole('combobox', { name: /^Role for/ }), [
       'Emergency fund',
     ]);
     await waitFor(() => expect(patches).toEqual(['{"role":"emergency_fund","is_active":true}']));
     const savings = screen.getByRole('group', { name: 'Chase Savings' });
     await waitFor(() =>
-      expect(within(savings).getByRole('combobox', { name: 'Role' })).toHaveValue(''),
+      expect(within(savings).getByRole('combobox', { name: /^Role for/ })).toHaveValue(''),
     );
   });
 
@@ -163,11 +212,11 @@ describe('LinkScreen accounts', () => {
     const patches = requests('PATCH', `/accounts/${CHECKING_ID}`);
     const { user } = renderLink();
     const checking = await screen.findByRole('group', { name: 'Chase Total Checking' });
-    await user.selectOptions(within(checking).getByRole('combobox', { name: 'Role' }), [
+    await user.selectOptions(within(checking).getByRole('combobox', { name: /^Role for/ }), [
       'Not used',
     ]);
     await waitFor(() => expect(patches).toEqual(['{"role":null,"is_active":false}']));
-    expect(within(checking).getByRole('combobox', { name: 'Role' })).toHaveValue('unused');
+    expect(within(checking).getByRole('combobox', { name: /^Role for/ })).toHaveValue('unused');
   });
 
   it('puts the role back and says so when saving fails', async () => {
@@ -178,8 +227,8 @@ describe('LinkScreen accounts', () => {
     );
     const { user } = renderLink();
     const checking = await screen.findByRole('group', { name: 'Chase Total Checking' });
-    const select = within(checking).getByRole('combobox', { name: 'Role' });
-    await user.selectOptions(select, ['Retirement']);
+    const select = within(checking).getByRole('combobox', { name: /^Role for/ });
+    await user.selectOptions(select, ['Emergency fund']);
     expect(await within(checking).findByRole('alert')).toHaveTextContent(
       'Could not save the role. Database is busy',
     );
@@ -332,20 +381,21 @@ describe('LinkScreen accounts', () => {
     act(() =>
       xhr.last().respond(200, {
         account: sampleCsvAccount,
-        imported: 5,
+        added: 5,
+        already_present: 0,
         categorize_job_id: categorize,
         recurring_job_id: recurring,
       }),
     );
     expect(
-      await within(panel).findByText('Imported 5 transactions into Credit union checking.'),
+      await within(panel).findByText('Added 5 transactions to Credit union checking.'),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Remove Credit union' }));
     await user.click(screen.getByRole('button', { name: 'Yes, remove Credit union' }));
     await within(accountsCard()).findByText(/^Removed Credit union\./);
 
-    expect(within(panel).queryByText(/^Imported \d+ transactions? into /)).toBeNull();
+    expect(within(panel).queryByText(/^Added \d+ transactions? to /)).toBeNull();
     expect(within(panel).queryByRole('progressbar', { name: 'Labeling categories' })).toBeNull();
     // The account it named is gone, so a new account is the target again.
     expect(target).toHaveValue('');
@@ -706,7 +756,16 @@ describe('LinkScreen documents', () => {
 
     expect(confirmed).toHaveTextContent('Confirmed');
     expect(within(confirmed).getByText('No numbers hidden')).toBeInTheDocument();
-    expect(within(confirmed).queryByRole('link')).not.toBeInTheDocument();
+    // Nothing is left to review; its confirmed values open read-only (issue 243).
+    expect(
+      within(confirmed)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['View']);
+    expect(within(confirmed).getByRole('link', { name: 'View pay stub' })).toHaveAttribute(
+      'href',
+      '/setup/confirm/doc-done',
+    );
 
     expect(failedRow).toHaveTextContent('Failed');
     expect(failedRow).toHaveTextContent('This file could not be opened.');
@@ -859,6 +918,44 @@ describe('LinkScreen documents', () => {
       'notes.docx was not uploaded. Upload a PDF, PNG or JPEG.',
     );
     expect(xhr.requests).toHaveLength(0);
+  });
+
+  it("drops an upload's warning once the next upload is chosen (issue 240)", async () => {
+    const xhr = installFakeXhr();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime, applyAccept: false });
+    renderLink();
+    await firstStubRow();
+    await user.upload(dropZone(), new File(['x'], 'bank-export.csv', { type: 'text/csv' }));
+    expect(await within(docsCard()).findByRole('alert')).toHaveTextContent(
+      'bank-export.csv was not uploaded. Upload a PDF, PNG or JPEG.',
+    );
+    await user.upload(dropZone(), new File(['%PDF-1.4'], 'stub.pdf', { type: 'application/pdf' }));
+    expect(within(docsCard()).queryByRole('alert')).toBeNull();
+    await waitFor(() => expect(xhr.requests).toHaveLength(1));
+  });
+
+  it('keeps a warning about reading one document while another is uploaded, until that one is read again', async () => {
+    server.use(
+      http.post(apiUrl('/docs/:id/extract'), () =>
+        HttpResponse.json({ error: { code: 'x', message: 'Database is busy' } }, { status: 503 }),
+      ),
+    );
+    db.documents = [sampleDocument({ status: 'uploaded', page_count: null })];
+    const xhr = installFakeXhr();
+    const { user } = renderLink();
+    const [row] = await firstStubRow();
+    await user.click(within(row!).getByRole('button', { name: 'Read pay stub' }));
+    expect(await within(docsCard()).findByRole('alert')).toHaveTextContent(
+      'Could not start reading the pay stub. Database is busy',
+    );
+    // An upload is another action: what it says replaces only upload warnings.
+    await user.upload(dropZone(), new File(['%PDF-1.4'], 'other.pdf', { type: 'application/pdf' }));
+    await waitFor(() => expect(xhr.requests).toHaveLength(1));
+    expect(within(docsCard()).getByRole('alert')).toHaveTextContent('Could not start reading');
+    // Reading it again supersedes it.
+    server.resetHandlers();
+    await user.click(within(row!).getByRole('button', { name: 'Read pay stub' }));
+    await waitFor(() => expect(within(docsCard()).queryByRole('alert')).toBeNull());
   });
 
   it('reads a document again that went to manual entry while the AI was unavailable', async () => {

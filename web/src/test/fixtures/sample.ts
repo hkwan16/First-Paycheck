@@ -28,9 +28,12 @@ export const sampleAccounts: readonly Account[] = [
     kind: 'checking',
     mask: '4821',
     role: 'spending',
+    allowed_roles: ['spending', 'emergency_fund'],
     is_active: true,
     balance_cents: 318_212,
     balance_as_of: SAMPLE_SYNCED_AT,
+    transaction_count: 16,
+    first_posted_at: '2026-10-01',
   },
   {
     id: SAVINGS_ID,
@@ -41,9 +44,12 @@ export const sampleAccounts: readonly Account[] = [
     kind: 'savings',
     mask: '7730',
     role: 'emergency_fund',
+    allowed_roles: ['emergency_fund'],
     is_active: true,
     balance_cents: 214_000,
     balance_as_of: SAMPLE_SYNCED_AT,
+    transaction_count: 0,
+    first_posted_at: null,
   },
 ];
 
@@ -60,9 +66,12 @@ export const sampleCsvAccount: Account = {
   kind: 'checking',
   mask: null,
   role: null,
+  allowed_roles: ['spending', 'emergency_fund'],
   is_active: true,
   balance_cents: null,
   balance_as_of: null,
+  transaction_count: 0,
+  first_posted_at: null,
 };
 
 type Row = [

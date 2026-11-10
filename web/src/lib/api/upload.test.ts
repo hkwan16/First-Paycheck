@@ -209,7 +209,8 @@ describe('importCsv', () => {
 
     const body = {
       account: { id: 'a1' },
-      imported: 3,
+      added: 3,
+      already_present: 0,
       categorize_job_id: 'j1',
       recurring_job_id: 'j2',
     };

@@ -26,6 +26,12 @@ interface Upload {
 interface Alert {
   key: number;
   message: string;
+  /**
+   * What it is about: an upload, or reading one document (its id). A newer
+   * action of the same kind supersedes it (issue 240): choosing files drops
+   * every upload warning, reading a document again drops that one's.
+   */
+  about: 'upload' | { read: string };
 }
 
 /** The two kinds of upload the person picks between (the mockup's two rows). */
@@ -90,10 +96,19 @@ export function DocumentsCard() {
   const extract = useExtractDocument();
   const list = documents.data ?? [];
 
-  const alert = (message: string) =>
-    setAlerts((current) => [...current, { key: ++sequence.current, message }]);
+  const alert = (message: string, about: Alert['about']) =>
+    setAlerts((current) => [...current, { key: ++sequence.current, message, about }]);
+  const supersede = (about: Alert['about']) =>
+    setAlerts((current) =>
+      current.filter((a) =>
+        about === 'upload'
+          ? a.about !== 'upload'
+          : a.about === 'upload' || a.about.read !== about.read,
+      ),
+    );
 
   const read = async (documentId: string, documentType: DocumentType) => {
+    supersede({ read: documentId });
     setStarting((current) => new Set(current).add(documentId));
     setJobs(({ [documentId]: _previous, ...rest }) => rest);
     try {
@@ -102,6 +117,7 @@ export function DocumentsCard() {
     } catch (error) {
       alert(
         `Could not start reading the ${documentTypeLabel(documentType).toLowerCase()}. ${apiErrorMessage(error, 'Try again.')}`,
+        { read: documentId },
       );
     } finally {
       setStarting((current) => {
@@ -127,7 +143,7 @@ export function DocumentsCard() {
       });
       if (READABLE_TYPES.has(documentType)) void read(document_id, documentType);
     } catch (error) {
-      alert(uploadErrorMessage(file.name, error));
+      alert(uploadErrorMessage(file.name, error), 'upload');
     } finally {
       setUploads((current) => current.filter((u) => u.key !== key));
     }
@@ -170,7 +186,10 @@ export function DocumentsCard() {
             jobId={jobs[doc.id]}
             starting={starting.has(doc.id)}
             onRead={(d) => void read(d.id, d.type)}
-            onReplace={(d, file) => void send(file, d.type, d.id)}
+            onReplace={(d, file) => {
+              supersede('upload');
+              void send(file, d.type, d.id);
+            }}
           />
         ))}
       </ListRows>
@@ -204,8 +223,15 @@ export function DocumentsCard() {
         <DropZone
           accept={DOCUMENT_ACCEPT}
           multiple
-          onFiles={(files) => files.forEach((file) => void send(file, type))}
-          onReject={(files) => files.forEach((file) => alert(rejectedFileMessage(file.name)))}
+          onFiles={(files) => {
+            supersede('upload');
+            files.forEach((file) => void send(file, type));
+          }}
+          onReject={(files) => {
+            // Runs right after onFiles for one choice, so it keeps that choice's uploads.
+            supersede('upload');
+            files.forEach((file) => alert(rejectedFileMessage(file.name), 'upload'));
+          }}
           title={list.length > 0 ? 'Add another document' : 'Add a document'}
           hint="PDF, PNG or JPEG. A photo or a scan works too."
         />
