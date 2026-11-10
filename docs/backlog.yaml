@@ -2482,3 +2482,15 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Low
+  - title: "Cash withdrawals are counted as transfers, not spending"
+    body: >-
+      An ATM or cash withdrawal is categorized "Transfer between accounts", so
+      it is left out of the month's spending and the safe-to-spend figure is
+      too high by the cash taken out. Spec 003 does not say which it is.
+      Decided November 10: cash withdrawn counts as spending in a "Cash"
+      category. Done when spec 003 says so, a withdrawal is categorized "Cash"
+      and counted in spending and cash flow, and a transfer between the
+      person's own accounts still is not.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: Medium

@@ -727,3 +727,29 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above, on `fix/usability-spending`.
 
 **Time saved or lost:** Not measured.
+
+## 2026-11-09: an end-to-end pass on production with Claude in Chrome, and six fix branches (issues 221 to 243)
+
+**Task:** Drive the production site end to end as a new user would (sign in, Link, Confirm, the three decisions, Spending, the plan and its PDF, check-ins, Why, account menu), write down every bug, then fix them.
+
+**Tool:** Claude Code. One subagent drove Claude in Chrome against production with the e2e account; six Opus 5.5 subagents at high effort, each in its own worktree with its own databases and ports, fixed the findings; the main session wrote the issues, reviewed the reports and looked after CI.
+
+**Prompt or skill:** The tester was told to use only the e2e account, never delete it or unlink its bank, and report each bug with steps, what was expected and what was seen. Each fix brief: spec first, the bug reproduced end to end on the local real-API stack, a failing test, then the code, and no contact with production.
+
+**What it produced:** 23 issues (221 to 243) in `docs/backlog.yaml`, and six pull requests: 244 (past check-ins are frozen records, "Income deposited", overdue deadlines), 245 (a salary that disagrees with the newest stub is asked about, and saved decisions that used old numbers say "Needs review"), 246 (a 401(k) rise is never explained as costing nothing, a replaced decision's Why page says so), 247 (Confirm keeps a draft across a reload, "Confirm none" for a stub with no 401(k) line, CSV re-import says what was already there, roles fit the account kind), 248 (budgeting apps are subscriptions, the cash-flow diagram balances), 249 (Back after Sign out shows nothing, bad ids are a 404 page, a hung session read ends in a notice).
+
+**What was wrong:**
+- `make lint` did not run the prettier check CI runs, so a branch passed locally and failed "lint, types, unit, build". `make lint` now runs `pnpm format:check`, and CLAUDE.md and the cursor rule say so.
+- Two agents wrote `pr-body.md` to the shared scratchpad, and pull request 247 was opened with the Spending description for a few minutes. Agents now need a file name of their own.
+- The intake agent skipped the Plaid-dependent Playwright projects, and CI's "playwright against the API" failed on `import.spec.ts` expecting the old import message. It was sent back, fixed the spec and ran the link, spending, import, confirm and alpha projects with the Plaid keys in its process environment only.
+- Docker is not available on this machine, so every Linux baseline came from the failed smoke run's `playwright-report` artifact, each actual screenshot read before it was committed as the baseline in its own commit.
+- Two flaky tests turned up on the way and were fixed at the cause in 248: `RecurringCard.test.tsx` asserted before the mocked response arrived, and a Hypothesis property in `test_k401_properties.py` did not exclude the case where a limit binds.
+- Three branches each add a migration that revises `0021_paycheck_change`, so they cannot all merge as they are: the later two are renumbered as each lands.
+- Issue 225 (the endless skeleton) is only partly fixed. One way to get there was reproduced and now ends in a notice, but what happened on production was not captured.
+- The zero-cost check on explanations is a wording check for the 401(k) only, and the paid LLM evals were not run.
+
+**How it was caught:** The Chrome pass itself for the 23 bugs; CI for the prettier, import-message and baseline failures; a trial merge of the branches in a scratch worktree for the migration heads and four text conflicts.
+
+**Fix:** As above, in pull requests 244 to 249.
+
+**Time saved or lost:** Not measured.
