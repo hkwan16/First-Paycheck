@@ -2359,8 +2359,11 @@
         "required": [
           "id",
           "kind",
+          "key",
           "column",
-          "cents"
+          "cents",
+          "refunds_cents",
+          "categories"
         ],
         "title": "FlowNode",
         "type": "object"

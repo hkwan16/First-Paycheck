@@ -762,6 +762,26 @@ export interface paths {
     patch: operations['update_recurring'];
     trace?: never;
   };
+  '/spending/months': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Spending Months
+     * @description The months with something to show: the Spending period picker's choices.
+     */
+    get: operations['spending_months'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/spending/summary': {
     parameters: {
       query?: never;
@@ -1153,6 +1173,7 @@ export interface components {
     CalendarStatus: 'upcoming' | 'done' | 'dismissed';
     /** CashFlow */
     CashFlow: {
+      diagram: components['schemas']['FlowDiagram'];
       /**
        * End
        * Format: date
@@ -1827,6 +1848,61 @@ export interface components {
      * @enum {string}
      */
     FindingSeverity: 'info' | 'warning' | 'alert';
+    /**
+     * FlowDiagram
+     * @description Every node and band of the cash-flow diagram: the bands into a node and
+     *     the bands out of it each sum to its ``cents``.
+     */
+    FlowDiagram: {
+      /** Links */
+      links: components['schemas']['FlowLink'][];
+      /** Nodes */
+      nodes: components['schemas']['FlowNode'][];
+    };
+    /** FlowLink */
+    FlowLink: {
+      /** Cents */
+      cents: number;
+      /** Source */
+      source: string;
+      /** Target */
+      target: string;
+    };
+    /** FlowNode */
+    FlowNode: {
+      /** Categories */
+      categories: string[];
+      /** Cents */
+      cents: number;
+      /**
+       * Column
+       * @enum {integer}
+       */
+      column: 0 | 1 | 2 | 3;
+      /** Id */
+      id: string;
+      /** Key */
+      key: string | null;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind:
+        | 'gross'
+        | 'line'
+        | 'take_home'
+        | 'income_deposited'
+        | 'other_deposits'
+        | 'refunds'
+        | 'savings_withdrawn'
+        | 'beyond_income'
+        | 'not_deposited'
+        | 'bucket'
+        | 'left_over'
+        | 'category';
+      /** Refunds Cents */
+      refunds_cents: number | null;
+    };
     /**
      * GoalKind
      * @enum {string}
@@ -3132,6 +3208,11 @@ export interface components {
       redacted: boolean;
       /** Text */
       text: string;
+    };
+    /** SpendingMonths */
+    SpendingMonths: {
+      /** Months */
+      months: string[];
     };
     /** SpendingSummary */
     SpendingSummary: {
@@ -5316,6 +5397,35 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  spending_months: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SpendingMonths'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
         headers: {
           [name: string]: unknown;
         };

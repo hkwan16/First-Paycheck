@@ -199,7 +199,8 @@ Magnitude = Annotated[int, Field(strict=True, ge=0)]
 
 
 class FlowNode(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    # Every field is always sent, so the schema lists the defaulted ones as required.
+    model_config = ConfigDict(frozen=True, json_schema_serialization_defaults_required=True)
 
     # Stable: "gross", "line:<key>", "take_home", "bucket:<bucket>", "category:<c>", ...
     id: str
