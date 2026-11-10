@@ -1,4 +1,4 @@
-"""The user's profile: what the calculators need to know (spec 005 rules 25-25a).
+"""The user's profile: what the calculators need to know (spec 005 rules 24c-25a).
 
 ``birth_year`` settles spec 006 open question 2: the client sends the 401(k)
 calculator ``age = tax_year - birth_year`` (the age reached by December 31 of
@@ -8,6 +8,7 @@ the tax year); ``calc/`` keeps taking ``age`` as an input.
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 from typing import Any, Self
 
 from fastapi import APIRouter
@@ -17,13 +18,15 @@ from sqlalchemy.orm import Session
 
 from app.auth import CurrentUser
 from app.deps import Now, UserSession
-from app.errors import AppError, error_responses
+from app.errors import AppError, NotFound, error_responses
 from app.pay_schedule import PaySchedule, pay_schedule
+from app.salary_review import SalaryReview, load_salary_review
 from app.types import UtcDateTime
 from calc.k401 import MAX_TIERS, MatchTier, tiers_ascending
 from calc.types import PositiveCents
 from db.enums import FilingStatus, HealthcareUsage, PayFrequency
 from db.models import Profile
+from db.pay_stubs import find_pay_stub
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 
@@ -42,6 +45,8 @@ class ProfileFields(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     salary_cents: PositiveCents | None = None
+    # The stub the salary was last compared with (spec 005 rule 24c).
+    salary_pay_stub_id: uuid.UUID | None = None
     pay_frequency: PayFrequency | None = None
     filing_status: FilingStatus | None = None
     other_jobs: list[OtherJob] = Field(default_factory=list, max_length=5)
@@ -72,6 +77,13 @@ class ProfileOut(ProfileFields):
             "confirmed stub's, else pay_frequency; null without either. Computed on read."
         )
     )
+    salary_review: SalaryReview | None = Field(
+        description=(
+            "Set when the newest confirmed stub's yearly pay differs from salary_cents and "
+            "from the stub salary_pay_stub_id names (spec 005 rule 24c): the person chooses "
+            "which salary to use. Computed on read."
+        )
+    )
 
 
 def _out(session: Session, profile: Profile | None) -> ProfileOut:
@@ -85,6 +97,7 @@ def _out(session: Session, profile: Profile | None) -> ProfileOut:
             **saved,
             "updated_at": None if profile is None else profile.updated_at,
             "pay_schedule": pay_schedule(session, profile),
+            "salary_review": load_salary_review(session, profile),
         }
     )
 
@@ -95,13 +108,18 @@ def get_profile(session: UserSession, user: CurrentUser) -> ProfileOut:
     return _out(session, session.get(Profile, user.id))
 
 
-@router.put("", responses=error_responses(401, 422))
+@router.put("", responses=error_responses(401, 404, 422))
 def put_profile(body: ProfileIn, session: UserSession, user: CurrentUser, now: Now) -> ProfileOut:
     """Replace the profile."""
     if body.birth_year is not None and body.birth_year > now.year:
         raise AppError(
             f"The birth year must be at most {now.year}", code="validation_error", status_code=422
         )
+    if (
+        body.salary_pay_stub_id is not None
+        and find_pay_stub(session, body.salary_pay_stub_id) is None
+    ):
+        raise NotFound("Pay stub not found")
     values: dict[str, Any] = body.model_dump(exclude={"other_jobs", "match_tiers"})
     # The jsonb columns hold JSON: percentages as two-place strings.
     values["other_jobs"] = [job.model_dump(mode="json") for job in body.other_jobs]
