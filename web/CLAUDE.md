@@ -64,11 +64,14 @@ src/app/            routes. (auth)/sign-in; (app)/setup/{link,confirm,confirm/[d
                     /setup/decisions itself is the proxy's redirect to the first live step),
                     (app)/why (index of saved decisions), (app)/why/[decisionId], (app)/plan,
                     (app)/check-in (list of check-ins), (app)/check-in/[checkInId]; (app)/error.tsx
-                    (the segment's error boundary); dev/kit
+                    (the segment's error boundary); not-found.tsx (any address with no page, in
+                    the app header, issue 237); dev/kit
 src/app/auth/callback/route.ts  exchanges the email-link code for a session
+src/app/auth/sign-out/route.ts  POST: ends this browser's session (see "Auth")
 src/proxy.ts        Next 16 proxy (formerly middleware): refreshes the Supabase session, sends
                     signed-out requests for (app) screens to /sign-in, forwards the requested path,
-                    and redirects /setup/decisions to the first live decision step
+                    and redirects /setup/decisions to the first live decision step; it leaves
+                    /auth/sign-out alone
 src/components/ui/  design system (below)
 src/components/chrome/  app frame (below)
 src/components/screens/<screen>/  one 'use client' screen component per page
@@ -77,13 +80,13 @@ src/components/sankey/  the cash-flow diagram: layout.ts, popover.ts, keyboard.t
 src/components/icons.tsx  the mockup's SVG glyphs, decorative, drawn in currentColor
 src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts, client.ts,
                     upload.ts, download.ts, keys.ts, errors.ts, hooks/), auth/ (next-path, protected,
-                    validation, errors, account), supabase/ (env, client, server, proxy),
+                    validation, errors, account, sign-out), supabase/ (env, client, server, proxy),
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
                     documents.ts, decisions.ts, decision-steps.ts, deep-equal.ts, explanations.ts,
                     escape-cancel.ts, features.ts, focus-handoff.ts, land-at-top.ts,
                     findings.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts,
-                    page-hydration.ts, page-title.ts, log-error.ts
+                    page-hydration.ts, page-title.ts, log-error.ts, timeout.ts
 src/app/dev/screens/{link,account,spending,confirm,confirm/manual,confirm/unread,confirm/benefits,confirm/extracting,
                     confirm/failed,confirm/confirmed,decisions/{emergency-fund,401k,health-plan,w4,
                     after-alpha},why,why/fallback,why/stale,why/emergency-fund,why-index,check-in,
@@ -156,9 +159,11 @@ A `destructive` Button (Yes, unlink; Delete account) sits beside a safe choice t
 (Keep), so the safe choice is never the weaker one (issue 205).
 
 Chrome (`components/chrome`): `Wordmark`, `Header` (`chips`, `account` slot, `minimal`),
-`HeaderAccount` (server: "Sample data" chip and `UserMenu` from the Supabase user), `UserMenu` (the
-user chip as a disclosure button with "Sign out" and "Delete account"; see "Deleting the account"),
-`DeleteAccountConfirm`, `NavStep` (`size` md 22px, sm 18px for a decision step), `SideNav`
+`HeaderAccount` (server: "Sample data" chip, `UserMenu` and `RestoredPageGuard` from the Supabase
+user), `UserMenu` (the user chip as an APG menu button: a `role="menu"` with "Sign out" and
+"Delete account" as `menuitem`s, one Tab stop, arrows, Home, End, Escape back to the chip, Tab or a
+click elsewhere closes it; see "Auth" and "Deleting the account"), `DeleteAccountConfirm` (a native
+modal `<dialog>`), `RestoredPageGuard` (see "Auth"), `NavStep` (`size` md 22px, sm 18px for a decision step), `SideNav`
 (`current`, `done` from `lib/setup-progress.ts`, `hrefs` for id-bound screens, `calculators`;
 "Decisions" nests its four steps, see "Decisions screen"; one list, stacked at every width),
 `AppSideNav` (current item from the URL), `Shell` (header, nav column `1 1 200px` up to 240px,
@@ -406,6 +411,10 @@ or checked for a phone.
   `afterEach`. For hooks, `renderHookWithClient(hook)` returns the `queryClient` for cache checks.
 - `DELETE /me` empties `db` (`emptyDb()`) and answers 204. A test of the sign-out paths mocks
   `@/lib/supabase/client` and `@/lib/navigation` (see `UserMenu.test.tsx`, `account.test.tsx`).
+  jsdom cannot submit a form as a navigation: catch the Sign out form's `submit` and prevent it.
+- jsdom has no `showModal()`: `src/test/dialog.ts` (installed by `setup.ts`) opens, closes and
+  cancels on Escape like a browser; the top layer, the inert page and the focus trap are checked
+  in the Playwright smoke spec.
 - `components/screens/card-boundaries.test.tsx` mocks one card per screen to throw and checks the
   rest of the screen still works; `limits.test.tsx` is the 429 and 413 table (see "Limits").
 - Third-party widgets are mocked at the module (`vi.mock('react-plaid-link', ...)`, see
@@ -465,11 +474,14 @@ or checked for a phone.
 ## Deleting the account
 
 The header's account menu (`UserMenu`) has Delete account under Sign out, behind a hairline and in
-the `destructive` Button style (issue 205). It swaps the panel for
-`DeleteAccountConfirm`: what goes, a field labeled "Type delete to confirm" (focused; capitals and
-spaces around the word do not matter; Enter submits only once it says delete), Delete my account
-and Keep my account (which returns focus to Delete account). Closing the menu (Escape, a click
-elsewhere) drops the confirmation. `useDeleteAccount` calls `DELETE /me`, then
+the `destructive` Button style (issue 205). It closes the menu and opens `DeleteAccountConfirm`, a
+native `<dialog>` opened with `showModal()` (issue 242: the dialog role, named by its heading, the
+page behind inert so Tab stays inside, Escape closes it except while the deletion runs): what goes,
+a field labeled "Type delete to confirm" (focused; capitals and spaces around the word do not
+matter; Enter submits only once it says delete), Delete my account and Keep my account. Keep and
+Escape give focus back to the account chip (the menu item that opened it closed with the menu), and
+its content mounts only while open, so it never reopens half typed. `useDeleteAccount` calls
+`DELETE /me`, then
 `sessionTokens.accountDeleted()`: the local session is cleared through the Supabase client and the
 browser goes to `/sign-in?deleted=1`. Success means the page is unloading, so the button stays busy.
 A failure says "Your account was not deleted." with the reason and keeps the person signed in.
@@ -902,8 +914,30 @@ previews without secrets).
 - **API calls**: `lib/api/client.ts` attaches `Authorization: Bearer <access_token>`; a 401 triggers
   one shared `refreshSession()` and a retry, and a second 401 signs out locally and goes to
   `/sign-in?next=<current path>`.
-- **Sign-out**: the header's user menu calls `signOut({ scope: 'local' })` (other devices stay signed
-  in) and fully navigates to `/sign-in`.
+- **Session reads** (issue 225): every request waits on supabase-js's `getSession()`, which waits
+  on any token refresh in flight, and that refresh has no timeout of its own. The middleware gives
+  each read and refresh `SESSION_READ_TIMEOUT_MS` (10 s, `withTimeout` from `lib/timeout.ts`);
+  one that runs out sends nothing and throws `SessionUnavailable` (an `ApiError`, status 0), so a
+  card shows its error instead of a skeleton forever, and `query-client.ts` does not retry it.
+  `sessionStatus` (`lib/api/session-status.ts`) records whether the last read answered, and
+  `SessionProblemNotice` (in the `(app)` layout) then says why nothing loads, with Reload the page
+  and Sign in again (the sign-out form, so the stuck session goes too); the next read that answers
+  hides it.
+- **Sign-out** (issue 224): the menu's Sign out drops every cached read (`queryClient.clear()`)
+  and submits a form to `POST /auth/sign-out` (`app/auth/sign-out/route.ts`), a full navigation.
+  The route asks Supabase to end this session (`scope: 'local'`: other devices stay signed in),
+  waiting at most `SIGN_OUT_TIMEOUT_MS`, then expires every Supabase cookie the request carries
+  (`isAuthCookie`) whatever Supabase answered, and answers 303 to `/sign-in` with `no-store`. So a
+  503 from Supabase (seen in production), a thrown fetch or no answer still signs the browser out.
+  The proxy skips this path, so no refreshed cookie races the expiry. POST only.
+- **Back after sign-out** (issue 224): Chrome may keep a `no-store` page in its back/forward cache
+  and show it again on Back, even after the sign-out changed the (non-HttpOnly) session cookies; that
+  showed a signed-out browser the signed-in header, nav and data. `RestoredPageGuard` (rendered by
+  `HeaderAccount`, so on every page that shows an account) hides a page as the browser keeps it
+  (`pagehide` with `persisted`; `html[data-restoring] body` in `globals.css`) and reloads one it
+  brings back (`pageshow` with `persisted`), so the server decides again. Every page response is
+  already `Cache-Control: private, no-cache, no-store` (Next sets it for these dynamic pages;
+  `sign-out.spec.ts` checks it).
 - **A deleted account** (spec 017 rule 9): its access token stays valid until it expires, and a
   write under it is a 401 `account_deleted`. The fetch middleware and the uploads skip the refresh
   for it (there is no session left to refresh), clear the local session and go to
@@ -917,8 +951,17 @@ previews without secrets).
 ### End-to-end auth tests
 
 `e2e/auth.setup.ts` signs in through the form and saves the session to `e2e/.auth/user.json`
-(git-ignored) for the `authenticated` project, which runs `e2e/auth.spec.ts`. Set these in
-`web/.env.local` or the environment:
+(git-ignored) for the `authenticated` project, which runs `e2e/auth.spec.ts`, `e2e/not-found.spec.ts`
+(a malformed id on the Why, check-in and Confirm screens reads as not found, and the app's
+not-found page, issue 237; the id checks need `E2E_API_URL`), `e2e/sign-out.spec.ts` (issue 224)
+and `e2e/session.spec.ts` (issue 225). The last two run only against the local stack's Auth
+stand-in, which can fail on purpose for one user (`e2e/support/auth-faults.ts`: `setAuthFaults`
+through `E2E_AUTH_FAULTS_URL`, for the session user `E2E_SESSION_USER_*`): a sign-out answered
+with 503, a token refresh that never answers. `sign-out.spec.ts` turns Chromium's back/forward
+cache back on (Playwright turns it off) with Chrome's settings for keeping `no-store` pages; only a
+production server exercises the restore (`next dev`'s live-reload socket keeps pages out of that
+cache), and the test records which it got as an annotation. Set these in `web/.env.local` or the
+environment:
 
 | Variable                                                           | Needed for                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -988,11 +1031,12 @@ paycheck the later screens show. Never use a real document as a fixture.
 ### Local real-API stack
 
 `make e2e-full` (`scripts/e2e_stack.py`) runs `pnpm e2e` against a stack it starts and stops: a
-disposable `first_paycheck_e2e` database (migrated, seeded, two synthetic users), a stand-in for
+disposable `first_paycheck_e2e` database (migrated, seeded, three synthetic users), a stand-in for
 Supabase Auth that signs ES256 tokens and serves its JWKS (the web signs in through its real form;
-the API verifies the same tokens), and the API and worker with `LLM_FAKE=true`. It sets every
-variable above itself, plus `E2E_ALPHA_USER_EMAIL`/`E2E_ALPHA_USER_PASSWORD` and
-`E2E_PLAID_SANDBOX`; the web runs on `E2E_PORT` 3247. Plaid comes from `PLAID_CLIENT_ID` and
+the API verifies the same tokens) and takes faults for the session user, and the API and worker
+with `LLM_FAKE=true`. It sets every variable above itself, plus
+`E2E_ALPHA_USER_EMAIL`/`E2E_ALPHA_USER_PASSWORD`, `E2E_SESSION_USER_EMAIL`/`E2E_SESSION_USER_PASSWORD`,
+`E2E_AUTH_FAULTS_URL` and `E2E_PLAID_SANDBOX`; the web runs on `E2E_PORT` 3247. Plaid comes from `PLAID_CLIENT_ID` and
 `PLAID_SECRET` in the environment or `.env`; without them `E2E_PLAID_SANDBOX=0` skips
 `link.spec.ts` and the alpha's link steps and leaves the spending project out.
 `uv run python -m scripts.e2e_stack run -- <command>` runs any command against it (CI's `e2e`
