@@ -97,7 +97,7 @@ Every job handler, after the privileged dequeue, opens a user-scoped session wit
 | `calculator_kind` | `emergency_fund`, `k401_match`, `health_plans`, `w4` |
 | `checkin_trigger` | `schedule`, `sync`, `manual` |
 | `checkin_status` | `open`, `completed` |
-| `finding_kind` | `election_mismatch`, `goal_off_pace`, `recurring_new`, `recurring_changed`, `recurring_stopped`, `pay_change`, `upcoming_deadline` (`0021_paycheck_change` removed `deduction_change`, spec 015) |
+| `finding_kind` | `election_mismatch`, `goal_off_pace`, `recurring_new`, `recurring_changed`, `recurring_stopped`, `pay_change`, `upcoming_deadline`, `overdue_deadline` (`0021_paycheck_change` removed `deduction_change` and `0022_deadline_dates` added `overdue_deadline`, spec 015) |
 | `finding_severity` | `info`, `warning`, `alert` |
 | `finding_action` | `done`, `dismissed` (`0012_checkin_findings` replaced the original `acknowledged`, `acted`, `dismissed`, spec 015) |
 | `calendar_kind` | `enrollment_deadline`, `tax_season`, `open_enrollment`, `goal_target` |
@@ -119,6 +119,7 @@ One row per user; the confirmed picture of the job and choices.
 |---|---|---|
 | `user_id` | `uuid` | Primary key, references `auth.users(id) ON DELETE CASCADE` |
 | `salary_cents` | `bigint` | Null until confirmed; `CHECK (salary_cents > 0)` |
+| `salary_pay_stub_id` | `uuid` | Null until the salary is compared with a stub; the stub it was last compared with (spec 005 rule 24c). `(salary_pay_stub_id, user_id)` references `pay_stubs (id, user_id)`, `ON DELETE SET NULL (salary_pay_stub_id)` |
 | `pay_frequency` | `pay_frequency` | Null until confirmed |
 | `filing_status` | `filing_status` | Null until confirmed |
 | `other_jobs` | `jsonb` | `NOT NULL DEFAULT '[]'`, `CHECK (jsonb_typeof(other_jobs) = 'array')`; item shape set by the W-4 spec (M7) |
@@ -462,6 +463,8 @@ Reference data, no `user_id` (RLS exception).
 | `0018_check_in_last_run_at` | Nothing new. `check_ins.last_run_at` (spec 015 rule 9a), filled from `updated_at` for existing rows with the `updated_at` trigger off. The downgrade drops it |
 | `0020_pay_stub_superseded_by` | Nothing new but a trigger function. `pay_stubs.employer_key` and `superseded_by_id` with the same-user foreign key, `uq_pay_stubs_current_paycheck`, `UPDATE (superseded_by_id)` for `authenticated` and the `pay_stubs_supersede_only()` trigger (spec 005 rules 22a-22e, issue 190). It supersedes the stubs already stored in confirm order before creating the index. The downgrade drops them; every copy then counts again |
 | `0021_paycheck_change` | Nothing new. Folds each check-in's `deduction_change` findings into their paycheck's `pay_change` and merges the findings a newer copy of a stub made (spec 015 rule 13a, issues 194 and 202), then rebuilds `finding_kind` without `deduction_change`. The downgrade splits the lines back into `deduction_change` findings and rebuilds the type with the label |
+| `0022_deadline_dates` | Nothing new. Rebuilds `finding_kind` with `overdue_deadline` after `upcoming_deadline` and keys each `upcoming_deadline` finding by its date, `upcoming_deadline:{calendar_kind}:{due_at}`, folding a check-in's findings that then share a key (spec 015 rule 13b, issues 233 and 234). The downgrade deletes the `overdue_deadline` findings, settles each check-in's status again, keys the date findings by their event and rebuilds the type without the label |
+| `0023_salary_pay_stub` | `profiles.salary_pay_stub_id` and its same-user foreign key to `pay_stubs` (spec 005 rule 24c, issue 221). The downgrade drops the column |
 
 CI runs upgrade, downgrade, upgrade and `alembic check` on every pull request.
 

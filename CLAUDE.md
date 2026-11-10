@@ -61,7 +61,7 @@ make dev        api + worker + web via honcho (Procfile.dev), against .env
 make test       all Python tests (api, evals, scripts) and web unit tests
 make test-api   API tests only (integration tests need TEST_DATABASE_URL)
 make e2e-full   Playwright against a local API, worker, auth stand-in and Postgres
-make lint       ruff, ruff format --check, mypy, em-dash check, eslint, tsc
+make lint       ruff, ruff format --check, mypy, em-dash check, eslint, prettier, tsc
 make eval       deterministic eval suites (free); make eval-llm for LLM suites
 make migrate    alembic upgrade head; make revision id=0002_core msg="core tables"
 make seed       load reference data (idempotent)

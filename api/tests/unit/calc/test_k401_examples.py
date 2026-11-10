@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from calc.k401 import K401MatchInput, K401MatchResult, k401_match
+from calc.k401 import K401MatchInput, K401MatchResult, k401_match, rate_change
 
 BASE_KEYS = [
     "k401.employer_match",
@@ -309,6 +309,72 @@ def test_stub_01_rate_with_a_half_cent_tie() -> None:
         limit=2_450_000,
         capped=False,
     )
+
+
+# ------------------------------------------------- rule 15: rate_change (issue 223)
+
+
+def moved(
+    salary_cents: int,
+    periods: int,
+    tiers: list[tuple[str, str]],
+    contribution: str,
+    from_pct: str,
+) -> tuple[int, int]:
+    """Spec 006 rule 15's two figures for moving from ``from_pct`` to ``contribution``."""
+    data = K401MatchInput.model_validate(
+        {
+            "salary_cents": salary_cents,
+            "pay_periods_per_year": periods,
+            "match_tiers": [
+                {"employee_pct_upto": upto, "employer_pct": pct} for upto, pct in tiers
+            ],
+            "contribution_pct": contribution,
+            "tax_year": 2026,
+            "filing_status": "single",
+            "age": 30,
+        }
+    )
+    change = rate_change(data, Decimal(from_pct))
+    return change.per_paycheck_cents, change.per_paycheck_after_tax_cents
+
+
+def test_rate_change_issue_223_against_the_stub() -> None:
+    """15a: 6% takes $237.50 a paycheck more than the 0% the stub shows."""
+    assert moved(9_500_010, 24, TIERED, "6", "0") == (23_750, 18_525)
+
+
+def test_rate_change_issue_223_above_the_full_match() -> None:
+    """15b: the point above the full match costs $39.58, not "no extra"."""
+    assert moved(9_500_010, 24, TIERED, "6", "5") == (3_958, 3_088)
+    # The result's own figure is the extra needed to reach the match: 0 above it.
+    assert run(9_500_010, 24, TIERED, "6").per_paycheck_cost_delta_cents == 0
+
+
+def test_rate_change_issue_223_at_the_full_match() -> None:
+    assert moved(9_500_010, 24, TIERED, "5", "0") == (19_792, 15_438)
+
+
+def test_rate_change_issue_132_against_the_stub() -> None:
+    """15d: example 11's figures, since 3% is its rate and 5% the full match."""
+    assert moved(9_500_010, 26, TIERED, "5", "3") == (7_308, 5_700)
+
+
+def test_rate_change_lowered_below_the_stub() -> None:
+    """15e: example 2's move backwards, so its figures with the sign turned."""
+    assert moved(6_500_000, 24, [("4", "100")], "2", "4") == (-5_417, -4_767)
+
+
+def test_rate_change_both_at_the_limit() -> None:
+    assert moved(30_000_000, 26, TIERED, "10", "9") == (0, 0)
+
+
+def test_rate_change_capped_above_the_full_match() -> None:
+    assert moved(30_000_000, 26, TIERED, "10", "5") == (36_538, 23_750)
+
+
+def test_rate_change_example_6_above_the_full_match() -> None:
+    assert moved(7_000_000, 26, [("4", "100")], "8", "4") == (10_769, 9_477)
 
 
 # ---------------------------------------------------------------- edge cases

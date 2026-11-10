@@ -176,6 +176,9 @@ export const invalidateAfterUnlink = (client: QueryClient) =>
     queryKeys.checkIn(),
   ]);
 
+/** The list and every version read (`is_current` and `review` change when a version lands). */
+const decisionReads = [queryKeys.decisions(), queryKeys.decision()];
+
 /** After an upload or a queued extraction: statuses changed. */
 export const invalidateDocuments = (client: QueryClient) => invalidateAll(client, documentReads);
 
@@ -196,10 +199,18 @@ export const invalidateAfterConfirm = (client: QueryClient) =>
     queryKeys.plan(),
     // A new stub or summary can leave an explanation out of date (spec 008 rule 19b).
     queryKeys.explanation(),
+    // A new stub can leave a saved decision needing review (spec 007 rule 19b, issue 222).
+    ...decisionReads,
   ]);
 
-/** The list and every version read (`is_current` changes when a version lands). */
-const decisionReads = [queryKeys.decisions(), queryKeys.decision()];
+/**
+ * After `PUT /profile`, whose answer the hook writes into the profile's cache:
+ * a decision's `review` compares what it read with the profile (its salary,
+ * filing status, match and birth year, and the salary question, spec 007
+ * rules 19b and 19c), and the plan repeats it.
+ */
+export const invalidateAfterProfile = (client: QueryClient) =>
+  invalidateAll(client, [...decisionReads, queryKeys.plan()]);
 
 /** A save lost a race (409): read the decisions again. */
 export const invalidateDecisions = (client: QueryClient) => invalidateAll(client, decisionReads);

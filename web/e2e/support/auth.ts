@@ -45,6 +45,20 @@ export function alphaUser(): E2EUser | null {
   return supabaseConfigured() && email && password ? { email, password } : null;
 }
 
+export const NO_SCHEDULE_USER =
+  'Skipped: set E2E_SCHEDULE_USER_EMAIL and E2E_SCHEDULE_USER_PASSWORD (a new, confirmed user with no data; scripts/e2e_stack.py makes one per run) to run the pay schedule change.';
+
+/**
+ * The account schedule-change.spec.ts confirms two pay stubs on different
+ * schedules for, with decisions saved between them (issues 221 and 222): it
+ * must be new, so it is neither the shared e2e user nor the alpha's.
+ */
+export function scheduleUser(): E2EUser | null {
+  const email = process.env.E2E_SCHEDULE_USER_EMAIL?.trim();
+  const password = process.env.E2E_SCHEDULE_USER_PASSWORD;
+  return supabaseConfigured() && email && password ? { email, password } : null;
+}
+
 /** Wait for React to hydrate before interacting, so no event lands on dead HTML. */
 export async function waitForHydration(page: Page) {
   await page.locator('html[data-hydrated="true"]').waitFor();

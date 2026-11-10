@@ -23,6 +23,7 @@ import {
   readPlanDetails,
   SALARY_EXAMPLE,
   salaryFromStub,
+  salaryStubId,
   stubSchedule,
   type PlanDetailsDraft,
   type PlanDetailsField,
@@ -90,7 +91,14 @@ export function PlanDetailsForm({
       return;
     }
     setErrors({});
-    update.mutate({ ...profileInput(profile), ...read.values }, { onSuccess: onSaved });
+    update.mutate(
+      {
+        ...profileInput(profile),
+        ...read.values,
+        salary_pay_stub_id: salaryStubId(profile, payStub, read.values.salary_cents),
+      },
+      { onSuccess: onSaved },
+    );
   };
 
   const fieldId = (name: string) => `${id}-${name}`;

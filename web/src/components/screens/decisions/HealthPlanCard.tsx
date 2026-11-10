@@ -44,6 +44,8 @@ import {
 } from './health-plan-format';
 import { HEALTH_CALC_PATH, PlanResult, type Scenarios } from './HealthPlanResult';
 import { PlanOptionsForm } from './PlanOptionsForm';
+import { ReviewNotice } from './ReviewNotice';
+import { SalaryQuestion } from './SalaryQuestion';
 
 type Source = 'benefits' | 'saved' | 'typed';
 
@@ -112,6 +114,8 @@ export function HealthPlanCard() {
   const periods = profile.data?.pay_schedule?.periods_per_year ?? null;
   const salary = profile.data?.salary_cents ?? null;
   const filing = profile.data?.filing_status ?? null;
+  // The salary question is open (spec 005 rule 24c): nothing is compared until it is answered.
+  const question = profile.data?.salary_review ?? null;
   const showForm = editing || plans === null;
 
   // Everything the decision reads is there. The plan table opening in place of the
@@ -122,7 +126,8 @@ export function HealthPlanCard() {
     payStub !== undefined &&
     periods !== null &&
     salary !== null &&
-    filing !== null;
+    filing !== null &&
+    question === null;
   const decided: HealthPlansInput | null =
     decidable && hsaRead.cents !== null
       ? {
@@ -200,6 +205,14 @@ export function HealthPlanCard() {
         This step needs your yearly salary, filing status and pay schedule to work out the tax an
         HSA saves. <Link href={decisionStepRoute('401k_match')}>Add them on the 401(k) step</Link>.
       </Notice>
+    );
+  } else if (question !== null) {
+    body = (
+      <SalaryQuestion
+        profile={profile.data!}
+        question={question}
+        onAnswered={() => focus.moveTo(showForm ? 'plans-form' : 'usage')}
+      />
     );
   } else if (showForm) {
     body = (
@@ -361,6 +374,7 @@ export function HealthPlanCard() {
       busy={!loaded && !failed}
       badge={loaded ? <Badge tone={saveBadgeTone(state.status)}>{state.label}</Badge> : undefined}
     >
+      {loaded && !failed && current && <ReviewNotice decision={current} />}
       {body}
     </DecisionCard>
   );

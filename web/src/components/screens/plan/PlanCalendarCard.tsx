@@ -10,9 +10,10 @@ import { eventHue } from './plan-format';
 import { decisionKindRoute } from '@/lib/routes';
 
 /**
- * "Next 90 days", from the mockup's decision calendar: the plan's upcoming
+ * "Next 90 days", from the mockup's decision calendar: the plan's open
  * events through `calendar_through` (spec 016 rule 6), in the API's order,
- * each marked with the decision it came from.
+ * each marked with the decision it came from, and Overdue when the API says
+ * its date passed with nothing done (issue 233).
  */
 export function PlanCalendarCard({ plan }: { plan: Plan }) {
   const through = formatDate(plan.calendar_through);
@@ -43,12 +44,21 @@ export function PlanCalendarCard({ plan }: { plan: Plan }) {
                 </span>
                 <div className="flex min-w-0 flex-col gap-1">
                   <div className="font-semibold">{event.title}</div>
-                  <div className="text-tiny text-ink-3">Due {formatDate(event.due_at)}</div>
-                  {decision && (
+                  <div className="text-tiny text-ink-3">
+                    {event.overdue ? 'Was due' : 'Due'} {formatDate(event.due_at)}
+                  </div>
+                  {(decision || event.overdue) && (
                     <div>
-                      <Badge tone={hue} href={decisionKindRoute(decision.calculator)}>
-                        {CALCULATOR_LABELS[decision.calculator]}
-                      </Badge>
+                      {event.overdue && (
+                        <Badge tone="off" className="mr-2">
+                          Overdue
+                        </Badge>
+                      )}
+                      {decision && (
+                        <Badge tone={hue} href={decisionKindRoute(decision.calculator)}>
+                          {CALCULATOR_LABELS[decision.calculator]}
+                        </Badge>
+                      )}
                     </div>
                   )}
                 </div>

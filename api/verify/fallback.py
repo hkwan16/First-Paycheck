@@ -13,7 +13,7 @@ from decimal import Decimal
 from typing import Any
 
 from calc.health_plans import HealthPlansInput, HealthPlansResult
-from calc.k401 import K401MatchInput, K401MatchResult
+from calc.k401 import K401MatchInput, K401MatchResult, RateChange, rate_costs
 from calc.pay_stub import StubRate, StubWithholding, stub_rate, stub_withholding
 from calc.w4 import W4Input, W4Result, at_withholding
 from llm.schemas import ExplanationDraft, NumberClaim
@@ -28,8 +28,10 @@ __all__ = ["FALLBACK_VERSION", "fallback_draft"]
 # negative health plan cost reads as an amount ahead (spec 012 rule 17). v4
 # (issue 181): the W-4 text says what the entries would withhold, states what
 # the pay stub withholds now and the refund or balance due at it (spec 008
-# rule 7b).
-FALLBACK_VERSION = "fallback/v4"
+# rule 7b). v5 (issue 223): the 401(k) text says what the rate chosen takes from
+# each paycheck against the stub's rate and for the part above the full match
+# (spec 008 rule 7c).
+FALLBACK_VERSION = "fallback/v5"
 
 K401_CONCEPT = "Your employer's 401(k) match and what it costs you to earn all of it."
 HEALTH_CONCEPT = "Comparing health plans by what each costs you in a year, not just by the premium."
@@ -67,6 +69,28 @@ def _stub_sentence(case: StubRate, pay_stub_pct: Decimal | None) -> list[str]:
     return [template.format(stub=percent(pay_stub_pct))]
 
 
+def _against_stub(change: RateChange | None) -> tuple[list[str], list[NumberClaim]]:
+    """What the chosen rate takes from each paycheck against the stub's (spec 008
+    rule 7c), once the election is changed; nothing when there is no such move."""
+    if change is None:
+        return [], []
+    before = dollars(abs(change.per_paycheck_cents))
+    after = dollars(abs(change.per_paycheck_after_tax_cents))
+    if change.per_paycheck_cents > 0:
+        sentence = (
+            f"Once it does, each paycheck has {before} more taken before tax, or about {after}"
+            " less take-home pay after federal income tax."
+        )
+        label = "More taken per paycheck than at your pay stub's rate"
+    else:
+        sentence = (
+            f"Once it does, each paycheck has {before} less taken before tax, or about {after}"
+            " more take-home pay after federal income tax."
+        )
+        label = "Less taken per paycheck than at your pay stub's rate"
+    return [sentence], [NumberClaim(value=before, label=label)]
+
+
 def _k401(
     data: K401MatchInput, result: K401MatchResult, pay_stub_pct: Decimal | None
 ) -> tuple[str, list[NumberClaim]]:
@@ -74,6 +98,8 @@ def _k401(
     full = percent(result.full_match_pct)
     yours = dollars(result.employee_annual_cents_current)
     case = stub_rate(data.contribution_pct, pay_stub_pct)
+    costs = rate_costs(data, pay_stub_pct)
+    stub_cost, stub_claims = _against_stub(costs.against_stub)
     sentences: list[str] = []
     claims = [NumberClaim(value=yours, label="Your yearly contribution at the rate you chose")]
     if not data.match_tiers:
@@ -81,6 +107,8 @@ def _k401(
             f"Your plan has no employer match. At the {rate} you chose, you put in {yours} a year."
         )
         sentences += _stub_sentence(case, pay_stub_pct)
+        sentences += stub_cost
+        claims += stub_claims
     else:
         match_now = dollars(result.employer_match_cents_current)
         match_full = dollars(result.employer_match_cents_full)
@@ -89,6 +117,8 @@ def _k401(
             f" {match_now}."
         )
         sentences += _stub_sentence(case, pay_stub_pct)
+        sentences += stub_cost
+        claims += stub_claims
         claims.append(NumberClaim(value=match_full, label="Full employer match per year"))
         if result.missed_cents > 0:
             missed = dollars(result.missed_cents)
@@ -108,9 +138,25 @@ def _k401(
                 " marginal rate."
             )
             claims += [
-                NumberClaim(value=before, label="Extra per paycheck before tax"),
-                NumberClaim(value=after, label="Extra per paycheck after federal income tax"),
+                NumberClaim(
+                    value=before, label="Extra per paycheck before tax to reach the full match"
+                ),
+                NumberClaim(
+                    value=after,
+                    label="Extra per paycheck after federal income tax to reach the full match",
+                ),
             ]
+        above = costs.above_full_match
+        if above is not None:
+            before = dollars(above.per_paycheck_cents)
+            after = dollars(above.per_paycheck_after_tax_cents)
+            sentences.append(
+                f"The part of your rate above {full} earns no match and takes {before} from each"
+                f" paycheck before tax, or about {after} after federal income tax."
+            )
+            claims.append(
+                NumberClaim(value=before, label="Per paycheck for the part above the full match")
+            )
     sentences.append(
         f"Your {data.tax_year} limit on 401(k) contributions is"
         f" {dollars(result.deferral_limit_cents)}."

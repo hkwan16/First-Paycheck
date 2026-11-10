@@ -329,6 +329,7 @@ async function saveProfileSchedule(page: Page, payFrequency: string) {
   const {
     updated_at: _updatedAt,
     pay_schedule: _paySchedule,
+    salary_review: _salaryReview,
     ...fields
   } = (await response.json()) as Record<string, unknown>;
   const put = await page.request.put(`${e2eApiUrl()}/profile`, {

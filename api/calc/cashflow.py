@@ -383,7 +383,7 @@ def diagram(
 # ---------------------------------------------------------------- against the plan (spec 015)
 
 PlanLineKey = Literal[
-    "take_home", "essentials", "flexible", "other", "savings", "retirement", "health", "left_over"
+    "income", "essentials", "flexible", "other", "savings", "retirement", "health", "left_over"
 ]
 
 
@@ -392,7 +392,9 @@ class SpendingActuals(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    take_home_cents: Cents
+    # The money deposited into the cash accounts, which Spending calls Income
+    # deposited: not take-home pay, the pay stubs' net (issue 235).
+    income_cents: Cents
     essentials_cents: Cents
     flexible_cents: Cents
     other_cents: Cents
@@ -434,6 +436,9 @@ class PlanLine(BaseModel):
     # Which side of the plan the line is on, beyond the tolerance; null without
     # a plan. Whether over is good depends on the line (spending vs saving).
     status: PlanLineStatus | None
+    # A decision sets this line's plan from the period's pay stubs, and the
+    # period has none yet, so the plan is not known (spec 015 rule 19).
+    needs_pay_stub: bool
 
 
 def plan_tolerance(plan_cents: int) -> int:
@@ -454,7 +459,9 @@ def plan_status(actual_cents: int, plan_cents: int | None) -> PlanLineStatus | N
     return "on_plan"
 
 
-def _line(key: PlanLineKey, label: str, actual: int, plan: int | None) -> PlanLine:
+def _line(
+    key: PlanLineKey, label: str, actual: int, plan: int | None, *, needs_pay_stub: bool = False
+) -> PlanLine:
     return PlanLine(
         key=key,
         label=label,
@@ -462,6 +469,7 @@ def _line(key: PlanLineKey, label: str, actual: int, plan: int | None) -> PlanLi
         plan_cents=plan,
         difference_cents=None if plan is None else actual - plan,
         status=plan_status(actual, plan),
+        needs_pay_stub=needs_pay_stub,
     )
 
 
@@ -476,20 +484,23 @@ def against_plan(
 
     ``total`` is the period's summed stub flow (``withholding(...).total``).
     The retirement plan is the elected rate on the period's actual gross; the
-    health plan is the premium times the paychecks in the period.
+    health plan is the premium times the paychecks in the period. Both follow
+    the period's pay stubs, so with none they are not known yet: null, with
+    ``needs_pay_stub`` (a share of no pay read "plan $0.00, On plan").
     """
+    has_stub = paycheck_count > 0
     retirement_plan = (
-        None
-        if targets.contribution_pct is None
-        else round_half_up(pct_of(total.gross_cents, targets.contribution_pct))
+        round_half_up(pct_of(total.gross_cents, targets.contribution_pct))
+        if targets.contribution_pct is not None and has_stub
+        else None
     )
     health_plan = (
-        None
-        if targets.premium_per_period_cents is None
-        else targets.premium_per_period_cents * paycheck_count
+        targets.premium_per_period_cents * paycheck_count
+        if targets.premium_per_period_cents is not None and has_stub
+        else None
     )
     return [
-        _line("take_home", "Take-home pay", spending.take_home_cents, None),
+        _line("income", "Income deposited", spending.income_cents, None),
         _line(
             "essentials", "Essentials", spending.essentials_cents, targets.monthly_essentials_cents
         ),
@@ -501,7 +512,14 @@ def against_plan(
             "401(k) from pay stubs",
             _amount(total, "retirement_contribution"),
             retirement_plan,
+            needs_pay_stub=targets.contribution_pct is not None and not has_stub,
         ),
-        _line("health", "Health premiums", _amount(total, "medical_premium"), health_plan),
+        _line(
+            "health",
+            "Health premiums",
+            _amount(total, "medical_premium"),
+            health_plan,
+            needs_pay_stub=targets.premium_per_period_cents is not None and not has_stub,
+        ),
         _line("left_over", "Left over", spending.left_over_cents, None),
     ]

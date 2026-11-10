@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app import decision_effects, ratelimit
 from app.auth import CurrentUser
+from app.decision_review import ReviewContext, ReviewReason, load_context, review
 from app.deps import Now, UserSession
 from app.errors import AppError, NotFound, error_responses, validation_message
 from app.types import UtcDateTime
@@ -70,6 +71,9 @@ class DecisionOut(DecisionVersion):
     inputs: dict[str, Any]
     result: dict[str, Any]
     is_current: bool
+    # Why this decision needs review (spec 007 rules 19a-19e); empty when nothing
+    # does, and always for a version that is not current.
+    review: list[ReviewReason]
 
 
 class CalculatorDecisions(BaseModel):
@@ -193,7 +197,9 @@ def save_decision(
     )
 
 
-def _out(decision: Decision, *, is_current: bool) -> DecisionOut:
+def _out(decision: Decision, *, context: ReviewContext | None) -> DecisionOut:
+    """``context`` is what the steps read now, for the current version; None for one
+    that is not current."""
     return DecisionOut(
         id=decision.id,
         calculator=decision.calculator,
@@ -203,7 +209,8 @@ def _out(decision: Decision, *, is_current: bool) -> DecisionOut:
         inputs=decision.inputs,
         result=decision.result,
         created_at=decision.created_at,
-        is_current=is_current,
+        is_current=context is not None,
+        review=[] if context is None else review(decision.calculator, decision.inputs, context),
     )
 
 
@@ -211,6 +218,7 @@ def _out(decision: Decision, *, is_current: bool) -> DecisionOut:
 def list_decisions(session: UserSession) -> DecisionList:
     """The current decision and the version history of every calculator."""
     current = set(session.scalars(select(_current_decisions.c.id)))
+    context = load_context(session)
     rows = session.scalars(select(Decision).order_by(Decision.version.desc()))
     by_calculator: dict[CalculatorKind, list[Decision]] = {}
     for row in rows:
@@ -222,7 +230,7 @@ def list_decisions(session: UserSession) -> DecisionList:
         items.append(
             CalculatorDecisions(
                 calculator=kind,
-                current=_out(head, is_current=True),
+                current=_out(head, context=context),
                 versions=[
                     DecisionVersion(
                         id=row.id,
@@ -244,4 +252,4 @@ def get_decision(decision_id: uuid.UUID, session: UserSession) -> DecisionOut:
     if decision is None:
         raise NotFound("Decision not found")
     is_current = session.scalar(select(exists().where(_current_decisions.c.id == decision.id)))
-    return _out(decision, is_current=bool(is_current))
+    return _out(decision, context=load_context(session) if is_current else None)

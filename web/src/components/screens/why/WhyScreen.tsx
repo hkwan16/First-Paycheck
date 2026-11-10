@@ -8,18 +8,26 @@ import { Card } from '@/components/ui/Card';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { apiErrorCode, apiErrorMessage } from '@/lib/api/errors';
-import { useCalendar, useDecision, useExplain, useExplanation, usePayStubs } from '@/lib/api/hooks';
+import {
+  useCalendar,
+  useDecision,
+  useDecisions,
+  useExplain,
+  useExplanation,
+  usePayStubs,
+} from '@/lib/api/hooks';
 import type { Decision, Explanation } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import { asK401Inputs, CALCULATOR_LABELS } from '@/lib/decisions';
 import { isExplained } from '@/lib/explanations';
 import { formatRate } from '@/lib/money';
-import { decisionKindRoute, firstDecisionRoute } from '@/lib/routes';
+import { decisionKindRoute, firstDecisionRoute, whyRoute } from '@/lib/routes';
 import { CalculatorResultCard } from './CalculatorResultCard';
 import {
   CheckedNote,
   NextSteps,
   NotWrittenNote,
+  ReplacedNote,
   StaleNote,
   VerifiedBody,
 } from './ExplanationViews';
@@ -50,10 +58,13 @@ const taxYearOf = (decision: Decision | undefined): number | null => {
  * one; `POST /explain` answers when the run is over. One note says which
  * state it is in (spec 008 rule 19b). An emergency fund is never explained
  * (spec 011 rule 18): its page shows the saved result and offers no
- * explanation.
+ * explanation. A version a newer one replaced says so in place of that note,
+ * links to the current one and offers nothing that acts on it (spec 008 rule
+ * 19c).
  */
 export function WhyScreen({ decisionId }: { decisionId: string }) {
   const decision = useDecision(decisionId);
+  const decisions = useDecisions();
   const explanation = useExplanation(decisionId);
   const explain = useExplain();
   const calendar = useCalendar();
@@ -73,12 +84,26 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
   }
 
   const current = decision.data;
+  // Spec 008 rule 19c (issue 227): a version a newer one replaced is kept as a
+  // record. It says so, links to the current one, and offers nothing that acts
+  // on the current decision or writes an explanation.
+  const replaced = current?.is_current === false;
+  const latest = replaced
+    ? decisions.data?.items.find((item) => item.calculator === current.calculator)?.current
+    : undefined;
+  const replacedNote = replaced && (
+    <ReplacedNote
+      savedOn={current.created_at}
+      replacedOn={latest?.created_at}
+      current={latest ? whyRoute(latest.id) : '/why'}
+    />
+  );
   const write = (force: boolean) => explain.mutate({ decisionId, force });
   const event = calendar.data?.find((e) => e.decision_id === decisionId);
   const llmUnavailable = apiErrorCode(explain.error) === 'llm_unavailable';
   // Back to this decision's own step (spec 018 rule 4).
   const change = current ? decisionKindRoute(current.calculator) : firstDecisionRoute();
-  const changeButton = (
+  const changeButton = !replaced && (
     <Button size="sm" href={change}>
       Change this decision
     </Button>
@@ -110,11 +135,18 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
   const explained = current === undefined || isExplained(current.calculator);
   let body: ReactNode;
   if (current && !explained) {
-    body = savedNumbers(changeButton);
+    body = (
+      <>
+        {replacedNote}
+        {savedNumbers(changeButton)}
+      </>
+    );
   } else if (explanation.data?.verified) {
     // Out of date (spec 008 rule 19b): asked for again without force, so the
     // API answers with a current row another tab may already have written.
-    const note = explanation.data.stale ? (
+    const note = replacedNote ? (
+      replacedNote
+    ) : explanation.data.stale ? (
       <StaleNote explanation={explanation.data} action={writeButton(false, 'Write it again')} />
     ) : (
       <CheckedNote explanation={explanation.data} />
@@ -130,17 +162,34 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
           </>
         }
         taxYear={taxYearOf(current)}
-        next={<NextSteps event={event} change={change} />}
+        next={!replaced && <NextSteps event={event} change={change} />}
       />
     );
   } else if (explanation.data) {
     body = (
       <>
-        <NotWrittenNote explanation={explanation.data} action={writeButton(true, 'Try again')} />
+        {replacedNote || (
+          <NotWrittenNote explanation={explanation.data} action={writeButton(true, 'Try again')} />
+        )}
         {progress}
         {explainError}
         {savedNumbers(changeButton)}
         <Sources citations={explanation.data.citations} taxYear={taxYearOf(current)} />
+      </>
+    );
+  } else if (replaced && apiErrorCode(explanation.error) === 'not_found') {
+    body = (
+      <>
+        {replacedNote}
+        <Card aria-labelledby="none-title" gap={14}>
+          <h2 id="none-title" className="m-0">
+            No explanation
+          </h2>
+          <p className="m-0 text-small text-ink-3">
+            No explanation was written for this decision before it was replaced.
+          </p>
+        </Card>
+        {savedNumbers()}
       </>
     );
   } else if (apiErrorCode(explanation.error) === 'not_found') {
@@ -192,6 +241,7 @@ export function WhyScreen({ decisionId }: { decisionId: string }) {
             <>
               <Badge>{CALCULATOR_LABELS[current.calculator]}</Badge>
               <span className="text-small text-ink-3">Saved {formatDate(current.created_at)}</span>
+              {replaced && <Badge>Replaced</Badge>}
             </>
           )
         }

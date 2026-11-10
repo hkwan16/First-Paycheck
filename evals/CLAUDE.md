@@ -125,12 +125,15 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   `document_accuracy`. `SuiteUnavailable` without `ANTHROPIC_API_KEY`; its
   baseline is measured: 1.0 on all three in every live run on October 29,
   about 6 cents a run (spec 013 targets 0.90, 0.80, 0.60). Scoring is unit-tested with a reader that answers from the labels.
-- `fixtures/explain/decisions.json`: 29 synthetic `k401_match` inputs (with
+- `fixtures/explain/decisions.json`: 31 synthetic `k401_match` inputs (with
   optional benefits passages) covering under-match, capped, catch-up,
   compensation-capped, already-full and no-match cases, each with the rate its
   pay stub shows (`pay_stub_contribution_pct`, null for no stub; spec 008 rule
-  7a): 11 at the chosen rate, 14 at another (issue 132's stub-01 case among
-  them: 3% on the stub, 5% chosen), 4 with no stub. Results are computed by the
+  7a): 11 at the chosen rate, 16 at another (issue 132's stub-01 case among
+  them: 3% on the stub, 5% chosen; and issue 223's, 6% and 5% chosen where 5%
+  earns the full match, 24 paychecks, the stub at 0%: spec 008 rule 7c), 4
+  with no stub. The two issue 223 decisions and `explain/v5` came after the
+  November 1 baseline run; no live run has measured them yet. Results are computed by the
   suite, never stored.
 - `suites/explain.py` (`explain`, LLM): the real draft-verify-retry-fallback
   flow (`verify.flow.run_explain`) with `LLMGateway` over those decisions, the
@@ -149,7 +152,7 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   1.0 on every metric in a run on November 1 (39 cents); a second run the same
   day measured `concise` and `whole_dollars` 0.97 each (one decision each, 38
   cents). `rate_framing` (issue
-  132): over the 18 decisions whose stub shows another rate or none, the share
+  132): over the 20 decisions whose stub shows another rate or none, the share
   whose final row does not claim the chosen rate is already in effect, as an
   LLM judge reads it (`Gateway.judge_rate_claim`, `judge_rate_claim/v1`, spec
   008 rule 24a): it is sent the chosen rate, the stub's rate (null for no
@@ -186,12 +189,14 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   baseline keep their meaning. Its baseline is measured: 1.0 on all five metrics in three live runs on October 30, 21 to 23 cents a run. `concise` and `whole_dollars` as in `explain`: `explain/v3` measured 0.42 (7 of 12 over 150 words, up to 225) and 0.0 on November 1 (23 cents); on `explain/v4` two runs that day measured `concise` 1.0 both times and `whole_dollars` 0.58 and 0.75 (the model keeps the cents on some yearly W-4 amounts; 19 cents each), and the baseline records 0.58, with every other metric at 1.0. `SuiteUnavailable` without
   `ANTHROPIC_API_KEY`; scoring is unit-tested with scripted judges.
 - `suites/explain_smoke.py` (`explain-smoke`, free): the same flow with
-  `ScriptedGateway` over eight scripted runs (pass, fail-then-pass,
+  `ScriptedGateway` over ten scripted runs (pass, fail-then-pass,
   fail-twice on a 401(k) decision; pass and fail-twice on the first W-4
   decision in `fixtures/explain/w4_decisions.json`, spec 014 example 9; a pass
   on issue 132's decision that states the stub's rate, spec 008 rule 7a; a
   pass and a fail-twice on issue 181's W-4 decision whose draft and fallback
-  state the stub's withholding, rule 7b);
+  state the stub's withholding, rule 7b; on issue 223's two decisions, a
+  first draft that says the choice costs no extra per paycheck, which rule 14a
+  rejects, then the fake's draft, which states rule 7c's costs and verifies);
   `flow_correct`
   checks rows, the retry's feedback and that the fallback verifies and is
   cited. Fixture entries name their `calculator` (default `k401_match`) and
@@ -243,10 +248,10 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
   `document_accuracy` (34 stubs) 2.9, extraction `field_accuracy` (442 fields) and benefits
   `plan_field_accuracy` (72) 2, categorization `llm_accuracy` 11.8 and
   `accuracy` 2.6 (one label covers all 14 `sunrise bakery` rows, of the 119 the
-  model labels and the 540 in all), explain 3.4 (29 decisions), its
-  `rate_framing` 5.6 (a share of only the 18 it scores) and its
+  model labels and the 540 in all), explain 3.2 (31 decisions), its
+  `rate_framing` 5.0 (a share of only the 20 it scores) and its
   `judge_accuracy` 2.7 (37 calibration items), `concise` and `whole_dollars` one
-  drafted decision each (3.4 when all 29 are drafted); explain-w4 8.3 (12 decisions, also its
+  drafted decision each (3.2 when all 31 are drafted); explain-w4 8.3 (12 decisions, also its
   `concise` and `whole_dollars`), its `withholding_framing` 11.1 (a share of the 9 it scores) and its `judge_accuracy` 4.2 (24 items). A metric above its baseline passes. The
   report gives each metric's tolerance under `tolerances`. `test_run.py` checks
   the rule through the CLI; each LLM suite's tests check its `case_worth`.
