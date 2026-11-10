@@ -749,7 +749,7 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
   line's `status` (spec 015 rule 19a: `on_plan | over | under`, null without a plan) is the API's;
   `planStatusTone` only decides whether that side matters for the line: `on_plan` is `confirmed`;
   over is a `warning` on spending lines (essentials, flexible, other) and under is `confirmed`;
-  savings, retirement, take-home and left over are the reverse (more is not a problem); health
+  savings, retirement, income and left over are the reverse (more is not a problem); health
   premiums warn on either side (they should match the chosen plan); null is neutral. That tone
   colors the planned line's `Bar` and a `Badge` beside the actual saying the status in words
   (`planStatusText`: On plan, Over plan, Under plan). The bar width is geometry (`planBarValue`:
@@ -769,8 +769,19 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
   maps the API series to rows without deriving anything. Colors (blue net worth, teal assets,
   coral liabilities) pass the dataviz palette validator; teal is under 3:1 on white, which the
   legend and the table cover.
-- **Coming up** (`DeadlinesCard`): `GET /calendar` from the first of the month to the end of the
-  next (`checkInWindow`).
+- **Coming up** (`DeadlinesCard`): `GET /calendar?to=` the end of next month (`checkInWindow`, no
+  start), so an open date that passed with nothing done is listed first, "Was due" with an `off`
+  Overdue badge from the API's `overdue` (issue 233). Only a check-in that is not `past` shows it.
+- **A past check-in is a record** (spec 015 rule 9b, issue 233). When `past` is true the lead says
+  it is the month's record as of `as_of`, not checked again; `FindingText` takes `past` and words
+  every finding in the past (and drops that day's advice: "Ask payroll to update it."); the
+  cash-flow note says the targets are the choices saved now and the month counts in full instead
+  of "This month counts up to today"; there is no Coming up card. No finding prints a count of
+  days, this month's included: `days_until` counts from the run's day. An `overdue_deadline`
+  says "It was due {date}, and is not marked done." A recurring finding with `charge_gone` adds
+  "Spending no longer counts this as a recurring charge." The deposits line is `income`, "Income
+  deposited" as on Spending (issue 235), and a line with `needs_pay_stub` reads "No pay stub yet"
+  where a line without a plan reads "No target".
 - **Check in now** (`CheckInNow.tsx`, spec 015 rule 23): `CheckInNowButton` in the title row (the
   mockup's "Run again now") and `CheckInNowStatus` under it, over one `useCheckInNow()`. The list
   always offers it; a check-in offers it only when it is this month's and open
@@ -806,7 +817,9 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
 - **Your paycheck** (`PaycheckCard`): the newest confirmed stub's gross and take-home tiles and
   its deductions, or a link to Confirm. **Goals** (`GoalsCard`): status badge, contribution,
   target and date, progress bar. **Next 90 days** (`PlanCalendarCard`): `calendar` through
-  `calendar_through`, each event in its decision's hue (`eventHue`) with a badge to its step.
+  `calendar_through`, each event in its decision's hue (`eventHue`) with a badge to its step;
+  an event the API marks `overdue` (an open date that passed, spec 015 rule 24, issue 233)
+  reads "Was due" with an `off` Overdue badge.
 - **Export** (`ExportCard`): Download PDF starts `useExportPlan`, shows `JobProgress` while the
   job runs, downloads once it succeeds (once per job), then says "Downloaded {name}." with
   Download again. A dead job offers Try again (a new export); a failed download offers Try
