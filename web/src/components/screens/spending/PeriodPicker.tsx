@@ -50,7 +50,8 @@ export function PeriodPicker({ value, shown, onChange }: PeriodPickerProps) {
         size="sm"
         className="w-auto"
         value={selected}
-        disabled={options.length === 0}
+        // Only the period shown is known until the months arrive (spec 010 rule 5d).
+        disabled={options.length === 0 || months.isPending}
         onChange={(event) => {
           const option = options.find((o) => o.value === event.currentTarget.value);
           if (option) onChange(option.period);

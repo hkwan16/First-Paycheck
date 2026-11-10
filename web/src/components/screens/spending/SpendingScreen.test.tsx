@@ -241,6 +241,24 @@ describe('SpendingScreen summary', () => {
     );
   });
 
+  it('waits for the months before offering a choice', async () => {
+    const answer = Promise.withResolvers<void>();
+    server.use(
+      http.get(apiUrl('/spending/months'), async () => {
+        await answer.promise;
+        return HttpResponse.json({ months: ['2026-10-01', '2026-09-01'] });
+      }),
+    );
+    await renderSpending();
+    const picker = screen.getByRole('combobox', { name: 'Period' });
+    // The period shown is on screen, but nothing to pick until the months arrive.
+    await waitFor(() => expect(picker).toHaveValue('2026-10'));
+    expect(picker).toBeDisabled();
+    answer.resolve();
+    await waitFor(() => expect(picker).toBeEnabled());
+    expect(within(picker).getAllByRole('option')).toHaveLength(2);
+  });
+
   it('offers every month when the months cannot be read', async () => {
     server.use(
       http.get(apiUrl('/spending/months'), () =>
