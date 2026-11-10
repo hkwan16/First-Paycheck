@@ -209,8 +209,8 @@ Rules:
   `0013_plan_export_job`, `0014_delete_account_fn`, `0015_loan_account_kind`,
   `0016_rule_match_contains`, `0017_document_replaced_by`,
   `0018_check_in_last_run_at`, `0019_explanation_context_digest`,
-  `0020_pay_stub_superseded_by`, `0021_paycheck_change` (each revises the one
-  before it); the head is `0021_paycheck_change`.
+  `0020_pay_stub_superseded_by`, `0021_paycheck_change`, `0022_salary_pay_stub`
+  (each revises the one before it); the head is `0022_salary_pay_stub`.
 - Adding an enum label is `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with
   `AFTER` when the order means something, as `by_kind` does for
   `account_kind`); the downgrade maps the rows that use it and rebuilds the
@@ -273,6 +273,14 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   gross, never stored. The 401(k) card starts from it when nothing is saved,
   and `POST /explain` states it beside the chosen rate (spec 008 rule 7a).
   `db/pay_stubs.py:newest_pay_stub` is the newest stub in that order.
+- **The salary check** (spec 005 rule 24c, issue 221, migration `0022`):
+  `profiles.salary_pay_stub_id` (a same-user composite key, `ON DELETE SET NULL
+  (salary_pay_stub_id)`, written by hand) names the stub the saved salary was
+  compared with; `PUT /profile` takes it (404 for a stub that is not the
+  user's, `db/pay_stubs.py:find_pay_stub`). `ProfileOut.salary_review`
+  (`app/salary_review.py`, computed on read) is set while the newest current
+  stub's `annual_salary_cents` differs from `salary_cents` and from that
+  stub's. The API never changes the salary; the web asks which to use.
 - **One current stub per paycheck** (spec 005 rules 22a-22e, issue 190, migration
   `0020`). Confirm goes through `db/pay_stubs.py:add_confirmed`, which takes a
   per-user advisory lock and marks as superseded (`superseded_by_id`) the current
@@ -333,6 +341,17 @@ explanation, `GET /calendar` shows the check it implies.
   `auth.users` row (`pg_trigger_depth() > 1` and the owner gone). Side effects
   (the `election_check` calendar event, dismissing the superseded one) run in
   the same transaction.
+- **A decision that needs review** (spec 007 rules 19a-19e, issue 222).
+  `app/decision_review.py:review` compares the inputs a step reads rather than
+  asks (`CONTEXT_INPUTS`: the pay schedule, salary, tax year, filing status,
+  age, match tiers, and for the W-4 the saved 401(k) rate and health premium),
+  as stored, with what the step would send now (`load_context`, one read per
+  request under RLS), and words each difference once with `verify.format`;
+  an open salary question adds a `salary_unconfirmed` reason to every
+  calculator that reads the salary. `DecisionOut.review` (current versions
+  only), `PlanDecision.review` and `PlanCompleteness.needs_review` carry it;
+  the PDF prints the reasons and `export/html.py:REVIEW_NOTE` in place of the
+  figures. Computed on read, never stored: decisions are immutable.
 - **Explain never shows an unchecked number.** `verify/` is plain code:
   `extract_numbers`, `AllowedNumbers.from_decision(inputs, result)` (keys with
   a `_cents` part are money, `_pct`/`_rate` parts are percentages) and

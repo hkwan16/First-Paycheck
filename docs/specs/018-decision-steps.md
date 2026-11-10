@@ -53,7 +53,7 @@ The side nav's "Decisions" item gets a nested list of four sub-items, labeled "E
 ### Side nav
 
 7. **Sub-items**: "Decisions" holds a nested list of the four steps in step order, indented under it. Each is a link at least 44px tall with a small marker (a dot, or a check once done) and its label. The current step's link has `aria-current="page"`; nothing else on a step page does (the "Decisions" link is the section, not the page).
-8. **Done marks**: a sub-item is done when its calculator is live and its saved decision needs no review (`setupProgress`, from `settledDecisionCalculators`, the calculators of `GET /decisions` whose current decision's `review` is empty, and `liveCalculators`; no new API call). A decision that needs review (rule 5c) is saved but not done: before issue 222 the nav ticked a step whose saved numbers were figured on a pay schedule the person no longer has. "Decisions" itself is done when every live calculator is saved (unchanged). A done item says ", done" to screen readers, like the steps.
+8. **Done marks**: a sub-item is done when its calculator is live and its saved decision needs no review (`setupProgress`, from `settledDecisionCalculators`, the calculators of `GET /decisions` whose current decision's `review` is empty, and `liveCalculators`; no new API call). A decision that needs review (rule 5c) is saved but not done: before issue 222 the nav ticked a step whose saved numbers were figured on a pay schedule the person no longer has. "Decisions" itself is done when every live step is. A done item says ", done" to screen readers, like the steps.
 9. **Not live**: a calculator off in `features.calculators` is still a sub-item, still a link to its step (whose page shows the placeholder), drawn muted with a visible "After alpha" after its label; its accessible name ends ", After alpha". It is never marked done.
 10. **"Decisions" links to the entry step** (rule 3's target), not to `/setup/decisions`, so following it costs no redirect.
 
@@ -99,7 +99,7 @@ No row shows a version: v2 saved on screen reads "Saved", never "Saved as v2", a
 | `marks each saved live calculator's step` | all four | `401k_match`, `w4` | 401(k), W-4 | no |
 | `never marks a step that is not live` | `401k_match` | `w4` | none | no |
 | `all live saved` | `401k_match` | `401k_match` | 401(k) | yes |
-| `a decision that needs review is not done` | all four | all four, the health plan and W-4 needing review | emergency fund, 401(k) | no |
+| `a decision that needs review is not done` | all four | all four, the health plan and W-4 needing review (settled: emergency fund, 401(k)) | emergency fund, 401(k) | no |
 
 ### Redirect (`web/src/proxy.test.ts`)
 
