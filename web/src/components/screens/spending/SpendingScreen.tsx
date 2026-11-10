@@ -69,7 +69,8 @@ export function SpendingScreen({
         <TransactionsCard filters={transactions} />
       </CardErrorBoundary>
       <StepFooter
-        back={{ href: '/setup/link' }}
+        // Spending is step 3; Confirm pay stub is the step before it.
+        back={{ href: '/setup/confirm' }}
         next={{ label: 'Use these numbers in decisions', href: firstDecisionRoute() }}
       />
     </>

@@ -650,6 +650,27 @@ describe('SpendingScreen transactions', () => {
     expect(await screen.findByRole('row', { name: /Sweetgreen/ })).toBeInTheDocument();
   });
 
+  it('clears the saved notice once another period is shown (issue 240)', async () => {
+    const { user } = await renderSpending();
+    await user.selectOptions(categoryOf('Sweetgreen'), ['Groceries']);
+    expect(await screen.findByText(/^Saved\./)).toBeInTheDocument();
+    await pickPeriod(user, 'August 2026');
+    await waitFor(() => expect(screen.queryByText(/^Saved\./)).not.toBeInTheDocument());
+  });
+
+  it('clears the saved notice when the list is opened or closed (issue 240)', async () => {
+    const { user } = await renderSpending();
+    await user.selectOptions(categoryOf('Sweetgreen'), ['Groceries']);
+    expect(await screen.findByText(/^Saved\./)).toBeInTheDocument();
+    await showAll(user);
+    expect(screen.queryByText(/^Saved\./)).not.toBeInTheDocument();
+  });
+
+  it('goes back to Confirm, the step before Spending', async () => {
+    await renderSpending();
+    expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/setup/confirm');
+  });
+
   it('continues to decisions', async () => {
     await renderSpending();
     expect(screen.getByRole('link', { name: /Use these numbers in decisions/ })).toHaveAttribute(
