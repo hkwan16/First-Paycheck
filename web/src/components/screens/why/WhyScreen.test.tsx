@@ -302,6 +302,38 @@ describe('WhyScreen for an emergency fund (spec 011 rule 18, issue 162)', () => 
   });
 });
 
+describe('WhyScreen, "Your numbers" (spec 008 rule 19d, issue 243)', () => {
+  it('shows every label in sentence case, leaving names as they are', async () => {
+    db.explanations = new Map([
+      [
+        DECISION_V1_ID,
+        [
+          sampleExplanation({
+            numbers: [
+              { value: '4%', label: 'rate you chose' },
+              { value: '0%', label: '401(k) rate on your pay stub now' },
+              { value: '$2,600', label: "acme's match per year" },
+              { value: '12%', label: 'Your marginal rate' },
+            ],
+          }),
+        ],
+      ],
+    ]);
+    renderWhy();
+    const numbers = await screen.findByRole('region', { name: 'Your numbers' });
+    expect(
+      within(numbers)
+        .getAllByRole('term')
+        .map((term) => term.textContent),
+    ).toEqual([
+      'Rate you chose',
+      '401(k) rate on your pay stub now',
+      "Acme's match per year",
+      'Your marginal rate',
+    ]);
+  });
+});
+
 describe('WhyScreen for a decision that is not there', () => {
   it('says so and links to the saved decisions', async () => {
     renderWhy('dec00000-0000-4000-8000-00000000ffff');

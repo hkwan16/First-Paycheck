@@ -7,6 +7,7 @@ import { KV, KVList } from '@/components/ui/KV';
 import { Notice, type NoticeProps } from '@/components/ui/Notice';
 import type { CalendarEvent, Explanation } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
+import { sentenceCase } from '@/lib/explanations';
 
 /*
  * The Why page's explanation, from docs/mockup/Why.dc.html. One note says
@@ -112,7 +113,7 @@ export function VerifiedBody({ explanation }: { explanation: Explanation }) {
           </h2>
           <KVList spacing="comfortable">
             {explanation.numbers.map((claim, index) => (
-              <KV key={index} label={claim.label} value={claim.value} />
+              <KV key={index} label={sentenceCase(claim.label)} value={claim.value} />
             ))}
           </KVList>
         </Card>
