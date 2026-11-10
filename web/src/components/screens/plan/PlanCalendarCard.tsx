@@ -48,8 +48,12 @@ export function PlanCalendarCard({ plan }: { plan: Plan }) {
                     {event.overdue ? 'Was due' : 'Due'} {formatDate(event.due_at)}
                   </div>
                   {(decision || event.overdue) && (
-                    <div className="flex flex-wrap gap-2">
-                      {event.overdue && <Badge tone="off">Overdue</Badge>}
+                    <div>
+                      {event.overdue && (
+                        <Badge tone="off" className="mr-2">
+                          Overdue
+                        </Badge>
+                      )}
                       {decision && (
                         <Badge tone={hue} href={decisionKindRoute(decision.calculator)}>
                           {CALCULATOR_LABELS[decision.calculator]}

@@ -51,13 +51,13 @@ export function DeadlinesCard({ period }: { period: string }) {
                 <span className="text-micro font-semibold text-ink-3 uppercase">{month}</span>
                 <span className="font-bold tabular-nums">{day}</span>
               </span>
-              <div className="flex min-w-0 flex-col gap-1">
+              <div className="min-w-0">
                 <div className="font-semibold">{event.title}</div>
                 <div className="text-tiny text-ink-3">
                   {event.overdue ? 'Was due' : 'Due'} {formatDate(event.due_at)}
                 </div>
                 {event.overdue && (
-                  <div>
+                  <div className="mt-1">
                     <Badge tone="off">Overdue</Badge>
                   </div>
                 )}
