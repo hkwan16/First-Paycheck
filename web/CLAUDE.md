@@ -592,6 +592,8 @@ offer letter states).
   and vesting changed) and links to Decisions. A benefits summary nothing could be read from is
   not typed in here: Confirm and Link point to the decision cards. Its lines are not linked to
   fields, so the source pane highlights nothing (`linked={false}`).
+- **Not found**: any 404 `not_found` (an unknown id, another person's, or one that is not an id)
+  is the one "Document not found" state with Back to documents, whatever the API's message.
 - **Replaced**: a document with `replaced_by_id` (open in an old tab, or reached by Back) says it
   was replaced and links to the replacement (`confirmRoute(replaced_by_id)`) and back to the
   documents; the API refuses to confirm it (409 `document_replaced`, one of the state conflicts
@@ -962,7 +964,8 @@ Tests that sign out sign in through the form first, so they never end the saved 
 tests share.
 
 `link.spec.ts` (project `authenticated-link`) unlinks everything, links Plaid's sandbox bank with
-the e2e-only button, follows the sync and sets roles; `spending.spec.ts` (project
+the e2e-only button, follows the sync and sets roles (each select named for its account, offering
+only its kind's roles, and cleared to "No role", issues 241 and 242); `spending.spec.ts` (project
 `authenticated-spending`, which depends on it) reads those transactions (on the newest month
 in the picker that has some, `support/spending.ts`: `user_good`'s rows may all be in the month so
 far, and the list keeps to the summary's period), checks that every period lists only its own
@@ -970,8 +973,9 @@ rows or says it has none, checks that the
 diagram's buckets match the summary tiles (and that the scale badge shows only when there is
 gross pay or income to scale by: the sandbox bank's last month may deposit nothing), drives a node
 from the keyboard, changes the period and saves a category fix; `import.spec.ts` (project `authenticated-import`, after Spending)
-imports `e2e/fixtures/bank-export.csv` (five synthetic rows) into a new CSV account, imports it
-again without making a second account, imports into another new account and removes it (the panel
+imports `e2e/fixtures/bank-export.csv` (five synthetic rows) into a new CSV account ("Added 5
+transactions to ..."), imports it again without making a second account ("No new transactions: all
+5 were already in ...", issue 231), imports into another new account and removes it (the panel
 then reports nothing about it), and checks a broken file's row errors.
 Both change the e2e user's data, so they are ordered projects with serial files rather than
 parallel tests. `confirm.spec.ts` (project `authenticated-confirm`) uploads
