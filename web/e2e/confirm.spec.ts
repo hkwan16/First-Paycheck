@@ -130,7 +130,9 @@ test('confirming the same pay stub again counts it once on Spending (issue 190)'
   await expect(page).toHaveURL('/setup/spending', { timeout: 30_000 });
   await waitForHydration(page);
 
-  const picker = page.getByLabel('Period');
+  // Exact: after the client-side navigation Next keeps the Confirm page in the
+  // DOM, hidden, and its "Period start" and "Period end" rows match "Period".
+  const picker = page.getByLabel('Period', { exact: true });
   await expect(picker).toBeEnabled({ timeout: 60_000 });
   const months = await picker.locator('option').allTextContents();
   expect(
