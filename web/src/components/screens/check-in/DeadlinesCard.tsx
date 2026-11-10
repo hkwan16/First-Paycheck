@@ -1,5 +1,6 @@
 'use client';
 
+import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { ListRows } from '@/components/ui/ListRows';
 import { Notice } from '@/components/ui/Notice';
@@ -10,8 +11,9 @@ import { calendarParts, formatDate } from '@/lib/dates';
 import { checkInWindow } from './checkin-format';
 
 /**
- * "Coming up": the upcoming calendar dates from the first of the check-in's
- * month to the end of the next (`GET /calendar?from=&to=`), soonest first.
+ * "Coming up": the open calendar dates due by the end of the month after the
+ * check-in's (`GET /calendar?to=`), soonest first. A date that passed with
+ * nothing done is first, marked overdue by the API (spec 015 rule 24).
  */
 export function DeadlinesCard({ period }: { period: string }) {
   const dates = checkInWindow(period);
@@ -34,11 +36,7 @@ export function DeadlinesCard({ period }: { period: string }) {
       </div>
     );
   } else if (events.length === 0) {
-    body = (
-      <p className="m-0 text-small text-ink-3">
-        Nothing is due between {formatDate(dates.from)} and {formatDate(dates.to)}.
-      </p>
-    );
+    body = <p className="m-0 text-small text-ink-3">Nothing is due by {formatDate(dates.to)}.</p>;
   } else {
     body = (
       <ListRows as="ul" aria-label="Upcoming dates">
@@ -55,7 +53,14 @@ export function DeadlinesCard({ period }: { period: string }) {
               </span>
               <div className="min-w-0">
                 <div className="font-semibold">{event.title}</div>
-                <div className="text-tiny text-ink-3">Due {formatDate(event.due_at)}</div>
+                <div className="text-tiny text-ink-3">
+                  {event.overdue ? 'Was due' : 'Due'} {formatDate(event.due_at)}
+                </div>
+                {event.overdue && (
+                  <div className="mt-1">
+                    <Badge tone="off">Overdue</Badge>
+                  </div>
+                )}
               </div>
             </li>
           );

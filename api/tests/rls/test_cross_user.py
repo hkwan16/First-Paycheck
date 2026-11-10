@@ -852,6 +852,23 @@ def test_user_b_cannot_reach_user_a_finding_through_own_check_in(
     assert actions == 0
 
 
+def test_user_b_cannot_check_a_salary_against_user_a_stub(
+    db_connection: Connection,
+    client_as: Callable[[FixtureUser], TestClient],
+    user_a: FixtureUser,
+    user_b: FixtureUser,
+) -> None:
+    """``PUT /profile`` with ``salary_pay_stub_id`` naming A's stub (spec 005 rule
+    24c): 404, and B's profile is not saved."""
+    stub = make_pay_stub(db_connection, USER_A.id, a_document(db_connection, with_blob=False))
+    response = client_as(user_b).put(
+        "/profile", json={"salary_cents": 6_500_000, "salary_pay_stub_id": str(stub)}
+    )
+    assert response.status_code == 404, response.text
+    assert response.json()["error"]["code"] == "not_found"
+    assert count(db_connection, "profiles", USER_B) == 0
+
+
 def test_user_b_cannot_replace_user_a_document(
     db_connection: Connection,
     client_as: Callable[[FixtureUser], TestClient],

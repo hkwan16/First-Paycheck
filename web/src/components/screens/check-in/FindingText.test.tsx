@@ -8,6 +8,7 @@ import {
   healthElectionFinding,
   huluFinding,
   netflixFinding,
+  overdueFinding,
   payChangeFinding,
   paycheckFinding,
   payCutFinding,
@@ -16,8 +17,8 @@ import { render, screen, within } from '@/test/render';
 import { FindingText } from './FindingText';
 
 /** The title and body a finding renders; each call renders on its own. */
-function show(finding: Finding) {
-  const { unmount } = render(<FindingText finding={finding} titleId="t" />);
+function show(finding: Finding, past = false) {
+  const { unmount } = render(<FindingText finding={finding} titleId="t" past={past} />);
   const title = document.getElementById('t')!;
   const text = { title: title.textContent, body: title.nextElementSibling?.textContent };
   unmount();
@@ -123,18 +124,64 @@ describe('FindingText', () => {
     expect(show(payCutFinding()).body).toContain('(-$192.41)');
   });
 
-  it('upcoming_deadline: the event title and when it is due', () => {
+  it('upcoming_deadline: the event title and when it is due, with no count of days', () => {
+    // Spec 015 rule 9b (issue 233): days_until counts from the run's date, so
+    // "in 4 days" read on a later day was wrong; no count is printed.
     expect(show(deadlineFinding())).toEqual({
       title: 'Make your first emergency fund contribution',
-      body: 'Due Nov 20, 2026, in 4 days.',
+      body: 'Due Nov 20, 2026.',
     });
-    const tomorrow = withPayload(deadlineFinding(), { days_until: 1 });
-    expect(show(tomorrow).body).toBe('Due Nov 20, 2026, tomorrow.');
+    for (const days of [0, 1, 25]) {
+      expect(show(withPayload(deadlineFinding(), { days_until: days })).body).toBe(
+        'Due Nov 20, 2026.',
+      );
+    }
+    expect(show(deadlineFinding(), true).body).toBe('Due Nov 20, 2026.');
   });
 
-  it('upcoming_deadline due today', () => {
-    const today = withPayload(deadlineFinding(), { days_until: 0 });
-    render(<FindingText finding={today} titleId="today" />);
-    expect(screen.getByText('Due Nov 20, 2026, today.')).toBeInTheDocument();
+  it('overdue_deadline: the date passed and nothing marked it done (issue 233)', () => {
+    const overdue = overdueFinding();
+    expect(show(overdue)).toEqual({
+      title: 'Give your employer your updated Form W-4',
+      body: 'It was due Nov 6, 2026, and is not marked done. Mark it done once you have done it.',
+    });
+    expect(show(overdue, true).body).toBe('It was due Nov 6, 2026, and was not marked done.');
+  });
+
+  it('words a past check-in’s findings in the past (spec 015 rule 9b)', () => {
+    expect(show(electionFinding(), true)).toEqual({
+      title: 'Your pay stub put 2% in your 401(k). You had chosen 4%.',
+      body: 'Your Nov 15, 2026 pay stub put $54.17 in your 401(k). At the rate you had chosen it would have been $108.33 a paycheck, a difference of -$54.16.',
+    });
+    expect(show(healthElectionFinding(), true)).toEqual({
+      title: 'Your health premium differed from the HDHP + HSA plan.',
+      body: 'Your Nov 15, 2026 pay stub took $62.50 for health coverage. The plan you had chosen cost $31.25 a paycheck, a difference of +$31.25.',
+    });
+    expect(show(goalFinding(), true)).toEqual({
+      title: 'Your emergency fund was $160.00 behind.',
+      body: 'To be on track it would have held $2,900.00 by then, $2,000.00 on Aug 1, 2026 plus $300.00 a month for 3 months. It held $2,740.00 on Nov 15, 2026, toward your $5,470.00 goal.',
+    });
+    expect(show(equinoxFinding(), true).title).toBe(
+      'Equinox looked like a monthly charge of $185.00.',
+    );
+    expect(show(netflixFinding(), true)).toEqual({
+      title: 'Netflix charged $16.99 a month.',
+      body: 'It had been $15.49, a change of +$1.50.',
+    });
+    expect(show(huluFinding(), true)).toEqual({
+      title: 'Hulu had stopped charging.',
+      body: 'Last charged $17.99 on Sep 9, 2026. That matched the cancellation you marked.',
+    });
+    expect(show(paycheckFinding(), true).title).toBe('Your Nov 15, 2026 paycheck changed.');
+  });
+
+  it('says when Spending no longer lists a recurring charge (issue 233)', () => {
+    const gone = { ...equinoxFinding(), charge_gone: true };
+    render(<FindingText finding={gone} titleId="gone" past />);
+    expect(
+      screen.getByText('Spending no longer counts this as a recurring charge.'),
+    ).toBeInTheDocument();
+    render(<FindingText finding={equinoxFinding()} titleId="kept" />);
+    expect(screen.getAllByText(/no longer counts this/)).toHaveLength(1);
   });
 });

@@ -7,6 +7,7 @@ import {
   profileInput,
   readPlanDetails,
   salaryFromStub,
+  salaryStubId,
   stubSchedule,
   type PlanDetailsDraft,
 } from './plan-details';
@@ -197,8 +198,34 @@ describe('profileInput', () => {
       other_jobs: [],
       pay_frequency: 'semimonthly',
       salary_cents: 6_500_000,
+      salary_pay_stub_id: null,
       start_date: null,
       vesting_years: 3,
     });
+    // The stub the salary was compared with goes through too (spec 005 rule 24c).
+    expect(
+      profileInput({ ...sampleProfile, salary_pay_stub_id: 'stub-1' }).salary_pay_stub_id,
+    ).toBe('stub-1');
+  });
+});
+
+describe('salaryStubId (spec 005 rule 24c)', () => {
+  const compared = { ...sampleProfile, salary_pay_stub_id: 'stub-older' };
+
+  it('names the newest stub once the person saves a salary of their own beside it', () => {
+    expect(salaryStubId(compared, stub, 6_499_992)).toBe(stub.id);
+    // A first salary, typed or taken from the stub.
+    expect(salaryStubId(emptyProfile, stub, 6_500_000)).toBe(stub.id);
+  });
+
+  it('keeps the stub compared before when the salary is the one already saved', () => {
+    // Saving another field never answers an open salary question.
+    expect(salaryStubId(compared, stub, 6_500_000)).toBe('stub-older');
+    expect(salaryStubId(sampleProfile, stub, 6_500_000)).toBeNull();
+  });
+
+  it('names no stub without one', () => {
+    expect(salaryStubId(emptyProfile, undefined, 6_500_000)).toBeNull();
+    expect(salaryStubId(compared, undefined, 6_499_992)).toBe('stub-older');
   });
 });

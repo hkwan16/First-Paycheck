@@ -121,6 +121,9 @@ export default defineConfig({
       : []),
     // The whole alpha path as a new user signing in through the form (E2E_ALPHA_USER_*).
     { name: 'alpha', testMatch: 'alpha.spec.ts', use: desktop },
+    // A new user whose newer pay stub changes schedule under saved decisions
+    // (E2E_SCHEDULE_USER_*; issues 221 and 222).
+    { name: 'schedule-change', testMatch: 'schedule-change.spec.ts', use: desktop },
   ],
   webServer: {
     command: `next dev --port ${PORT}`,

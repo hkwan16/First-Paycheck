@@ -96,6 +96,7 @@ export function sampleW4Decision(overrides: Partial<Decision> = {}): Decision {
     result: structuredClone(result),
     created_at: SAMPLE_SAVED_AT,
     is_current: true,
+    review: [],
     ...overrides,
   };
 }
@@ -109,6 +110,7 @@ export function sampleW4Event(overrides: Partial<CalendarEvent> = {}): CalendarE
     due_at: '2026-10-31',
     decision_id: W4_DECISION_ID,
     status: 'upcoming',
+    overdue: false,
     ...overrides,
   };
 }

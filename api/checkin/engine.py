@@ -42,6 +42,7 @@ __all__ = [
     "Existing",
     "Subjects",
     "Trigger",
+    "charge_gone",
     "checkin_key",
     "month_end",
     "monthly_payload",
@@ -58,7 +59,12 @@ Trigger = Literal["schedule", "sync"]
 # Rule 10.4: kinds that stop being true when their facts change, so an
 # unhandled one that no finder produces any more is retracted.
 CONDITIONS = frozenset(
-    {FindingKind.ELECTION_MISMATCH, FindingKind.GOAL_OFF_PACE, FindingKind.UPCOMING_DEADLINE}
+    {
+        FindingKind.ELECTION_MISMATCH,
+        FindingKind.GOAL_OFF_PACE,
+        FindingKind.UPCOMING_DEADLINE,
+        FindingKind.OVERDUE_DEADLINE,
+    }
 )
 # Events about a recurring charge: their subject is the charge's row.
 RECURRING_EVENTS = frozenset(
@@ -99,6 +105,16 @@ def _all_present(
         return False
 
 
+def charge_gone(
+    kind: FindingKind, payload: dict[str, Any], charge_ids: Collection[uuid.UUID]
+) -> bool:
+    """A recurring finding whose charge is not one of the user's any more: an unlink
+    removed it (spec 017 rule 14), or the detector stopped counting it (issue 200)."""
+    return kind in RECURRING_EVENTS and not _all_present(
+        payload, ("recurring_charge_id",), charge_ids
+    )
+
+
 def subject_gone(kind: FindingKind, payload: dict[str, Any], subjects: Subjects) -> bool:
     """Rule 10.4: an event finding whose subject the user no longer has.
 
@@ -109,7 +125,7 @@ def subject_gone(kind: FindingKind, payload: dict[str, Any], subjects: Subjects)
     retracted once no finder produces them, whatever they report on.
     """
     if kind in RECURRING_EVENTS:
-        return not _all_present(payload, ("recurring_charge_id",), subjects.charge_ids)
+        return charge_gone(kind, payload, subjects.charge_ids)
     if kind is FindingKind.PAY_CHANGE:
         return not _all_present(payload, _COMPARED_STUBS, subjects.current_stub_ids)
     return False

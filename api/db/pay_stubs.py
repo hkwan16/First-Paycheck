@@ -23,6 +23,7 @@ __all__ = [
     "NEWEST_FIRST",
     "add_confirmed",
     "current_pay_stubs",
+    "find_pay_stub",
     "latest_pay_date",
     "newest_pay_stub",
     "paid_between_count",
@@ -73,6 +74,14 @@ def newest_pay_stub(session: Session) -> PayStub | None:
     """The user's newest current confirmed stub, in ``GET /pay-stubs`` order (spec 005
     rules 22d and 24)."""
     return session.scalars(current_pay_stubs().order_by(*NEWEST_FIRST).limit(1)).first()
+
+
+def find_pay_stub(session: Session, stub_id: uuid.UUID) -> PayStub | None:
+    """One of the user's stubs by id, current or superseded; None for one they cannot
+    see. The profile names the stub its salary was compared with (spec 005 rule
+    24c), which a later copy may have superseded since: its figures still say what
+    the person answered for."""
+    return session.get(PayStub, stub_id)
 
 
 def paycheck_ids(session: Session) -> dict[uuid.UUID, uuid.UUID]:

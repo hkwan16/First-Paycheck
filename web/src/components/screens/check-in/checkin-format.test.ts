@@ -55,8 +55,10 @@ describe('KIND_LABELS', () => {
         'recurring_new',
         'recurring_stopped',
         'upcoming_deadline',
+        'overdue_deadline',
       ].sort(),
     );
+    expect(KIND_LABELS.overdue_deadline).toBe('Overdue');
   });
 });
 
@@ -106,11 +108,12 @@ describe('planStatusTone', () => {
     plan_cents: status === null ? null : 10_000,
     difference_cents: null,
     status,
+    needs_pay_stub: false,
   });
 
   it('reads the API status on the November lines', () => {
     expect(novemberPlan().map((l) => [l.key, planStatusTone(l)])).toEqual([
-      ['take_home', 'neutral'],
+      ['income', 'neutral'],
       ['essentials', 'confirmed'],
       ['flexible', 'neutral'],
       ['other', 'neutral'],
@@ -135,7 +138,7 @@ describe('planStatusTone', () => {
   });
 
   it('asks for a look below the plan where more is not a problem', () => {
-    for (const key of ['savings', 'retirement', 'take_home', 'left_over'] as const) {
+    for (const key of ['savings', 'retirement', 'income', 'left_over'] as const) {
       expect(planStatusTone(line(key, 'under'))).toBe('warning');
       expect(planStatusTone(line(key, 'over'))).toBe('confirmed');
     }
@@ -167,6 +170,7 @@ describe('planBarValue', () => {
     label: '401(k) from pay stubs',
     actual_cents: actual,
     status: null,
+    needs_pay_stub: false,
     plan_cents: plan,
     difference_cents: null,
   });
@@ -197,11 +201,11 @@ describe('offersCheckInNow', () => {
 });
 
 describe('checkInWindow', () => {
-  it('runs from the first of the month to the end of the next one', () => {
-    expect(checkInWindow('2026-11-01')).toEqual({ from: '2026-11-01', to: '2026-12-31' });
-    expect(checkInWindow('2026-12-01')).toEqual({ from: '2026-12-01', to: '2027-01-31' });
-    expect(checkInWindow('2027-01-01')).toEqual({ from: '2027-01-01', to: '2027-02-28' });
-    expect(checkInWindow('2028-01-01')).toEqual({ from: '2028-01-01', to: '2028-02-29' });
+  it('runs to the end of the next month, with no start, so overdue dates are in it', () => {
+    expect(checkInWindow('2026-11-01')).toEqual({ to: '2026-12-31' });
+    expect(checkInWindow('2026-12-01')).toEqual({ to: '2027-01-31' });
+    expect(checkInWindow('2027-01-01')).toEqual({ to: '2027-02-28' });
+    expect(checkInWindow('2028-01-01')).toEqual({ to: '2028-02-29' });
   });
 });
 

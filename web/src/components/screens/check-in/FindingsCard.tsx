@@ -8,6 +8,7 @@ import { apiErrorMessage } from '@/lib/api/errors';
 import { useUpdateFinding, type UpdateFindingVariables } from '@/lib/api/hooks';
 import type { CheckInDetail } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
+import { monthName } from '../spending/spending-format';
 import { handledText } from './checkin-format';
 import { FindingRow } from './FindingRow';
 
@@ -73,8 +74,9 @@ export function FindingsCard({ checkIn }: { checkIn: CheckInDetail }) {
       )}
       {checkIn.findings.length === 0 ? (
         <p className="m-0 text-small text-ink-3">
-          Nothing changed against your plan this month. We check again when a new pay stub or new
-          transactions come in.
+          {checkIn.past
+            ? `Nothing changed against your plan in ${monthName(checkIn.period)}.`
+            : 'Nothing changed against your plan this month. We check again when a new pay stub or new transactions come in.'}
         </p>
       ) : (
         <ul aria-label="Findings" className="m-0 flex list-none flex-col p-0">
@@ -82,6 +84,7 @@ export function FindingsCard({ checkIn }: { checkIn: CheckInDetail }) {
             <FindingRow
               key={finding.id}
               finding={finding}
+              past={checkIn.past}
               onAction={onAction}
               actionRef={(element, handled) => {
                 const target = focusAfter.current;

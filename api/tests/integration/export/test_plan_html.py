@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import datetime as dt
 from pathlib import Path
 
 from sqlalchemy import Connection, text
 
 from app.db import user_session_for
+from app.decision_review import ReviewReason
 from app.plan import build_plan
-from export.html import STALE_LABEL, render_html
+from export.html import REVIEW_NOTE, STALE_LABEL, render_html
 from tests.conftest import FixtureUser
 from tests.support.factories import make_document
 from tests.support.plan_user import NOW, PlanUser
@@ -48,6 +50,18 @@ def test_a_paused_goal_has_no_pace(
     assert "On pace for" not in html
 
 
+def test_an_overdue_date_is_marked(
+    plan_user: PlanUser, db_connection: Connection, user_a: FixtureUser
+) -> None:
+    """Spec 016 rules 6 and 11 (issue 233): printed on 2026-11-02, the three
+    2026-10-31 dates nobody settled are listed and marked Overdue."""
+    with user_session_for(user_a.id, bind=db_connection) as session:
+        html = render_html(build_plan(session, dt.date(2026, 11, 2)), NOW)
+    assert html.count('<span class="overdue">Overdue</span>') == 3
+    assert "Oct 31, 2026" in html
+    assert 'class="overdue"' not in plan_html(db_connection, user_a)
+
+
 def test_an_empty_plan_says_nothing_is_saved(
     frozen_app: object, db_connection: Connection, user_b: FixtureUser
 ) -> None:
@@ -76,3 +90,29 @@ def test_a_stale_explanation_is_labeled_and_its_text_left_out(
     assert "Contributing 4% earns the full employer match" not in html
     # The W-4's explanation is still current and printed.
     assert "the withholding covers the year" in html
+
+
+def test_a_decision_that_needs_review_prints_the_note(
+    plan_user: PlanUser, db_connection: Connection, user_a: FixtureUser
+) -> None:
+    """Spec 016 rule 3a: its figures were worked out before the change, so none print."""
+    with user_session_for(user_a.id, bind=db_connection) as session:
+        plan = build_plan(session, NOW.date())
+    reason = ReviewReason(
+        kind="changed",
+        input="pay_periods_per_year",
+        text="Your pay schedule changed from 24 to 26 paychecks a year.",
+    )
+    decisions = [
+        decision.model_copy(update={"review": [reason]})
+        if decision.calculator == "health_plans"
+        else decision
+        for decision in plan.decisions
+    ]
+    html = render_html(plan.model_copy(update={"decisions": decisions}), NOW)
+    assert "Needs review: Your pay schedule changed from 24 to 26 paychecks a year." in html
+    assert html.count(REVIEW_NOTE) == 1
+    # The health plan's figures are left out; the other decisions keep theirs.
+    assert "Bronze HSA" not in html
+    assert "Premiums a year" not in html
+    assert "Federal tax withheld per paycheck with your new W-4" in html

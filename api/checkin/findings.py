@@ -8,7 +8,10 @@ arithmetic; every amount they report comes from ``calc/checkin.py``.
 A finding's ``key`` names the event it reports (rule 12): the engine uses it
 to update a finding it already wrote and to report an event only once. A pay
 stub finding names the paycheck (``StubFact.paycheck_id``), never the stub's
-row, so a newer copy of the same paycheck is the same event (issue 194).
+row, so a newer copy of the same paycheck is the same event (issue 194). A
+date finding names the date (its calendar kind and day), never the event's
+row, so a newer decision version's reminder on the same day is the same
+reminder (issue 234).
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ from calc.cashflow import LINES, LineKey
 from calc.checkin import change_cents, expected_deferral_cents, goal_pace
 from calc.money import rate_pct
 from calc.pay_dates import add_months
+from db.calendar import days_until
 from db.enums import (
     CalendarKind,
     FindingKind,
@@ -39,6 +43,7 @@ __all__ = [
     "FINDERS",
     "Affects",
     "BalanceFact",
+    "DeadlinePayload",
     "DeductionLine",
     "ElectionMismatchPayload",
     "EventFact",
@@ -53,12 +58,12 @@ __all__ = [
     "RecurringFact",
     "RecurringPayload",
     "StubFact",
-    "UpcomingDeadlinePayload",
     "all_findings",
     "calendar_affects",
     "election_mismatch",
     "goal_off_pace",
     "months_elapsed",
+    "overdue_deadline",
     "pay_change",
     "recurring_changed",
     "recurring_new",
@@ -156,7 +161,7 @@ class RecurringFact(_Fact):
 
 
 class EventFact(_Fact):
-    """An upcoming calendar event due within 30 days of ``today``."""
+    """An open calendar event due by 30 days after ``today``, or already past (rule 24)."""
 
     id: uuid.UUID
     kind: CalendarKind
@@ -259,12 +264,15 @@ class PayChangePayload(_Payload):
     deductions: list[DeductionLine]
 
 
-class UpcomingDeadlinePayload(_Payload):
-    kind: Literal["upcoming_deadline"] = "upcoming_deadline"
+class DeadlinePayload(_Payload):
+    """A date coming up (``upcoming_deadline``) or gone past unsettled (``overdue_deadline``)."""
+
+    kind: Literal["upcoming_deadline", "overdue_deadline"]
     calendar_event_id: uuid.UUID
     calendar_kind: CalendarKind
     title: str
     due_at: dt.date
+    # From the run's date (rule 9b): negative for an overdue date.
     days_until: int
 
 
@@ -273,7 +281,7 @@ FindingPayload = Annotated[
     | GoalOffPacePayload
     | RecurringPayload
     | PayChangePayload
-    | UpcomingDeadlinePayload,
+    | DeadlinePayload,
     Field(discriminator="kind"),
 ]
 
@@ -544,27 +552,55 @@ def calendar_affects(kind: CalendarKind) -> Affects:
             assert_never(kind)
 
 
+def _dates(facts: Facts) -> list[tuple[EventFact, int]]:
+    """Rule 7: one event per kind and day (the last in the facts' order), with its days."""
+    by_date = {(event.kind, event.due_at): event for event in facts.events}
+    return [(event, days_until(event.due_at, facts.today)) for event in by_date.values()]
+
+
+def _date_finding(
+    kind: Literal["upcoming_deadline", "overdue_deadline"],
+    severity: FindingSeverity,
+    event: EventFact,
+    days: int,
+) -> Finding:
+    return Finding(
+        severity=severity,
+        key=f"{kind}:{event.kind.value}:{event.due_at.isoformat()}",
+        decision_id=event.decision_id,
+        payload=DeadlinePayload(
+            kind=kind,
+            affects=calendar_affects(event.kind),
+            calendar_event_id=event.id,
+            calendar_kind=event.kind,
+            title=event.title,
+            due_at=event.due_at,
+            days_until=days,
+        ),
+    )
+
+
 def upcoming_deadline(facts: Facts) -> list[Finding]:
-    """Rule 7: each upcoming event the facts hold (due within 30 days)."""
-    found: list[Finding] = []
-    for event in facts.events:
-        days = (event.due_at - facts.today).days
-        found.append(
-            Finding(
-                severity=FindingSeverity.WARNING if days <= SOON_DAYS else FindingSeverity.INFO,
-                key=f"upcoming_deadline:{event.id}",
-                decision_id=event.decision_id,
-                payload=UpcomingDeadlinePayload(
-                    affects=calendar_affects(event.kind),
-                    calendar_event_id=event.id,
-                    calendar_kind=event.kind,
-                    title=event.title,
-                    due_at=event.due_at,
-                    days_until=days,
-                ),
-            )
+    """Rule 7: each open date from today to 30 days on; a warning within a week."""
+    return [
+        _date_finding(
+            "upcoming_deadline",
+            FindingSeverity.WARNING if days <= SOON_DAYS else FindingSeverity.INFO,
+            event,
+            days,
         )
-    return found
+        for event, days in _dates(facts)
+        if days >= 0
+    ]
+
+
+def overdue_deadline(facts: Facts) -> list[Finding]:
+    """Rule 7: each open date whose day has passed (issue 233)."""
+    return [
+        _date_finding("overdue_deadline", FindingSeverity.ALERT, event, days)
+        for event, days in _dates(facts)
+        if days < 0
+    ]
 
 
 Finder = Callable[[Facts], list[Finding]]
@@ -578,6 +614,7 @@ FINDERS: tuple[Finder, ...] = (
     recurring_stopped,
     pay_change,
     upcoming_deadline,
+    overdue_deadline,
 )
 
 

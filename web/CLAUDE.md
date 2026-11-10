@@ -220,8 +220,11 @@ or checked for a phone.
   (`lib/accounts.ts`: its name, else "Imported CSV" or "Linked bank") everywhere: the Link
   group heading, the account's initials tile and the Spending summary (issue 183).
   Documents: `invalidateDocuments` after an upload or extraction, `invalidateAfterConfirm`
-  (documents, pay stubs, benefits plans, the profile and the plan) after a confirm. Decisions: `invalidateDecisions` (the list and every
+  (documents, pay stubs, benefits plans, the profile, the plan and the decisions, whose `review` a
+  new stub can change) after a confirm. Decisions: `invalidateDecisions` (the list and every
   `GET /decisions/{id}`) and `invalidateAfterDecision` (also calendar, plan and goals) after a save.
+  `useUpdateProfile` writes the saved profile into its cache and then `invalidateAfterProfile`
+  (the decisions and the plan): a decision's `review` reads the profile.
   `GET /plan` repeats decisions, goals, the calendar, explanation statuses and the newest pay stub,
   so whatever changes one of those invalidates `queryKeys.plan()` too (a goal change, a new
   explanation, a confirm, a sync's balances).
@@ -243,7 +246,9 @@ or checked for a phone.
   details) and invalidates that calculator's results so the card recalculates and asks to save
   again. `decisionSaveState(current, inputs, { ignore })` (`lib/decisions.ts`) drives the save
   button and badge in words with no version number (spec 018 rule 5a): unsaved ("Save", "Not
-  saved"), `dirty` ("Save changes", "Changes not saved") or `saved` ("Saved", "Saved Oct 17"),
+  saved"), `dirty` ("Save changes", "Changes not saved"), `review` ("Save again", "Needs review",
+  whatever is on screen, while the current version's `review` from the API is not empty; spec 018
+  rule 5c) or `saved` ("Saved", "Saved Oct 17"),
   comparing inputs structurally (`lib/deep-equal.ts`, so key order and object identity do not
   matter) and leaving out the `ignore` keys, inputs that are not what the person decided (the
   W-4's `W4_CONTEXT_INPUTS`, the health plan's `HEALTH_WHAT_IF_INPUTS`). The save is a step's one
@@ -413,6 +418,14 @@ or checked for a phone.
   `LinkScreen.test.tsx`), and the test calls the callbacks the widget would.
 - Screen tests cannot name status colors (ESLint): test a tone through a pure helper
   (`sourceBadge`, `saveBadgeTone`) or in the `components/ui` tests.
+- Ids the handlers make (`nextId`) use the `9000` group, fixture ids the `8000` group, so a save
+  never makes a row with a fixture row's id, whichever test in a file runs first.
+- A decision that needs review: set `review` on its `db.decisions` row (`SCHEDULE_CHANGED`,
+  `SALARY_UNCONFIRMED` in `fixtures/decisions.ts`); a saved version has none. A plan's: set
+  `review` on its decisions and rebuild `completeness` with `completenessOf`.
+  `salaryQuestionOpen()` is `decisionsReady()` with `sampleSalaryReview()` on the profile (the
+  sample stub's $64,999.92 against $65,000.00); `PUT /profile` answers it when the body names its
+  stub or takes its figure.
 - Decisions: `decisionsReady()` seeds a confirmed pay stub (with `SAMPLE_ANNUAL_SALARY_CENTS` and
   `SAMPLE_RETIREMENT_CONTRIBUTION_PCT`, the API's figures for it; the confirm handler keeps them
   only for the sample's gross with its frequency or its retirement line, else null) and a profile
@@ -599,11 +612,26 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
 - **Side nav**: "Decisions" holds a nested list of the four steps (labels from `STEP_TEXT`),
   indented behind a hairline, each a 44px link with an 18px `NavStep` (a dot, or a check once
   done). The current step has `aria-current="page"`; "Decisions" never does on a step. A step is
-  done when its calculator is live and saved (`setupProgress`, keyed by the calculator id);
+  done when its calculator is live and its saved decision needs no review (`setupProgress` over
+  `settledDecisionCalculators`, keyed by the calculator id; spec 018 rule 8, issue 222);
   "Decisions" when every live one is. A step that is not live is muted with "After alpha" under
   its label (its name ends ", After alpha") and still links to its placeholder page.
   `navKeyForPath` returns the calculator id for a step's path.
 
+- **Needs review** (spec 007 rules 19a-19e, spec 018 rule 5c, issue 222): the API reports on each
+  current decision why it needs review (`review`: what its step read, such as the pay schedule or
+  the salary, changed since the save, worded once by the API). Every card shows `ReviewNotice`,
+  "What changed", at its top: "Since you saved this on Oct 21, 2026:", the reasons of kind
+  `changed` (`reviewChanges`) and that the numbers use what you have now. The client compares no
+  context itself. Saving again from the inputs of now clears it.
+- **The salary question** (spec 005 rule 24c, spec 018 rule 5d, issue 221): while
+  `profile.salary_review` is set, the 401(k), health plan and W-4 cards show `SalaryQuestion` in
+  place of their calculator and send no calculator request: the stub's gross and schedule, its
+  yearly pay and the saved salary (`salaryQuestionText`, every figure the API's), with "Use
+  $64,999.92" (primary) and "Keep $95,000.10". Each saves the profile with `salary_pay_stub_id` set
+  to the stub, which answers it; focus then goes to the card's first control. The plan details form
+  names the newest stub only when it saves a salary other than the saved one (`salaryStubId`),
+  so saving another field never answers the question. The emergency fund reads no salary.
 - **`Match401kCard`** always renders the same `DecisionCard` frame (a region named by its title)
   and swaps its body: skeleton, error, a link to Confirm when there is no confirmed pay stub,
   `PlanDetailsForm` when the profile has no salary, match tiers, birth year or pay schedule
@@ -766,7 +794,7 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
   line's `status` (spec 015 rule 19a: `on_plan | over | under`, null without a plan) is the API's;
   `planStatusTone` only decides whether that side matters for the line: `on_plan` is `confirmed`;
   over is a `warning` on spending lines (essentials, flexible, other) and under is `confirmed`;
-  savings, retirement, take-home and left over are the reverse (more is not a problem); health
+  savings, retirement, income and left over are the reverse (more is not a problem); health
   premiums warn on either side (they should match the chosen plan); null is neutral. That tone
   colors the planned line's `Bar` and a `Badge` beside the actual saying the status in words
   (`planStatusText`: On plan, Over plan, Under plan). The bar width is geometry (`planBarValue`:
@@ -786,8 +814,19 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
   maps the API series to rows without deriving anything. Colors (blue net worth, teal assets,
   coral liabilities) pass the dataviz palette validator; teal is under 3:1 on white, which the
   legend and the table cover.
-- **Coming up** (`DeadlinesCard`): `GET /calendar` from the first of the month to the end of the
-  next (`checkInWindow`).
+- **Coming up** (`DeadlinesCard`): `GET /calendar?to=` the end of next month (`checkInWindow`, no
+  start), so an open date that passed with nothing done is listed first, "Was due" with an `off`
+  Overdue badge from the API's `overdue` (issue 233). Only a check-in that is not `past` shows it.
+- **A past check-in is a record** (spec 015 rule 9b, issue 233). When `past` is true the lead says
+  it is the month's record as of `as_of`, not checked again; `FindingText` takes `past` and words
+  every finding in the past (and drops that day's advice: "Ask payroll to update it."); the
+  cash-flow note says the targets are the choices saved now and the month counts in full instead
+  of "This month counts up to today"; there is no Coming up card. No finding prints a count of
+  days, this month's included: `days_until` counts from the run's day. An `overdue_deadline`
+  says "It was due {date}, and is not marked done." A recurring finding with `charge_gone` adds
+  "Spending no longer counts this as a recurring charge." The deposits line is `income`, "Income
+  deposited" as on Spending (issue 235), and a line with `needs_pay_stub` reads "No pay stub yet"
+  where a line without a plan reads "No target".
 - **Check in now** (`CheckInNow.tsx`, spec 015 rule 23): `CheckInNowButton` in the title row (the
   mockup's "Run again now") and `CheckInNowStatus` under it, over one `useCheckInNow()`. The list
   always offers it; a check-in offers it only when it is this month's and open
@@ -804,12 +843,17 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
 ## Plan screen
 
 `/plan` (`PlanScreen`, from `Plan.dc.html`) is one read of `GET /plan` (spec 016). The side
-nav's "Plan and calendar" gets its done mark when the plan's `completeness.missing` is empty
-(`setupProgress`, `planMissingCount`).
+nav's "Plan and calendar" gets its done mark when the plan's `completeness.missing` and
+`completeness.needs_review` are both empty (`setupProgress`, `planMissingCount`,
+`planNeedsReviewCount`).
 
 - **Completeness**: an "n of 4 decisions saved" badge (`completenessText`, counting the API's
-  two lists; `confirmed` when nothing is missing) and "Still to decide" linking each missing
-  calculator to its step (`decisionKindRoute`).
+  lists, with ", 3 need review" or ", 1 needs review" while any does; `completenessTone`:
+  `confirmed` when nothing is missing or needs review, `warning` while any needs review) and
+  "Still to decide" linking each missing calculator to its step (`decisionKindRoute`).
+- **Needs review** (spec 016 rule 3a): a decision with `review` reasons shows a "Needs review"
+  badge, the reasons in the API's words and "Review your health plan" (its step) in place of its
+  figures, which were worked out for a paycheck that may no longer be the person's.
 - **Decisions** (`DecisionSummary`): one `DecisionCard` per saved decision in the API's order,
   with "Saved {date}", the API's `figures` by their labels (`figureText` formats by
   `kind`: money, a net cost (negative reads "$260.00 ahead"), a refund ("$0.08 refund",
@@ -823,7 +867,9 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
 - **Your paycheck** (`PaycheckCard`): the newest confirmed stub's gross and take-home tiles and
   its deductions, or a link to Confirm. **Goals** (`GoalsCard`): status badge, contribution,
   target and date, progress bar. **Next 90 days** (`PlanCalendarCard`): `calendar` through
-  `calendar_through`, each event in its decision's hue (`eventHue`) with a badge to its step.
+  `calendar_through`, each event in its decision's hue (`eventHue`) with a badge to its step;
+  an event the API marks `overdue` (an open date that passed, spec 015 rule 24, issue 233)
+  reads "Was due" with an `off` Overdue badge.
 - **Export** (`ExportCard`): Download PDF starts `useExportPlan`, shows `JobProgress` while the
   job runs, downloads once it succeeds (once per job), then says "Downloaded {name}." with
   Download again. A dead job offers Try again (a new export); a failed download offers Try

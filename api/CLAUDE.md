@@ -14,7 +14,8 @@ calc/       calculators: f(Input) -> Result, Pydantic models, integer cents, Dec
             data/<year>.json (federal constants), data/pub15t_<year>.json (withholding
             tables), registry.py, pay_dates.py, spending.py,
             cashflow.py, recurring.py (amount arithmetic for detection)
-db/         models.py (Base), rls.py (enable_rls), enums.py, seed/ (load.py, data files)
+db/         models.py (Base), rls.py (enable_rls), enums.py, seed/ (load.py, data files),
+            calendar.py (open and overdue dates, the one day count)
 alembic/    env.py, versions/NNNN_name.py
 sync/       provider.py (protocol), pipeline.py, crypto.py, categorize.py, categories.py,
             plaid/ (client, provider, webhook), csv_provider.py, recurring.py
@@ -209,8 +210,9 @@ Rules:
   `0013_plan_export_job`, `0014_delete_account_fn`, `0015_loan_account_kind`,
   `0016_rule_match_contains`, `0017_document_replaced_by`,
   `0018_check_in_last_run_at`, `0019_explanation_context_digest`,
-  `0020_pay_stub_superseded_by`, `0021_paycheck_change` (each revises the one
-  before it); the head is `0021_paycheck_change`.
+  `0020_pay_stub_superseded_by`, `0021_paycheck_change`, `0022_deadline_dates`,
+  `0023_salary_pay_stub` (each revises the one before it); the head is
+  `0023_salary_pay_stub`.
 - Adding an enum label is `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with
   `AFTER` when the order means something, as `by_kind` does for
   `account_kind`); the downgrade maps the rows that use it and rebuilds the
@@ -273,6 +275,14 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   gross, never stored. The 401(k) card starts from it when nothing is saved,
   and `POST /explain` states it beside the chosen rate (spec 008 rule 7a).
   `db/pay_stubs.py:newest_pay_stub` is the newest stub in that order.
+- **The salary check** (spec 005 rule 24c, issue 221, migration `0022`):
+  `profiles.salary_pay_stub_id` (a same-user composite key, `ON DELETE SET NULL
+  (salary_pay_stub_id)`, written by hand) names the stub the saved salary was
+  compared with; `PUT /profile` takes it (404 for a stub that is not the
+  user's, `db/pay_stubs.py:find_pay_stub`). `ProfileOut.salary_review`
+  (`app/salary_review.py`, computed on read) is set while the newest current
+  stub's `annual_salary_cents` differs from `salary_cents` and from that
+  stub's. The API never changes the salary; the web asks which to use.
 - **One current stub per paycheck** (spec 005 rules 22a-22e, issue 190, migration
   `0020`). Confirm goes through `db/pay_stubs.py:add_confirmed`, which takes a
   per-user advisory lock and marks as superseded (`superseded_by_id`) the current
@@ -333,6 +343,17 @@ explanation, `GET /calendar` shows the check it implies.
   `auth.users` row (`pg_trigger_depth() > 1` and the owner gone). Side effects
   (the `election_check` calendar event, dismissing the superseded one) run in
   the same transaction.
+- **A decision that needs review** (spec 007 rules 19a-19e, issue 222).
+  `app/decision_review.py:review` compares the inputs a step reads rather than
+  asks (`CONTEXT_INPUTS`: the pay schedule, salary, tax year, filing status,
+  age, match tiers, and for the W-4 the saved 401(k) rate and health premium),
+  as stored, with what the step would send now (`load_context`, one read per
+  request under RLS), and words each difference once with `verify.format`;
+  an open salary question adds a `salary_unconfirmed` reason to every
+  calculator that reads the salary. `DecisionOut.review` (current versions
+  only), `PlanDecision.review` and `PlanCompleteness.needs_review` carry it;
+  the PDF prints the reasons and `export/html.py:REVIEW_NOTE` in place of the
+  figures. Computed on read, never stored: decisions are immutable.
 - **Explain never shows an unchecked number.** `verify/` is plain code:
   `extract_numbers`, `AllowedNumbers.from_decision(inputs, result)` (keys with
   a `_cents` part are money, `_pct`/`_rate` parts are percentages) and
@@ -617,7 +638,9 @@ with your plan on" reads it, never `updated_at`, which moves only when the row
 itself changes (issue #171). `0021_paycheck_change` folds the stored
 `deduction_change` findings into their paycheck's `pay_change`, merges the
 duplicates a newer copy of a stub made, and drops the label (rule 13a, issues
-194 and 202).
+194 and 202). `0022_deadline_dates` adds `overdue_deadline` and keys each date
+finding by its day, folding a reminder a newer decision version repeated
+(rule 13b, issues 233 and 234).
 
 - **Finders** (`checkin/findings.py`) are pure, one per `finding_kind`,
   `f(Facts) -> list[Finding]`; `all_findings` runs them in rule order. Facts
@@ -629,17 +652,31 @@ duplicates a newer copy of a stub made, and drops the label (rule 13a, issues
   (`checkin/engine.py`) reconciles a refresh by key: a key on another of the
   user's check-ins is dropped (reported once), a key already here is updated
   in place (the user's action stays), a condition (`election_mismatch`,
-  `goal_off_pace`, `upcoming_deadline`) nobody produces any more is retracted
+  `goal_off_pace`, `upcoming_deadline`, `overdue_deadline`) nobody produces any more is retracted
   unless handled, events are kept unless their subject is gone (a recurring
   finding whose charge an unlink removed, a `pay_change` about a stub that is no
   longer current). Pay stub keys name the paycheck, not the row: `paycheck_id`
   is the first copy of a paycheck (`db/pay_stubs.py:paycheck_ids`), so a newer
   copy updates the same finding in place (issue 194). One `pay_change` per
   paycheck carries gross pay and every deduction line that moved
-  (`deductions`, issue 202). Surfacing sets `new`/`changed` recurring
+  (`deductions`, issue 202). Date keys name the date, never the event row:
+  `{kind}:{calendar_kind}:{due_at}`, so a newer decision version's reminder on
+  the same day updates the finding in place (issue 234). Surfacing sets `new`/`changed` recurring
   charges `active`; the engine holds `checkin:{user}` then
   `recurring.detect:{user}` advisory locks so it never interleaves with
   detection.
+- **Dates** (`db/calendar.py`, spec 015 rule 24). An event is open while its
+  status is `upcoming` and no date finding about its kind and day has a user
+  action (`open_events`, `settled_by_finding`); nothing writes the event's
+  status from a finding. The facts, `GET /calendar` and the plan's calendar
+  read open events only, the facts and the plan with no lower bound, so a
+  passed date is an `overdue_deadline` finding (`alert`) and `overdue: true`
+  on `CalendarEventOut` (`routers/calendar.py:event_out`). `days_until` is the
+  one count of days; callers pass their own today.
+- **Records** (rule 9b). No run reaches a check-in after its month, so its
+  findings are a record of `as_of` (the last run's UTC date, capped at the
+  month's last day); `past` says the month ended. `FindingOut.charge_gone` marks a
+  recurring finding whose charge row is gone (`checkin.engine.charge_gone`).
 - **Jobs.** `checkin.monthly` (`jobs/handlers/checkin.py`), payload `{"period":
   "YYYY-MM-01", "trigger": "schedule" | "sync"}`, dated `min(clock, last day of
   period)`. `schedule.tick` queues one per `auth.users` row and UTC month with
@@ -650,7 +687,9 @@ duplicates a newer copy of a stub made, and drops the label (rule 13a, issues
   `cash_flow`: `GET /cashflow`'s body for the month to date via
   `routers/cashflow.py:cash_flow_for`, plus `calc/cashflow.py:against_plan`
   lines, each with a `status` `on_plan | over | under` within
-  `max(5% of plan, $25)` from `plan_status`, null without a plan), `POST
+  `max(5% of plan, $25)` from `plan_status`, null without a plan; the deposits
+  line is `income`, "Income deposited", and with no stub in the period the
+  `retirement` and `health` plans are null with `needs_pay_stub`), `POST
   /check-ins` (`check_in_now`, 202 `{job_id, check_in_id}`: queues the
   month's keyed job, or once it has started a refresh shared by repeated
   requests; `checkin/engine.py:queue_check_in_now`; the scheduler and the
@@ -662,7 +701,9 @@ duplicates a newer copy of a stub made, and drops the label (rule 13a, issues
   `GET /calendar?from=&to=`.
 - Tests: `tests/unit/checkin/` (finders from the spec table, reconcile),
   `tests/integration/checkin/` (job, tick, refresh, routes, check in now) on
-  the November user in `tests/support/november.py`, with the worker and job
+  the November user in `tests/support/november.py`, and `test_check_in_records.py`
+  (spec 015's October user: decisions saved through the API, Check in now on
+  three days, records, overdue dates, settling a date, a new version's reminder), with the worker and job
   readers in `tests/support/checkin_jobs.py`; factories `make_decision` (with a
   chosen `created_at`), `make_goal`, `make_check_in`, `make_finding`,
   `make_calendar_event`.
@@ -678,8 +719,8 @@ table `plan_exports` (`enable_rls`, SELECT and INSERT only).
   their path, `inputs.x` or `result.plans[i].y`; no arithmetic, a test follows
   every key), the explanation status from the latest row (`verified`,
   `fallback`, `none`) with its citations and `stale`, `GET /goals`'s goals (`goal_out`),
-  upcoming events from today to today + 90 days ordered by `due_at`, `kind`,
-  `id`, the newest pay stub and `completeness`. A total the plan needs belongs
+  open events (`db/calendar.py`) due by today + 90 days, the overdue ones
+  included and marked, ordered by `due_at`, `kind`, `id`, the newest pay stub and `completeness`. A total the plan needs belongs
   in `calc/`, not here.
 - **`GET /plan/calendar.ics`** (`export/calendar.py`, standard library):
   every event in any status, `UID` = event id, all-day `DTSTART;VALUE=DATE`,

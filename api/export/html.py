@@ -19,7 +19,7 @@ from app.plan import PlanFigure, PlanOut
 from db.enums import CalculatorKind, CalendarKind, GoalKind, GoalStatus
 from verify.format import dollars, net_cost, percent, refund
 
-__all__ = ["STALE_LABEL", "render_html"]
+__all__ = ["REVIEW_NOTE", "STALE_LABEL", "render_html"]
 
 TEMPLATES = Path(__file__).parent / "templates"
 
@@ -39,6 +39,12 @@ EXPLANATION_LABELS = {
 STALE_LABEL = (
     "Out of date: written from figures that have changed since. Open Why in First Paycheck"
     " to write it again."
+)
+# Spec 016 rule 3a: a decision whose inputs changed since it was saved (spec 007
+# rules 19a-19e) prints its reasons and this, in place of figures worked out before.
+REVIEW_NOTE = (
+    "Open First Paycheck to check it and save it again. Its figures are not printed because"
+    " they were worked out before this changed."
 )
 GOAL_TITLES = {GoalKind.EMERGENCY_FUND: "Emergency fund", GoalKind.CUSTOM: "Savings goal"}
 GOAL_STATUSES = {
@@ -104,6 +110,7 @@ def render_html(plan: PlanOut, prepared_at: dt.datetime) -> str:
         calculator_titles=CALCULATOR_TITLES,
         explanation_labels=EXPLANATION_LABELS,
         stale_label=STALE_LABEL,
+        review_note=REVIEW_NOTE,
         goal_titles=GOAL_TITLES,
         goal_statuses=GOAL_STATUSES,
         calendar_kinds=CalendarKind,
