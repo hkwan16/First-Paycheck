@@ -92,6 +92,15 @@ export default defineConfig({
       dependencies: ['authenticated-decisions'],
       use: { ...desktop, storageState: STORAGE_STATE },
     },
+    // Saves two more 401(k) versions and opens the replaced one's Why page
+    // (issue 227). After Plan and Check-in, which read the saved decisions, so
+    // its saves never change what they are reading.
+    {
+      name: 'authenticated-why',
+      testMatch: 'why.spec.ts',
+      dependencies: ['authenticated-plan', 'authenticated-check-in'],
+      use: { ...desktop, storageState: STORAGE_STATE },
+    },
     // Spending reads the bank Link linked, so it needs Plaid's sandbox.
     ...(plaidSandbox
       ? [
