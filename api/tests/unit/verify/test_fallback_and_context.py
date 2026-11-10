@@ -18,15 +18,16 @@ from retrieval.citations import Citation
 from retrieval.context import (
     CAPPED_NOTE,
     COMPENSATION_NOTE,
+    FULL_MATCH_EARNED_NOTE,
     NEGATIVE_COST_NOTE,
     NO_STUB_NOTE,
     STUB_DIFFERS_NOTE,
     STUB_SAME_NOTE,
     context_digest,
+    context_numbers,
     explain_context,
     explain_setup,
     name_numbers,
-    pay_stub_numbers,
 )
 from tests.unit.calc import test_health_plans_examples as health_examples
 from verify.allowed import AllowedNumbers
@@ -142,9 +143,20 @@ def test_context_for_example_1() -> None:
     assert facts["Employer match per year at the rate you chose"] == "$1,800.00"
     assert facts["Employer match per year at the full-match rate"] == "$2,400.00"
     assert facts["Match you miss per year at the rate you chose"] == "$600.00"
-    assert facts["Extra per paycheck before tax at the full-match rate"] == "$46.15"
-    assert facts["Extra per paycheck after federal income tax"] == "$40.62"
-    assert facts["Federal marginal tax rate used"] == "12%"
+    assert (
+        facts[
+            "More taken per paycheck before tax to raise the rate you chose to the full-match rate"
+        ]
+        == "$46.15"
+    )
+    assert (
+        facts[
+            "Less take-home pay per paycheck after federal income tax to raise the rate you"
+            " chose to the full-match rate"
+        ]
+        == "$40.62"
+    )
+    assert facts["Federal marginal income tax rate the after-tax figures use"] == "12%"
     assert facts["Your yearly contribution at the rate you chose"] == "$1,800.00"
     assert facts["Yearly 401(k) contribution limit"] == "$24,500.00"
     assert facts["Paychecks per year"] == "26"
@@ -164,9 +176,11 @@ def test_context_for_example_1() -> None:
 def test_context_notes_the_limits() -> None:
     inputs, result = decision("9")
     context = explain_context("k401_match", inputs, result, SEEDED, [], pay_stub_pct=Decimal(6))
-    assert context.notes == [STUB_SAME_NOTE, CAPPED_NOTE, COMPENSATION_NOTE]
-    assert "limit" in context.notes[1]
-    assert "compensation" in context.notes[2]
+    # 6% asks for more than the limit, which 5% already reaches on this salary: the
+    # whole match is earned, and the part above 5% puts in nothing more (rule 7c).
+    assert context.notes == [STUB_SAME_NOTE, FULL_MATCH_EARNED_NOTE, CAPPED_NOTE, COMPENSATION_NOTE]
+    assert "limit" in context.notes[2]
+    assert "compensation" in context.notes[3]
 
 
 # Each k401 example explained with no pay stub, a stub at the chosen rate, and a
@@ -200,9 +214,9 @@ def test_every_fact_passes_the_verifier(example: str, stub: str) -> None:
         check = verify_explanation(
             ExplanationDraft(
                 concept="c",
-                text=f"{fact.label}: {fact.value}.",
+                text=" ".join([f"{fact.label}: {fact.value}.", *setup.context.notes]),
                 numbers=[],
-                what_ifs=[*setup.context.notes],
+                what_ifs=[],
                 citation_keys=["k401.employer_match"],
             ),
             setup.allowed_numbers,
@@ -267,12 +281,15 @@ def test_context_for_issue_132() -> None:
     context = explain_context(
         "k401_match", inputs, result, SEEDED, [], pay_stub_pct=Decimal("3.00")
     )
-    assert [(fact.label, fact.value) for fact in context.facts[:3]] == [
+    against_stub = "at the rate you chose than at the rate your latest pay stub shows"
+    assert [(fact.label, fact.value) for fact in context.facts[:5]] == [
         ("Contribution rate you chose", "5%"),
         ("401(k) contribution rate your latest pay stub shows", "3%"),
+        (f"More taken per paycheck before tax {against_stub}", "$73.08"),
+        (f"Less take-home pay per paycheck after federal income tax {against_stub}", "$57.00"),
         ("Contribution rate that earns the full match", "5%"),
     ]
-    assert context.notes == [STUB_DIFFERS_NOTE]
+    assert context.notes == [STUB_DIFFERS_NOTE, FULL_MATCH_EARNED_NOTE]
     # Notes add no number a draft could repeat ("401(k)" is a name, not a figure).
     for note in (STUB_DIFFERS_NOTE, STUB_SAME_NOTE, NO_STUB_NOTE):
         assert extract_numbers(note) == [], note
@@ -326,7 +343,7 @@ def test_context_without_a_pay_stub() -> None:
     labels = [fact.label for fact in context.facts]
     assert labels[0] == "Contribution rate you chose"
     assert "401(k) contribution rate your latest pay stub shows" not in labels
-    assert context.notes == [NO_STUB_NOTE]
+    assert context.notes == [NO_STUB_NOTE, FULL_MATCH_EARNED_NOTE]
 
 
 @pytest.mark.parametrize(
@@ -362,22 +379,42 @@ def test_fallback_for_issue_132() -> None:
         "At the 5% you chose, you put in $4,750.01 a year and your employer adds $3,800.00."
         " Your latest pay stub shows 3% going to your 401(k), so the rate you chose takes"
         " effect once you change your election with your employer."
+        " Once it does, each paycheck has $73.08 more taken before tax, or about $57.00 less"
+        " take-home pay after federal income tax."
         " That rate earns the full match of $3,800.00 a year."
     )
     assert "already" not in draft.text
 
 
-def test_pay_stub_numbers() -> None:
+def test_context_numbers() -> None:
     inputs, result = decision("issue-132")
 
     def numbers(calculator: str, rate: Decimal | None) -> dict[str, Any]:
-        return pay_stub_numbers(calculator, inputs, result, pay_stub_pct=rate)
+        return context_numbers(calculator, inputs, result, pay_stub_pct=rate)
 
-    assert numbers("k401_match", Decimal("3.00")) == {"pay_stub_contribution_pct": "3.00"}
+    assert numbers("k401_match", Decimal("3.00")) == {
+        "pay_stub_contribution_pct": "3.00",
+        "pay_stub_change_per_paycheck_cents": 7_308,
+        "pay_stub_change_per_paycheck_after_tax_cents": 5_700,
+    }
+    # The stub shows the rate chosen: no move to price.
+    assert numbers("k401_match", Decimal("5.00")) == {"pay_stub_contribution_pct": "5.00"}
     assert numbers("k401_match", None) == {}
     assert numbers("health_plans", Decimal("3.00")) == {}
     allowed = AllowedNumbers.from_decision({}, {}, numbers("k401_match", Decimal("3.69")))
     assert allowed.percents == {Decimal("3.69")}
+    assert allowed.zero_cost is True
+    setup = explain_setup(
+        "k401_match",
+        inputs,
+        result,
+        SEEDED,
+        [],
+        pay_stub_pct=Decimal("3.00"),
+        pay_stub_withholding_cents=None,
+    )
+    # Rule 14a: a 401(k) draft may not say a choice costs nothing.
+    assert setup.allowed_numbers.zero_cost is False
 
 
 def test_other_calculators_ignore_the_pay_stub() -> None:

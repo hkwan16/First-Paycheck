@@ -113,7 +113,7 @@ Rules:
 - One public method per prompt: `categorize` (`categorize/v3`),
   `extract_pay_stub` (`extract_pay_stub/v2`: a dash or `0.00` printed on a line is 0
   tied to that line, not null; spec 005 rule 1a, issue 195), `extract_benefits`
-  (`extract_benefits/v2`), `explain` (`explain/v4`), `judge_rate_claim`
+  (`extract_benefits/v2`), `explain` (`explain/v5`), `judge_rate_claim`
   (`judge_rate_claim/v1`, schema `RateClaimVerdict`; spec 008 rule 24a), the
   explain eval's judge of whether a final explanation calls the chosen 401(k)
   rate the one in effect, and `judge_withholding_claim`
@@ -350,15 +350,34 @@ explanation, `GET /calendar` shows the check it implies.
   its rate as `pay_stub_pct` to `retrieval/context.py:explain_setup`, which
   builds the context (facts `Contribution rate you chose` and `401(k)
   contribution rate your latest pay stub shows`), the allowed numbers
-  (`pay_stub_numbers`) and the fallback, for the route and the eval suites
+  (`context_numbers`) and the fallback, for the route and the eval suites
   alike. Which of the three cases holds is `calc/pay_stub.py:stub_rate`
   (`StubRate.CHOSEN`, `OTHER`, `NONE`), decided once; the context's note and
   the fallback's sentences are looked up by it. It never goes into the
   decision, which is immutable. The verifier checks numbers and citations
   only; whether drafts call the chosen rate the one in effect is the explain
   eval's `rate_framing` metric, read by `Gateway.judge_rate_claim`, not a
-  check. The gateway sends `explain/v4` (issue 204: shorter, whole dollars at
-  $100 and over, no quoted passages); fallback rows are `fallback/v4`.
+  check. The gateway sends `explain/v5` (v4, issue 204: shorter, whole
+  dollars at $100 and over, no quoted passages; v5, issue 223: the costs
+  below); fallback rows are `fallback/v5`.
+- **Every 401(k) cost names its move, and none is zero** (spec 008 rule 7c,
+  issue 223). `calc/k401.py:rate_change(data, from_pct)` (spec 006 rule 15) is
+  what the chosen rate takes from each paycheck against another rate, signed,
+  at the decision's marginal rate; `rate_costs(data, pay_stub_pct)` picks the
+  two moves an explanation states, against the stub's rate and for the part
+  above the full-match rate, None when a move does not apply or changes
+  nothing. The facts say which move each cost prices (`More taken per paycheck
+  before tax at the rate you chose than at the rate your latest pay stub
+  shows`, `... to raise the rate you chose to the full-match rate` only when
+  that is above zero, `... by the part of the rate you chose above the
+  full-match rate`), and notes say why a cost is absent. So no 401(k) cost
+  fact is ever zero, and `explain_setup` sets `AllowedNumbers.zero_cost` false
+  for a 401(k) decision: `verify/zero_cost.py:zero_cost_claims` finds the
+  sentences that say a cost is zero ("would cost no extra per paycheck") and
+  `verify_explanation` fails the draft with `Verification.zero_cost_claims`
+  (rule 14a), stored in the row's `verification` and on `VerificationOut`.
+  This is the one wording the verifier reads; everything else about framing
+  stays the eval's.
 - **The entries' withholding is not the withholding in effect** (spec 008
   rule 7b, issue 181), the same pattern for a W-4 decision. The same read of
   the newest stub gives `pay_stub_withholding_cents`

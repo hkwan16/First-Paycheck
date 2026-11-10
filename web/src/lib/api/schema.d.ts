@@ -3345,6 +3345,8 @@ export interface components {
       numbers_checked: number;
       /** Numbers Unmatched */
       numbers_unmatched: string[];
+      /** Zero Cost Claims */
+      zero_cost_claims?: string[];
     };
     /**
      * W4Input

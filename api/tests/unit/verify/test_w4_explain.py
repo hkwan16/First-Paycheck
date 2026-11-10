@@ -19,9 +19,9 @@ from retrieval.context import (
     W4_NO_STUB_NOTE,
     W4_STUB_DIFFERS_NOTE,
     W4_STUB_SAME_NOTE,
+    context_numbers,
     explain_context,
     explain_setup,
-    pay_stub_numbers,
 )
 from verify.allowed import AllowedNumbers
 from verify.fallback import fallback_draft
@@ -417,18 +417,18 @@ def test_fallback_states_a_refund_at_the_stub() -> None:
     ) in draft.text
 
 
-def test_pay_stub_numbers_for_w4() -> None:
+def test_context_numbers_for_w4() -> None:
     inputs, result = w4_decision("11")
-    assert pay_stub_numbers("w4", inputs, result, pay_stub_withholding_cents=27_244) == {
+    assert context_numbers("w4", inputs, result, pay_stub_withholding_cents=27_244) == {
         "pay_stub_withholding_per_paycheck_cents": 27_244,
         "pay_stub_annual_withholding_cents": 708_344,
         "pay_stub_refund_cents": -391_870,
     }
-    assert pay_stub_numbers("w4", inputs, result, pay_stub_withholding_cents=None) == {}
+    assert context_numbers("w4", inputs, result, pay_stub_withholding_cents=None) == {}
     # A W-4 decision has no 401(k) rate to compare, and a 401(k) one no withholding.
-    assert pay_stub_numbers("w4", inputs, result, pay_stub_pct=None) == {}
+    assert context_numbers("w4", inputs, result, pay_stub_pct=None) == {}
     allowed = AllowedNumbers.from_decision(
-        {}, {}, pay_stub_numbers("w4", inputs, result, pay_stub_withholding_cents=27_244)
+        {}, {}, context_numbers("w4", inputs, result, pay_stub_withholding_cents=27_244)
     )
     assert allowed.money_exact == {Decimal("272.44"), Decimal("7083.44"), Decimal("3918.70")}
     assert Decimal("3919") in allowed.money_whole
@@ -468,4 +468,4 @@ def test_other_calculators_ignore_the_pay_stub_withholding() -> None:
         )
 
     assert setup(None) == setup(27_244)
-    assert pay_stub_numbers("k401_match", inputs, result, pay_stub_withholding_cents=27_244) == {}
+    assert context_numbers("k401_match", inputs, result, pay_stub_withholding_cents=27_244) == {}

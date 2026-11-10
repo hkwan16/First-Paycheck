@@ -288,7 +288,35 @@ def test_explain_v4_is_short_in_whole_dollars_and_quotes_no_passage() -> None:
     assert "Do not quote the citations or the benefits passages" in v4
     assert "Never mention the calculator" in v4
     assert "rejects" not in v4
-    assert EXPLAIN_PROMPT == ("explain", "v4")
+
+
+COST_SECTION = "What a 401(k) rate costs per paycheck:"
+
+
+def test_explain_v5_prices_each_move_and_never_calls_a_cost_zero() -> None:
+    """Spec 008 rules 7c, 8 and 19d (issues 223 and 243): v4 asked, for every 401(k)
+    decision, what the full-match rate "costs per paycheck", so above the match it
+    restated the zero cost of reaching it. v5 keeps v4's rate and withholding rules
+    and every number rule but the zero example, adds what each cost fact prices,
+    forbids a zero cost, asks for sentence-case labels, and is the version sent."""
+    v4 = load_prompt("explain", "v4").system
+    v5 = load_prompt("explain", "v5").system
+    for heading in (RATE_SECTION, WITHHOLDING_SECTION):
+        assert _section(v5, heading) == _section(v4, heading), heading
+    zero = 'Say a zero amount in words ("no extra cost")'
+    for line in _section(v4, "Rules for numbers.").splitlines():
+        if line.startswith("- ") and zero not in line:
+            assert line in v5, line
+    assert zero not in v5
+    assert '("you miss none of the match")' in v5
+    assert "what that costs per paycheck before and after federal income tax" not in v5
+    costs = _section(v5, COST_SECTION)
+    assert "at the rate you chose than at the rate your latest pay stub shows" in costs
+    assert "to raise the rate you chose to the full-match rate" in costs
+    assert "by the part of the rate you chose above the full-match rate" in costs
+    assert "Never say a 401(k) choice costs nothing, no extra, no more or $0 per paycheck" in costs
+    assert "a label of a few plain words in sentence case" in v5
+    assert EXPLAIN_PROMPT == ("explain", "v5")
 
 
 def test_judge_rate_claim() -> None:
