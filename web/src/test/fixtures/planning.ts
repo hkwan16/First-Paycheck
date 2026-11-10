@@ -260,6 +260,7 @@ export function samplePlanningEvents(): CalendarEvent[] {
       due_at: '2026-10-31',
       decision_id: EMERGENCY_DECISION_ID,
       status: 'upcoming',
+      overdue: false,
     },
     {
       id: 'ca000000-0000-4000-8000-0000000000c1',
@@ -268,6 +269,7 @@ export function samplePlanningEvents(): CalendarEvent[] {
       due_at: ENROLLMENT_DEADLINE,
       decision_id: HEALTH_DECISION_ID,
       status: 'upcoming',
+      overdue: false,
     },
     {
       id: 'ca000000-0000-4000-8000-0000000000e2',
@@ -276,6 +278,7 @@ export function samplePlanningEvents(): CalendarEvent[] {
       due_at: '2027-01-31',
       decision_id: EMERGENCY_DECISION_ID,
       status: 'upcoming',
+      overdue: false,
     },
   ];
 }

@@ -27,7 +27,7 @@ Save the calculator result a user picks as an immutable, versioned `decisions` r
 - `DecisionOut`: `id`, `calculator`, `version`, `supersedes_id`, `check_in_id`, `inputs`, `result`, `created_at`, `is_current`.
 - `GET /decisions` returns `DecisionList`: `items`, one `CalculatorDecisions` per calculator the user has saved, in `calculator_kind` order: `calculator`, `current` (a `DecisionOut`) and `versions` (every version, newest first, as `DecisionVersion`: `id`, `version`, `supersedes_id`, `created_at`).
 - `GET /decisions/{id}` returns `DecisionOut` for any version the user owns; another user's id is 404.
-- `GET /calendar` returns `CalendarEventOut` items (`id`, `kind`, `title`, `due_at`, `decision_id`, `status`) with status `upcoming`, ordered by `due_at`, then `created_at`.
+- `GET /calendar` returns `CalendarEventOut` items (`id`, `kind`, `title`, `due_at`, `decision_id`, `status`) with status `upcoming`, ordered by `due_at`, then `created_at`; spec 015 rule 22 leaves out the dates a check-in finding settled and adds `overdue`.
 - `GET /spending/summary`: see Part B.
 
 ## Rules
@@ -65,7 +65,7 @@ Save the calculator result a user picks as an immutable, versioned `decisions` r
 
 17. `GET /decisions` lists only calculators with at least one decision. `current` is the `current_decisions` row; `versions` holds every row of the chain, newest first.
 18. `GET /decisions/{id}` sets `is_current` from `current_decisions`.
-19. `GET /calendar` returns only `upcoming` events; done and dismissed events stay in the table for the plan export (M9).
+19. `GET /calendar` returns only `upcoming` events; done and dismissed events stay in the table for the plan export (M9). Spec 015 rule 24 narrows this to open events: an `upcoming` one whose date the person settled from a check-in finding is left out too.
 
 ## Part B: `GET /spending/summary`
 

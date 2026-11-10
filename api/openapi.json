@@ -579,6 +579,10 @@
           "kind": {
             "$ref": "#/components/schemas/CalendarKind"
           },
+          "overdue": {
+            "title": "Overdue",
+            "type": "boolean"
+          },
           "status": {
             "$ref": "#/components/schemas/CalendarStatus"
           },
@@ -593,7 +597,8 @@
           "title",
           "due_at",
           "decision_id",
-          "status"
+          "status",
+          "overdue"
         ],
         "title": "CalendarEventOut",
         "type": "object"
@@ -790,6 +795,11 @@
       },
       "CheckInDetail": {
         "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
           "cash_flow": {
             "$ref": "#/components/schemas/CheckInCashFlow"
           },
@@ -835,6 +845,10 @@
             "title": "Last Run At",
             "type": "string"
           },
+          "past": {
+            "title": "Past",
+            "type": "boolean"
+          },
           "period": {
             "format": "date",
             "title": "Period",
@@ -863,6 +877,8 @@
           "created_at",
           "updated_at",
           "last_run_at",
+          "as_of",
+          "past",
           "findings",
           "cash_flow"
         ],
@@ -898,6 +914,11 @@
       },
       "CheckInSummary": {
         "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
           "completed_at": {
             "anyOf": [
               {
@@ -933,6 +954,10 @@
             "title": "Last Run At",
             "type": "string"
           },
+          "past": {
+            "title": "Past",
+            "type": "boolean"
+          },
           "period": {
             "format": "date",
             "title": "Period",
@@ -960,7 +985,9 @@
           "handled_count",
           "created_at",
           "updated_at",
-          "last_run_at"
+          "last_run_at",
+          "as_of",
+          "past"
         ],
         "title": "CheckInSummary",
         "type": "object"
@@ -1106,6 +1133,70 @@
           "recurring_job_id"
         ],
         "title": "CsvImport",
+        "type": "object"
+      },
+      "DeadlinePayload": {
+        "additionalProperties": false,
+        "description": "A date coming up (``upcoming_deadline``) or gone past unsettled (``overdue_deadline``).",
+        "properties": {
+          "affects": {
+            "anyOf": [
+              {
+                "enum": [
+                  "k401_match",
+                  "health_plans",
+                  "emergency_fund",
+                  "w4",
+                  "spending"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affects"
+          },
+          "calendar_event_id": {
+            "format": "uuid",
+            "title": "Calendar Event Id",
+            "type": "string"
+          },
+          "calendar_kind": {
+            "$ref": "#/components/schemas/CalendarKind"
+          },
+          "days_until": {
+            "title": "Days Until",
+            "type": "integer"
+          },
+          "due_at": {
+            "format": "date",
+            "title": "Due At",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "upcoming_deadline",
+              "overdue_deadline"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "affects",
+          "kind",
+          "calendar_event_id",
+          "calendar_kind",
+          "title",
+          "due_at",
+          "days_until"
+        ],
+        "title": "DeadlinePayload",
         "type": "object"
       },
       "DecisionIn": {
@@ -2082,13 +2173,18 @@
           "recurring_changed",
           "recurring_stopped",
           "pay_change",
-          "upcoming_deadline"
+          "upcoming_deadline",
+          "overdue_deadline"
         ],
         "title": "FindingKind",
         "type": "string"
       },
       "FindingOut": {
         "properties": {
+          "charge_gone": {
+            "title": "Charge Gone",
+            "type": "boolean"
+          },
           "check_in_id": {
             "format": "uuid",
             "title": "Check In Id",
@@ -2128,11 +2224,12 @@
               "mapping": {
                 "election_mismatch": "#/components/schemas/ElectionMismatchPayload",
                 "goal_off_pace": "#/components/schemas/GoalOffPacePayload",
+                "overdue_deadline": "#/components/schemas/DeadlinePayload",
                 "pay_change": "#/components/schemas/PayChangePayload",
                 "recurring_changed": "#/components/schemas/RecurringPayload",
                 "recurring_new": "#/components/schemas/RecurringPayload",
                 "recurring_stopped": "#/components/schemas/RecurringPayload",
-                "upcoming_deadline": "#/components/schemas/UpcomingDeadlinePayload"
+                "upcoming_deadline": "#/components/schemas/DeadlinePayload"
               },
               "propertyName": "kind"
             },
@@ -2150,7 +2247,7 @@
                 "$ref": "#/components/schemas/PayChangePayload"
               },
               {
-                "$ref": "#/components/schemas/UpcomingDeadlinePayload"
+                "$ref": "#/components/schemas/DeadlinePayload"
               }
             ],
             "title": "Payload"
@@ -2197,7 +2294,8 @@
           "user_action",
           "user_action_at",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "charge_gone"
         ],
         "title": "FindingOut",
         "type": "object"
@@ -4428,7 +4526,7 @@
           },
           "key": {
             "enum": [
-              "take_home",
+              "income",
               "essentials",
               "flexible",
               "other",
@@ -4443,6 +4541,10 @@
           "label": {
             "title": "Label",
             "type": "string"
+          },
+          "needs_pay_stub": {
+            "title": "Needs Pay Stub",
+            "type": "boolean"
           },
           "plan_cents": {
             "anyOf": [
@@ -4478,7 +4580,8 @@
           "actual_cents",
           "plan_cents",
           "difference_cents",
-          "status"
+          "status",
+          "needs_pay_stub"
         ],
         "title": "PlanLine",
         "type": "object"
@@ -6039,66 +6142,6 @@
         "title": "UnlinkedItem",
         "type": "object"
       },
-      "UpcomingDeadlinePayload": {
-        "additionalProperties": false,
-        "properties": {
-          "affects": {
-            "anyOf": [
-              {
-                "enum": [
-                  "k401_match",
-                  "health_plans",
-                  "emergency_fund",
-                  "w4",
-                  "spending"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Affects"
-          },
-          "calendar_event_id": {
-            "format": "uuid",
-            "title": "Calendar Event Id",
-            "type": "string"
-          },
-          "calendar_kind": {
-            "$ref": "#/components/schemas/CalendarKind"
-          },
-          "days_until": {
-            "title": "Days Until",
-            "type": "integer"
-          },
-          "due_at": {
-            "format": "date",
-            "title": "Due At",
-            "type": "string"
-          },
-          "kind": {
-            "const": "upcoming_deadline",
-            "default": "upcoming_deadline",
-            "title": "Kind",
-            "type": "string"
-          },
-          "title": {
-            "title": "Title",
-            "type": "string"
-          }
-        },
-        "required": [
-          "affects",
-          "calendar_event_id",
-          "calendar_kind",
-          "title",
-          "due_at",
-          "days_until"
-        ],
-        "title": "UpcomingDeadlinePayload",
-        "type": "object"
-      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -7103,7 +7146,7 @@
     },
     "/calendar": {
       "get": {
-        "description": "Upcoming events, soonest first; done and dismissed ones stay for the plan export.",
+        "description": "Open events, soonest first; done, dismissed and settled ones stay for the plan export.",
         "operationId": "list_calendar",
         "parameters": [
           {
