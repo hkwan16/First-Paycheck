@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import http.client
 import json
 import os
+import threading
 import uuid
 from collections.abc import Iterator
 from typing import Any
@@ -25,11 +27,16 @@ USER = FixtureUser(
     email="someone@example.test",
     password="correct horse battery staple",
 )
+OTHER = FixtureUser(
+    id=uuid.UUID("00000000-0000-4000-8000-0000000000e3"),
+    email="someone.else@example.test",
+    password="another horse battery staple",
+)
 
 
 @pytest.fixture
 def auth() -> Iterator[FakeSupabaseAuth]:
-    server = FakeSupabaseAuth([USER], port=0)
+    server = FakeSupabaseAuth([USER, OTHER], port=0)
     server.start()
     try:
         yield server
@@ -42,9 +49,10 @@ def call(
     url: str,
     body: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
+    timeout: float = 5,
 ) -> tuple[int, dict[str, str], Any]:
     parsed = urlsplit(url)
-    connection = http.client.HTTPConnection(parsed.netloc, timeout=5)
+    connection = http.client.HTTPConnection(parsed.netloc, timeout=timeout)
     sent = dict(headers or {})
     data = None
     if body is not None:
@@ -154,6 +162,91 @@ def test_sign_out_and_unsupported_routes(auth: FakeSupabaseAuth) -> None:
     status, _, body = call("POST", f"{auth.url}/auth/v1/signup", {"email": "x@example.test"})
     assert status == 422
     assert body["error_code"] == "signup_disabled"
+
+
+def set_faults(auth: FakeSupabaseAuth, **faults: str) -> tuple[int, Any]:
+    status, _, body = call("POST", f"{auth.url}{e2e_stack.FAULTS_PATH}", faults)
+    return status, body
+
+
+def refresh(auth: FakeSupabaseAuth, token: str) -> int:
+    url = f"{auth.url}/auth/v1/token?grant_type=refresh_token"
+    return call("POST", url, {"refresh_token": token}, timeout=30)[0]
+
+
+def test_a_fault_makes_one_users_refresh_hang_until_it_is_cleared(auth: FakeSupabaseAuth) -> None:
+    """Issue 225: a token refresh that never answers, for one user only."""
+    _, session = sign_in(auth, USER.email, USER.password)
+    _, other = sign_in(auth, OTHER.email, OTHER.password)
+    assert set_faults(auth, email=USER.email, refresh="hang") == (
+        200,
+        {"email": USER.email, "refresh": "hang", "logout": "ok"},
+    )
+
+    answers: list[int] = []
+    waiting = threading.Thread(
+        target=lambda: answers.append(refresh(auth, session["refresh_token"]))
+    )
+    waiting.start()
+    waiting.join(timeout=1)
+    assert waiting.is_alive(), "the refresh answered while it should hang"
+    # Another user's refresh still answers.
+    assert refresh(auth, other["refresh_token"]) == 200
+
+    assert set_faults(auth, email=USER.email, refresh="ok")[0] == 200
+    waiting.join(timeout=5)
+    assert answers == [200]
+
+
+def test_stopping_the_server_releases_a_hanging_refresh() -> None:
+    server = FakeSupabaseAuth([USER], port=0)
+    server.start()
+    _, session = sign_in(server, USER.email, USER.password)
+    set_faults(server, email=USER.email, refresh="hang")
+
+    def hang() -> None:
+        with contextlib.suppress(OSError):
+            refresh(server, session["refresh_token"])
+
+    waiting = threading.Thread(target=hang)
+    waiting.start()
+    waiting.join(timeout=0.5)
+    server.stop()
+    waiting.join(timeout=5)
+    assert not waiting.is_alive()
+
+
+def test_a_fault_makes_one_users_sign_out_unavailable(auth: FakeSupabaseAuth) -> None:
+    """Issue 224: Supabase answered a sign-out with 503."""
+    _, session = sign_in(auth, USER.email, USER.password)
+    _, other = sign_in(auth, OTHER.email, OTHER.password)
+    set_faults(auth, email=USER.email, logout="unavailable")
+
+    def logout(token: str) -> int:
+        return call(
+            "POST",
+            f"{auth.url}/auth/v1/logout?scope=local",
+            headers={"Authorization": f"Bearer {token}"},
+        )[0]
+
+    assert logout(session["access_token"]) == 503
+    assert logout(other["access_token"]) == 204
+    set_faults(auth, email=USER.email, logout="ok")
+    assert logout(session["access_token"]) == 204
+
+
+@pytest.mark.parametrize(
+    "faults",
+    [{"email": "nobody@example.test", "refresh": "hang"}, {"refresh": "hang"}],
+    ids=["unknown user", "no user"],
+)
+def test_faults_name_a_fixture_user(auth: FakeSupabaseAuth, faults: dict[str, str]) -> None:
+    assert set_faults(auth, **faults)[0] == 400
+
+
+@pytest.mark.parametrize("faults", [{"refresh": "slow"}, {"logout": "maybe"}])
+def test_faults_take_known_values_only(auth: FakeSupabaseAuth, faults: dict[str, str]) -> None:
+    assert set_faults(auth, email=USER.email, **faults)[0] == 400
 
 
 def test_the_jwks_names_the_key_tokens_are_signed_with(auth: FakeSupabaseAuth) -> None:
@@ -308,6 +401,10 @@ def test_playwright_environment_points_the_web_at_the_stack() -> None:
     assert env["E2E_USER_PASSWORD"] == users.shared.password
     assert env["E2E_ALPHA_USER_EMAIL"] == users.alpha.email
     assert env["E2E_ALPHA_USER_PASSWORD"] == users.alpha.password
+    assert env["E2E_SESSION_USER_EMAIL"] == users.session.email
+    assert env["E2E_SESSION_USER_PASSWORD"] == users.session.password
+    # Only the stand-in takes faults (e2e/support/auth-faults.ts); a hosted project has none.
+    assert env["E2E_AUTH_FAULTS_URL"] == f"http://127.0.0.1:54347{e2e_stack.FAULTS_PATH}"
     assert env["E2E_PLAID_SANDBOX"] == "0"
 
     with_plaid = e2e_stack.playwright_environment(
@@ -323,8 +420,8 @@ def test_playwright_environment_points_the_web_at_the_stack() -> None:
 
 def test_fixture_users_are_distinct_and_get_fresh_passwords() -> None:
     first, second = e2e_stack.fixture_users(), e2e_stack.fixture_users()
-    assert first.shared.id != first.alpha.id
-    assert first.shared.email != first.alpha.email
+    assert len({user.id for user in first}) == len(first) == 3
+    assert len({user.email for user in first}) == 3
     assert first.shared.id == second.shared.id
     assert first.shared.password != second.shared.password
     assert len(first.alpha.password) >= 20
