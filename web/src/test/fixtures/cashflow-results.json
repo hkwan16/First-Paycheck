@@ -1,0 +1,2882 @@
+{
+  "sample": {
+    "withholding": {
+      "gross_cents": 541666,
+      "lines": [
+        {
+          "key": "federal_withholding",
+          "label": "Federal tax",
+          "role": "tax",
+          "amount_cents": 59552
+        },
+        {
+          "key": "social_security",
+          "label": "Social Security",
+          "role": "tax",
+          "amount_cents": 33584
+        },
+        {
+          "key": "medicare",
+          "label": "Medicare",
+          "role": "tax",
+          "amount_cents": 7854
+        },
+        {
+          "key": "state_tax",
+          "label": "State tax",
+          "role": "tax",
+          "amount_cents": 19628
+        },
+        {
+          "key": "retirement_contribution",
+          "label": "401(k)",
+          "role": "retirement",
+          "amount_cents": 0
+        },
+        {
+          "key": "medical_premium",
+          "label": "Health premiums",
+          "role": "health",
+          "amount_cents": 12500
+        },
+        {
+          "key": "other_deductions",
+          "label": "Other deductions",
+          "role": "other",
+          "amount_cents": 9340
+        }
+      ],
+      "roles": {
+        "tax_cents": 120618,
+        "retirement_cents": 0,
+        "health_cents": 12500,
+        "other_cents": 9340
+      },
+      "deductions_cents": 142458,
+      "net_cents": 399208,
+      "paycheck_count": 2
+    },
+    "spending": {
+      "income_cents": 399208,
+      "essentials_cents": 182325,
+      "flexible_cents": 24989,
+      "savings_cents": 30000,
+      "other_cents": 0,
+      "transfers_ignored_cents": 0,
+      "income_outflows_ignored_cents": 0,
+      "uncategorized_cents": 0,
+      "uncategorized_count": 0,
+      "left_over_cents": 161894,
+      "essentials_pct": "45.7",
+      "flexible_pct": "6.3",
+      "savings_rate_pct": "7.5",
+      "transaction_count": 16,
+      "categories": [
+        {
+          "category": "income",
+          "bucket": "income",
+          "total_cents": 399208,
+          "count": 2
+        },
+        {
+          "category": "housing",
+          "bucket": "essentials",
+          "total_cents": 145000,
+          "count": 1
+        },
+        {
+          "category": "utilities",
+          "bucket": "essentials",
+          "total_cents": 6140,
+          "count": 1
+        },
+        {
+          "category": "phone_internet",
+          "bucket": "essentials",
+          "total_cents": 7000,
+          "count": 1
+        },
+        {
+          "category": "groceries",
+          "bucket": "essentials",
+          "total_cents": 17545,
+          "count": 2
+        },
+        {
+          "category": "dining",
+          "bucket": "flexible",
+          "total_cents": 2100,
+          "count": 2
+        },
+        {
+          "category": "transport",
+          "bucket": "essentials",
+          "total_cents": 6640,
+          "count": 2
+        },
+        {
+          "category": "subscriptions",
+          "bucket": "flexible",
+          "total_cents": 2399,
+          "count": 2
+        },
+        {
+          "category": "shopping",
+          "bucket": "flexible",
+          "total_cents": 20490,
+          "count": 2
+        },
+        {
+          "category": "savings_investment",
+          "bucket": "savings",
+          "total_cents": 30000,
+          "count": 1
+        }
+      ]
+    },
+    "diagram": {
+      "nodes": [
+        {
+          "id": "gross",
+          "kind": "gross",
+          "key": null,
+          "column": 0,
+          "cents": 541666,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:federal_withholding",
+          "kind": "line",
+          "key": "federal_withholding",
+          "column": 1,
+          "cents": 59552,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:social_security",
+          "kind": "line",
+          "key": "social_security",
+          "column": 1,
+          "cents": 33584,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:medicare",
+          "kind": "line",
+          "key": "medicare",
+          "column": 1,
+          "cents": 7854,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:state_tax",
+          "kind": "line",
+          "key": "state_tax",
+          "column": 1,
+          "cents": 19628,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:retirement_contribution",
+          "kind": "line",
+          "key": "retirement_contribution",
+          "column": 1,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:medical_premium",
+          "kind": "line",
+          "key": "medical_premium",
+          "column": 1,
+          "cents": 12500,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:other_deductions",
+          "kind": "line",
+          "key": "other_deductions",
+          "column": 1,
+          "cents": 9340,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "take_home",
+          "kind": "take_home",
+          "key": null,
+          "column": 1,
+          "cents": 399208,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:essentials",
+          "kind": "bucket",
+          "key": "essentials",
+          "column": 2,
+          "cents": 182325,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:flexible",
+          "kind": "bucket",
+          "key": "flexible",
+          "column": 2,
+          "cents": 24989,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:savings",
+          "kind": "bucket",
+          "key": "savings",
+          "column": 2,
+          "cents": 30000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:other",
+          "kind": "bucket",
+          "key": "other",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "left_over",
+          "kind": "left_over",
+          "key": null,
+          "column": 2,
+          "cents": 161894,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:housing",
+          "kind": "category",
+          "key": "housing",
+          "column": 3,
+          "cents": 145000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:utilities",
+          "kind": "category",
+          "key": "utilities",
+          "column": 3,
+          "cents": 6140,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:phone_internet",
+          "kind": "category",
+          "key": "phone_internet",
+          "column": 3,
+          "cents": 7000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:groceries",
+          "kind": "category",
+          "key": "groceries",
+          "column": 3,
+          "cents": 17545,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:transport",
+          "kind": "category",
+          "key": "transport",
+          "column": 3,
+          "cents": 6640,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:dining",
+          "kind": "category",
+          "key": "dining",
+          "column": 3,
+          "cents": 2100,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:subscriptions",
+          "kind": "category",
+          "key": "subscriptions",
+          "column": 3,
+          "cents": 2399,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:shopping",
+          "kind": "category",
+          "key": "shopping",
+          "column": 3,
+          "cents": 20490,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:savings_investment",
+          "kind": "category",
+          "key": "savings_investment",
+          "column": 3,
+          "cents": 30000,
+          "refunds_cents": null,
+          "categories": []
+        }
+      ],
+      "links": [
+        {
+          "source": "gross",
+          "target": "line:federal_withholding",
+          "cents": 59552
+        },
+        {
+          "source": "gross",
+          "target": "line:social_security",
+          "cents": 33584
+        },
+        {
+          "source": "gross",
+          "target": "line:medicare",
+          "cents": 7854
+        },
+        {
+          "source": "gross",
+          "target": "line:state_tax",
+          "cents": 19628
+        },
+        {
+          "source": "gross",
+          "target": "line:medical_premium",
+          "cents": 12500
+        },
+        {
+          "source": "gross",
+          "target": "line:other_deductions",
+          "cents": 9340
+        },
+        {
+          "source": "gross",
+          "target": "take_home",
+          "cents": 399208
+        },
+        {
+          "source": "take_home",
+          "target": "bucket:essentials",
+          "cents": 182325
+        },
+        {
+          "source": "take_home",
+          "target": "bucket:flexible",
+          "cents": 24989
+        },
+        {
+          "source": "take_home",
+          "target": "bucket:savings",
+          "cents": 30000
+        },
+        {
+          "source": "take_home",
+          "target": "left_over",
+          "cents": 161894
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:housing",
+          "cents": 145000
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:utilities",
+          "cents": 6140
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:phone_internet",
+          "cents": 7000
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:groceries",
+          "cents": 17545
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:transport",
+          "cents": 6640
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:dining",
+          "cents": 2100
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:subscriptions",
+          "cents": 2399
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:shopping",
+          "cents": 20490
+        },
+        {
+          "source": "bucket:savings",
+          "target": "category:savings_investment",
+          "cents": 30000
+        }
+      ]
+    }
+  },
+  "sandbox": {
+    "withholding": {
+      "gross_cents": 0,
+      "lines": [
+        {
+          "key": "federal_withholding",
+          "label": "Federal tax",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "social_security",
+          "label": "Social Security",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "medicare",
+          "label": "Medicare",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "state_tax",
+          "label": "State tax",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "retirement_contribution",
+          "label": "401(k)",
+          "role": "retirement",
+          "amount_cents": 0
+        },
+        {
+          "key": "medical_premium",
+          "label": "Health premiums",
+          "role": "health",
+          "amount_cents": 0
+        },
+        {
+          "key": "other_deductions",
+          "label": "Other deductions",
+          "role": "other",
+          "amount_cents": 0
+        }
+      ],
+      "roles": {
+        "tax_cents": 0,
+        "retirement_cents": 0,
+        "health_cents": 0,
+        "other_cents": 0
+      },
+      "deductions_cents": 0,
+      "net_cents": 0,
+      "paycheck_count": 0
+    },
+    "spending": {
+      "income_cents": 422,
+      "essentials_cents": 540,
+      "flexible_cents": 68423,
+      "savings_cents": 100000,
+      "other_cents": 0,
+      "transfers_ignored_cents": 210350,
+      "income_outflows_ignored_cents": 585000,
+      "uncategorized_cents": 50000,
+      "uncategorized_count": 1,
+      "left_over_cents": -168541,
+      "essentials_pct": "128.0",
+      "flexible_pct": null,
+      "savings_rate_pct": null,
+      "transaction_count": 14,
+      "categories": [
+        {
+          "category": "income",
+          "bucket": "income",
+          "total_cents": 422,
+          "count": 1
+        },
+        {
+          "category": "transfer",
+          "bucket": "transfer",
+          "total_cents": 210350,
+          "count": 2
+        },
+        {
+          "category": "dining",
+          "bucket": "flexible",
+          "total_cents": 51633,
+          "count": 3
+        },
+        {
+          "category": "transport",
+          "bucket": "essentials",
+          "total_cents": 540,
+          "count": 1
+        },
+        {
+          "category": "shopping",
+          "bucket": "flexible",
+          "total_cents": 58940,
+          "count": 2
+        },
+        {
+          "category": "entertainment",
+          "bucket": "flexible",
+          "total_cents": 7850,
+          "count": 1
+        },
+        {
+          "category": "travel",
+          "bucket": "flexible",
+          "total_cents": -50000,
+          "count": 1
+        },
+        {
+          "category": "savings_investment",
+          "bucket": "savings",
+          "total_cents": 100000,
+          "count": 1
+        }
+      ]
+    },
+    "diagram": {
+      "nodes": [
+        {
+          "id": "gross",
+          "kind": "gross",
+          "key": null,
+          "column": 0,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "income_deposited",
+          "kind": "income_deposited",
+          "key": null,
+          "column": 1,
+          "cents": 422,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "refunds",
+          "kind": "refunds",
+          "key": null,
+          "column": 1,
+          "cents": 50000,
+          "refunds_cents": null,
+          "categories": ["travel"]
+        },
+        {
+          "id": "beyond_income",
+          "kind": "beyond_income",
+          "key": null,
+          "column": 1,
+          "cents": 168541,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:essentials",
+          "kind": "bucket",
+          "key": "essentials",
+          "column": 2,
+          "cents": 540,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:flexible",
+          "kind": "bucket",
+          "key": "flexible",
+          "column": 2,
+          "cents": 118423,
+          "refunds_cents": 50000,
+          "categories": []
+        },
+        {
+          "id": "bucket:savings",
+          "kind": "bucket",
+          "key": "savings",
+          "column": 2,
+          "cents": 100000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:other",
+          "kind": "bucket",
+          "key": "other",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:transport",
+          "kind": "category",
+          "key": "transport",
+          "column": 3,
+          "cents": 540,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:dining",
+          "kind": "category",
+          "key": "dining",
+          "column": 3,
+          "cents": 51633,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:shopping",
+          "kind": "category",
+          "key": "shopping",
+          "column": 3,
+          "cents": 58940,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:entertainment",
+          "kind": "category",
+          "key": "entertainment",
+          "column": 3,
+          "cents": 7850,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:savings_investment",
+          "kind": "category",
+          "key": "savings_investment",
+          "column": 3,
+          "cents": 100000,
+          "refunds_cents": null,
+          "categories": []
+        }
+      ],
+      "links": [
+        {
+          "source": "income_deposited",
+          "target": "bucket:essentials",
+          "cents": 422
+        },
+        {
+          "source": "refunds",
+          "target": "bucket:essentials",
+          "cents": 118
+        },
+        {
+          "source": "refunds",
+          "target": "bucket:flexible",
+          "cents": 49882
+        },
+        {
+          "source": "beyond_income",
+          "target": "bucket:flexible",
+          "cents": 68541
+        },
+        {
+          "source": "beyond_income",
+          "target": "bucket:savings",
+          "cents": 100000
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:transport",
+          "cents": 540
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:dining",
+          "cents": 51633
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:shopping",
+          "cents": 58940
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:entertainment",
+          "cents": 7850
+        },
+        {
+          "source": "bucket:savings",
+          "target": "category:savings_investment",
+          "cents": 100000
+        }
+      ]
+    }
+  },
+  "dynamic": {
+    "withholding": {
+      "gross_cents": 0,
+      "lines": [
+        {
+          "key": "federal_withholding",
+          "label": "Federal tax",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "social_security",
+          "label": "Social Security",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "medicare",
+          "label": "Medicare",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "state_tax",
+          "label": "State tax",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "retirement_contribution",
+          "label": "401(k)",
+          "role": "retirement",
+          "amount_cents": 0
+        },
+        {
+          "key": "medical_premium",
+          "label": "Health premiums",
+          "role": "health",
+          "amount_cents": 0
+        },
+        {
+          "key": "other_deductions",
+          "label": "Other deductions",
+          "role": "other",
+          "amount_cents": 0
+        }
+      ],
+      "roles": {
+        "tax_cents": 0,
+        "retirement_cents": 0,
+        "health_cents": 0,
+        "other_cents": 0
+      },
+      "deductions_cents": 0,
+      "net_cents": 0,
+      "paycheck_count": 0
+    },
+    "spending": {
+      "income_cents": 12,
+      "essentials_cents": 36480,
+      "flexible_cents": -101979,
+      "savings_cents": 0,
+      "other_cents": 0,
+      "transfers_ignored_cents": 301989,
+      "income_outflows_ignored_cents": 0,
+      "uncategorized_cents": 121602,
+      "uncategorized_count": 35,
+      "left_over_cents": 65511,
+      "essentials_pct": null,
+      "flexible_pct": null,
+      "savings_rate_pct": "0.0",
+      "transaction_count": 80,
+      "categories": [
+        {
+          "category": "income",
+          "bucket": "income",
+          "total_cents": 12,
+          "count": 1
+        },
+        {
+          "category": "transfer",
+          "bucket": "transfer",
+          "total_cents": 301989,
+          "count": 4
+        },
+        {
+          "category": "groceries",
+          "bucket": "essentials",
+          "total_cents": 34267,
+          "count": 5
+        },
+        {
+          "category": "dining",
+          "bucket": "flexible",
+          "total_cents": -173353,
+          "count": 15
+        },
+        {
+          "category": "transport",
+          "bucket": "essentials",
+          "total_cents": 2213,
+          "count": 2
+        },
+        {
+          "category": "subscriptions",
+          "bucket": "flexible",
+          "total_cents": 3521,
+          "count": 3
+        },
+        {
+          "category": "shopping",
+          "bucket": "flexible",
+          "total_cents": 46655,
+          "count": 13
+        },
+        {
+          "category": "travel",
+          "bucket": "flexible",
+          "total_cents": 18600,
+          "count": 1
+        },
+        {
+          "category": "personal_care",
+          "bucket": "flexible",
+          "total_cents": 2598,
+          "count": 1
+        }
+      ]
+    },
+    "diagram": {
+      "nodes": [
+        {
+          "id": "gross",
+          "kind": "gross",
+          "key": null,
+          "column": 0,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "income_deposited",
+          "kind": "income_deposited",
+          "key": null,
+          "column": 1,
+          "cents": 12,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "refunds",
+          "kind": "refunds",
+          "key": null,
+          "column": 1,
+          "cents": 173353,
+          "refunds_cents": null,
+          "categories": ["dining"]
+        },
+        {
+          "id": "bucket:essentials",
+          "kind": "bucket",
+          "key": "essentials",
+          "column": 2,
+          "cents": 36480,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:flexible",
+          "kind": "bucket",
+          "key": "flexible",
+          "column": 2,
+          "cents": 71374,
+          "refunds_cents": 173353,
+          "categories": []
+        },
+        {
+          "id": "bucket:savings",
+          "kind": "bucket",
+          "key": "savings",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:other",
+          "kind": "bucket",
+          "key": "other",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "left_over",
+          "kind": "left_over",
+          "key": null,
+          "column": 2,
+          "cents": 65511,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:groceries",
+          "kind": "category",
+          "key": "groceries",
+          "column": 3,
+          "cents": 34267,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:transport",
+          "kind": "category",
+          "key": "transport",
+          "column": 3,
+          "cents": 2213,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:subscriptions",
+          "kind": "category",
+          "key": "subscriptions",
+          "column": 3,
+          "cents": 3521,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:shopping",
+          "kind": "category",
+          "key": "shopping",
+          "column": 3,
+          "cents": 46655,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:travel",
+          "kind": "category",
+          "key": "travel",
+          "column": 3,
+          "cents": 18600,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:personal_care",
+          "kind": "category",
+          "key": "personal_care",
+          "column": 3,
+          "cents": 2598,
+          "refunds_cents": null,
+          "categories": []
+        }
+      ],
+      "links": [
+        {
+          "source": "income_deposited",
+          "target": "bucket:essentials",
+          "cents": 12
+        },
+        {
+          "source": "refunds",
+          "target": "bucket:essentials",
+          "cents": 36468
+        },
+        {
+          "source": "refunds",
+          "target": "bucket:flexible",
+          "cents": 71374
+        },
+        {
+          "source": "refunds",
+          "target": "left_over",
+          "cents": 65511
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:groceries",
+          "cents": 34267
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:transport",
+          "cents": 2213
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:subscriptions",
+          "cents": 3521
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:shopping",
+          "cents": 46655
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:travel",
+          "cents": 18600
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:personal_care",
+          "cents": 2598
+        }
+      ]
+    }
+  },
+  "november": {
+    "withholding": {
+      "gross_cents": 270833,
+      "lines": [
+        {
+          "key": "federal_withholding",
+          "label": "Federal tax",
+          "role": "tax",
+          "amount_cents": 21196
+        },
+        {
+          "key": "social_security",
+          "label": "Social Security",
+          "role": "tax",
+          "amount_cents": 16792
+        },
+        {
+          "key": "medicare",
+          "label": "Medicare",
+          "role": "tax",
+          "amount_cents": 3927
+        },
+        {
+          "key": "state_tax",
+          "label": "State tax",
+          "role": "tax",
+          "amount_cents": 9814
+        },
+        {
+          "key": "retirement_contribution",
+          "label": "401(k)",
+          "role": "retirement",
+          "amount_cents": 5417
+        },
+        {
+          "key": "medical_premium",
+          "label": "Health premiums",
+          "role": "health",
+          "amount_cents": 3125
+        },
+        {
+          "key": "other_deductions",
+          "label": "Other deductions",
+          "role": "other",
+          "amount_cents": 4670
+        }
+      ],
+      "roles": {
+        "tax_cents": 51729,
+        "retirement_cents": 5417,
+        "health_cents": 3125,
+        "other_cents": 4670
+      },
+      "deductions_cents": 64941,
+      "net_cents": 205892,
+      "paycheck_count": 1
+    },
+    "spending": {
+      "income_cents": 205892,
+      "essentials_cents": 25860,
+      "flexible_cents": 22349,
+      "savings_cents": 30000,
+      "other_cents": 0,
+      "transfers_ignored_cents": 0,
+      "income_outflows_ignored_cents": 0,
+      "uncategorized_cents": 0,
+      "uncategorized_count": 0,
+      "left_over_cents": 127683,
+      "essentials_pct": "12.6",
+      "flexible_pct": "10.9",
+      "savings_rate_pct": "14.6",
+      "transaction_count": 9,
+      "categories": [
+        {
+          "category": "income",
+          "bucket": "income",
+          "total_cents": 205892,
+          "count": 1
+        },
+        {
+          "category": "utilities",
+          "bucket": "essentials",
+          "total_cents": 8215,
+          "count": 1
+        },
+        {
+          "category": "phone_internet",
+          "bucket": "essentials",
+          "total_cents": 7000,
+          "count": 1
+        },
+        {
+          "category": "groceries",
+          "bucket": "essentials",
+          "total_cents": 7325,
+          "count": 1
+        },
+        {
+          "category": "dining",
+          "bucket": "flexible",
+          "total_cents": 2150,
+          "count": 1
+        },
+        {
+          "category": "transport",
+          "bucket": "essentials",
+          "total_cents": 3320,
+          "count": 1
+        },
+        {
+          "category": "subscriptions",
+          "bucket": "flexible",
+          "total_cents": 1699,
+          "count": 1
+        },
+        {
+          "category": "personal_care",
+          "bucket": "flexible",
+          "total_cents": 18500,
+          "count": 1
+        },
+        {
+          "category": "savings_investment",
+          "bucket": "savings",
+          "total_cents": 30000,
+          "count": 1
+        }
+      ]
+    },
+    "diagram": {
+      "nodes": [
+        {
+          "id": "gross",
+          "kind": "gross",
+          "key": null,
+          "column": 0,
+          "cents": 270833,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:federal_withholding",
+          "kind": "line",
+          "key": "federal_withholding",
+          "column": 1,
+          "cents": 21196,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:social_security",
+          "kind": "line",
+          "key": "social_security",
+          "column": 1,
+          "cents": 16792,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:medicare",
+          "kind": "line",
+          "key": "medicare",
+          "column": 1,
+          "cents": 3927,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:state_tax",
+          "kind": "line",
+          "key": "state_tax",
+          "column": 1,
+          "cents": 9814,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:retirement_contribution",
+          "kind": "line",
+          "key": "retirement_contribution",
+          "column": 1,
+          "cents": 5417,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:medical_premium",
+          "kind": "line",
+          "key": "medical_premium",
+          "column": 1,
+          "cents": 3125,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:other_deductions",
+          "kind": "line",
+          "key": "other_deductions",
+          "column": 1,
+          "cents": 4670,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "take_home",
+          "kind": "take_home",
+          "key": null,
+          "column": 1,
+          "cents": 205892,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:essentials",
+          "kind": "bucket",
+          "key": "essentials",
+          "column": 2,
+          "cents": 25860,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:flexible",
+          "kind": "bucket",
+          "key": "flexible",
+          "column": 2,
+          "cents": 22349,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:savings",
+          "kind": "bucket",
+          "key": "savings",
+          "column": 2,
+          "cents": 30000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:other",
+          "kind": "bucket",
+          "key": "other",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "left_over",
+          "kind": "left_over",
+          "key": null,
+          "column": 2,
+          "cents": 127683,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:utilities",
+          "kind": "category",
+          "key": "utilities",
+          "column": 3,
+          "cents": 8215,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:phone_internet",
+          "kind": "category",
+          "key": "phone_internet",
+          "column": 3,
+          "cents": 7000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:groceries",
+          "kind": "category",
+          "key": "groceries",
+          "column": 3,
+          "cents": 7325,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:transport",
+          "kind": "category",
+          "key": "transport",
+          "column": 3,
+          "cents": 3320,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:dining",
+          "kind": "category",
+          "key": "dining",
+          "column": 3,
+          "cents": 2150,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:subscriptions",
+          "kind": "category",
+          "key": "subscriptions",
+          "column": 3,
+          "cents": 1699,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:personal_care",
+          "kind": "category",
+          "key": "personal_care",
+          "column": 3,
+          "cents": 18500,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:savings_investment",
+          "kind": "category",
+          "key": "savings_investment",
+          "column": 3,
+          "cents": 30000,
+          "refunds_cents": null,
+          "categories": []
+        }
+      ],
+      "links": [
+        {
+          "source": "gross",
+          "target": "line:federal_withholding",
+          "cents": 21196
+        },
+        {
+          "source": "gross",
+          "target": "line:social_security",
+          "cents": 16792
+        },
+        {
+          "source": "gross",
+          "target": "line:medicare",
+          "cents": 3927
+        },
+        {
+          "source": "gross",
+          "target": "line:state_tax",
+          "cents": 9814
+        },
+        {
+          "source": "gross",
+          "target": "line:retirement_contribution",
+          "cents": 5417
+        },
+        {
+          "source": "gross",
+          "target": "line:medical_premium",
+          "cents": 3125
+        },
+        {
+          "source": "gross",
+          "target": "line:other_deductions",
+          "cents": 4670
+        },
+        {
+          "source": "gross",
+          "target": "take_home",
+          "cents": 205892
+        },
+        {
+          "source": "take_home",
+          "target": "bucket:essentials",
+          "cents": 25860
+        },
+        {
+          "source": "take_home",
+          "target": "bucket:flexible",
+          "cents": 22349
+        },
+        {
+          "source": "take_home",
+          "target": "bucket:savings",
+          "cents": 30000
+        },
+        {
+          "source": "take_home",
+          "target": "left_over",
+          "cents": 127683
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:utilities",
+          "cents": 8215
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:phone_internet",
+          "cents": 7000
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:groceries",
+          "cents": 7325
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:transport",
+          "cents": 3320
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:dining",
+          "cents": 2150
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:subscriptions",
+          "cents": 1699
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:personal_care",
+          "cents": 18500
+        },
+        {
+          "source": "bucket:savings",
+          "target": "category:savings_investment",
+          "cents": 30000
+        }
+      ]
+    }
+  },
+  "september": {
+    "withholding": {
+      "gross_cents": 541666,
+      "lines": [
+        {
+          "key": "federal_withholding",
+          "label": "Federal tax",
+          "role": "tax",
+          "amount_cents": 59552
+        },
+        {
+          "key": "social_security",
+          "label": "Social Security",
+          "role": "tax",
+          "amount_cents": 33584
+        },
+        {
+          "key": "medicare",
+          "label": "Medicare",
+          "role": "tax",
+          "amount_cents": 7854
+        },
+        {
+          "key": "state_tax",
+          "label": "State tax",
+          "role": "tax",
+          "amount_cents": 19628
+        },
+        {
+          "key": "retirement_contribution",
+          "label": "401(k)",
+          "role": "retirement",
+          "amount_cents": 0
+        },
+        {
+          "key": "medical_premium",
+          "label": "Health premiums",
+          "role": "health",
+          "amount_cents": 12500
+        },
+        {
+          "key": "other_deductions",
+          "label": "Other deductions",
+          "role": "other",
+          "amount_cents": 9340
+        }
+      ],
+      "roles": {
+        "tax_cents": 120618,
+        "retirement_cents": 0,
+        "health_cents": 12500,
+        "other_cents": 9340
+      },
+      "deductions_cents": 142458,
+      "net_cents": 399208,
+      "paycheck_count": 2
+    },
+    "spending": {
+      "income_cents": 399208,
+      "essentials_cents": 180000,
+      "flexible_cents": 8500,
+      "savings_cents": 40000,
+      "other_cents": 3900,
+      "transfers_ignored_cents": 0,
+      "income_outflows_ignored_cents": 0,
+      "uncategorized_cents": 0,
+      "uncategorized_count": 0,
+      "left_over_cents": 166808,
+      "essentials_pct": "45.1",
+      "flexible_pct": "2.1",
+      "savings_rate_pct": "10.0",
+      "transaction_count": 8,
+      "categories": [
+        {
+          "category": "income",
+          "bucket": "income",
+          "total_cents": 399208,
+          "count": 2
+        },
+        {
+          "category": "housing",
+          "bucket": "essentials",
+          "total_cents": 150000,
+          "count": 1
+        },
+        {
+          "category": "groceries",
+          "bucket": "essentials",
+          "total_cents": 30000,
+          "count": 2
+        },
+        {
+          "category": "dining",
+          "bucket": "flexible",
+          "total_cents": 8500,
+          "count": 1
+        },
+        {
+          "category": "fees",
+          "bucket": "other",
+          "total_cents": 3900,
+          "count": 1
+        },
+        {
+          "category": "savings_investment",
+          "bucket": "savings",
+          "total_cents": 40000,
+          "count": 1
+        }
+      ]
+    },
+    "diagram": {
+      "nodes": [
+        {
+          "id": "gross",
+          "kind": "gross",
+          "key": null,
+          "column": 0,
+          "cents": 541666,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:federal_withholding",
+          "kind": "line",
+          "key": "federal_withholding",
+          "column": 1,
+          "cents": 59552,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:social_security",
+          "kind": "line",
+          "key": "social_security",
+          "column": 1,
+          "cents": 33584,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:medicare",
+          "kind": "line",
+          "key": "medicare",
+          "column": 1,
+          "cents": 7854,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:state_tax",
+          "kind": "line",
+          "key": "state_tax",
+          "column": 1,
+          "cents": 19628,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:retirement_contribution",
+          "kind": "line",
+          "key": "retirement_contribution",
+          "column": 1,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:medical_premium",
+          "kind": "line",
+          "key": "medical_premium",
+          "column": 1,
+          "cents": 12500,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:other_deductions",
+          "kind": "line",
+          "key": "other_deductions",
+          "column": 1,
+          "cents": 9340,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "take_home",
+          "kind": "take_home",
+          "key": null,
+          "column": 1,
+          "cents": 399208,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:essentials",
+          "kind": "bucket",
+          "key": "essentials",
+          "column": 2,
+          "cents": 180000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:flexible",
+          "kind": "bucket",
+          "key": "flexible",
+          "column": 2,
+          "cents": 8500,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:savings",
+          "kind": "bucket",
+          "key": "savings",
+          "column": 2,
+          "cents": 40000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:other",
+          "kind": "bucket",
+          "key": "other",
+          "column": 2,
+          "cents": 3900,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "left_over",
+          "kind": "left_over",
+          "key": null,
+          "column": 2,
+          "cents": 166808,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:housing",
+          "kind": "category",
+          "key": "housing",
+          "column": 3,
+          "cents": 150000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:groceries",
+          "kind": "category",
+          "key": "groceries",
+          "column": 3,
+          "cents": 30000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:dining",
+          "kind": "category",
+          "key": "dining",
+          "column": 3,
+          "cents": 8500,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:savings_investment",
+          "kind": "category",
+          "key": "savings_investment",
+          "column": 3,
+          "cents": 40000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:fees",
+          "kind": "category",
+          "key": "fees",
+          "column": 3,
+          "cents": 3900,
+          "refunds_cents": null,
+          "categories": []
+        }
+      ],
+      "links": [
+        {
+          "source": "gross",
+          "target": "line:federal_withholding",
+          "cents": 59552
+        },
+        {
+          "source": "gross",
+          "target": "line:social_security",
+          "cents": 33584
+        },
+        {
+          "source": "gross",
+          "target": "line:medicare",
+          "cents": 7854
+        },
+        {
+          "source": "gross",
+          "target": "line:state_tax",
+          "cents": 19628
+        },
+        {
+          "source": "gross",
+          "target": "line:medical_premium",
+          "cents": 12500
+        },
+        {
+          "source": "gross",
+          "target": "line:other_deductions",
+          "cents": 9340
+        },
+        {
+          "source": "gross",
+          "target": "take_home",
+          "cents": 399208
+        },
+        {
+          "source": "take_home",
+          "target": "bucket:essentials",
+          "cents": 180000
+        },
+        {
+          "source": "take_home",
+          "target": "bucket:flexible",
+          "cents": 8500
+        },
+        {
+          "source": "take_home",
+          "target": "bucket:savings",
+          "cents": 40000
+        },
+        {
+          "source": "take_home",
+          "target": "bucket:other",
+          "cents": 3900
+        },
+        {
+          "source": "take_home",
+          "target": "left_over",
+          "cents": 166808
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:housing",
+          "cents": 150000
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:groceries",
+          "cents": 30000
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:dining",
+          "cents": 8500
+        },
+        {
+          "source": "bucket:savings",
+          "target": "category:savings_investment",
+          "cents": 40000
+        },
+        {
+          "source": "bucket:other",
+          "target": "category:fees",
+          "cents": 3900
+        }
+      ]
+    }
+  },
+  "beyond": {
+    "withholding": {
+      "gross_cents": 270833,
+      "lines": [
+        {
+          "key": "federal_withholding",
+          "label": "Federal tax",
+          "role": "tax",
+          "amount_cents": 29776
+        },
+        {
+          "key": "social_security",
+          "label": "Social Security",
+          "role": "tax",
+          "amount_cents": 16792
+        },
+        {
+          "key": "medicare",
+          "label": "Medicare",
+          "role": "tax",
+          "amount_cents": 3927
+        },
+        {
+          "key": "state_tax",
+          "label": "State tax",
+          "role": "tax",
+          "amount_cents": 9814
+        },
+        {
+          "key": "retirement_contribution",
+          "label": "401(k)",
+          "role": "retirement",
+          "amount_cents": 0
+        },
+        {
+          "key": "medical_premium",
+          "label": "Health premiums",
+          "role": "health",
+          "amount_cents": 6250
+        },
+        {
+          "key": "other_deductions",
+          "label": "Other deductions",
+          "role": "other",
+          "amount_cents": 4670
+        }
+      ],
+      "roles": {
+        "tax_cents": 60309,
+        "retirement_cents": 0,
+        "health_cents": 6250,
+        "other_cents": 4670
+      },
+      "deductions_cents": 71229,
+      "net_cents": 199604,
+      "paycheck_count": 1
+    },
+    "spending": {
+      "income_cents": 324012,
+      "essentials_cents": 310000,
+      "flexible_cents": 211344,
+      "savings_cents": 2154,
+      "other_cents": 0,
+      "transfers_ignored_cents": 0,
+      "income_outflows_ignored_cents": 0,
+      "uncategorized_cents": 0,
+      "uncategorized_count": 0,
+      "left_over_cents": -199486,
+      "essentials_pct": "95.7",
+      "flexible_pct": "65.2",
+      "savings_rate_pct": "0.7",
+      "transaction_count": 24,
+      "categories": [
+        {
+          "category": "income",
+          "bucket": "income",
+          "total_cents": 324012,
+          "count": 3
+        },
+        {
+          "category": "housing",
+          "bucket": "essentials",
+          "total_cents": 250000,
+          "count": 1
+        },
+        {
+          "category": "groceries",
+          "bucket": "essentials",
+          "total_cents": 60000,
+          "count": 4
+        },
+        {
+          "category": "dining",
+          "bucket": "flexible",
+          "total_cents": 80000,
+          "count": 9
+        },
+        {
+          "category": "shopping",
+          "bucket": "flexible",
+          "total_cents": 131344,
+          "count": 6
+        },
+        {
+          "category": "savings_investment",
+          "bucket": "savings",
+          "total_cents": 2154,
+          "count": 1
+        }
+      ]
+    },
+    "diagram": {
+      "nodes": [
+        {
+          "id": "gross",
+          "kind": "gross",
+          "key": null,
+          "column": 0,
+          "cents": 270833,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:federal_withholding",
+          "kind": "line",
+          "key": "federal_withholding",
+          "column": 1,
+          "cents": 29776,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:social_security",
+          "kind": "line",
+          "key": "social_security",
+          "column": 1,
+          "cents": 16792,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:medicare",
+          "kind": "line",
+          "key": "medicare",
+          "column": 1,
+          "cents": 3927,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:state_tax",
+          "kind": "line",
+          "key": "state_tax",
+          "column": 1,
+          "cents": 9814,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:retirement_contribution",
+          "kind": "line",
+          "key": "retirement_contribution",
+          "column": 1,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:medical_premium",
+          "kind": "line",
+          "key": "medical_premium",
+          "column": 1,
+          "cents": 6250,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:other_deductions",
+          "kind": "line",
+          "key": "other_deductions",
+          "column": 1,
+          "cents": 4670,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "take_home",
+          "kind": "take_home",
+          "key": null,
+          "column": 1,
+          "cents": 199604,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "other_deposits",
+          "kind": "other_deposits",
+          "key": null,
+          "column": 1,
+          "cents": 124408,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "beyond_income",
+          "kind": "beyond_income",
+          "key": null,
+          "column": 1,
+          "cents": 199486,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:essentials",
+          "kind": "bucket",
+          "key": "essentials",
+          "column": 2,
+          "cents": 310000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:flexible",
+          "kind": "bucket",
+          "key": "flexible",
+          "column": 2,
+          "cents": 211344,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:savings",
+          "kind": "bucket",
+          "key": "savings",
+          "column": 2,
+          "cents": 2154,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:other",
+          "kind": "bucket",
+          "key": "other",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:housing",
+          "kind": "category",
+          "key": "housing",
+          "column": 3,
+          "cents": 250000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:groceries",
+          "kind": "category",
+          "key": "groceries",
+          "column": 3,
+          "cents": 60000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:dining",
+          "kind": "category",
+          "key": "dining",
+          "column": 3,
+          "cents": 80000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:shopping",
+          "kind": "category",
+          "key": "shopping",
+          "column": 3,
+          "cents": 131344,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:savings_investment",
+          "kind": "category",
+          "key": "savings_investment",
+          "column": 3,
+          "cents": 2154,
+          "refunds_cents": null,
+          "categories": []
+        }
+      ],
+      "links": [
+        {
+          "source": "gross",
+          "target": "line:federal_withholding",
+          "cents": 29776
+        },
+        {
+          "source": "gross",
+          "target": "line:social_security",
+          "cents": 16792
+        },
+        {
+          "source": "gross",
+          "target": "line:medicare",
+          "cents": 3927
+        },
+        {
+          "source": "gross",
+          "target": "line:state_tax",
+          "cents": 9814
+        },
+        {
+          "source": "gross",
+          "target": "line:medical_premium",
+          "cents": 6250
+        },
+        {
+          "source": "gross",
+          "target": "line:other_deductions",
+          "cents": 4670
+        },
+        {
+          "source": "gross",
+          "target": "take_home",
+          "cents": 199604
+        },
+        {
+          "source": "take_home",
+          "target": "bucket:essentials",
+          "cents": 199604
+        },
+        {
+          "source": "other_deposits",
+          "target": "bucket:essentials",
+          "cents": 110396
+        },
+        {
+          "source": "other_deposits",
+          "target": "bucket:flexible",
+          "cents": 14012
+        },
+        {
+          "source": "beyond_income",
+          "target": "bucket:flexible",
+          "cents": 197332
+        },
+        {
+          "source": "beyond_income",
+          "target": "bucket:savings",
+          "cents": 2154
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:housing",
+          "cents": 250000
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:groceries",
+          "cents": 60000
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:dining",
+          "cents": 80000
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:shopping",
+          "cents": 131344
+        },
+        {
+          "source": "bucket:savings",
+          "target": "category:savings_investment",
+          "cents": 2154
+        }
+      ]
+    }
+  },
+  "not_deposited": {
+    "withholding": {
+      "gross_cents": 270833,
+      "lines": [
+        {
+          "key": "federal_withholding",
+          "label": "Federal tax",
+          "role": "tax",
+          "amount_cents": 29776
+        },
+        {
+          "key": "social_security",
+          "label": "Social Security",
+          "role": "tax",
+          "amount_cents": 16792
+        },
+        {
+          "key": "medicare",
+          "label": "Medicare",
+          "role": "tax",
+          "amount_cents": 3927
+        },
+        {
+          "key": "state_tax",
+          "label": "State tax",
+          "role": "tax",
+          "amount_cents": 9814
+        },
+        {
+          "key": "retirement_contribution",
+          "label": "401(k)",
+          "role": "retirement",
+          "amount_cents": 0
+        },
+        {
+          "key": "medical_premium",
+          "label": "Health premiums",
+          "role": "health",
+          "amount_cents": 6250
+        },
+        {
+          "key": "other_deductions",
+          "label": "Other deductions",
+          "role": "other",
+          "amount_cents": 4670
+        }
+      ],
+      "roles": {
+        "tax_cents": 60309,
+        "retirement_cents": 0,
+        "health_cents": 6250,
+        "other_cents": 4670
+      },
+      "deductions_cents": 71229,
+      "net_cents": 199604,
+      "paycheck_count": 1
+    },
+    "spending": {
+      "income_cents": 150000,
+      "essentials_cents": 100000,
+      "flexible_cents": 0,
+      "savings_cents": 0,
+      "other_cents": 0,
+      "transfers_ignored_cents": 0,
+      "income_outflows_ignored_cents": 0,
+      "uncategorized_cents": 0,
+      "uncategorized_count": 0,
+      "left_over_cents": 50000,
+      "essentials_pct": "66.7",
+      "flexible_pct": "0.0",
+      "savings_rate_pct": "0.0",
+      "transaction_count": 2,
+      "categories": [
+        {
+          "category": "income",
+          "bucket": "income",
+          "total_cents": 150000,
+          "count": 1
+        },
+        {
+          "category": "housing",
+          "bucket": "essentials",
+          "total_cents": 100000,
+          "count": 1
+        }
+      ]
+    },
+    "diagram": {
+      "nodes": [
+        {
+          "id": "gross",
+          "kind": "gross",
+          "key": null,
+          "column": 0,
+          "cents": 270833,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:federal_withholding",
+          "kind": "line",
+          "key": "federal_withholding",
+          "column": 1,
+          "cents": 29776,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:social_security",
+          "kind": "line",
+          "key": "social_security",
+          "column": 1,
+          "cents": 16792,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:medicare",
+          "kind": "line",
+          "key": "medicare",
+          "column": 1,
+          "cents": 3927,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:state_tax",
+          "kind": "line",
+          "key": "state_tax",
+          "column": 1,
+          "cents": 9814,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:retirement_contribution",
+          "kind": "line",
+          "key": "retirement_contribution",
+          "column": 1,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:medical_premium",
+          "kind": "line",
+          "key": "medical_premium",
+          "column": 1,
+          "cents": 6250,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "line:other_deductions",
+          "kind": "line",
+          "key": "other_deductions",
+          "column": 1,
+          "cents": 4670,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "take_home",
+          "kind": "take_home",
+          "key": null,
+          "column": 1,
+          "cents": 199604,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "not_deposited",
+          "kind": "not_deposited",
+          "key": null,
+          "column": 2,
+          "cents": 49604,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:essentials",
+          "kind": "bucket",
+          "key": "essentials",
+          "column": 2,
+          "cents": 100000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:flexible",
+          "kind": "bucket",
+          "key": "flexible",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:savings",
+          "kind": "bucket",
+          "key": "savings",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:other",
+          "kind": "bucket",
+          "key": "other",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "left_over",
+          "kind": "left_over",
+          "key": null,
+          "column": 2,
+          "cents": 50000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:housing",
+          "kind": "category",
+          "key": "housing",
+          "column": 3,
+          "cents": 100000,
+          "refunds_cents": null,
+          "categories": []
+        }
+      ],
+      "links": [
+        {
+          "source": "gross",
+          "target": "line:federal_withholding",
+          "cents": 29776
+        },
+        {
+          "source": "gross",
+          "target": "line:social_security",
+          "cents": 16792
+        },
+        {
+          "source": "gross",
+          "target": "line:medicare",
+          "cents": 3927
+        },
+        {
+          "source": "gross",
+          "target": "line:state_tax",
+          "cents": 9814
+        },
+        {
+          "source": "gross",
+          "target": "line:medical_premium",
+          "cents": 6250
+        },
+        {
+          "source": "gross",
+          "target": "line:other_deductions",
+          "cents": 4670
+        },
+        {
+          "source": "gross",
+          "target": "take_home",
+          "cents": 199604
+        },
+        {
+          "source": "take_home",
+          "target": "not_deposited",
+          "cents": 49604
+        },
+        {
+          "source": "take_home",
+          "target": "bucket:essentials",
+          "cents": 100000
+        },
+        {
+          "source": "take_home",
+          "target": "left_over",
+          "cents": 50000
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:housing",
+          "cents": 100000
+        }
+      ]
+    }
+  },
+  "empty": {
+    "withholding": {
+      "gross_cents": 0,
+      "lines": [
+        {
+          "key": "federal_withholding",
+          "label": "Federal tax",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "social_security",
+          "label": "Social Security",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "medicare",
+          "label": "Medicare",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "state_tax",
+          "label": "State tax",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "retirement_contribution",
+          "label": "401(k)",
+          "role": "retirement",
+          "amount_cents": 0
+        },
+        {
+          "key": "medical_premium",
+          "label": "Health premiums",
+          "role": "health",
+          "amount_cents": 0
+        },
+        {
+          "key": "other_deductions",
+          "label": "Other deductions",
+          "role": "other",
+          "amount_cents": 0
+        }
+      ],
+      "roles": {
+        "tax_cents": 0,
+        "retirement_cents": 0,
+        "health_cents": 0,
+        "other_cents": 0
+      },
+      "deductions_cents": 0,
+      "net_cents": 0,
+      "paycheck_count": 0
+    },
+    "spending": {
+      "income_cents": 0,
+      "essentials_cents": 0,
+      "flexible_cents": 0,
+      "savings_cents": 0,
+      "other_cents": 0,
+      "transfers_ignored_cents": 0,
+      "income_outflows_ignored_cents": 0,
+      "uncategorized_cents": 0,
+      "uncategorized_count": 0,
+      "left_over_cents": 0,
+      "essentials_pct": null,
+      "flexible_pct": null,
+      "savings_rate_pct": null,
+      "transaction_count": 0,
+      "categories": []
+    },
+    "diagram": {
+      "nodes": [
+        {
+          "id": "gross",
+          "kind": "gross",
+          "key": null,
+          "column": 0,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "income_deposited",
+          "kind": "income_deposited",
+          "key": null,
+          "column": 1,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:essentials",
+          "kind": "bucket",
+          "key": "essentials",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:flexible",
+          "kind": "bucket",
+          "key": "flexible",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:savings",
+          "kind": "bucket",
+          "key": "savings",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:other",
+          "kind": "bucket",
+          "key": "other",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "left_over",
+          "kind": "left_over",
+          "key": null,
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        }
+      ],
+      "links": []
+    }
+  },
+  "no_income": {
+    "withholding": {
+      "gross_cents": 0,
+      "lines": [
+        {
+          "key": "federal_withholding",
+          "label": "Federal tax",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "social_security",
+          "label": "Social Security",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "medicare",
+          "label": "Medicare",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "state_tax",
+          "label": "State tax",
+          "role": "tax",
+          "amount_cents": 0
+        },
+        {
+          "key": "retirement_contribution",
+          "label": "401(k)",
+          "role": "retirement",
+          "amount_cents": 0
+        },
+        {
+          "key": "medical_premium",
+          "label": "Health premiums",
+          "role": "health",
+          "amount_cents": 0
+        },
+        {
+          "key": "other_deductions",
+          "label": "Other deductions",
+          "role": "other",
+          "amount_cents": 0
+        }
+      ],
+      "roles": {
+        "tax_cents": 0,
+        "retirement_cents": 0,
+        "health_cents": 0,
+        "other_cents": 0
+      },
+      "deductions_cents": 0,
+      "net_cents": 0,
+      "paycheck_count": 0
+    },
+    "spending": {
+      "income_cents": 0,
+      "essentials_cents": 633,
+      "flexible_cents": 50000,
+      "savings_cents": 0,
+      "other_cents": 0,
+      "transfers_ignored_cents": 0,
+      "income_outflows_ignored_cents": 0,
+      "uncategorized_cents": 0,
+      "uncategorized_count": 0,
+      "left_over_cents": -50633,
+      "essentials_pct": null,
+      "flexible_pct": null,
+      "savings_rate_pct": null,
+      "transaction_count": 3,
+      "categories": [
+        {
+          "category": "transport",
+          "bucket": "essentials",
+          "total_cents": 633,
+          "count": 1
+        },
+        {
+          "category": "travel",
+          "bucket": "flexible",
+          "total_cents": 50000,
+          "count": 2
+        }
+      ]
+    },
+    "diagram": {
+      "nodes": [
+        {
+          "id": "gross",
+          "kind": "gross",
+          "key": null,
+          "column": 0,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "income_deposited",
+          "kind": "income_deposited",
+          "key": null,
+          "column": 1,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "beyond_income",
+          "kind": "beyond_income",
+          "key": null,
+          "column": 1,
+          "cents": 50633,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:essentials",
+          "kind": "bucket",
+          "key": "essentials",
+          "column": 2,
+          "cents": 633,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:flexible",
+          "kind": "bucket",
+          "key": "flexible",
+          "column": 2,
+          "cents": 50000,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:savings",
+          "kind": "bucket",
+          "key": "savings",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "bucket:other",
+          "kind": "bucket",
+          "key": "other",
+          "column": 2,
+          "cents": 0,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:transport",
+          "kind": "category",
+          "key": "transport",
+          "column": 3,
+          "cents": 633,
+          "refunds_cents": null,
+          "categories": []
+        },
+        {
+          "id": "category:travel",
+          "kind": "category",
+          "key": "travel",
+          "column": 3,
+          "cents": 50000,
+          "refunds_cents": null,
+          "categories": []
+        }
+      ],
+      "links": [
+        {
+          "source": "beyond_income",
+          "target": "bucket:essentials",
+          "cents": 633
+        },
+        {
+          "source": "beyond_income",
+          "target": "bucket:flexible",
+          "cents": 50000
+        },
+        {
+          "source": "bucket:essentials",
+          "target": "category:transport",
+          "cents": 633
+        },
+        {
+          "source": "bucket:flexible",
+          "target": "category:travel",
+          "cents": 50000
+        }
+      ]
+    }
+  }
+}

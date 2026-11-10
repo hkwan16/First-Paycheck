@@ -24,6 +24,15 @@ export function useCashflow(period: Period | null) {
 }
 
 /**
+ * `GET /spending/months`: the first day of each month with a posted
+ * transaction on a counted account or a confirmed pay stub, newest first
+ * (spec 010 rule 5d). The period picker offers only these months.
+ */
+export function useSpendingMonths() {
+  return $api.useQuery('get', '/spending/months');
+}
+
+/**
  * `GET /spending/summary`: bucket totals, percentages and counts for a
  * period (the last complete month by default). The Spending screen reads the
  * same summary from `useCashflow`; this is for screens that need the totals

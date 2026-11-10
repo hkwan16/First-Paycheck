@@ -1,12 +1,14 @@
 import type {
   CashFlow,
   CategoryTotal,
+  FlowDiagram,
   PayStubFlow,
   RecurringCharge,
   SpendingSummary,
   WithholdingLine,
   WithholdingTotal,
 } from '@/lib/api/types';
+import results from './cashflow-results.json';
 import { SAMPLE_SYNCED_AT } from './sample';
 
 /*
@@ -14,6 +16,10 @@ import { SAMPLE_SYNCED_AT } from './sample';
  * for the sample user (src/test/fixtures/sample.ts): October 1 to 17, the two
  * Acme pay stubs of spec 010 example 2 and the sixteen October transactions.
  * Every total is written out as the API computes it; the client never adds.
+ * Each fixture's diagram (spec 010 rule 5b) and the newer fixtures' totals
+ * come from cashflow-results.json, which make-cashflow-results.py writes with
+ * the API's own code; cashflow-results.test.ts checks the hand-written totals
+ * here still match it.
  */
 
 export const SAMPLE_PERIOD = { start: '2026-10-01', end: '2026-10-17' } as const;
@@ -152,6 +158,38 @@ export const PAY_STUB_FLOW_IDS = [
   '6e000000-0000-4000-8000-000000000015',
 ] as const;
 
+/** What make-cashflow-results.py computed for one fixture, with the API's code. */
+export interface CashflowResult {
+  withholding: WithholdingTotal;
+  spending: Omit<
+    SpendingSummary,
+    | 'start'
+    | 'end'
+    | 'paycheck_count'
+    | 'ledger_rows_skipped'
+    | 'account_kinds_counted'
+    | 'category_buckets'
+  >;
+  diagram: FlowDiagram;
+}
+
+export type CashflowResultName =
+  | 'sample'
+  | 'sandbox'
+  | 'dynamic'
+  | 'november'
+  | 'september'
+  | 'beyond'
+  | 'not_deposited'
+  | 'empty'
+  | 'no_income';
+
+export const CASHFLOW_RESULTS = results as Record<CashflowResultName, CashflowResult>;
+
+/** The API's diagram for one fixture, a fresh copy. */
+export const diagramOf = (name: CashflowResultName): FlowDiagram =>
+  structuredClone(CASHFLOW_RESULTS[name].diagram);
+
 /** `GET /cashflow` for the sample period. */
 export function sampleCashflow(overrides: Partial<CashFlow> = {}): CashFlow {
   return structuredClone({
@@ -159,9 +197,57 @@ export function sampleCashflow(overrides: Partial<CashFlow> = {}): CashFlow {
     pay_stubs: [stub(PAY_STUB_FLOW_IDS[0], '2026-10-01'), stub(PAY_STUB_FLOW_IDS[1], '2026-10-15')],
     withholding: SAMPLE_WITHHOLDING,
     spending: sampleSpendingSummary,
+    diagram: diagramOf('sample'),
     ...overrides,
   });
 }
+
+/** A fixture made whole from its computed results, with Acme stubs paid on `payDates`. */
+function fromResults(
+  name: CashflowResultName,
+  period: { start: string; end: string },
+  payDates: readonly string[],
+): CashFlow {
+  const { withholding, spending, diagram } = structuredClone(CASHFLOW_RESULTS[name]);
+  return {
+    ...period,
+    pay_stubs: payDates.map((date, index) =>
+      stub(`6e000000-0000-4000-8000-${String(900 + index).padStart(12, '0')}`, date),
+    ),
+    withholding,
+    spending: {
+      ...spending,
+      ...period,
+      paycheck_count: withholding.paycheck_count,
+      ledger_rows_skipped: { count: 0, net_cents: 0 },
+      account_kinds_counted: ACCOUNT_KINDS_COUNTED,
+      category_buckets: CATEGORY_BUCKETS,
+    },
+    diagram,
+  };
+}
+
+/** Spec 007's September with its two Acme stubs: take-home equal to the deposits (D2). */
+export const septemberCashflow = (): CashFlow =>
+  fromResults('september', { start: '2026-09-01', end: '2026-09-30' }, [
+    '2026-09-15',
+    '2026-09-30',
+  ]);
+
+/**
+ * Issue 236's October: one Acme stub (take-home 1,996.04), 3,240.12
+ * deposited and 5,234.98 spent, so other deposits and spending beyond the
+ * income pay for the rest (spec 010 diagram example D1).
+ */
+export const beyondCashflow = (): CashFlow => fromResults('beyond', SANDBOX_PERIOD, ['2026-10-15']);
+
+/** One Acme stub with 1,500.00 deposited: part of take-home is not deposited (D4). */
+export const notDepositedCashflow = (): CashFlow =>
+  fromResults('not_deposited', SANDBOX_PERIOD, ['2026-10-15']);
+
+/** The e2e sandbox user's September: 506.33 of charges, no stub and no deposit. */
+export const noIncomeCashflow = (): CashFlow =>
+  fromResults('no_income', { start: '2026-09-01', end: '2026-09-30' }, []);
 
 const ZERO_LINES = lines({
   federal_withholding: 0,
@@ -210,6 +296,7 @@ export function emptyCashflow(start: string, end: string): CashFlow {
       categories: [],
       category_buckets: CATEGORY_BUCKETS,
     },
+    diagram: diagramOf('empty'),
   };
 }
 
@@ -255,6 +342,7 @@ export function sandboxCashflow(): CashFlow {
         category('savings_investment', 'savings', 100_000, 1),
       ],
     },
+    diagram: diagramOf('sandbox'),
   };
 }
 
@@ -300,6 +388,7 @@ export function dynamicCashflow(): CashFlow {
         category('personal_care', 'flexible', 2_598, 1),
       ],
     },
+    diagram: diagramOf('dynamic'),
   };
 }
 

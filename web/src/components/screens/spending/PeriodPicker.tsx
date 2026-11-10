@@ -2,8 +2,14 @@
 
 import { useId } from 'react';
 import { Select } from '@/components/ui/Select';
-import type { Period } from '@/lib/api/hooks';
-import { periodOptions, selectedPeriodKey, useToday, type PeriodOption } from '@/lib/periods';
+import { useSpendingMonths, type Period } from '@/lib/api/hooks';
+import {
+  optionsWithin,
+  periodOptions,
+  selectedPeriodKey,
+  useToday,
+  type PeriodOption,
+} from '@/lib/periods';
 import { periodText } from './spending-format';
 
 export interface PeriodPickerProps {
@@ -16,14 +22,19 @@ export interface PeriodPickerProps {
 
 /**
  * Which month the totals and the diagram cover: this month so far, the last
- * complete month (the API's default) or one of the four before it. The
- * months come from today's date, which is only known on the client, so the
- * server renders just the month the API answered for.
+ * complete month (the API's default) or one of the four before it, each only
+ * when it has a transaction or a pay stub to show (`GET /spending/months`,
+ * spec 010 rule 5d; all six if that cannot be read). The months come from
+ * today's date, which is only known on the client, so the server renders
+ * just the month the API answered for.
  */
 export function PeriodPicker({ value, shown, onChange }: PeriodPickerProps) {
   const id = useId();
   const today = useToday();
-  const options: PeriodOption[] = today ? periodOptions(today) : [];
+  const months = useSpendingMonths();
+  const known = months.isError ? null : months.data?.months;
+  const options: PeriodOption[] =
+    today && known !== undefined ? optionsWithin(periodOptions(today), known) : [];
   const selected = selectedPeriodKey(value, shown);
   if (shown && !options.some((o) => o.value === selected)) {
     options.unshift({ value: selected, label: periodText(shown.start, shown.end), period: shown });

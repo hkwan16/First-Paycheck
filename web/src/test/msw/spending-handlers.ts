@@ -5,8 +5,8 @@ import { sampleCashflow, sampleRecurring } from '../fixtures/cashflow';
 import { SAMPLE_NOW } from '../fixtures/sample';
 
 /*
- * The M5 routes: `GET /cashflow`, `GET /spending/summary`, `GET /recurring`
- * and `PATCH /recurring/{id}`, over their own in-memory state, reset after
+ * The M5 routes: `GET /cashflow`, `GET /spending/summary`,
+ * `GET /spending/months`, `GET /recurring` and `PATCH /recurring/{id}`, over their own in-memory state, reset after
  * every test (src/test/setup.ts). `POST /accounts/import` goes over
  * XMLHttpRequest like document uploads, so tests drive it with
  * `installFakeXhr()` instead of a handler here.
@@ -16,16 +16,29 @@ export interface SpendingDb {
   /** What `GET /cashflow` answers; `spending` is also `GET /spending/summary`. */
   cashflow: CashFlow;
   recurring: RecurringCharge[];
+  /** What `GET /spending/months` answers: by default the six months the picker can offer. */
+  months: string[];
 }
+
+const SAMPLE_MONTHS = [
+  '2026-10-01',
+  '2026-09-01',
+  '2026-08-01',
+  '2026-07-01',
+  '2026-06-01',
+  '2026-05-01',
+];
 
 export const spendingDb: SpendingDb = {
   cashflow: sampleCashflow(),
   recurring: structuredClone([...sampleRecurring]),
+  months: [...SAMPLE_MONTHS],
 };
 
 export function resetSpendingDb() {
   spendingDb.cashflow = sampleCashflow();
   spendingDb.recurring = structuredClone([...sampleRecurring]);
+  spendingDb.months = [...SAMPLE_MONTHS];
 }
 
 const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
@@ -68,6 +81,8 @@ export const spendingHandlers = [
     const flow = cashflowFor(new URL(request.url));
     return flow instanceof Response ? flow : HttpResponse.json(flow.spending);
   }),
+
+  http.get(apiUrl('/spending/months'), () => HttpResponse.json({ months: spendingDb.months })),
 
   http.get(apiUrl('/recurring'), () => HttpResponse.json(spendingDb.recurring)),
 
