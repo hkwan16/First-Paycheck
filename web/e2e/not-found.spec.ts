@@ -39,11 +39,16 @@ test.describe('an id that is not an id', () => {
     for (const id of ['00000000-0000-4000-8000-000000000000', 'not-a-uuid']) {
       await page.goto(`/setup/confirm/${id}`);
       await waitForHydration(page);
-      // The API's sentence for a well-formed unknown id names the document; for
-      // a malformed one it cannot know the route's noun. Neither asks for a reload.
-      const notice = page.getByRole('main').getByRole('alert');
-      await expect(notice, id).toContainText(/not found/i, { timeout: 30_000 });
-      await expect(notice, id).not.toContainText('connection');
+      // Any 404 is the same answer (an unknown id, or one that is not an id at
+      // all): its own page with the way back, never a "check your connection".
+      await expect(
+        page.getByRole('heading', { level: 1, name: 'Document not found' }),
+        id,
+      ).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(page.getByRole('main'), id).not.toContainText('connection');
+      await expect(page.getByRole('link', { name: 'Back to documents' }), id).toBeVisible();
     }
   });
 });
