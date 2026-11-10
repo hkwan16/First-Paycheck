@@ -58,6 +58,31 @@ def inputs(draw: st.DrawFn) -> K401MatchInput:
     )
 
 
+@st.composite
+def below_full_match_inputs(draw: st.DrawFn) -> K401MatchInput:
+    """Inputs under the full match with no limit binding, built rather than filtered.
+
+    Drawing ``inputs()`` and rejecting the rest kept about one in twenty (a
+    contribution under the highest tier is rare in 0-100%, and so is a salary
+    under both limits), and Hypothesis's filter_too_much health check failed
+    the test on unlucky runs.
+    """
+    data = draw(inputs().filter(lambda d: bool(d.match_tiers)))
+    full = max(tier.employee_pct_upto for tier in data.match_tiers)
+    # The base deferral limit, the smallest at any age, so no age makes it bind.
+    salary_cap = min(
+        LIMITS.compensation_limit_cents,
+        int(Decimal(LIMITS.elective_deferral_limit_cents) * 100 / full),
+    )
+    hundredths = int(full * 100)
+    return data.model_copy(
+        update={
+            "salary_cents": draw(st.integers(100_000, max(100_000, salary_cap))),
+            "contribution_pct": Decimal(draw(st.integers(0, hundredths - 1))) / 100,
+        }
+    )
+
+
 def with_contribution(data: K401MatchInput, pct: Decimal) -> K401MatchInput:
     return data.model_copy(update={"contribution_pct": pct})
 
@@ -99,15 +124,15 @@ def test_nothing_missed_at_or_above_full_match(data: K401MatchInput) -> None:
 
 
 @EXAMPLES
-@given(inputs())
+@given(below_full_match_inputs())
 def test_something_missed_below_full_match_when_no_limit_binds(data: K401MatchInput) -> None:
     result = k401_match(data)
     salary = Decimal(data.salary_cents)
     full = result.full_match_pct
-    assume(data.match_tiers)
-    assume(data.contribution_pct < full)
-    assume(salary * full / 100 <= result.deferral_limit_cents)
-    assume(data.salary_cents <= LIMITS.compensation_limit_cents)
+    # What the strategy builds: below the full match, and no limit binds.
+    assert data.contribution_pct < full
+    assert salary * full / 100 <= result.deferral_limit_cents
+    assert data.salary_cents <= LIMITS.compensation_limit_cents
     smallest_rate = min(tier.employer_pct for tier in data.match_tiers)
     # The exact difference is at least this much; at one cent or more it
     # survives rounding to whole cents.
