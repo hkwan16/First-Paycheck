@@ -73,7 +73,9 @@ Rules:
   migration that creates it: RLS enabled and forced, grants reset, one owner
   policy on `public.current_user_id()`.
 - Money columns are `bigint` named `*_cents`; Pydantic uses
-  `Annotated[int, Field(strict=True)]`. Timestamps are `timestamptz` in UTC.
+  `Annotated[int, Field(strict=True)]`. Timestamps are `timestamptz` in UTC;
+  due dates and periods are plain `date`s. A date taken from the clock is the
+  person's day, never the UTC date (see "The person's day" below).
 - New revision: `make revision id=0002_core msg="core tables"`. Hand-check
   autogenerate output; RLS, grants, triggers and functions are written by hand.
   Every revision has a working `downgrade()`.
@@ -221,8 +223,8 @@ Rules:
   `0018_check_in_last_run_at`, `0019_explanation_context_digest`,
   `0020_pay_stub_superseded_by`, `0021_paycheck_change`, `0022_deadline_dates`,
   `0023_salary_pay_stub`, `0024_document_review_draft`,
-  `0025_account_role_fits_kind` (each revises the one before it); the head is
-  `0025_account_role_fits_kind`.
+  `0025_account_role_fits_kind`, `0026_the_persons_day` (each revises the one
+  before it); the head is `0026_the_persons_day`.
 - Adding an enum label is `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with
   `AFTER` when the order means something, as `by_kind` does for
   `account_kind`); the downgrade maps the rows that use it and rebuilds the
@@ -340,6 +342,33 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
 - Swagger UI is at `/api-docs`: `/docs` is the documents API.
 - The request clock is the `Now` dependency (`app/deps.py:get_now`); tests
   override it to freeze time (the upload rate limit is per clock hour, UTC).
+  A route that needs a date takes `Day` (`get_day`), never `now.date()`.
+
+### The person's day (spec 019, issue 232)
+
+- `profiles.time_zone` (migration `0026_the_persons_day`) is the IANA zone the
+  browser last reported through `PUT /profile/time-zone` (`put_time_zone`;
+  the web's `TimeZoneSync`), validated against `zoneinfo.available_timezones()`
+  (the `tzdata` package, so every host knows the same zones) and at most 64
+  characters. `PUT /profile` neither takes nor changes it. Unset or no longer
+  known (logged without the name) means `DEFAULT_TIME_ZONE`,
+  `America/New_York`.
+- `db/person_day.py` is the one answer to "what is today": `person_day(session,
+  user_id, now)` reads the zone under RLS and returns `PersonDay(zone, today)`
+  with `.month`, `.day_of(moment)` and `.start_of(day)` (the day's first
+  instant, in UTC); `person_day_at(now, zone_for(name))` when the zone is in
+  hand; `day_in(moment, zone)` for a stored timestamp (a decision's
+  `decided_on`). Routes take the `Day` dependency; job handlers and the sync
+  pipeline call `person_day` in their user session. `GET /profile` answers
+  `today` so the web never reads its own clock for a date.
+- Every clock-derived date goes through it: the plan's `as_of` and
+  `calendar_through`, `overdue` and `days_until`, the Spending and cash flow
+  default periods, the check-in period and its `as_of`, recurring detection's
+  today, a holding's fallback date, net worth's newest snapshot per day, the
+  PDF's preparation date and file name, the birth year's upper bound.
+- Still UTC on purpose: the LLM budget day and the rate-limit hours (cost
+  guards over every user alike), the `.ics` `DTSTAMP` (RFC 5545), retention
+  and export expiry ages (durations), and stored timestamps.
 
 ## Calculators, decisions and explain (from M3)
 
@@ -722,15 +751,20 @@ finding by its day, folding a reminder a newer decision version repeated
   read open events only, the facts and the plan with no lower bound, so a
   passed date is an `overdue_deadline` finding (`alert`) and `overdue: true`
   on `CalendarEventOut` (`routers/calendar.py:event_out`). `days_until` is the
-  one count of days; callers pass their own today.
+  one count of days; callers pass the person's today (spec 019).
 - **Records** (rule 9b). No run reaches a check-in after its month, so its
-  findings are a record of `as_of` (the last run's UTC date, capped at the
-  month's last day); `past` says the month ended. `FindingOut.charge_gone` marks a
+  findings are a record of `as_of`, stored on the row by each run
+  (`check_ins.as_of`, migration `0026`, kept inside the month by
+  `ck_check_ins_as_of_in_period`): the person's day of the run, held to the
+  month (`checkin.engine.run_date`); `past` says the month ended. `FindingOut.charge_gone` marks a
   recurring finding whose charge row is gone (`checkin.engine.charge_gone`).
 - **Jobs.** `checkin.monthly` (`jobs/handlers/checkin.py`), payload `{"period":
-  "YYYY-MM-01", "trigger": "schedule" | "sync"}`, dated `min(clock, last day of
-  period)`. `schedule.tick` queues one per `auth.users` row and UTC month with
-  key `checkin.monthly:YYYY-MM` (result `checkins_queued`); `recurring.detect`
+  "YYYY-MM-01", "trigger": "schedule" | "sync"}`, dated `run_date(period,
+  person's today)`. `schedule.tick` queues one per `auth.users` row for that
+  person's own month (their zone from `profiles`, read on the privileged
+  connection; one INSERT per distinct month) with key
+  `checkin.monthly:YYYY-MM` (result `checkins_queued`), so near midnight UTC
+  one person's November and another's October are both right; `recurring.detect`
   queues a `sync` refresh after writing when the month's check-in is open.
   A `sync` job never creates a check-in, and a completed one is not refreshed.
 - **Routes.** `GET /check-ins`, `GET /check-ins/{id}` (findings by severity,
@@ -780,7 +814,10 @@ table `plan_exports` (`enable_rls`, SELECT and INSERT only).
   fixtures byte for byte.
 - **PDF.** `POST /plan/export` queues `plan.export` (`enqueue_unless_queued`,
   payload `{}`); `jobs/handlers/plan_export.py` builds the plan in one user
-  session as of `Services.clock`, renders `export/templates/plan.html.j2`
+  session as of the person's day at `Services.clock`, stores that day as the
+  job result's `prepared_on` (the download is named
+  `first-paycheck-plan-<prepared_on>.pdf`; an export from before has none and
+  keeps its UTC `created_at` date), renders `export/templates/plan.html.j2`
   (`export/html.py`, Jinja2, autoescaped, numbers via `verify.format`) with
   `export/pdf.py` (WeasyPrint imported inside the function, URL fetcher refuses
   everything) with no session open, and stores it in a second session; a rerun

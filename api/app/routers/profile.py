@@ -3,21 +3,26 @@
 ``birth_year`` settles spec 006 open question 2: the client sends the 401(k)
 calculator ``age = tax_year - birth_year`` (the age reached by December 31 of
 the tax year); ``calc/`` keeps taking ``age`` as an input.
+
+``time_zone`` is the browser's IANA zone (spec 019 rule 5), written only by
+``PUT /profile/time-zone``: ``PUT /profile`` replaces everything else, so a form
+save can never put an old zone back. ``ProfileOut.today`` is the person's today
+in it (rule 2).
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import uuid
-from typing import Any, Self
+from typing import Annotated, Any, Self
 
 from fastapi import APIRouter
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.auth import CurrentUser
-from app.deps import Now, UserSession
+from app.deps import Day, Now, UserSession
 from app.errors import AppError, NotFound, error_responses
 from app.pay_schedule import PaySchedule, pay_schedule
 from app.salary_review import SalaryReview, load_salary_review
@@ -27,6 +32,13 @@ from calc.types import PositiveCents
 from db.enums import FilingStatus, HealthcareUsage, PayFrequency
 from db.models import Profile
 from db.pay_stubs import find_pay_stub
+from db.person_day import (
+    MAX_TIME_ZONE_LENGTH,
+    PersonDay,
+    is_time_zone,
+    person_day_at,
+    zone_for,
+)
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 
@@ -68,9 +80,39 @@ class ProfileIn(ProfileFields):
     """The whole profile; a field left out is reset to its default."""
 
 
+def _known_time_zone(name: str) -> str:
+    if not is_time_zone(name):
+        raise ValueError("Choose a time zone from the IANA list, such as America/Los_Angeles.")
+    return name
+
+
+TimeZoneName = Annotated[
+    str,
+    Field(max_length=MAX_TIME_ZONE_LENGTH, examples=["America/Los_Angeles"]),
+    AfterValidator(_known_time_zone),
+]
+
+
+class TimeZoneIn(BaseModel):
+    """The browser's zone, ``Intl.DateTimeFormat().resolvedOptions().timeZone``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    time_zone: TimeZoneName
+
+
 class ProfileOut(ProfileFields):
     # Null until the profile is first saved.
     updated_at: UtcDateTime | None
+    time_zone: str | None = Field(
+        description=(
+            "The IANA zone the browser last reported (spec 019 rule 5), null before the "
+            "first report; dates are then taken in America/New_York."
+        )
+    )
+    today: dt.date = Field(
+        description="The person's today in their zone (spec 019 rule 2). Computed on read."
+    )
     pay_schedule: PaySchedule | None = Field(
         description=(
             "The pay schedule every calculator uses (spec 005 rule 25a): the newest "
@@ -86,7 +128,7 @@ class ProfileOut(ProfileFields):
     )
 
 
-def _out(session: Session, profile: Profile | None) -> ProfileOut:
+def _out(session: Session, profile: Profile | None, day: PersonDay) -> ProfileOut:
     saved = (
         {}
         if profile is None
@@ -96,6 +138,8 @@ def _out(session: Session, profile: Profile | None) -> ProfileOut:
         {
             **saved,
             "updated_at": None if profile is None else profile.updated_at,
+            "time_zone": None if profile is None else profile.time_zone,
+            "today": day.today,
             "pay_schedule": pay_schedule(session, profile),
             "salary_review": load_salary_review(session, profile),
         }
@@ -103,17 +147,18 @@ def _out(session: Session, profile: Profile | None) -> ProfileOut:
 
 
 @router.get("", responses=error_responses(401))
-def get_profile(session: UserSession, user: CurrentUser) -> ProfileOut:
+def get_profile(session: UserSession, user: CurrentUser, day: Day) -> ProfileOut:
     """The saved profile, or the defaults when nothing is saved yet."""
-    return _out(session, session.get(Profile, user.id))
+    return _out(session, session.get(Profile, user.id), day)
 
 
 @router.put("", responses=error_responses(401, 404, 422))
-def put_profile(body: ProfileIn, session: UserSession, user: CurrentUser, now: Now) -> ProfileOut:
-    """Replace the profile."""
-    if body.birth_year is not None and body.birth_year > now.year:
+def put_profile(body: ProfileIn, session: UserSession, user: CurrentUser, day: Day) -> ProfileOut:
+    """Replace the profile, except its time zone."""
+    this_year = day.today.year
+    if body.birth_year is not None and body.birth_year > this_year:
         raise AppError(
-            f"The birth year must be at most {now.year}", code="validation_error", status_code=422
+            f"The birth year must be at most {this_year}", code="validation_error", status_code=422
         )
     if (
         body.salary_pay_stub_id is not None
@@ -131,4 +176,19 @@ def put_profile(body: ProfileIn, session: UserSession, user: CurrentUser, now: N
         .returning(Profile)
     )
     profile = session.scalars(statement, execution_options={"populate_existing": True}).one()
-    return _out(session, profile)
+    return _out(session, profile, day)
+
+
+@router.put("/time-zone", responses=error_responses(401, 422))
+def put_time_zone(
+    body: TimeZoneIn, session: UserSession, user: CurrentUser, now: Now
+) -> ProfileOut:
+    """Save the browser's time zone, making the profile when there is none (spec 019 rule 5)."""
+    statement = (
+        insert(Profile)
+        .values(user_id=user.id, time_zone=body.time_zone)
+        .on_conflict_do_update(index_elements=[Profile.user_id], set_={"time_zone": body.time_zone})
+        .returning(Profile)
+    )
+    profile = session.scalars(statement, execution_options={"populate_existing": True}).one()
+    return _out(session, profile, person_day_at(now, zone_for(profile.time_zone)))

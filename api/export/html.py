@@ -99,14 +99,14 @@ def _environment() -> Environment:
 _ENVIRONMENT = _environment()
 
 
-def render_html(plan: PlanOut, prepared_at: dt.datetime) -> str:
-    """The page for ``plan``, prepared at ``prepared_at`` (its UTC date is printed)."""
+def render_html(plan: PlanOut) -> str:
+    """The page for ``plan``, prepared on its ``as_of``, the person's today (spec 019)."""
     calculators: dict[uuid.UUID, CalculatorKind] = {
         decision.id: decision.calculator for decision in plan.decisions
     }
     return _ENVIRONMENT.get_template("plan.html.j2").render(
         plan=plan,
-        prepared_on=prepared_at.astimezone(dt.UTC).date(),
+        prepared_on=plan.as_of,
         calculator_titles=CALCULATOR_TITLES,
         explanation_labels=EXPLANATION_LABELS,
         stale_label=STALE_LABEL,

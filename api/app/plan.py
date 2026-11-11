@@ -335,7 +335,7 @@ def _pay_stub(session: Session) -> PlanPayStub | None:
 
 
 def build_plan(session: Session, today: dt.date) -> PlanOut:
-    """The plan as of ``today`` (UTC), read under the session's RLS."""
+    """The plan as of ``today``, the person's (spec 019), read under the session's RLS."""
     through = today + CALENDAR_WINDOW
     decisions = _decisions(session)
     saved = [decision.calculator for decision in decisions]

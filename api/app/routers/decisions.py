@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app import decision_effects, ratelimit
 from app.auth import CurrentUser
 from app.decision_review import ReviewContext, ReviewReason, load_context, review
-from app.deps import Now, UserSession
+from app.deps import Day, Now, UserSession
 from app.errors import AppError, NotFound, error_responses, validation_message
 from app.types import UtcDateTime
 from calc.registry import Calculator, UnknownCalculator, calculator
@@ -154,7 +154,7 @@ def _next_version(session: Session, body: DecisionIn) -> int:
     "", status_code=status.HTTP_201_CREATED, responses=error_responses(401, 404, 409, 422, 429)
 )
 def save_decision(
-    body: DecisionIn, session: UserSession, user: CurrentUser, now: Now
+    body: DecisionIn, session: UserSession, user: CurrentUser, now: Now, day: Day
 ) -> DecisionSaved:
     """Save the result the user picked as a new decision version."""
     ratelimit.consume(session, user.id, ratelimit.DECISIONS, now=now)
@@ -185,7 +185,7 @@ def save_decision(
         if constraint in _CONFLICT_CONSTRAINTS:
             raise _conflict() from exc
         raise
-    effects = decision_effects.apply(session, decision, inputs, computed, now.date())
+    effects = decision_effects.apply(session, decision, inputs, computed, day.today)
     return DecisionSaved(
         decision_id=decision.id,
         calculator=decision.calculator,

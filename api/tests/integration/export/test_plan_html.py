@@ -21,7 +21,7 @@ FIXTURE = Path(__file__).parent.parent.parent / "fixtures" / "export" / "plan.ht
 def plan_html(connection: Connection, user: FixtureUser) -> str:
     with user_session_for(user.id, bind=connection) as session:
         plan = build_plan(session, NOW.date())
-    return render_html(plan, NOW)
+    return render_html(plan)
 
 
 def test_html_matches_the_fixture(
@@ -56,7 +56,7 @@ def test_an_overdue_date_is_marked(
     """Spec 016 rules 6 and 11 (issue 233): printed on 2026-11-02, the three
     2026-10-31 dates nobody settled are listed and marked Overdue."""
     with user_session_for(user_a.id, bind=db_connection) as session:
-        html = render_html(build_plan(session, dt.date(2026, 11, 2)), NOW)
+        html = render_html(build_plan(session, dt.date(2026, 11, 2)))
     assert html.count('<span class="overdue">Overdue</span>') == 3
     assert "Oct 31, 2026" in html
     assert 'class="overdue"' not in plan_html(db_connection, user_a)
@@ -109,7 +109,7 @@ def test_a_decision_that_needs_review_prints_the_note(
         else decision
         for decision in plan.decisions
     ]
-    html = render_html(plan.model_copy(update={"decisions": decisions}), NOW)
+    html = render_html(plan.model_copy(update={"decisions": decisions}))
     assert "Needs review: Your pay schedule changed from 24 to 26 paychecks a year." in html
     assert html.count(REVIEW_NOTE) == 1
     # The health plan's figures are left out; the other decisions keep theirs.

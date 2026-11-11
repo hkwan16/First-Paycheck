@@ -325,11 +325,14 @@ async function saveProfileSchedule(page: Page, payFrequency: string) {
   await page.goto('/setup/decisions/401k');
   const response = await read;
   const { authorization } = await response.request().allHeaders();
-  // The profile as PUT /profile takes it: what GET adds on read stays out.
+  // The profile as PUT /profile takes it: what GET adds on read stays out, and
+  // so does the time zone, which only PUT /profile/time-zone writes (spec 019).
   const {
     updated_at: _updatedAt,
     pay_schedule: _paySchedule,
     salary_review: _salaryReview,
+    time_zone: _timeZone,
+    today: _today,
     ...fields
   } = (await response.json()) as Record<string, unknown>;
   const put = await page.request.put(`${e2eApiUrl()}/profile`, {

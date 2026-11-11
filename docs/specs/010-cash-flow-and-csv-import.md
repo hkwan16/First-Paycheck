@@ -12,7 +12,7 @@ Part B lets a user bring in an account they will not link through Plaid: `POST /
 
 ### `GET /cashflow`
 
-`start` and `end`, inclusive ISO dates, with exactly the rules of `GET /spending/summary` (spec 007 part B): both or neither, `start <= end`, at most 366 days, and the last complete UTC calendar month by default.
+`start` and `end`, inclusive ISO dates, with exactly the rules of `GET /spending/summary` (spec 007 part B): both or neither, `start <= end`, at most 366 days, and the last complete calendar month before the person's today by default (spec 019).
 
 ### `GET /spending/months`
 
@@ -82,7 +82,7 @@ No parameters.
 
 ### `GET /spending/months` (`SpendingMonths`)
 
-- `months`: the first day of each UTC calendar month with at least one posted transaction on an active `checking`, `savings` or `credit` account (the rows the summary reads, spec 007 rule 21a) or a current confirmed pay stub paid in it (rule 1), newest first, each once.
+- `months`: the first day of each calendar month with at least one posted transaction on an active `checking`, `savings` or `credit` account (the rows the summary reads, spec 007 rule 21a) or a current confirmed pay stub paid in it (rule 1), newest first, each once.
 
 ### `POST /accounts/import` (`CsvImport`)
 

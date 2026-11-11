@@ -31,9 +31,18 @@ DEFAULTS: dict[str, Any] = {
     "birth_year": None,
     "salary_pay_stub_id": None,
 }
+# The request clock: 08:00 EDT on October 21, 2026.
+NOW = dt.datetime(2026, 10, 21, 12, 0, tzinfo=dt.UTC)
 # What GET and PUT add on read: the pay schedule (rule 25a), none without a stub or an
-# entry, and the salary check (rule 24c), none without a salary and a stub that disagree.
-OUT_DEFAULTS: dict[str, Any] = {**DEFAULTS, "pay_schedule": None, "salary_review": None}
+# entry, the salary check (rule 24c), none without a salary and a stub that disagree,
+# and the zone the browser reported with the person's today (spec 019 rules 2 and 5).
+OUT_DEFAULTS: dict[str, Any] = {
+    **DEFAULTS,
+    "pay_schedule": None,
+    "salary_review": None,
+    "time_zone": None,
+    "today": "2026-10-21",
+}
 FULL: dict[str, Any] = {
     "salary_cents": 6_500_000,
     "pay_frequency": "semimonthly",
@@ -49,6 +58,11 @@ FULL: dict[str, Any] = {
     "vesting_years": 3,
     "birth_year": 2001,
 }
+
+
+@pytest.fixture(autouse=True)
+def _frozen(app: FastAPI) -> None:
+    app.dependency_overrides[get_now] = lambda: NOW
 
 
 def test_defaults_before_anything_is_saved(client_as: Client, user_a: FixtureUser) -> None:

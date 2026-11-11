@@ -14,7 +14,7 @@ Code: the pure detector and status rules in `api/sync/recurring.py`, the amount 
 |---|---|---|
 | Transactions | rows of `transactions` (spec 001) read under RLS: `merchant_norm`, `merchant_clean`, `merchant_raw`, `posted_at`, `amount_cents` | Posted (`pending = false`) rows of active (`accounts.is_active`) checking, savings and credit accounts (rule 1a) |
 | Stored charges | rows of `recurring_charges` | The user's own |
-| `today` | ISO date | The job's UTC date |
+| `today` | ISO date | The person's today at the job's clock (spec 019 rule 2) |
 | `PATCH /recurring/{id}` body | `{user_status?, merchant_clean?}` | `user_status` one of `confirmed`, `ignored`, `cancelled` or null; `merchant_clean` 1-100 characters after trimming |
 
 ## Outputs

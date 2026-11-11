@@ -124,6 +124,9 @@ export default defineConfig({
     // A new user whose newer pay stub changes schedule under saved decisions
     // (E2E_SCHEDULE_USER_*; issues 221 and 222).
     { name: 'schedule-change', testMatch: 'schedule-change.spec.ts', use: desktop },
+    // A new user whose browser is in a zone whose date is not UTC's (E2E_DAY_USER_*;
+    // spec 019, issue 232): every screen and the PDF count the browser's day.
+    { name: 'persons-day', testMatch: 'persons-day.spec.ts', use: desktop },
   ],
   webServer: {
     command: `next dev --port ${PORT}`,

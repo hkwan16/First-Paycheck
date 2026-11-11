@@ -727,3 +727,27 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above, on `fix/usability-spending`.
 
 **Time saved or lost:** Not measured.
+
+## 2026-11-11: "today" was the UTC day, not the person's (issue 232)
+
+**Task:** In the evening in a US time zone the app already counted the next day: at 22:27 Pacific on November 9, Spending said "November 1 to 10", the plan "As of Nov 10, 2026" and "Through Feb 8, 2027", the PDF was named for November 10, and a check-in run that evening counted one day fewer to its dates. Every clock-derived date was `now.date()` on a UTC clock, and the web's period picker read `new Date().toISOString()`.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Spec first (`docs/specs/019-the-persons-day.md`), reproduce end to end in Playwright and keep it, failing unit, integration, migration and RLS tests, then the fix; the dev-writing skill for the PR body.
+
+**What it produced:** `profiles.time_zone` (migration `0026_the_persons_day`), set from the browser's `Intl.DateTimeFormat().resolvedOptions().timeZone` by `TimeZoneSync` through `PUT /profile/time-zone`, validated against `zoneinfo` (the `tzdata` package), `America/New_York` when unset. `db/person_day.py` is the one answer to "what is today" (`PersonDay`, the `Day` route dependency, `person_day` for jobs). Every clock-derived date goes through it: the plan's `as_of` and window, `overdue` and `days_until`, the Spending and cash flow defaults, check-in periods, the scheduler's per-person month, recurring detection, a holding's fallback date, net worth's snapshot days, the PDF's date and file name, the birth year bound. `check_ins.as_of` is now stored by each run and backfilled from `last_run_at`; a PDF stores `prepared_on` in its job result, and an older export keeps its old name. The web's `useToday()` is `GET /profile`'s `today`; no request sends a "today". The LLM budget day, rate-limit hours and the `.ics` `DTSTAMP` stay UTC on purpose.
+
+**What was wrong:**
+- The stack's API, worker, Postgres and auth stand-in share the real clock, so the e2e test could not set the clock to the evening. It moves the browser's zone instead: Los Angeles before 06:00 UTC, Pago Pago before 10:00, else Kiritimati, so the browser's date differs from UTC's whenever it runs.
+- The first repro run expected "This month's check-in is ready", but the stack's startup tick had already made the month's check-in; the assertion accepts either outcome.
+- Defaulting to New York moved the day for existing tests whose clocks sat at midnight UTC; their clocks moved past Eastern midnight, each with a comment, rather than pinning the zone to UTC.
+- Net worth picked the larger of two snapshots taken the same day; it now takes the newest (found while moving its dates to the person's day).
+- Two Playwright runs and one `make test` timed out (15 smoke tests, then 6 `authenticated` tests whose pages never hydrated, and 10 web unit tests at the 5 s default) while the machine's load average was 13 to 16 on 10 cores, with Spotlight indexing and another worktree's Playwright run beside it. Each passed on a rerun with no change (the real-API projects with `--workers=2`, as CI runs them), and the visual baselines matched.
+- `decisions.spec.ts` round-trips `GET /profile` into `PUT /profile` and failed on the two new read-only fields; the helper now leaves them out.
+
+**How it was caught:** `persons-day.spec.ts` against the old code at 19:52 UTC (Kiritimati, November 12): Spending read "November 1 to 11" and "No transactions from November 1 to 11" beside a purchase dated the 12th, the plan was not "As of Nov 12, 2026", and the PDF was named `2026-11-11`.
+
+**Fix:** As above, on `fix/the-persons-day`.
+
+**Time saved or lost:** Not measured.

@@ -55,7 +55,7 @@ Save the calculator result a user picks as an immutable, versioned `decisions` r
 
 14. **401(k).** Saving a `k401_match` decision creates no goal and one `calendar_events` row: kind `election_check`, title "Check that your next pay stub shows your new 401(k) contribution", `due_at` the next expected pay date (rule 16), linked to the new decision. The previous version's `upcoming` `election_check` events become `dismissed` in the same transaction, so the calendar shows one check per calculator.
 15. Side effects run in the same transaction as the insert; a failure saves nothing.
-16. **Next expected pay date** (`calc/pay_dates.py:next_pay_date(frequency, anchor, today)`, pure). `today` is the request's UTC date. `frequency` is the user's pay schedule (spec 005 rule 25a: the newest current stub's `pay_frequency`, else the profile's; issue 198), or, when there is none, the one matching the decision's `pay_periods_per_year` (52 weekly, 26 biweekly, 24 semimonthly, 12 monthly). `anchor` is the latest current confirmed pay stub's `pay_date` (a superseded copy never counts, spec 005 rule 22d), or none. The result is the first date strictly after `today` in the schedule:
+16. **Next expected pay date** (`calc/pay_dates.py:next_pay_date(frequency, anchor, today)`, pure). `today` is the person's today (spec 019 rule 2). `frequency` is the user's pay schedule (spec 005 rule 25a: the newest current stub's `pay_frequency`, else the profile's; issue 198), or, when there is none, the one matching the decision's `pay_periods_per_year` (52 weekly, 26 biweekly, 24 semimonthly, 12 monthly). `anchor` is the latest current confirmed pay stub's `pay_date` (a superseded copy never counts, spec 005 rule 22d), or none. The result is the first date strictly after `today` in the schedule:
     - weekly and biweekly: `anchor + k * 7` or `anchor + k * 14` days for any integer `k`;
     - monthly: the anchor's day of month in every month, clamped to the month's last day;
     - semimonthly: the 15th and the last day of every month when the anchor is the 15th or a month's last day; otherwise the anchor's day `d` and `d + 15` (when `d <= 15`) or `d - 15` and `d` (when `d > 15`), each clamped to the month's last day;
@@ -107,7 +107,7 @@ Some of a decision's inputs are not what the person chose but what its step read
 
 ### Inputs
 
-`start` and `end`, inclusive ISO dates. Both or neither: one alone is 422. `start > end` is 422, as is a span over 366 days. Without them the period is the last complete calendar month in UTC (on 2026-10-21 that is 2026-09-01 to 2026-09-30).
+`start` and `end`, inclusive ISO dates. Both or neither: one alone is 422. `start > end` is 422, as is a span over 366 days. Without them the period is the last complete calendar month before the person's today (spec 019; on 2026-10-21 that is 2026-09-01 to 2026-09-30).
 
 ### Outputs (`SpendingSummary`)
 

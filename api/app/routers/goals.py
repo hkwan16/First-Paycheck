@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import decision_effects
-from app.deps import Now, UserSession
+from app.deps import Day, Now, UserSession
 from app.errors import NotFound, error_responses
 from app.types import UtcDateTime
 from calc.emergency_fund import funded_pct
@@ -109,7 +109,9 @@ def list_goals(session: UserSession) -> list[GoalOut]:
 
 
 @router.patch("/{goal_id}", responses=error_responses(401, 404, 422))
-def update_goal(goal_id: uuid.UUID, body: GoalPatch, session: UserSession, now: Now) -> GoalOut:
+def update_goal(
+    goal_id: uuid.UUID, body: GoalPatch, session: UserSession, now: Now, day: Day
+) -> GoalOut:
     """Pause, resume or mark a goal reached, change its contribution or its account.
 
     A new contribution projects the goal's date again, the way saving the
@@ -127,7 +129,7 @@ def update_goal(goal_id: uuid.UUID, body: GoalPatch, session: UserSession, now: 
     if contribution is not None and contribution != goal.monthly_contribution_cents:
         goal.monthly_contribution_cents = contribution
         # As saving the decision at this contribution would project it (spec 011 rule 17a).
-        goal.target_date = decision_effects.reproject_goal(session, goal, now.date())
+        goal.target_date = decision_effects.reproject_goal(session, goal, day.today)
     if body.status is not None and body.status != goal.status:
         goal.status = body.status
         goal.reached_at = now if body.status is GoalStatus.REACHED else None

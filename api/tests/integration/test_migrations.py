@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import uuid
 from typing import Any
 
+import pytest
 from sqlalchemy import Engine, text
+from sqlalchemy.exc import IntegrityError
 
 from app.db import current_alembic_revision, user_session_for
 from db.seed.load import load_category_rules, read_seed_rules
@@ -940,3 +943,69 @@ def test_0025_clears_roles_the_kind_does_not_allow(scratch_database: tuple[str, 
         "Brokerage spend": None,
         "Unset": None,
     }
+
+
+def test_0026_keeps_each_check_ins_date(scratch_database: tuple[str, Engine]) -> None:
+    """Spec 019 rule 12 (issue 232): a check-in keeps the date it showed before
+    0026 (the UTC date of its last run, capped at its month's last day), with
+    its updated_at untouched; profiles gain an unset time zone."""
+    url, engine = scratch_database
+    upgrade(url, "0025_account_role_fits_kind")
+    user = "00000000-0000-4000-8000-0000000000d6"
+    rows = [
+        ("2026-09-01", "2026-10-02 01:00+00"),  # run after its month: its last day
+        ("2026-10-01", "2026-10-28 12:00+00"),
+        ("2026-11-01", "2026-11-10 06:27+00"),  # 22:27 Pacific on the 9th, still the 10th
+    ]
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO auth.users (id) VALUES (:u)"), {"u": user})
+        connection.execute(text("INSERT INTO profiles (user_id) VALUES (:u)"), {"u": user})
+        for period, last_run_at in rows:
+            connection.execute(
+                text(
+                    "INSERT INTO check_ins (user_id, period, triggered_by, last_run_at)"
+                    " VALUES (:u, :p, 'schedule', :r)"
+                ),
+                {"u": user, "p": period, "r": last_run_at},
+            )
+        # An updated_at the backfill must leave alone (set_updated_at() would stamp it).
+        connection.execute(text("ALTER TABLE check_ins DISABLE TRIGGER check_ins_set_updated_at"))
+        connection.execute(text("UPDATE check_ins SET updated_at = '2026-11-10 06:30+00'"))
+        connection.execute(text("ALTER TABLE check_ins ENABLE TRIGGER check_ins_set_updated_at"))
+
+    upgrade(url, "0026_the_persons_day")
+    with engine.connect() as connection:
+        dates = connection.execute(
+            text("SELECT period::text, as_of::text, updated_at FROM check_ins ORDER BY period")
+        ).all()
+        zone = connection.execute(text("SELECT time_zone FROM profiles")).scalar_one()
+    assert [(period, as_of) for period, as_of, _ in dates] == [
+        ("2026-09-01", "2026-09-30"),
+        ("2026-10-01", "2026-10-28"),
+        ("2026-11-01", "2026-11-10"),
+    ]
+    assert {updated_at.astimezone(dt.UTC) for _, _, updated_at in dates} == {
+        dt.datetime(2026, 11, 10, 6, 30, tzinfo=dt.UTC)
+    }
+    assert zone is None
+
+    # A date outside the month, a check-in without one and an empty zone are refused.
+    for statement in (
+        "UPDATE check_ins SET as_of = '2026-12-01' WHERE period = '2026-11-01'",
+        "INSERT INTO check_ins (user_id, period, triggered_by) VALUES (:u, '2026-12-01', 'sync')",
+        "UPDATE profiles SET time_zone = ''",
+    ):
+        with pytest.raises(IntegrityError), engine.begin() as connection:
+            connection.execute(text(statement), {"u": user})
+
+    downgrade(url, "0025_account_role_fits_kind")
+    with engine.connect() as connection:
+        columns = connection.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns"
+                " WHERE (table_name, column_name) IN"
+                " (('check_ins', 'as_of'), ('profiles', 'time_zone'))"
+            )
+        ).all()
+    assert columns == []
+    upgrade(url, "head")

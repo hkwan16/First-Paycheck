@@ -20,7 +20,7 @@ from jobs.registry import default_handlers
 from jobs.worker import Worker
 from tests.conftest import FixtureUser
 from tests.support.checkin_jobs import check_ins, checkin_jobs, findings, job_row, run_all
-from tests.support.factories import make_check_in, make_finding, make_snapshot
+from tests.support.factories import make_check_in, make_finding, make_snapshot, make_time_zone
 from tests.support.november import NOW, PERIOD, S1, S2, november
 from tests.support.pay_stub_copies import (
     confirm,
@@ -87,10 +87,48 @@ def test_tick_queues_one_check_in_per_user_per_month(
     ]
     assert queued[0]["payload"] == {"period": "2026-11-01", "trigger": "schedule"}
 
-    december = dt.datetime(2026, 12, 1, 0, 1, tzinfo=dt.UTC)
+    # 00:01 EST on December 1: a user with no zone reads as New York (spec 019 rule 1).
+    december = dt.datetime(2026, 12, 1, 5, 1, tzinfo=dt.UTC)
     assert scheduler.tick(bind=empty_queue, now=december)["checkins_queued"] == 2
     keys = sorted(j["idempotency_key"] for j in checkin_jobs(empty_queue))
     assert keys.count("checkin.monthly:2026-12") == 2
+
+
+def test_tick_queues_each_persons_month(
+    empty_queue: Connection, user_a: FixtureUser, user_b: FixtureUser
+) -> None:
+    """Spec 019 rule 13, example 18: November begins at each person's midnight."""
+    user_c = FixtureUser(uuid.UUID("00000000-0000-4000-8000-0000000000c9"), "c@example.com")
+    empty_queue.execute(
+        text("INSERT INTO auth.users (id, email) VALUES (:id, :email)"),
+        {"id": user_c.id, "email": user_c.email},
+    )
+    make_time_zone(empty_queue, user_a.id, "America/Los_Angeles")
+    make_time_zone(empty_queue, user_b.id, "America/New_York")
+    for user in (user_a, user_b, user_c):
+        queue_check_in(empty_queue, user, period="2026-10-01")
+        empty_queue.execute(
+            text("UPDATE jobs SET idempotency_key = 'checkin.monthly:2026-10' WHERE user_id = :u"),
+            {"u": user.id},
+        )
+
+    def november() -> set[uuid.UUID]:
+        return {
+            job["user_id"]
+            for job in checkin_jobs(empty_queue)
+            if job["idempotency_key"] == "checkin.monthly:2026-11"
+        }
+
+    # 00:30 EDT on November 1; 21:30 PDT on October 31.
+    first = dt.datetime(2026, 11, 1, 4, 30, tzinfo=dt.UTC)
+    assert scheduler.tick(bind=empty_queue, now=first)["checkins_queued"] == 2
+    assert november() == {user_b.id, user_c.id}
+    # 00:30 PDT on November 1.
+    second = dt.datetime(2026, 11, 1, 7, 30, tzinfo=dt.UTC)
+    assert scheduler.tick(bind=empty_queue, now=second)["checkins_queued"] == 1
+    assert november() == {user_a.id, user_b.id, user_c.id}
+    payloads = {job["user_id"]: job["payload"] for job in checkin_jobs(empty_queue)}
+    assert payloads[user_a.id] == {"period": "2026-11-01", "trigger": "schedule"}
 
 
 def test_tick_catches_up_later_in_the_month(empty_queue: Connection, user_a: FixtureUser) -> None:
@@ -103,7 +141,8 @@ def test_the_tick_handler_uses_the_job_clock(empty_queue: Connection, user_a: Fi
     empty_queue.execute(text("INSERT INTO jobs (kind) VALUES ('schedule.tick')"))
     Worker(
         handlers={JobKind.SCHEDULE_TICK: default_handlers()[JobKind.SCHEDULE_TICK]},
-        services=Services(clock=lambda: dt.datetime(2027, 1, 1, tzinfo=dt.UTC)),
+        # 00:00 EST on January 1 (spec 019 rule 1: no zone reads as New York).
+        services=Services(clock=lambda: dt.datetime(2027, 1, 1, 5, tzinfo=dt.UTC)),
         queue_bind=empty_queue,
         user_bind=empty_queue,
     ).run_once()

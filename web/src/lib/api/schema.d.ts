@@ -207,8 +207,8 @@ export interface paths {
     };
     /**
      * Get Cashflow
-     * @description Gross-to-net lines of each pay stub and the spending summary; the last full UTC
-     *     month by default.
+     * @description Gross-to-net lines of each pay stub and the spending summary; by default the last
+     *     full month before the person's today.
      */
     get: operations['get_cashflow'];
     put?: never;
@@ -734,9 +734,29 @@ export interface paths {
     get: operations['get_profile'];
     /**
      * Put Profile
-     * @description Replace the profile.
+     * @description Replace the profile, except its time zone.
      */
     put: operations['put_profile'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/profile/time-zone': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Put Time Zone
+     * @description Save the browser's time zone, making the profile when there is none (spec 019 rule 5).
+     */
+    put: operations['put_time_zone'];
     post?: never;
     delete?: never;
     options?: never;
@@ -813,7 +833,8 @@ export interface paths {
     };
     /**
      * Spending Summary
-     * @description Income, spending by bucket and what is left over; the last full UTC month by default.
+     * @description Income, spending by bucket and what is left over; by default the last full month
+     *     before the person's today.
      */
     get: operations['spending_summary'];
     put?: never;
@@ -3108,6 +3129,17 @@ export interface components {
       salary_review: components['schemas']['SalaryReview'] | null;
       /** Start Date */
       start_date?: string | null;
+      /**
+       * Time Zone
+       * @description The IANA zone the browser last reported (spec 019 rule 5), null before the first report; dates are then taken in America/New_York.
+       */
+      time_zone: string | null;
+      /**
+       * Today
+       * Format: date
+       * @description The person's today in their zone (spec 019 rule 2). Computed on read.
+       */
+      today: string;
       /** Updated At */
       updated_at: string | null;
       /** Vesting Years */
@@ -3493,6 +3525,17 @@ export interface components {
     TierProposal: {
       /** Fields */
       fields: components['schemas']['ProposedField'][];
+    };
+    /**
+     * TimeZoneIn
+     * @description The browser's zone, ``Intl.DateTimeFormat().resolvedOptions().timeZone``.
+     */
+    TimeZoneIn: {
+      /**
+       * Time Zone
+       * @example America/Los_Angeles
+       */
+      time_zone: string;
     };
     /** TransactionOut */
     TransactionOut: {
@@ -5543,6 +5586,48 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  put_time_zone: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TimeZoneIn'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProfileOut'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
         headers: {
           [name: string]: unknown;
         };

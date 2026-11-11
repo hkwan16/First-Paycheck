@@ -184,9 +184,9 @@ export function planBarValue(line: PlanLine): number | null {
 
 /**
  * Whether a check-in offers "Check in now": `POST /check-ins` runs the
- * request clock's UTC month (spec 015 rule 23) and leaves a completed
+ * person's month (spec 015 rule 23, spec 019 rule 9) and leaves a completed
  * check-in as it is, so only this month's open check-in. `today` is
- * `useToday()`, null until the client knows the date.
+ * `useToday()`, the person's today from `GET /profile`, null until it answers.
  */
 export const offersCheckInNow = (
   checkIn: Pick<CheckInDetail, 'period' | 'status'>,

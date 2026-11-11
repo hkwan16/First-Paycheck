@@ -12,6 +12,7 @@ import uuid
 from collections.abc import Mapping
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import column, select, table, text
 from sqlalchemy.orm import Session
@@ -44,8 +45,9 @@ from db.models import (
     RecurringCharge,
 )
 from db.pay_stubs import NEWEST_FIRST, current_pay_stubs
+from db.person_day import day_in
 
-__all__ = ["DEADLINE_WINDOW_DAYS", "current_decisions", "load_facts", "plan_targets", "utc_date"]
+__all__ = ["DEADLINE_WINDOW_DAYS", "current_decisions", "load_facts", "plan_targets"]
 
 # Rule 7: open events due up to this many days after today are reported.
 DEADLINE_WINDOW_DAYS = 30
@@ -59,22 +61,18 @@ _RECURRING_KINDS = (
 )
 
 
-def utc_date(moment: dt.datetime) -> dt.date:
-    return moment.astimezone(dt.UTC).date()
-
-
 def current_decisions(session: Session) -> dict[CalculatorKind, Decision]:
     """The current decision of each calculator (spec 001 rule 18)."""
     rows = session.scalars(select(Decision).where(Decision.id.in_(select(_CURRENT.c.id))))
     return {row.calculator: row for row in rows}
 
 
-def _k401(decision: Decision | None) -> K401Fact | None:
+def _k401(decision: Decision | None, zone: ZoneInfo) -> K401Fact | None:
     if decision is None:
         return None
     return K401Fact(
         decision_id=decision.id,
-        decided_on=utc_date(decision.created_at),
+        decided_on=day_in(decision.created_at, zone),
         contribution_pct=Decimal(str(decision.inputs["contribution_pct"])),
     )
 
@@ -88,13 +86,13 @@ def _selected_plan(decision: Decision) -> dict[str, Any] | None:
     return plan
 
 
-def _health(decision: Decision | None) -> HealthFact | None:
+def _health(decision: Decision | None, zone: ZoneInfo) -> HealthFact | None:
     plan = _selected_plan(decision) if decision is not None else None
     if decision is None or plan is None:
         return None
     return HealthFact(
         decision_id=decision.id,
-        decided_on=utc_date(decision.created_at),
+        decided_on=day_in(decision.created_at, zone),
         plan_name=str(plan["name"]),
         premium_per_period_cents=int(plan["premium_per_period_cents"]),
     )
@@ -119,7 +117,9 @@ def _stub(row: PayStub, paychecks: Mapping[uuid.UUID, uuid.UUID]) -> StubFact:
     )
 
 
-def _goals(session: Session, decisions: dict[uuid.UUID, Decision]) -> list[GoalFact]:
+def _goals(
+    session: Session, decisions: dict[uuid.UUID, Decision], zone: ZoneInfo
+) -> list[GoalFact]:
     goals = session.scalars(
         select(Goal)
         .where(Goal.status == GoalStatus.ACTIVE, Goal.account_id.is_not(None))
@@ -139,11 +139,11 @@ def _goals(session: Session, decisions: dict[uuid.UUID, Decision]) -> list[GoalF
                 id=goal.id,
                 kind=goal.kind,
                 decision_id=goal.decision_id,
-                started_on=utc_date(started),
+                started_on=day_in(started, zone),
                 target_amount_cents=goal.target_amount_cents,
                 monthly_contribution_cents=goal.monthly_contribution_cents,
                 balances=[
-                    BalanceFact(as_of=utc_date(as_of), balance_cents=cents)
+                    BalanceFact(as_of=day_in(as_of, zone), balance_cents=cents)
                     for as_of, cents in balances
                 ],
             )
@@ -221,9 +221,12 @@ def load_facts(
     period: dt.date,
     today: dt.date,
     paychecks: Mapping[uuid.UUID, uuid.UUID],
+    *,
+    zone: ZoneInfo,
 ) -> Facts:
     """Everything the finders read for ``period``, as of ``today``; ``paychecks``
-    is ``db/pay_stubs.py:paycheck_ids``, which the engine reads once for both."""
+    is ``db/pay_stubs.py:paycheck_ids``, which the engine reads once for both.
+    Stored instants are dated in the person's ``zone`` (spec 019 rule 3)."""
     current = current_decisions(session)
     stubs = session.scalars(current_pay_stubs().order_by(*NEWEST_FIRST).limit(2))
     by_id = {decision.id: decision for decision in current.values()}
@@ -238,10 +241,10 @@ def load_facts(
         period=period,
         today=today,
         pay_stubs=[_stub(row, paychecks) for row in stubs],
-        k401=_k401(current.get(CalculatorKind.K401_MATCH)),
-        health=_health(current.get(CalculatorKind.HEALTH_PLANS)),
+        k401=_k401(current.get(CalculatorKind.K401_MATCH), zone),
+        health=_health(current.get(CalculatorKind.HEALTH_PLANS), zone),
         w4_decision_id=w4.id if w4 is not None else None,
-        goals=_goals(session, {**goal_decisions, **by_id}),
+        goals=_goals(session, {**goal_decisions, **by_id}, zone),
         recurring=_recurring(session),
         events=_events(session, today),
     )

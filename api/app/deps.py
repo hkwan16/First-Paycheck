@@ -26,6 +26,7 @@ from app.db import (
     user_session,
 )
 from app.errors import AppError
+from db.person_day import PersonDay, person_day
 from jobs import scheduler
 from llm.gateway import Gateway, LLMNotConfigured, get_gateway
 from sync.crypto import TokenCipher, TokenCipherNotConfigured, cipher_from_settings
@@ -129,6 +130,16 @@ def get_now() -> dt.datetime:
 
 
 Now = Annotated[dt.datetime, Depends(get_now)]
+
+
+def get_day(session: UserSession, user: CurrentUser, now: Now) -> PersonDay:
+    """The person's day at the request clock (spec 019 rule 2): their saved zone,
+    read in the request's RLS session, and their date at ``Now``. A test that
+    freezes ``Now`` freezes the person's day too."""
+    return person_day(session, user.id, now)
+
+
+Day = Annotated[PersonDay, Depends(get_day)]
 
 
 def alembic_revision(bind: DbBind) -> str | None:

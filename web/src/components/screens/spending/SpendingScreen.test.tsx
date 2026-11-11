@@ -174,6 +174,18 @@ describe('SpendingScreen summary', () => {
     await waitFor(() => expect(tile('Income deposited')).toHaveTextContent('$3,992.08'));
   });
 
+  it('ends this month so far on the person’s today from the API, not the browser’s clock', async () => {
+    // Issue 232: 23:30 Pacific on October 17 is October 18 in UTC, which the
+    // picker used to end the month on; the API answers the person's day.
+    vi.setSystemTime(new Date('2026-10-18T06:30:00Z'));
+    db.profile.today = '2026-10-17';
+    const reads = cashflowReads();
+    const { user } = await renderSpending();
+    await pickPeriod(user, 'October 2026 so far');
+    await waitFor(() => expect(reads).toContain('?start=2026-10-01&end=2026-10-17'));
+    expect(reads.some((query) => query.includes('2026-10-18'))).toBe(false);
+  });
+
   it("picks a period: this month so far, the API's last complete month, or one before", async () => {
     const reads = cashflowReads();
     const { user } = await renderSpending();

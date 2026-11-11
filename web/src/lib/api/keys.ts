@@ -212,6 +212,20 @@ export const invalidateAfterConfirm = (client: QueryClient) =>
 export const invalidateAfterProfile = (client: QueryClient) =>
   invalidateAll(client, [...decisionReads, queryKeys.plan()]);
 
+/**
+ * After `PUT /profile/time-zone`, whose answer (with the person's new today)
+ * the hook writes into the profile's cache: every other read, because the
+ * API dates nearly everything by the person's day (spec 019 rule 5): the
+ * plan's as-of date, the calendar's overdue marks, the Spending default, the
+ * check-ins' current month.
+ */
+export const invalidateAfterTimeZone = (client: QueryClient) => {
+  const [method, path] = queryKeys.profile();
+  return client.invalidateQueries({
+    predicate: ({ queryKey }) => !(queryKey[0] === method && queryKey[1] === path),
+  });
+};
+
 /** A save lost a race (409): read the decisions again. */
 export const invalidateDecisions = (client: QueryClient) => invalidateAll(client, decisionReads);
 

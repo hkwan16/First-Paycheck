@@ -59,6 +59,20 @@ export function scheduleUser(): E2EUser | null {
   return supabaseConfigured() && email && password ? { email, password } : null;
 }
 
+export const NO_DAY_USER =
+  "Skipped: set E2E_DAY_USER_EMAIL and E2E_DAY_USER_PASSWORD (a new, confirmed user with no data; scripts/e2e_stack.py makes one per run) to run the person's day.";
+
+/**
+ * The account persons-day.spec.ts signs in with from a browser in a zone whose
+ * date is not UTC's (spec 019, issue 232): the browser's zone becomes its
+ * profile's, so it is no other spec's user.
+ */
+export function dayUser(): E2EUser | null {
+  const email = process.env.E2E_DAY_USER_EMAIL?.trim();
+  const password = process.env.E2E_DAY_USER_PASSWORD;
+  return supabaseConfigured() && email && password ? { email, password } : null;
+}
+
 /** Wait for React to hydrate before interacting, so no event lands on dead HTML. */
 export async function waitForHydration(page: Page) {
   await page.locator('html[data-hydrated="true"]').waitFor();

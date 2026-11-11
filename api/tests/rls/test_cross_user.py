@@ -365,6 +365,29 @@ def put_profile(connection: Connection, client_as: Callable[[FixtureUser], TestC
     return Case("PUT", "/profile", 200, json={"salary_cents": 1}, after=a_profile_unchanged)
 
 
+def put_time_zone(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    """B's report saves B's zone only (spec 019 rule 5): A's stays unset."""
+    a_profile(connection)
+
+    def a_zone_unchanged(connection: Connection) -> None:
+        a_profile_unchanged(connection)
+        rows = connection.execute(text("SELECT user_id, time_zone FROM profiles")).all()
+        zones: dict[uuid.UUID, str | None] = dict(rows)
+        assert zones == {USER_A.id: None, USER_B.id: "America/Chicago"}
+
+    def body(data: Any) -> None:
+        assert (data["time_zone"], data["salary_cents"]) == ("America/Chicago", None)
+
+    return Case(
+        "PUT",
+        "/profile/time-zone",
+        200,
+        json={"time_zone": "America/Chicago"},
+        body=body,
+        after=a_zone_unchanged,
+    )
+
+
 K401_INPUTS: dict[str, Any] = {
     "salary_cents": 6_000_000,
     "pay_periods_per_year": 26,
@@ -840,6 +863,7 @@ ROUTE_CASES: dict[tuple[str, str], Builder] = {
     ("GET", "/benefits-plans"): list_benefits_plans,
     ("GET", "/profile"): get_profile,
     ("PUT", "/profile"): put_profile,
+    ("PUT", "/profile/time-zone"): put_time_zone,
     ("POST", "/sync/link-token"): link_token,
     ("POST", "/sync/items"): link_item,
     ("DELETE", "/sync/items/{item_id}"): delete_item,

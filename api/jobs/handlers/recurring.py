@@ -9,13 +9,15 @@ from __future__ import annotations
 from typing import Any
 
 from checkin.engine import queue_refresh
+from db.person_day import person_day
 from jobs.context import JobContext
 from sync.recurring import run_detection
 
 
 def detect(ctx: JobContext) -> dict[str, Any]:
-    today = ctx.services.clock().date()
     with ctx.user_session() as session:
-        result = run_detection(session, ctx.user_id, today)
-        queue_refresh(session, ctx.user_id, today)
+        # The person's today and month at the job clock (spec 019 rule 9).
+        day = person_day(session, ctx.user_id, ctx.services.clock())
+        result = run_detection(session, ctx.user_id, day.today)
+        queue_refresh(session, ctx.user_id, day.month)
     return result.as_job_result()

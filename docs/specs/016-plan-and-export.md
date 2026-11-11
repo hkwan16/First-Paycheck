@@ -10,7 +10,7 @@ Show the user their whole plan in one read: the current version of every saved d
 
 | Route | Input |
 |---|---|
-| `GET /plan` | None. Today is the request's UTC date (`Now`). |
+| `GET /plan` | None. Today is the person's today at the request clock (`Day`, spec 019). |
 | `GET /plan/calendar.ics` | None. `DTSTAMP` is the request's time (`Now`). |
 | `POST /plan/export` | None (no body). |
 | `GET /plan/export/{job_id}` | `job_id` (uuid): the job `POST /plan/export` returned. |
@@ -23,7 +23,7 @@ The data read, all under the user's RLS session: `current_decisions` and `decisi
 
 | Field | Type | Meaning |
 |---|---|---|
-| `as_of` | date | Today (UTC). |
+| `as_of` | date | The person's today (spec 019). |
 | `calendar_through` | date | `as_of + 90 days`, the last due date `calendar` includes. |
 | `completeness` | `PlanCompleteness` | `saved`, `missing` and `needs_review`: lists of `calculator_kind`, each in enum order (`emergency_fund`, `k401_match`, `health_plans`, `w4`). |
 | `decisions` | list of `PlanDecision` | One per saved calculator, in enum order: `id`, `calculator`, `version`, `created_at`, `inputs`, `result` (as stored, spec 007 rule 3), `figures`, `explanation` and `review` (spec 007 rule 19b). |
@@ -45,7 +45,7 @@ The data read, all under the user's RLS session: `current_decisions` and `decisi
 
 ### `GET /plan/export/{job_id}`
 
-`200`, `Content-Type: application/pdf`, `Content-Disposition: attachment; filename="first-paycheck-plan-<YYYY-MM-DD>.pdf"` (the export's UTC creation date), the PDF bytes. `404 not_found` otherwise (rule 22).
+`200`, `Content-Type: application/pdf`, `Content-Disposition: attachment; filename="first-paycheck-plan-<YYYY-MM-DD>.pdf"` (the job result's `prepared_on`, the plan's `as_of`; an export without one is named by the UTC date of its `created_at`, spec 019 rule 12), the PDF bytes. `404 not_found` otherwise (rule 22).
 
 ## Rules
 
@@ -73,8 +73,8 @@ The data read, all under the user's RLS session: `current_decisions` and `decisi
 ### PDF export
 
 9. **Queue.** `POST /plan/export` enqueues `plan.export` for the user with payload `{}` (spec 001 rule 28) through `jobs.queue.enqueue_unless_queued`, so a second click while one is waiting returns the same job.
-10. **The job** (`jobs/handlers/plan_export.py`) reads the plan with `app.plan.build_plan` in one user session (`ctx.user_session()`, RLS), as of the job clock's UTC date (`Services.clock`), renders it with no session open, and stores the bytes in a second user session. Its result is `{"size_bytes": n}`. A rerun of the same job (a stale requeue after the bytes were stored) keeps the first export and renders nothing.
-11. **Template.** `api/export/templates/plan.html.j2` (Jinja2, autoescaped) renders `PlanOut` and the export time. Page 1 is the plan: the title, the employer and preparation date, the pay stub's figures, each saved decision with its version, figures (or, for one that needs review, rule 3a's note) and explanation status, the calculators still missing, and the goals. Page 2 starts with the decision calendar (rule 6's events, an overdue one marked "Overdue") and then "Why, with sources": for each decision with an explanation, its concept and text and, for every citation, the title, the IRS document name and the full URL printed as text. A stale explanation (spec 008 rules 19a and 19b) is labeled "Out of date: written from figures that have changed since. Open Why in First Paycheck to write it again." on both pages, and page 2 prints only that label for it, no concept, text or sources. Money is written `$1,234.56` (`verify.format.dollars`), a `net_cost` figure the same way unless it is negative, then as `$403.00 ahead` (`verify.format.net_cost`, spec 012 rule 17), a `refund` figure as `$0.02 refund`, `$3,918.70 due` or `Nothing due, no refund`, percentages `4%` (`verify.format.percent`), dates `Oct 31, 2026`. The page carries no ids and no timestamps other than the preparation date, so the same plan renders to the same HTML.
+10. **The job** (`jobs/handlers/plan_export.py`) reads the plan with `app.plan.build_plan` in one user session (`ctx.user_session()`, RLS), as of the person's today at the job clock (`Services.clock`, spec 019), renders it with no session open, and stores the bytes in a second user session. Its result is `{"size_bytes": n, "prepared_on": "YYYY-MM-DD"}`, the plan's `as_of`. A rerun of the same job (a stale requeue after the bytes were stored) keeps the first export and renders nothing.
+11. **Template.** `api/export/templates/plan.html.j2` (Jinja2, autoescaped) renders `PlanOut`; the preparation date it prints is the plan's `as_of`. Page 1 is the plan: the title, the employer and preparation date, the pay stub's figures, each saved decision with its version, figures (or, for one that needs review, rule 3a's note) and explanation status, the calculators still missing, and the goals. Page 2 starts with the decision calendar (rule 6's events, an overdue one marked "Overdue") and then "Why, with sources": for each decision with an explanation, its concept and text and, for every citation, the title, the IRS document name and the full URL printed as text. A stale explanation (spec 008 rules 19a and 19b) is labeled "Out of date: written from figures that have changed since. Open Why in First Paycheck to write it again." on both pages, and page 2 prints only that label for it, no concept, text or sources. Money is written `$1,234.56` (`verify.format.dollars`), a `net_cost` figure the same way unless it is negative, then as `$403.00 ahead` (`verify.format.net_cost`, spec 012 rule 17), a `refund` figure as `$0.02 refund`, `$3,918.70 due` or `Nothing due, no refund`, percentages `4%` (`verify.format.percent`), dates `Oct 31, 2026`. The page carries no ids and no timestamps other than the preparation date, so the same plan renders to the same HTML.
 12. **Print-safe Ledger look.** Ink `#16181D` text on white, secondary text `#3F4650` and `#5B6370`, hairlines `#D0D3D9`; no background fills, shadows, images or screenshots; US Letter with 0.6 in margins; `"DejaVu Sans"` first in the font stack (the Docker image installs `fonts-dejavu-core`); a footer with "Page n of m".
 13. **Rendering** is `export/pdf.py:render_pdf(html) -> bytes`, which imports WeasyPrint inside the function. Only the worker calls it; the API process never imports `weasyprint`, `export.pdf` or `export.html` (`tests/unit/test_boundaries.py`).
 14. **Storage.** `plan_exports` (migration `0013_plan_export_job`): `job_id uuid` primary key, `user_id` (as convention), `bytes bytea NOT NULL` with `CHECK (octet_length(bytes) > 0)`, `content_type text NOT NULL` with `CHECK (content_type = 'application/pdf')`, `created_at timestamptz NOT NULL DEFAULT now()`; foreign key `(job_id, user_id) -> jobs(id, user_id) ON DELETE CASCADE`, for which `jobs` gains `UNIQUE (id, user_id)`; index `(created_at)` for retention. `enable_rls("plan_exports", privileges=("SELECT", "INSERT"))`. `export/store.py` is the only module that touches the table.

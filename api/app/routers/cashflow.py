@@ -17,7 +17,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.deps import Now, UserSession
+from app.deps import Day, UserSession
 from app.errors import error_responses
 from app.routers.spending import SpendingSummary, period, summary_for
 from calc.cashflow import FlowDiagram, StubFlow, diagram, withholding
@@ -68,13 +68,13 @@ def _amounts(stub: PayStub) -> PayStubAmounts:
 @router.get("", responses=error_responses(401, 422))
 def get_cashflow(
     session: UserSession,
-    now: Now,
+    day: Day,
     start: Annotated[dt.date | None, Query(description="First day, inclusive")] = None,
     end: Annotated[dt.date | None, Query(description="Last day, inclusive")] = None,
 ) -> CashFlow:
-    """Gross-to-net lines of each pay stub and the spending summary; the last full UTC
-    month by default."""
-    first, last = period(start, end, now.date())
+    """Gross-to-net lines of each pay stub and the spending summary; by default the last
+    full month before the person's today."""
+    first, last = period(start, end, day.today)
     return cash_flow_for(session, first, last)
 
 
