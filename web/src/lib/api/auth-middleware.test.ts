@@ -1,8 +1,15 @@
 import { http, HttpResponse } from 'msw';
 import createFetchClient from 'openapi-fetch';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '@/test/msw/server';
-import { createAuthMiddleware, createSessionTokens, type SessionAuth } from './auth-middleware';
+import {
+  createAuthMiddleware,
+  createSessionTokens,
+  SESSION_READ_TIMEOUT_MS,
+  SESSION_UNAVAILABLE_MESSAGE,
+  SessionUnavailable,
+  type SessionAuth,
+} from './auth-middleware';
 
 const BASE = 'http://api.test';
 
@@ -236,6 +243,88 @@ describe('createSessionTokens', () => {
     expect(auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: 'local' });
     expect(onAccountDeleted).toHaveBeenCalledOnce();
     expect(onSessionExpired).not.toHaveBeenCalled();
+  });
+
+  describe('a session read or sign-out that never answers (issue 225)', () => {
+    const never = () => new Promise<never>(() => undefined);
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('stops waiting for the session after SESSION_READ_TIMEOUT_MS, and says so', async () => {
+      vi.useFakeTimers();
+      const auth = fakeAuth();
+      auth.getSession.mockImplementationOnce(never);
+      const onSessionReadable = vi.fn();
+      const tokens = createSessionTokens({
+        getAuth: () => auth,
+        onSessionExpired: vi.fn(),
+        onAccountDeleted: vi.fn(),
+        onSessionReadable,
+      });
+      const reading = tokens.current();
+      const outcome = expect(reading).rejects.toBeInstanceOf(SessionUnavailable);
+      await vi.advanceTimersByTimeAsync(SESSION_READ_TIMEOUT_MS);
+      await outcome;
+      await expect(reading).rejects.toMatchObject({
+        status: 0,
+        code: 'session_unavailable',
+        error: { message: SESSION_UNAVAILABLE_MESSAGE },
+      });
+      expect(onSessionReadable).toHaveBeenLastCalledWith(false);
+
+      // A later read that answers clears it.
+      await expect(tokens.current()).resolves.toBe('old');
+      expect(onSessionReadable).toHaveBeenLastCalledWith(true);
+    });
+
+    it('sends no request while the session cannot be read, and fails it instead', async () => {
+      vi.useFakeTimers();
+      const auth = fakeAuth();
+      auth.getSession.mockImplementation(never);
+      const sent = vi.fn();
+      server.use(
+        http.get(`${BASE}/ping`, () => {
+          sent();
+          return HttpResponse.json({ ok: true });
+        }),
+      );
+      const request = clientWith(auth).GET('/ping');
+      const outcome = expect(request).rejects.toBeInstanceOf(SessionUnavailable);
+      await vi.advanceTimersByTimeAsync(SESSION_READ_TIMEOUT_MS);
+      await outcome;
+      expect(sent).not.toHaveBeenCalled();
+    });
+
+    it('treats a refresh that never answers as a failed one', async () => {
+      vi.useFakeTimers();
+      const auth = fakeAuth();
+      auth.refreshSession.mockImplementationOnce(never);
+      const tokens = createSessionTokens({
+        getAuth: () => auth,
+        onSessionExpired: vi.fn(),
+        onAccountDeleted: vi.fn(),
+      });
+      const refreshing = tokens.refreshed();
+      await vi.advanceTimersByTimeAsync(SESSION_READ_TIMEOUT_MS);
+      await expect(refreshing).resolves.toBeNull();
+    });
+
+    it('still reports the expiry when the local sign-out never answers', async () => {
+      vi.useFakeTimers();
+      const auth = fakeAuth();
+      auth.signOut.mockImplementationOnce(never);
+      const onSessionExpired = vi.fn();
+      const expiring = createSessionTokens({
+        getAuth: () => auth,
+        onSessionExpired,
+        onAccountDeleted: vi.fn(),
+      }).expire();
+      await vi.advanceTimersByTimeAsync(SESSION_READ_TIMEOUT_MS);
+      await expiring;
+      expect(onSessionExpired).toHaveBeenCalledOnce();
+    });
   });
 
   it('reports a deleted account when auth is off, with nothing to sign out', async () => {

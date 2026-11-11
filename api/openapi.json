@@ -7770,11 +7770,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Validation Error"
           }
         },
         "security": [
@@ -8334,11 +8334,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Validation Error"
           }
         },
         "security": [
@@ -8857,11 +8857,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Validation Error"
           }
         },
         "security": [

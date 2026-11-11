@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, model_validator
@@ -47,6 +49,14 @@ def build_app() -> FastAPI:
 
     @router.post("/range")
     def range_(body: Range) -> Range:
+        return body
+
+    @router.get("/things/{thing_id}")
+    def thing(thing_id: uuid.UUID, limit: int = 10) -> dict[str, str]:
+        return {"id": str(thing_id)}
+
+    @router.patch("/things/{thing_id}")
+    def change_thing(thing_id: uuid.UUID, body: Payload) -> Payload:
         return body
 
     @router.get("/boom")
@@ -110,6 +120,28 @@ def test_a_validators_own_sentence_is_the_message() -> None:
             "message": "The low end must not be more than the high end",
         }
     }
+
+
+def test_a_path_id_that_is_not_an_id_is_not_found() -> None:
+    """Spec 001 rule 12a: a malformed id names no row, like an unknown one (issue 237)."""
+    response = client.get("/things/not-a-uuid")
+    assert response.status_code == 404
+    assert response.json() == {"error": {"code": "not_found", "message": "Not found"}}
+
+    # The bad id decides it even when the body is wrong too.
+    response = client.patch("/things/not-a-uuid", json={"amount_cents": "lots"})
+    assert response.status_code == 404
+
+
+def test_a_bad_query_or_body_beside_a_good_id_is_still_a_validation_error() -> None:
+    thing = uuid.uuid4()
+    response = client.get(f"/things/{thing}", params={"limit": "many"})
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+
+    response = client.patch(f"/things/{thing}", json={"amount_cents": "lots"})
+    assert response.status_code == 422
+    assert "body.amount_cents" in response.json()["error"]["message"]
 
 
 def test_details_and_headers_travel_with_the_error() -> None:

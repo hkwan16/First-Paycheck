@@ -196,6 +196,53 @@ describe('AuthForm, sign in', () => {
     expect(mocks.auth.signInWithOtp).not.toHaveBeenCalled();
   });
 
+  it('drops the password message once the person asks for a link instead (issue 240)', async () => {
+    const { user, email } = setup();
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(screen.getByText('Enter your password.')).toBeInTheDocument();
+
+    await user.type(email, 'alex@');
+    await user.click(screen.getByRole('button', { name: 'Email me a sign-in link' }));
+    expect(screen.getByText('Enter an email address like you@example.com.')).toBeInTheDocument();
+    // A link needs no password, so the earlier message no longer describes anything.
+    expect(screen.queryByText('Enter your password.')).toBeNull();
+    expect(screen.getByLabelText('Password')).not.toHaveAttribute('aria-invalid');
+
+    // Signing in with a password again asks for it again.
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(screen.getByText('Enter your password.')).toBeInTheDocument();
+  });
+
+  it('drops the last attempt’s notice when the next one does not get past the form (issue 240)', async () => {
+    mocks.auth.signInWithPassword.mockResolvedValueOnce({
+      data: { session: null },
+      error: new AuthApiError('Invalid login credentials', 400, 'invalid_credentials'),
+    });
+    const { user, email, password } = setup();
+    await user.type(email, EMAIL);
+    await user.type(password, 'wrong password');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('do not match');
+
+    await user.clear(email);
+    await user.type(email, 'alex@');
+    await user.click(screen.getByRole('button', { name: 'Email me a sign-in link' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText('Enter an email address like you@example.com.')).toBeInTheDocument();
+  });
+
+  it('drops a sent-link notice when the person signs in with a password instead', async () => {
+    mocks.auth.signInWithPassword.mockReturnValueOnce(new Promise(() => undefined));
+    const { user, email, password } = setup();
+    await user.type(email, EMAIL);
+    await user.click(screen.getByRole('button', { name: 'Email me a sign-in link' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('We sent a sign-in link');
+
+    await user.type(password, PASSWORD);
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
   it('reports a failed link request', async () => {
     mocks.auth.signInWithOtp.mockResolvedValueOnce({
       data: {},

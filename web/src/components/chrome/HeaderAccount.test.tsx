@@ -1,13 +1,16 @@
-import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderWithProviders, screen } from '@/test/render';
 
 const mocks = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock('./RestoredPageGuard', () => ({
+  RestoredPageGuard: () => <span data-testid="restored-page-guard" />,
+}));
 
 import { HeaderAccount } from './HeaderAccount';
 
 async function renderAccount() {
-  const { container } = render(<>{await HeaderAccount()}</>);
+  const { container } = renderWithProviders(<>{await HeaderAccount()}</>);
   return container;
 }
 
@@ -49,6 +52,12 @@ describe('HeaderAccount', () => {
     const menu = screen.getByRole('button', { name: 'e2e@example.com' });
     expect(chip).toHaveClass('bg-fill', 'rounded-full');
     expect(chip.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('keeps a page with the account from coming back on Back after sign out (issue 224)', async () => {
+    mocks.getCurrentUser.mockResolvedValueOnce({ id: 'u1', email: 'alex@example.com' });
+    await renderAccount();
+    expect(screen.getByTestId('restored-page-guard')).toBeInTheDocument();
   });
 
   it('shows no "Sample data" chip for anyone else', async () => {

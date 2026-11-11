@@ -1,6 +1,7 @@
 import { Chip } from '@/components/ui/Chip';
 import { accountSummary } from '@/lib/auth/account';
 import { getCurrentUser } from '@/lib/supabase/server';
+import { RestoredPageGuard } from './RestoredPageGuard';
 import { UserMenu } from './UserMenu';
 
 /**
@@ -17,6 +18,8 @@ export async function HeaderAccount() {
     <>
       {sampleData && <Chip>Sample data</Chip>}
       <UserMenu label={label} />
+      {/* A page that shows the account never comes back from the back/forward cache (issue 224). */}
+      <RestoredPageGuard />
     </>
   );
 }

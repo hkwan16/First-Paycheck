@@ -135,8 +135,18 @@ def validation_message(errors: Sequence[Any], prefix: Sequence[str] = ()) -> str
     return "; ".join(parts)
 
 
+def _names_no_row(errors: Sequence[Any]) -> bool:
+    """True when a path parameter failed to parse. Every path parameter is a
+    row's id, so a path that cannot name a row is a missing row (spec 001 rule
+    12a): 404, like an unknown id or another user's, never a 422 the client
+    could fix and send again (issue 237)."""
+    return any(tuple(item.get("loc", ()))[:1] == ("path",) for item in errors)
+
+
 async def _validation_error(_: Request, error: Exception) -> JSONResponse:
     exc = cast(RequestValidationError, error)
+    if _names_no_row(exc.errors()):
+        return JSONResponse(error_body(NotFound.code, "Not found"), status_code=404)
     return JSONResponse(
         error_body(
             "validation_error",

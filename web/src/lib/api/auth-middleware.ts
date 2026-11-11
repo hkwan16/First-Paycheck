@@ -1,9 +1,33 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Middleware } from 'openapi-fetch';
-import { apiErrorCode } from './errors';
+import { withTimeout } from '@/lib/timeout';
+import { ApiError, apiErrorCode } from './errors';
 
 /** The slice of Supabase Auth the middleware uses. */
 export type SessionAuth = Pick<SupabaseClient['auth'], 'getSession' | 'refreshSession' | 'signOut'>;
+
+/**
+ * How long a request waits for supabase-js to read (or refresh) the session
+ * before it fails (issue 225). A read is local unless the access token
+ * expired; then it waits on a token refresh, which supabase-js sends with no
+ * timeout of its own. A healthy refresh takes well under a second.
+ */
+export const SESSION_READ_TIMEOUT_MS = 10_000;
+
+export const SESSION_UNAVAILABLE_MESSAGE =
+  'We could not check that you are signed in. Reload the page, or sign in again.';
+
+/**
+ * The session could not be read in time, so the request was never sent. An
+ * `ApiError` with status 0 and a sentence for people, so every screen's
+ * `apiErrorMessage` shows it in place of its own fallback.
+ */
+export class SessionUnavailable extends ApiError {
+  constructor() {
+    super(0, { error: { code: 'session_unavailable', message: SESSION_UNAVAILABLE_MESSAGE } });
+    this.name = 'SessionUnavailable';
+  }
+}
 
 export interface AuthMiddlewareOptions {
   /** Supabase Auth in the browser, or null when auth is off (tests, server rendering). */
@@ -15,6 +39,8 @@ export interface AuthMiddlewareOptions {
    * still valid but its account is gone, so there is nothing to refresh.
    */
   onAccountDeleted: () => void;
+  /** Whether the last session read answered in time (false: `SessionUnavailable`). */
+  onSessionReadable?: (readable: boolean) => void;
 }
 
 /** True for the API's 401 `account_deleted`; reads a copy, so the body stays readable. */
@@ -56,14 +82,17 @@ export function createSessionTokens({
   getAuth,
   onSessionExpired,
   onAccountDeleted,
+  onSessionReadable,
 }: AuthMiddlewareOptions): SessionTokens {
   let refreshing: Promise<string | null> | null = null;
 
   const signOutLocally = async () => {
+    const auth = getAuth();
+    if (!auth) return;
     try {
-      await getAuth()?.signOut({ scope: 'local' });
+      await withTimeout(auth.signOut({ scope: 'local' }), SESSION_READ_TIMEOUT_MS);
     } catch {
-      // Unreachable Auth: the session is unusable anyway, so sign-in is still the way out.
+      // Unreachable or silent Auth: the session is unusable anyway, so sign-in is still the way out.
     }
   };
 
@@ -71,8 +100,15 @@ export function createSessionTokens({
     async current() {
       const auth = getAuth();
       if (!auth) return null;
-      const { data } = await auth.getSession();
-      return data.session?.access_token ?? null;
+      let session: Awaited<ReturnType<SessionAuth['getSession']>>;
+      try {
+        session = await withTimeout(auth.getSession(), SESSION_READ_TIMEOUT_MS);
+      } catch {
+        onSessionReadable?.(false);
+        throw new SessionUnavailable();
+      }
+      onSessionReadable?.(true);
+      return session.data.session?.access_token ?? null;
     },
 
     enabled: () => getAuth() !== null,
@@ -80,8 +116,7 @@ export function createSessionTokens({
     refreshed() {
       const auth = getAuth();
       if (!auth) return Promise.resolve(null);
-      refreshing ??= auth
-        .refreshSession()
+      refreshing ??= withTimeout(auth.refreshSession(), SESSION_READ_TIMEOUT_MS)
         .then(
           ({ data, error }) => (error ? null : (data.session?.access_token ?? null)),
           () => null,

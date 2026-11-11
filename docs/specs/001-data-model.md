@@ -33,6 +33,7 @@ Alembic revisions `0001_roles` through `0006_webhook_fn`, the SQLAlchemy models 
 10. The API connects as role `app_api` and, per request, runs `SET LOCAL ROLE authenticated` and `set_config('request.jwt.claims', <claims json>, true)` inside one transaction, so `auth.uid()` resolves in every policy. `app_api` cannot bypass RLS.
 11. The privileged connection (`postgres` role) is used only by `jobs/queue.py`, `jobs/scheduler.py`, Alembic and the seed loader that runs with it before deploy.
 12. A row the user does not own reads as absent, so routes return 404, never 403.
+12a. A path id that is not a well-formed id (`/decisions/not-a-uuid`) names no row either, so it is 404 `not_found` too, never a 422 the client could fix and send again (issue 237). Every path parameter is a row's id; a malformed query parameter or body field is still 422 `validation_error`.
 
 **Exceptions to the owner policy** (each covered by its own RLS test):
 

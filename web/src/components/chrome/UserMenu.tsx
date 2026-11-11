@@ -1,12 +1,18 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import { ArrowSmallIcon } from '@/components/icons';
 import { Button } from '@/components/ui/Button';
 import { chipClasses } from '@/components/ui/Chip';
+import { SIGN_OUT_PATH } from '@/lib/auth/sign-out';
 import { cn } from '@/lib/cn';
-import { hardNavigate } from '@/lib/navigation';
-import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { DeleteAccountConfirm } from './DeleteAccountConfirm';
 
 export interface UserMenuProps {
@@ -14,78 +20,106 @@ export interface UserMenuProps {
   label: string;
 }
 
+/** Which item takes focus when the menu opens. */
+type Opening = 'first' | 'last';
+
 /**
- * The header's user chip as a disclosure button: it opens a small panel with
- * "Sign out" and, below a rule and in the destructive style, "Delete account"
- * (issue 205). Escape or a click elsewhere closes it.
- * Sign-out ends only this browser's session, then fully navigates to /sign-in
- * so no state from the session survives. Delete account swaps the panel for
- * an in-page confirmation (`DeleteAccountConfirm`); closing the menu drops it.
+ * The header's user chip as a menu button (WAI-ARIA APG menu button, issue
+ * 242): it opens a small `role="menu"` with "Sign out" and, below a rule and
+ * in the destructive style, "Delete account" (issue 205). The items are one
+ * Tab stop: the arrow keys, Home and End move between them, Escape closes the
+ * menu and returns to the chip, Tab or a click elsewhere closes it.
+ *
+ * Sign out submits a form to `/auth/sign-out` (issue 224): a full navigation
+ * that ends this browser's session on the server even when Supabase fails,
+ * after the cached reads are dropped. Delete account closes the menu and opens
+ * the `DeleteAccountConfirm` dialog.
  */
 export function UserMenu({ label }: UserMenuProps) {
-  const panelId = useId();
-  const [open, setOpen] = useState(false);
+  const triggerId = useId();
+  const menuId = useId();
+  const signOutFormId = useId();
+  const queryClient = useQueryClient();
+  const [opening, setOpening] = useState<Opening | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const deleteRef = useRef<HTMLButtonElement>(null);
-  const returnToDelete = useRef(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const open = opening !== null;
 
-  // A closed menu forgets the confirmation, so it never reopens half typed.
-  const close = () => {
-    setOpen(false);
-    setDeleting(false);
-  };
+  const items = () => [
+    ...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []),
+  ];
 
   useEffect(() => {
-    if (deleting || !returnToDelete.current) return;
-    returnToDelete.current = false;
-    deleteRef.current?.focus();
-  }, [deleting]);
+    if (!opening) return;
+    const all = items();
+    (opening === 'first' ? all[0] : all.at(-1))?.focus();
+  }, [opening]);
 
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) close();
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      close();
-      triggerRef.current?.focus();
+      if (!rootRef.current?.contains(event.target as Node)) setOpening(null);
     };
     document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
+    return () => document.removeEventListener('pointerdown', onPointerDown);
   }, [open]);
 
-  const signOut = async () => {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return hardNavigate('/sign-in');
-    setSigningOut(true);
-    setError(null);
-    // 'local' ends this browser's session and leaves the person's other devices signed in.
-    const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
-    if (signOutError) {
-      setSigningOut(false);
-      setError('We could not sign you out. Check your connection and try again.');
-      return;
+  const closeToTrigger = () => {
+    setOpening(null);
+    triggerRef.current?.focus();
+  };
+
+  const onTriggerKeyDown = (event: ReactKeyboardEvent) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      setOpening(event.key === 'ArrowDown' ? 'first' : 'last');
     }
-    hardNavigate('/sign-in'); // Stay busy while the page unloads.
+  };
+
+  const onMenuKeyDown = (event: ReactKeyboardEvent) => {
+    const all = items();
+    const at = all.indexOf(document.activeElement as HTMLElement);
+    const focus = (index: number) => all[(index + all.length) % all.length]?.focus();
+    switch (event.key) {
+      case 'ArrowDown':
+        focus(at + 1);
+        break;
+      case 'ArrowUp':
+        focus(at - 1);
+        break;
+      case 'Home':
+        focus(0);
+        break;
+      case 'End':
+        focus(all.length - 1);
+        break;
+      case 'Escape':
+        closeToTrigger();
+        break;
+      case 'Tab':
+        // Focus moves on as usual; the menu does not stay open behind it.
+        setOpening(null);
+        return;
+      default:
+        return;
+    }
+    event.preventDefault();
   };
 
   return (
     <div ref={rootRef} className="relative">
       <button
         ref={triggerRef}
+        id={triggerId}
         type="button"
+        aria-haspopup="menu"
         aria-expanded={open}
-        aria-controls={panelId}
-        onClick={() => (open ? close() : setOpen(true))}
+        aria-controls={open ? menuId : undefined}
+        onClick={() => setOpening(open ? null : 'first')}
+        onKeyDown={onTriggerKeyDown}
         className={cn(
           chipClasses,
           // The chip stays 26px tall; the invisible ::after grows the target to 44px.
@@ -102,45 +136,56 @@ export function UserMenu({ label }: UserMenuProps) {
           )}
         />
       </button>
-      <div
-        id={panelId}
-        hidden={!open}
-        className={cn(
-          'absolute top-full right-0 z-20 mt-2.5 flex max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-tile bg-surface p-2 shadow-pop',
-          deleting ? 'w-80' : 'w-56',
-        )}
-      >
-        {open && deleting && (
-          <DeleteAccountConfirm
-            onCancel={() => {
-              returnToDelete.current = true;
-              setDeleting(false);
+      {/* The menu item submits it from inside the menu (the `form` attribute). */}
+      <form id={signOutFormId} method="post" action={SIGN_OUT_PATH} hidden />
+      {open && (
+        <div
+          ref={menuRef}
+          id={menuId}
+          role="menu"
+          aria-labelledby={triggerId}
+          onKeyDown={onMenuKeyDown}
+          className="absolute top-full right-0 z-20 mt-2.5 flex w-56 max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-tile bg-surface p-2 shadow-pop"
+        >
+          <Button
+            role="menuitem"
+            tabIndex={-1}
+            type="submit"
+            form={signOutFormId}
+            block
+            loading={signingOut}
+            onClick={() => {
+              setSigningOut(true);
+              // No reads of this session survive in memory, even if the page is kept for Back.
+              queryClient.clear();
             }}
-          />
-        )}
-        {open && !deleting && (
-          <>
-            <Button block loading={signingOut} onClick={signOut}>
-              Sign out
-            </Button>
-            <hr className="m-0 border-0 border-t border-line" />
-            <Button
-              ref={deleteRef}
-              variant="destructive"
-              block
-              disabled={signingOut}
-              onClick={() => setDeleting(true)}
-            >
-              Delete account
-            </Button>
-            {error && (
-              <p role="alert" className="m-0 px-1 text-small text-ink-2">
-                {error}
-              </p>
-            )}
-          </>
-        )}
-      </div>
+          >
+            Sign out
+          </Button>
+          <hr className="m-0 border-0 border-t border-line" />
+          <Button
+            role="menuitem"
+            tabIndex={-1}
+            variant="destructive"
+            block
+            disabled={signingOut}
+            onClick={() => {
+              setOpening(null);
+              setDeleting(true);
+            }}
+          >
+            Delete account
+          </Button>
+        </div>
+      )}
+      <DeleteAccountConfirm
+        open={deleting}
+        onClose={() => {
+          setDeleting(false);
+          // The menu item that opened it is gone with the menu, so focus goes to the chip.
+          triggerRef.current?.focus();
+        }}
+      />
     </div>
   );
 }

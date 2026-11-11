@@ -9,3 +9,8 @@
 export function hardNavigate(url: string): void {
   window.location.assign(url);
 }
+
+/** Load the current address again from the server (here for the same reason). */
+export function reloadPage(): void {
+  window.location.reload();
+}

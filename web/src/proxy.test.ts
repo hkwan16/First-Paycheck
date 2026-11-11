@@ -31,6 +31,15 @@ describe('proxy', () => {
     expect(mocks.createServerClient).not.toHaveBeenCalled();
   });
 
+  it('leaves sign-out alone, so no refreshed session cookie races its expiry (issue 224)', async () => {
+    const response = await proxy(
+      new NextRequest('http://localhost:3000/auth/sign-out', { method: 'POST' }),
+    );
+    expect(mocks.createServerClient).not.toHaveBeenCalled();
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+    expect(response.headers.get('set-cookie')).toBeNull();
+  });
+
   it('refreshes the Supabase session on every matched request', async () => {
     await proxy(new NextRequest('http://localhost:3000/plan'));
     expect(mocks.createServerClient).toHaveBeenCalledOnce();

@@ -20,7 +20,9 @@ vi.mock('@/lib/supabase/client', () => ({
 }));
 vi.mock('@/lib/navigation', () => ({ hardNavigate: mocks.hardNavigate }));
 
+import { SESSION_READ_TIMEOUT_MS, SessionUnavailable } from './auth-middleware';
 import { fetchClient } from './client';
+import { sessionStatus } from './session-status';
 
 const HEALTH = { status: 'ok', git_sha: 'test', alembic_revision: '0001_roles' };
 const sessionWith = (token: string) => ({
@@ -158,5 +160,22 @@ describe('fetchClient with a Supabase session', () => {
     expect(response.status).toBe(403);
     expect(mocks.auth.refreshSession).not.toHaveBeenCalled();
     expect(mocks.hardNavigate).not.toHaveBeenCalled();
+  });
+
+  it('tells the page when a session read times out, and when one answers again (issue 225)', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.auth.getSession.mockImplementationOnce(() => new Promise(() => undefined));
+      const request = fetchClient.GET('/health');
+      const outcome = expect(request).rejects.toBeInstanceOf(SessionUnavailable);
+      await vi.advanceTimersByTimeAsync(SESSION_READ_TIMEOUT_MS);
+      await outcome;
+      expect(sessionStatus.readable()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+    healthAcceptingTokens('access-1');
+    await fetchClient.GET('/health');
+    expect(sessionStatus.readable()).toBe(true);
   });
 });
