@@ -2207,6 +2207,8 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: High
+    status: done
+    # Fixed November 10: PR 245. The salary question asks which figure to use; nothing follows the newest stub silently (spec 005 rule 24c).
   - title: "The plan shows health plan and W-4 results from the old pay schedule as current"
     body: >-
       After the newest stub moved the e2e account from 26 to 24 paychecks a
@@ -2224,6 +2226,8 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: High
+    status: done
+    # Fixed November 10: PR 245. A saved decision whose inputs changed says Needs review, on its card, the plan and the PDF (spec 007 rules 19a-19e).
   - title: "A checked 401(k) explanation says going above the full match costs nothing"
     body: >-
       With a 401(k) decision saved at 6% (full match at 5%, salary $95,000.10),
@@ -2244,6 +2248,8 @@ issues:
     labels: ["area:api", "area:evals", "type:bug"]
     milestone: M10
     priority: High
+    status: done
+    # Fixed November 10: PR 246. A 401(k) rise is never explained as costing nothing: relabeled cost facts, prompt explain/v5 and the zero-cost check.
   - title: "Back after Sign out shows the signed-in app"
     body: >-
       On /setup/link, Sign out lands on /sign-in with the auth cookie gone, and
@@ -2260,6 +2266,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: High
+    status: done
+    # Fixed November 10: PR 249. Sign out expires the session cookies on the server, and a page restored by Back checks the session again.
   - title: "The app can hang on loading skeletons when the session read never resolves"
     body: >-
       Seen once: in a tab whose session had been idle for hours, /plan and
@@ -2274,6 +2282,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Medium
+    status: in_progress
+    # Partly fixed November 10: PR 249. A hung session read now ends in a notice with Reload and Sign in again. What happened on production was not captured, so this stays open.
   - title: "Rocket Money is still categorized as a savings transfer"
     body: >-
       Spending for October 2026 lists "Oct 28 Rocket Money, Our guess, -$21.54"
@@ -2285,6 +2295,8 @@ issues:
     labels: ["area:api", "type:bug"]
     milestone: M10
     priority: Medium
+    status: done
+    # Fixed November 10: PR 248. Budgeting apps are subscriptions by seed rule, and the categorize job relabels earlier guesses, never a person's choice.
   - title: "A replaced decision's Why page looks current"
     body: >-
       After saving the 401(k) at 6%, writing its explanation and saving 5%,
@@ -2298,6 +2310,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Medium
+    status: done
+    # Fixed November 10: PR 246. A replaced decision's Why page and the Why index say Replaced and link to the current version.
   - title: "Edit plans closes on a deductible above the out-of-pocket maximum and clears the plan choice"
     body: >-
       In the health plan step's Edit plans, an out-of-pocket maximum of 100
@@ -2320,6 +2334,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Medium
+    status: done
+    # Fixed November 10: PR 247. Confirm saves a review draft (PUT /docs/{id}/review) that survives a reload.
   - title: "A pay stub with no 401(k) line blocks Confirm until the person types 0"
     body: >-
       A stub with no 401(k) line shows "Not found - Type it if the document
@@ -2334,6 +2350,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Medium
+    status: done
+    # Fixed November 10: PR 247. A stub with no 401(k) line is confirmed with Confirm none.
   - title: "Re-importing the same CSV reports transactions that were not added"
     body: >-
       Importing web/e2e/fixtures/bank-export.csv into the same account twice
@@ -2344,6 +2362,8 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed November 10: PR 247. The import says how many rows were added and how many were already there.
   - title: "Dates and day counts follow the UTC day, not the person's"
     body: >-
       At 22:27 Pacific on November 9, Spending said "November 1 to 10", the
@@ -2373,6 +2393,8 @@ issues:
     labels: ["area:api", "area:web", "type:bug"]
     milestone: M10
     priority: Medium
+    status: done
+    # Fixed November 10: PR 244. A past check-in is a record of its date, and a date that passed unsettled is an overdue finding.
   - title: "Check in now reports findings changes the person cannot see"
     body: >-
       After saving a new 401(k) version, Check in now says "1 new finding. 1
@@ -2383,6 +2405,8 @@ issues:
     labels: ["area:api", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed November 10: PR 244. A reminder is keyed by its date, so a new decision version no longer repeats it.
   - title: "The check-in calls bank deposits take-home pay"
     body: >-
       The October check-in shows "Take-home pay $3,240.12". Spending calls the
@@ -2392,6 +2416,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Medium
+    status: done
+    # Fixed November 10: PR 244. The deposits line is Income deposited.
   - title: "The cash flow diagram draws Take-home taller than Gross pay"
     body: >-
       For October at 1344 px wide, "Gross pay, 1 stub $2,708.33" is about 157
@@ -2405,6 +2431,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Medium
+    status: done
+    # Fixed November 10: PR 248. The API builds every node and band of the diagram at one scale (spec 010 rules 5b-5d).
   - title: "Bad ids and unknown routes show a generic error or the bare Next.js 404"
     body: >-
       /why/not-a-uuid says "We could not load the explanation. Reload the page
@@ -2415,6 +2443,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed November 10: PR 249. A malformed id is a 404 like an unknown one, and each screen has its own not-found page.
   - title: "Decision forms accept out-of-range values or show the wrong message"
     body: >-
       Emergency fund essential spending of 99999999999999 or 1,234.567 says
@@ -2449,6 +2479,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: in_progress
+    # Partly fixed November 10: PRs 247, 248 and 249. The Confirm, Link, Spending and account-menu messages are fixed; the other screens are still to check.
   - title: "Account roles cannot be cleared, and loan accounts are offered roles and CSV imports"
     body: >-
       Once an account has a role, "Choose a role" is disabled, so the role
@@ -2459,6 +2491,8 @@ issues:
     labels: ["area:web", "area:api", "type:bug"]
     milestone: M10
     priority: Low
+    status: done
+    # Fixed November 10: PR 247. Each account kind is offered only its roles, a role can be cleared, and imports go to CSV accounts.
   - title: "Repeated controls share one accessible name, and the account menu and delete dialog have no roles"
     body: >-
       Spending's recurring list has several buttons named just "Not recurring"
@@ -2470,6 +2504,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: in_progress
+    # Partly fixed November 10: PRs 247, 248 and 249. Repeated controls on Link and Spending are named, the account menu is a menu button and Delete account a dialog; the other screens are still to check.
   - title: "A confirmed document cannot be told apart or opened again"
     body: >-
       Documents rows say only "Pay stub - Confirmed - 1 page - uploaded 8 days
@@ -2482,6 +2518,8 @@ issues:
     labels: ["area:web", "type:bug"]
     milestone: M10
     priority: Low
+    status: in_progress
+    # Partly fixed November 10: PRs 246 and 247. Confirmed rows name the employer and pay date and open a read-only view; the Why labels share one case. Left open until checked on production.
   - title: "Cash withdrawals are counted as transfers, not spending"
     body: >-
       An ATM or cash withdrawal is categorized "Transfer between accounts", so
