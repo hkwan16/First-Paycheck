@@ -911,11 +911,15 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
   explanation yet. Write the explanation" (spec 008 rule 19b). An emergency fund is never explained (spec 011), so
   it shows none (`explanationView`).
 - **Your paycheck** (`PaycheckCard`): the newest confirmed stub's gross and take-home tiles and
-  its deductions, or a link to Confirm. **Goals** (`GoalsCard`): status badge, contribution,
-  target and date, progress bar. **Next 90 days** (`PlanCalendarCard`): `calendar` through
+  its deductions (`PAYCHECK_TILES`, `PAYCHECK_LINES` in `plan-format.ts`), or a link to Confirm.
+  **Goals** (`GoalsCard`): status badge, contribution, target and date, progress bar. **Next 90 days** (`PlanCalendarCard`): `calendar` through
   `calendar_through`, each event in its decision's hue (`eventHue`) with a badge to its step;
   an event the API marks `overdue` (an open date that passed, spec 015 rule 24, issue 233)
   reads "Was due" with an `off` Overdue badge.
+- **The PDF says the same** (spec 016 rule 11a, issue 239): its calculator names are
+  `CALCULATOR_LABELS` and its paycheck labels are the card's. `plan-pdf-words.test.ts` reads the
+  API's rendered page (`api/tests/fixtures/export/plan.html`) and fails when either side renames
+  one, so rename in `api/export/` too and regenerate that fixture.
 - **Export** (`ExportCard`): Download PDF starts `useExportPlan`, shows `JobProgress` while the
   job runs, downloads once it succeeds (once per job), then says "Downloaded {name}." with
   Download again. A dead job offers Try again (a new export); a failed download offers Try

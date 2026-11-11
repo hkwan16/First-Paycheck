@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import io
+import re
 import uuid
 from collections.abc import Callable
 from typing import Any
@@ -112,12 +113,16 @@ def test_pdf_has_two_pages_and_the_plan_text(
         "$2,600.00",
         "Bronze HSA",
         "Federal tax withheld per paycheck",
-        "Verified against the calculator",
+        "401(k) match",
+        "Explained under Why, with sources.",
     ):
         assert expected in plan_page, expected
+    # Each decision's saved date, never a version number (spec 016 rule 11a).
+    assert len(re.findall(r"Saved [A-Z][a-z]{2} \d{1,2}, \d{4}", plan_page)) == 4
+    assert "Version" not in plan_page
     for expected in (
         # Section headings are set in capitals by the stylesheet.
-        "DECISION CALENDAR",
+        "NEXT 90 DAYS",
         "Oct 31, 2026",
         "Health plan enrollment deadline",
         "WHY, WITH SOURCES",

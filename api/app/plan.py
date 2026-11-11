@@ -144,7 +144,9 @@ def _emergency_fund(data: dict[str, Any]) -> list[PlanFigure]:
         _figure(data, "inputs.monthly_contribution_cents", "Monthly contribution", "money"),
         _figure(data, "result.per_paycheck_contribution_cents", "Per paycheck", "money"),
         _figure(data, "result.months_to_target", "Months to reach it", "count"),
-        _figure(data, "result.funded_pct", "Saved so far", "percent"),
+        # The balance the decision was worked out from, as it stood then. Its goal's
+        # "Saved so far" is the linked account's balance now (issue 239).
+        _figure(data, "inputs.current_balance_cents", "Already saved when you decided", "money"),
     ]
 
 

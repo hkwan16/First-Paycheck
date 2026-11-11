@@ -72,10 +72,10 @@ td.gap { width: 6%; border-top: 0; }
   <h2>Your paycheck</h2>
   <table>
     <tr><td class="label">Pay date</td><td class="num">Oct 15, 2026</td><td class="gap"></td><td class="label">Gross pay</td><td class="num">$2,708.33</td></tr>
-    <tr><td class="label">Federal income tax</td><td class="num">$297.76</td><td class="gap"></td><td class="label">Social Security</td><td class="num">$167.92</td></tr>
+    <tr><td class="label">Federal withholding</td><td class="num">$297.76</td><td class="gap"></td><td class="label">Social Security</td><td class="num">$167.92</td></tr>
     <tr><td class="label">Medicare</td><td class="num">$39.27</td><td class="gap"></td><td class="label">State tax</td><td class="num">$98.14</td></tr>
-    <tr><td class="label">401(k) contribution</td><td class="num">$0.00</td><td class="gap"></td><td class="label">Medical premium</td><td class="num">$62.50</td></tr>
-    <tr><td class="label">Other deductions</td><td class="num">$46.70</td><td class="gap"></td><td class="label"><strong>Net pay</strong></td><td class="num"><strong>$1,996.04</strong></td></tr>
+    <tr><td class="label">401(k)</td><td class="num">$0.00</td><td class="gap"></td><td class="label">Medical premium</td><td class="num">$62.50</td></tr>
+    <tr><td class="label">Other deductions</td><td class="num">$46.70</td><td class="gap"></td><td class="label"><strong>Take-home pay</strong></td><td class="num"><strong>$1,996.04</strong></td></tr>
   </table>
   <p class="muted">From your newest confirmed pay stub.</p>
 </section>
@@ -83,37 +83,36 @@ td.gap { width: 6%; border-top: 0; }
 <section>
   <h2>Decisions</h2>
   <div class="decision">
-    <div class="decision-head"><span class="name">1. Emergency fund</span><span class="muted">Version 1</span></div>
+    <div class="decision-head"><span class="name">1. Emergency fund</span><span class="muted">Saved Oct 21, 2026</span></div>
     <table>
       <tr><td class="label">Target</td><td class="num">$5,469.00</td><td class="gap"></td><td class="label">Monthly contribution</td><td class="num">$300.00</td></tr>
       <tr><td class="label">Per paycheck</td><td class="num">$150.00</td><td class="gap"></td><td class="label">Months to reach it</td><td class="num">12</td></tr>
-      <tr><td class="label">Saved so far</td><td class="num">39.13%</td><td class="gap"></td><td></td><td></td></tr>
+      <tr><td class="label">Already saved when you decided</td><td class="num">$2,140.00</td><td class="gap"></td><td></td><td></td></tr>
     </table>
-    <p class="status none">Not explained yet</p>
   </div>
   <div class="decision">
-    <div class="decision-head"><span class="name">2. 401(k) contribution</span><span class="muted">Version 2</span></div>
+    <div class="decision-head"><span class="name">2. 401(k) match</span><span class="muted">Saved Oct 21, 2026</span></div>
     <table>
       <tr><td class="label">Your contribution</td><td class="num">4%</td><td class="gap"></td><td class="label">Contribution for the full match</td><td class="num">4%</td></tr>
       <tr><td class="label">Employer match a year</td><td class="num">$2,600.00</td><td class="gap"></td><td class="label">Match you miss a year</td><td class="num">$0.00</td></tr>
     </table>
-    <p class="status verified">Verified against the calculator</p>
+    <p class="status verified">Explained under Why, with sources. We checked every number in it against the decision you saved.</p>
   </div>
   <div class="decision">
-    <div class="decision-head"><span class="name">3. Health plan</span><span class="muted">Version 1</span></div>
+    <div class="decision-head"><span class="name">3. Health plan</span><span class="muted">Saved Oct 21, 2026</span></div>
     <table>
       <tr><td class="label">Plan</td><td class="num">Bronze HSA</td><td class="gap"></td><td class="label">Expected cost a year at medium use</td><td class="num">$1,810.00</td></tr>
       <tr><td class="label">Premiums a year</td><td class="num">$600.00</td><td class="gap"></td><td class="label">Worst case a year</td><td class="num">$3,850.00</td></tr>
     </table>
-    <p class="status fallback">Plain calculator summary (the written explanation did not pass the check)</p>
+    <p class="status fallback">We could not write this explanation. Open Why in First Paycheck to try again.</p>
   </div>
   <div class="decision">
-    <div class="decision-head"><span class="name">4. Form W-4</span><span class="muted">Version 1</span></div>
+    <div class="decision-head"><span class="name">4. W-4, federal only</span><span class="muted">Saved Oct 21, 2026</span></div>
     <table>
       <tr><td class="label">Federal tax withheld per paycheck with your new W-4</td><td class="num">$218.17</td><td class="gap"></td><td class="label">Federal income tax for 2026</td><td class="num">$5,236.00</td></tr>
       <tr><td class="label">At tax time with your new W-4</td><td class="num">$0.08 refund</td><td class="gap"></td><td></td><td></td></tr>
     </table>
-    <p class="status verified">Verified against the calculator</p>
+    <p class="status verified">Explained under Why, with sources. We checked every number in it against the decision you saved.</p>
   </div>
 </section>
 
@@ -126,24 +125,24 @@ td.gap { width: 6%; border-top: 0; }
   </table>
 </section>
 
-<p class="footnote">Every amount comes from First Paycheck's calculators and your confirmed pay stub. Federal income tax only; state tax is not computed. Not tax advice.</p>
+<p class="footnote">First Paycheck worked out every amount from your confirmed pay stub and what you entered. It covers federal income tax only, not state tax. Not tax advice.</p>
 
 <section class="page-break">
-  <h2>Decision calendar</h2>
+  <h2>Next 90 days</h2>
   <table class="calendar">
-    <tr><td class="date">Oct 31, 2026</td><td>Check that your next pay stub shows your new 401(k) contribution <span class="what">&#183; 401(k) contribution</span></td></tr>
+    <tr><td class="date">Oct 31, 2026</td><td>Check that your next pay stub shows your new 401(k) contribution <span class="what">&#183; 401(k) match</span></td></tr>
     <tr><td class="date">Oct 31, 2026</td><td>Make your first emergency fund contribution <span class="what">&#183; Emergency fund</span></td></tr>
-    <tr><td class="date">Oct 31, 2026</td><td>Give your employer your updated Form W-4 <span class="what">&#183; Form W-4</span></td></tr>
+    <tr><td class="date">Oct 31, 2026</td><td>Give your employer your updated Form W-4 <span class="what">&#183; W-4, federal only</span></td></tr>
     <tr><td class="date">Nov 14, 2026</td><td>Health plan enrollment deadline <span class="what">&#183; Health plan</span></td></tr>
   </table>
-  <p class="muted">Upcoming through Jan 19, 2027.</p>
+  <p class="muted">Through Jan 19, 2027.</p>
 </section>
 
 <section>
   <h2>Why, with sources</h2>
   <div class="why">
-    <h3>401(k) contribution</h3>
-    <p class="status verified">Verified against the calculator</p>
+    <h3>401(k) match</h3>
+    <p class="status verified">We checked every number here against the decision you saved.</p>
     <p class="concept">Your employer matches what you put into your 401(k), up to a limit.</p>
     <p>Contributing 4% earns the full employer match of $2,600.00 a year, so no match is left on the table.</p>
     <ul class="sources">
@@ -153,7 +152,7 @@ td.gap { width: 6%; border-top: 0; }
   </div>
   <div class="why">
     <h3>Health plan</h3>
-    <p class="status fallback">Plain calculator summary (the written explanation did not pass the check)</p>
+    <p class="status fallback">We could not write an explanation that matches your numbers, so here are the numbers you saved.</p>
     <p class="concept">Comparing health plans by what each costs you in a year.</p>
     <p>The calculator&#39;s comparison of your two plans, without commentary.</p>
     <ul class="sources">
@@ -161,8 +160,8 @@ td.gap { width: 6%; border-top: 0; }
     </ul>
   </div>
   <div class="why">
-    <h3>Form W-4</h3>
-    <p class="status verified">Verified against the calculator</p>
+    <h3>W-4, federal only</h3>
+    <p class="status verified">We checked every number here against the decision you saved.</p>
     <p class="concept">Your Form W-4 sets the federal tax taken from each paycheck.</p>
     <p>With your 401(k) and premium counted, the withholding covers the year.</p>
     <ul class="sources">
