@@ -19,7 +19,7 @@ import { SpendingScreen } from '@/components/screens/spending/SpendingScreen';
 import { WhyIndexScreen } from '@/components/screens/why/WhyIndexScreen';
 import { WhyScreen } from '@/components/screens/why/WhyScreen';
 import { $api } from '@/lib/api/client';
-import { ACCOUNT_COUNT_LIMIT, periodFilters } from '@/lib/api/hooks';
+import { periodFilters } from '@/lib/api/hooks';
 import { queryKeys } from '@/lib/api/keys';
 import type { CheckInDetail, Decision } from '@/lib/api/types';
 import { CALCULATORS, type CalculatorId } from '@/lib/features';
@@ -29,6 +29,7 @@ import {
   SAMPLE_PERIOD,
   sampleCashflow,
   sampleRecurring,
+  sampleSpendingMonths,
   sampleSpendingSummary,
 } from '@/test/fixtures/cashflow';
 import {
@@ -44,6 +45,8 @@ import {
 } from '@/test/fixtures/checkins';
 import {
   DECISION_V1_ID,
+  DECISION_V2_ID,
+  REPLACED_AT,
   sampleCalendarEvent,
   sampleDecision,
   sampleExplanation,
@@ -56,12 +59,14 @@ import {
   manualEntryProposal,
   PAY_STUB_DOC_ID,
   sampleBenefitsDocument,
+  confirmedDocumentDetail,
   sampleDocument,
   sampleDocumentDetail,
   samplePayStub,
 } from '@/test/fixtures/documents';
 import {
   EMERGENCY_DECISION_ID,
+  HEALTH_DECISION_ID,
   sampleBenefitsPlans,
   sampleBenefitsProposal,
   sampleEmergencyDecision,
@@ -76,7 +81,7 @@ import {
   sampleTransactions,
 } from '@/test/fixtures/sample';
 import { emptyPlan, samplePlan } from '@/test/fixtures/plan';
-import { sampleW4Decision, sampleW4Event } from '@/test/fixtures/w4';
+import { sampleW4Decision, sampleW4Event, W4_DECISION_ID } from '@/test/fixtures/w4';
 
 /*
  * A setup screen in the app frame, rendered from the mockup's sample data
@@ -107,6 +112,7 @@ export type SampleScreenName =
   | 'why-stale'
   | 'why-emergency-fund'
   | 'why-index'
+  | 'why-replaced'
   | 'check-in'
   | 'check-in-complete'
   | 'check-in-index'
@@ -307,12 +313,58 @@ const SCREENS: Record<
     },
     done: ALL_DECIDED,
   },
-  // Every decision saved, so the index shows the emergency fund's row too.
+  // Every decision saved, so the index shows the emergency fund's row too, and
+  // each explained decision's explanation in a different state (spec 008 rule 19c).
   'why-index': {
     nav: 'why',
     render: () => <WhyIndexScreen />,
-    seed: seedAllDecided,
+    seed: (seed) => {
+      seedAllDecided(seed);
+      seed(queryKeys.explanation(DECISION_V1_ID), sampleExplanation());
+      seed(
+        queryKeys.explanation(HEALTH_DECISION_ID),
+        sampleExplanation({ decision_id: HEALTH_DECISION_ID, stale: true }),
+      );
+      seed(
+        queryKeys.explanation(W4_DECISION_ID),
+        sampleFallbackExplanation({ decision_id: W4_DECISION_ID }),
+      );
+    },
     done: ALL_DECIDED,
+  },
+  // Issue 227: the 401(k) at 4% after a 5% version replaced it.
+  'why-replaced': {
+    nav: 'why',
+    render: () => <WhyScreen decisionId={DECISION_V1_ID} />,
+    seed: (seed) => {
+      seedDecided(seed);
+      const replaced = sampleDecision({ is_current: false });
+      const { inputs, result } = sampleK401(5);
+      const current = sampleDecision({
+        id: DECISION_V2_ID,
+        version: 2,
+        supersedes_id: DECISION_V1_ID,
+        inputs: { ...inputs },
+        result: { ...result },
+        created_at: REPLACED_AT,
+      });
+      seed(queryKeys.decision(DECISION_V1_ID), replaced);
+      seed(queryKeys.decisions(), {
+        items: [
+          {
+            calculator: current.calculator,
+            current,
+            versions: [current, replaced].map(({ id, version, supersedes_id, created_at }) => ({
+              id,
+              version,
+              supersedes_id,
+              created_at,
+            })),
+          },
+        ],
+      });
+      seed(queryKeys.explanation(DECISION_V1_ID), sampleExplanation());
+    },
   },
   'check-in': {
     nav: 'checkIn',
@@ -404,13 +456,7 @@ export function seededClient(screen: SampleScreenName = 'link') {
       null,
     ),
   );
-  seed(
-    queryKeys.document(CONFIRMED_DOC_ID),
-    sampleDocumentDetail(
-      { id: CONFIRMED_DOC_ID, status: 'confirmed', confirmed_at: SAMPLE_NOW },
-      null,
-    ),
-  );
+  seed(queryKeys.document(CONFIRMED_DOC_ID), confirmedDocumentDetail({ id: CONFIRMED_DOC_ID }));
   // The Spending screen's list for the sample period (spec 003 rule 17a).
   seed(queryKeys.transactionPages(periodFilters(SAMPLE_PERIOD)), {
     pages: [{ items: [...sampleTransactions], next_cursor: null }],
@@ -419,15 +465,7 @@ export function seededClient(screen: SampleScreenName = 'link') {
   const period = { params: { query: { ...SAMPLE_PERIOD } } };
   seed($api.queryOptions('get', '/cashflow', period).queryKey, sampleCashflow());
   seed(queryKeys.recurring(), [...sampleRecurring]);
-  for (const account of sampleAccounts) {
-    const { queryKey } = $api.queryOptions('get', '/transactions', {
-      params: { query: { account_id: account.id, limit: ACCOUNT_COUNT_LIMIT } },
-    });
-    seed(queryKey, {
-      items: sampleTransactions.filter((t) => t.account_id === account.id),
-      next_cursor: null,
-    });
-  }
+  seed(queryKeys.spendingMonths(), sampleSpendingMonths);
   SCREENS[screen].seed?.(seed);
   return client;
 }

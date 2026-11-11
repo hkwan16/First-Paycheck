@@ -140,6 +140,15 @@ def test_seed_rules_label_a_refund_with_its_merchants_category(
         ("TARGET 00012345 SAN JOSE CA", 4_200, "shopping"),
         # A brand's licensed store in another category has its own, longer rule.
         ("TARGET OPTICAL 00123", 18_000, "healthcare"),
+        # Spec 003 rule 9c (issue #226): a budgeting app's plan is a
+        # subscription, not money saved.
+        ("Rocket Money", 2_154, "subscriptions"),
+        ("ROCKET MONEY PREMIUM", 1_200, "subscriptions"),
+        ("TRUEBILL *PREMIUM", 1_200, "subscriptions"),
+        ("YNAB", 1_499, "subscriptions"),
+        ("MONARCH MONEY", 1_499, "subscriptions"),
+        ("COPILOT MONEY", 1_300, "subscriptions"),
+        ("SIMPLIFI BY QUICKEN", 599, "subscriptions"),
     ],
 )
 def test_seed_rules_name_the_merchant(raw: str, amount_cents: int, category: str) -> None:

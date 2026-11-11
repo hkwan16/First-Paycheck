@@ -601,7 +601,7 @@
   {
     "expected": [
       {
-        "key": "upcoming_deadline:5773f49a-fea3-5d30-b93d-df702d11c902",
+        "key": "upcoming_deadline:goal_contribution:2026-11-20",
         "kind": "upcoming_deadline",
         "payload": {
           "days_until": 4
@@ -609,7 +609,7 @@
         "severity": "warning"
       },
       {
-        "key": "upcoming_deadline:16c638bb-5d4c-58ce-ba43-819645cd78f5",
+        "key": "upcoming_deadline:enrollment_deadline:2026-12-16",
         "kind": "upcoming_deadline",
         "payload": {
           "days_until": 30
@@ -710,5 +710,92 @@
       "today": "2026-11-16"
     },
     "id": "spec-015-test_keys_name_the_paycheck"
+  },
+  {
+    "expected": [
+      {
+        "key": "overdue_deadline:w4_submit:2026-11-15",
+        "kind": "overdue_deadline",
+        "payload": {
+          "affects": "w4",
+          "days_until": -1
+        },
+        "severity": "alert"
+      }
+    ],
+    "facts": {
+      "events": [
+        {
+          "decision_id": null,
+          "due_at": "2026-11-15",
+          "id": "14c0fcfe-7995-52c5-85b2-10ce4c3556b3",
+          "kind": "w4_submit",
+          "title": "Give your employer your updated Form W-4"
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_overdue_date"
+  },
+  {
+    "expected": [
+      {
+        "key": "upcoming_deadline:election_check:2026-11-16",
+        "kind": "upcoming_deadline",
+        "payload": {
+          "days_until": 0
+        },
+        "severity": "warning"
+      }
+    ],
+    "facts": {
+      "events": [
+        {
+          "decision_id": null,
+          "due_at": "2026-11-16",
+          "id": "2ac406a3-4ee8-5474-8146-125015987723",
+          "kind": "election_check",
+          "title": "Check that your next pay stub shows your new 401(k) contribution"
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_due_today_is_not_overdue"
+  },
+  {
+    "expected": [
+      {
+        "key": "upcoming_deadline:election_check:2026-11-30",
+        "kind": "upcoming_deadline",
+        "payload": {
+          "calendar_event_id": "b112a122-d2c5-5d6d-be83-ad191cf2d533",
+          "days_until": 14
+        },
+        "severity": "info"
+      }
+    ],
+    "facts": {
+      "events": [
+        {
+          "decision_id": null,
+          "due_at": "2026-11-30",
+          "id": "9948a3c6-a726-5bd1-87e1-c37b41670f07",
+          "kind": "election_check",
+          "title": "Check that your next pay stub shows your new 401(k) contribution"
+        },
+        {
+          "decision_id": null,
+          "due_at": "2026-11-30",
+          "id": "b112a122-d2c5-5d6d-be83-ad191cf2d533",
+          "kind": "election_check",
+          "title": "Check that your next pay stub shows your new 401(k) contribution"
+        }
+      ],
+      "period": "2026-11-01",
+      "today": "2026-11-16"
+    },
+    "id": "spec-015-test_one_finding_per_date"
   }
 ]

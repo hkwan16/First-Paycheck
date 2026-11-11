@@ -14,7 +14,7 @@ import datetime as dt
 import uuid
 from collections.abc import Collection
 
-from sqlalchemy import Select, Text, Update, and_, func, literal, or_, select, text, update
+from sqlalchemy import Date, Select, Text, Update, and_, func, literal, or_, select, text, update
 from sqlalchemy.orm import Session, aliased
 
 from db.models import Document, PayStub, employer_key
@@ -22,12 +22,14 @@ from db.models import Document, PayStub, employer_key
 __all__ = [
     "NEWEST_FIRST",
     "add_confirmed",
+    "confirmed_from",
     "current_pay_stubs",
+    "find_pay_stub",
     "latest_pay_date",
     "newest_pay_stub",
     "paid_between_count",
+    "paid_months",
     "paycheck_ids",
-    "superseded_documents",
 ]
 
 # GET /pay-stubs order (spec 005 rule 24); id breaks a tie inside one transaction.
@@ -73,6 +75,14 @@ def newest_pay_stub(session: Session) -> PayStub | None:
     """The user's newest current confirmed stub, in ``GET /pay-stubs`` order (spec 005
     rules 22d and 24)."""
     return session.scalars(current_pay_stubs().order_by(*NEWEST_FIRST).limit(1)).first()
+
+
+def find_pay_stub(session: Session, stub_id: uuid.UUID) -> PayStub | None:
+    """One of the user's stubs by id, current or superseded; None for one they cannot
+    see. The profile names the stub its salary was compared with (spec 005 rule
+    24c), which a later copy may have superseded since: its figures still say what
+    the person answered for."""
+    return session.get(PayStub, stub_id)
 
 
 def paycheck_ids(session: Session) -> dict[uuid.UUID, uuid.UUID]:
@@ -121,19 +131,27 @@ def paid_between_count(session: Session, first: dt.date, last: dt.date) -> int:
     return int(count or 0)
 
 
-def superseded_documents(
-    session: Session, document_ids: Collection[uuid.UUID]
-) -> frozenset[uuid.UUID]:
-    """Which of ``document_ids`` were confirmed into a stub a newer confirm has
-    since superseded (rule 22f): what Link shows instead of "Confirmed"."""
-    if not document_ids:
-        return frozenset()
+def paid_months(session: Session) -> set[dt.date]:
+    """The first day of each month a current stub was paid in (spec 010 rule 5d)."""
+    month = func.date_trunc("month", PayStub.pay_date).cast(Date)
     rows = session.scalars(
-        select(PayStub.document_id).where(
-            PayStub.superseded_by_id.is_not(None), PayStub.document_id.in_(document_ids)
-        )
+        current_pay_stubs().with_only_columns(month, maintain_column_froms=True).distinct()
     )
-    return frozenset(rows)
+    return set(rows)
+
+
+def confirmed_from(
+    session: Session, document_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, PayStub]:
+    """The stub confirmed from each of ``document_ids`` that has one, current or
+    superseded, in one query for a whole list: whether a newer confirm superseded
+    it (rule 22f, what Link shows instead of "Confirmed"), what names the
+    document's row and what its confirmed view shows (rules 22g and 22h). A
+    document is confirmed into at most one stub (``UNIQUE (document_id)``)."""
+    if not document_ids:
+        return {}
+    stubs = session.scalars(select(PayStub).where(PayStub.document_id.in_(document_ids)))
+    return {stub.document_id: stub for stub in stubs}
 
 
 def add_confirmed(session: Session, stub: PayStub) -> None:

@@ -63,8 +63,11 @@ export async function transactionsIn(page: Page, month: string): Promise<boolean
  */
 export async function showPeriodWithTransactions(page: Page) {
   const table = page.getByRole('table', { name: 'Transactions' });
-  if (await transactionsIn(page, await summaryMonth(await loadedSummary(page)))) return table;
   const picker = page.getByRole('combobox', { name: 'Period' });
+  const summary = await loadedSummary(page);
+  // The picker offers its months once GET /spending/months answers (spec 010 rule 5d).
+  await expect(picker).toBeEnabled({ timeout: 30_000 });
+  if (await transactionsIn(page, await summaryMonth(summary))) return table;
   for (const label of await picker.locator('option').allTextContents()) {
     await picker.selectOption({ label });
     if (await transactionsIn(page, monthOf(label))) return table;

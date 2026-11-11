@@ -8,13 +8,19 @@ import type {
   PayStub,
   Profile,
   Proposal,
+  ReviewDraft,
   Transaction,
 } from '@/lib/api/types';
 import {
+  DECISION_V1_ID,
+  DECISION_V2_ID,
+  REPLACED_AT,
   sampleCalendarEvent,
   sampleDecision,
   sampleExplanation,
+  sampleK401,
   sampleProfile,
+  sampleSalaryReview,
   stub01Profile,
 } from '../fixtures/decisions';
 import {
@@ -43,6 +49,8 @@ export interface TestDb {
   documents: DocumentSummary[];
   /** Each document's proposal, by id; `GET /docs/{id}` shows it while reviewable. */
   proposals: Map<string, Proposal>;
+  /** Each document's review draft, by id (`PUT /docs/{id}/review`); cleared as the API clears it. */
+  reviews: Map<string, ReviewDraft>;
   /** The proposal an extraction job writes when it succeeds. */
   nextProposal: Proposal;
   payStubs: PayStub[];
@@ -66,6 +74,7 @@ export const db: TestDb = {
   pendingAccounts: new Map(),
   documents: [],
   proposals: new Map(),
+  reviews: new Map(),
   nextProposal: sampleProposal,
   payStubs: [],
   profile: emptyProfile,
@@ -91,6 +100,7 @@ export function resetDb() {
   const stub = sampleDocument();
   db.documents = [stub];
   db.proposals = new Map([[stub.id, clone(sampleProposal)]]);
+  db.reviews = new Map();
   db.nextProposal = clone(sampleProposal);
   db.payStubs = [];
   db.profile = clone(emptyProfile);
@@ -128,6 +138,34 @@ export function savedDecision() {
   db.calendar = [sampleCalendarEvent()];
 }
 
+/**
+ * `savedDecision`, then version 2 at 5% saved over it a day later, with no
+ * explanation (issue 227): v1 is replaced, its explanation and check kept.
+ */
+export function replacedDecision() {
+  savedDecision();
+  const { inputs, result } = sampleK401(5);
+  db.decisions.push(
+    sampleDecision({
+      id: DECISION_V2_ID,
+      version: 2,
+      supersedes_id: DECISION_V1_ID,
+      inputs: { ...inputs },
+      result: { ...result },
+      created_at: REPLACED_AT,
+    }),
+  );
+}
+
+/**
+ * Ready for decisions with the salary question open (spec 005 rule 24c): the
+ * profile's $65,000.00 against the sample stub's $64,999.92 a year.
+ */
+export function salaryQuestionOpen() {
+  decisionsReady();
+  db.profile.salary_review = sampleSalaryReview();
+}
+
 /** A user who has linked and uploaded nothing yet. */
 export function emptyDb() {
   db.accounts = [];
@@ -139,6 +177,7 @@ export function emptyDb() {
 export function emptyDocuments() {
   db.documents = [];
   db.proposals = new Map();
+  db.reviews = new Map();
   db.payStubs = [];
 }
 

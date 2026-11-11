@@ -115,6 +115,10 @@ WRITE_ROUTE_POLICIES: dict[str, Limit | str] = {
     "update_goal": _OWN_ROW,
     "update_finding": _OWN_ROW,
     "put_profile": _OWN_ROW,
+    "save_review": (
+        "replaces one document's review draft, a bounded body (at most 200 fields); the"
+        " screen sends one per change, never per keystroke"
+    ),
 }
 # Counters are only read for the current window; older ones are pruned.
 COUNTER_RETENTION = dt.timedelta(days=1)

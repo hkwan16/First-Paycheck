@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { emptyCashflow, sampleCashflow, sandboxCashflow } from '@/test/fixtures/cashflow';
+import type { CashFlow } from '@/lib/api/types';
+import {
+  beyondCashflow,
+  dynamicCashflow,
+  emptyCashflow,
+  notDepositedCashflow,
+  sampleCashflow,
+  sandboxCashflow,
+  septemberCashflow,
+} from '@/test/fixtures/cashflow';
 import {
   flowScale,
   layoutCashFlow,
+  legendFor,
   placePopover,
   POPOVER_W,
+  MIN_BAND_PX,
   MIN_HOST_W,
   MIN_NODE_H,
   NODE_GAP,
@@ -21,8 +32,24 @@ const node = (layout: FlowLayout, id: string) => {
   return found;
 };
 const outOf = (layout: FlowLayout, id: string) => layout.links.filter((l) => l.from === id);
-const sumThickness = (links: FlowLayout['links']) =>
-  links.reduce((total, link) => total + link.thickness, 0);
+const into = (layout: FlowLayout, id: string) => layout.links.filter((l) => l.to === id);
+
+/** The pixels each band stands for (its cents at the scale), before any minimum. */
+const bandPx = (layout: FlowLayout, links: FlowLayout['links']) =>
+  links.reduce((total, link) => total + link.cents * layout.scale!.pxPerCent, 0);
+
+/** Rule 5b: a node is as tall as its amount, and so are the bands in and out of it. */
+function expectEveryNodeIsItsAmount(layout: FlowLayout) {
+  for (const n of layout.nodes) {
+    expect(n.h).toBeCloseTo(Math.max(MIN_NODE_H, n.valuePx), 6);
+    if (n.zero) continue;
+    expect(n.valuePx).toBeCloseTo(n.cents * layout.scale!.pxPerCent, 6);
+    const ins = into(layout, n.id);
+    const outs = outOf(layout, n.id);
+    if (ins.length > 0) expect(bandPx(layout, ins)).toBeCloseTo(n.valuePx, 6);
+    if (outs.length > 0) expect(bandPx(layout, outs)).toBeCloseTo(n.valuePx, 6);
+  }
+}
 
 describe('layoutCashFlow', () => {
   const layout = layoutCashFlow(sampleCashflow(), 928);
@@ -37,13 +64,13 @@ describe('layoutCashFlow', () => {
       'line:retirement_contribution',
       'line:medical_premium',
       'line:other_deductions',
-      'take-home',
+      'take_home',
     ]);
     expect(ids(layout, 2)).toEqual([
       'bucket:essentials',
       'bucket:flexible',
       'bucket:savings',
-      'bucket:left_over',
+      'left_over',
     ]);
     // Grouped by bucket, each bucket's categories in the API's order.
     expect(ids(layout, 3)).toEqual([
@@ -65,11 +92,8 @@ describe('layoutCashFlow', () => {
       name: 'Federal tax',
       cents: 59_552,
     });
-    expect(node(layout, 'take-home')).toMatchObject({ name: 'Take-home', cents: 399_208 });
-    expect(node(layout, 'bucket:left_over')).toMatchObject({
-      name: 'Left over',
-      cents: 161_894,
-    });
+    expect(node(layout, 'take_home')).toMatchObject({ name: 'Take-home', cents: 399_208 });
+    expect(node(layout, 'left_over')).toMatchObject({ name: 'Left over', cents: 161_894 });
     expect(node(layout, 'category:phone_internet')).toMatchObject({
       name: 'Phone and internet',
       cents: 7_000,
@@ -82,17 +106,17 @@ describe('layoutCashFlow', () => {
     expect(color('line:federal_withholding')).toBe('flow-tax');
     expect(color('line:retirement_contribution')).toBe('plum');
     expect(color('line:medical_premium')).toBe('coral');
-    expect(color('take-home')).toBe('ink-2');
+    expect(color('take_home')).toBe('ink-2');
     expect(color('bucket:essentials')).toBe('blue');
     expect(color('bucket:flexible')).toBe('coral');
     expect(color('bucket:savings')).toBe('teal');
-    expect(color('bucket:left_over')).toBe('flow-idle');
+    expect(color('left_over')).toBe('flow-idle');
     expect(color('category:housing')).toBe('blue-soft');
     expect(color('category:dining')).toBe('coral-soft');
     expect(color('category:savings_investment')).toBe('teal');
   });
 
-  it('derives the scale from a target gross height, for the "1 px is about" badge', () => {
+  it('derives the scale from a target height for the largest node, for the "1 px is about" badge', () => {
     expect(layout.scale).not.toBeNull();
     expect(layout.scale!.pxPerCent).toBeCloseTo(TARGET_GROSS_PX / 541_666, 12);
     // 541,666 cents over 240 px is 2,256.94 cents a pixel.
@@ -100,38 +124,32 @@ describe('layoutCashFlow', () => {
     expect(node(layout, 'gross').valuePx).toBeCloseTo(TARGET_GROSS_PX, 6);
   });
 
-  it('draws bands out of gross pay that add up to its height', () => {
-    const bands = outOf(layout, 'gross');
-    expect(bands.map((b) => b.to)).toEqual([
+  it('draws the bands the API gives, in its order', () => {
+    expect(outOf(layout, 'gross').map((b) => b.to)).toEqual([
       'line:federal_withholding',
       'line:social_security',
       'line:medicare',
       'line:state_tax',
       'line:medical_premium',
       'line:other_deductions',
-      'take-home',
+      'take_home',
     ]);
-    expect(sumThickness(bands)).toBeCloseTo(node(layout, 'gross').valuePx, 6);
-  });
-
-  it('draws take-home into the buckets and each bucket into its categories', () => {
-    expect(outOf(layout, 'take-home').map((b) => b.to)).toEqual([
+    expect(outOf(layout, 'take_home').map((b) => b.to)).toEqual([
       'bucket:essentials',
       'bucket:flexible',
       'bucket:savings',
-      'bucket:left_over',
+      'left_over',
     ]);
-    expect(sumThickness(outOf(layout, 'take-home'))).toBeCloseTo(
-      node(layout, 'take-home').valuePx,
-      6,
-    );
     expect(outOf(layout, 'bucket:flexible').map((b) => b.to)).toEqual([
       'category:dining',
       'category:subscriptions',
       'category:shopping',
     ]);
-    // Left over stays put: no category of its own.
-    expect(outOf(layout, 'bucket:left_over')).toEqual([]);
+    expect(outOf(layout, 'left_over')).toEqual([]);
+  });
+
+  it('makes every node as tall as its amount and its bands add up to it (spec 010 rule 5b)', () => {
+    expectEveryNodeIsItsAmount(layout);
   });
 
   it('gives each band the color of where it goes, lighter for the greys', () => {
@@ -141,13 +159,29 @@ describe('layoutCashFlow', () => {
     expect(band('bucket:essentials').d).toMatch(/^M \d+(\.\d)? [\d.]+ C .* Z$/);
   });
 
+  it('stacks the bands along a node from its top, and draws a tiny one at the minimum', () => {
+    const takeHome = node(layout, 'take_home');
+    const [first, second] = outOf(layout, 'take_home');
+    const top = takeHome.y + (takeHome.h - takeHome.valuePx) / 2;
+    expect(first!.d.startsWith(`M ${takeHome.x + NODE_W} ${Math.round(top * 10) / 10} `)).toBe(
+      true,
+    );
+    expect(second!.thickness).toBeCloseTo(24_989 * layout.scale!.pxPerCent, 6);
+    // The sandbox's 4.22 of income is under a pixel at its scale.
+    const tiny = layoutCashFlow(sandboxCashflow(), 928);
+    expect(outOf(tiny, 'income_deposited')[0]!.thickness).toBe(MIN_BAND_PX);
+  });
+
   it('shows a $0 401(k) as a dashed node with no band, and hides other $0 lines', () => {
     const k401 = node(layout, 'line:retirement_contribution');
     expect(k401).toMatchObject({ name: '401(k), not elected', cents: 0, zero: true });
     expect(layout.links.some((l) => l.to === k401.id)).toBe(false);
 
     const noOther = sampleCashflow();
-    noOther.withholding.lines.find((l) => l.key === 'other_deductions')!.amount_cents = 0;
+    noOther.diagram.nodes.find((n) => n.id === 'line:other_deductions')!.cents = 0;
+    noOther.diagram.links = noOther.diagram.links.filter(
+      (l) => l.target !== 'line:other_deductions',
+    );
     expect(ids(layoutCashFlow(noOther, 928), 1)).not.toContain('line:other_deductions');
   });
 
@@ -155,7 +189,6 @@ describe('layoutCashFlow', () => {
     for (const column of layout.columns) {
       column.forEach((n, i) => {
         expect(n.h).toBeGreaterThanOrEqual(MIN_NODE_H);
-        expect(n.h).toBeGreaterThanOrEqual(n.valuePx - 1e-9);
         const next = column[i + 1];
         if (next) expect(next.y).toBeCloseTo(n.y + n.h + NODE_GAP, 6);
       });
@@ -185,98 +218,101 @@ describe('layoutCashFlow', () => {
     expect(layoutCashFlow(sampleCashflow(), 1100.7).hostW).toBe(1100);
   });
 
-  it('without a confirmed pay stub, starts from the income deposited', () => {
-    const flow = sampleCashflow({ pay_stubs: [] });
-    flow.withholding = emptyCashflow(flow.start, flow.end).withholding;
-    const noStubs = layoutCashFlow(flow, 928);
+  it('issue 236: take-home is drawn shorter than gross pay, and other money pays the rest', () => {
+    // One stub: gross 2,708.33, take-home 1,996.04; 3,240.12 deposited, 5,234.98 spent.
+    const beyond = layoutCashFlow(beyondCashflow(), 1344);
+    const gross = node(beyond, 'gross');
+    const takeHome = node(beyond, 'take_home');
+    expect(gross).toMatchObject({ name: 'Gross pay, 1 stub', cents: 270_833 });
+    expect(takeHome).toMatchObject({ name: 'Take-home', cents: 199_604 });
+    expect(takeHome.h).toBeLessThan(gross.h);
+    expect(takeHome.h / gross.h).toBeCloseTo(199_604 / 270_833, 6);
+    expect(ids(beyond, 1).slice(-3)).toEqual(['take_home', 'other_deposits', 'beyond_income']);
+    expect(node(beyond, 'other_deposits')).toMatchObject({
+      name: 'Other deposits',
+      cents: 124_408,
+      color: 'ink-2',
+    });
+    expect(node(beyond, 'beyond_income')).toMatchObject({
+      name: 'Spent beyond income',
+      cents: 199_486,
+      color: 'flow-idle',
+      zero: false,
+    });
+    expect(ids(beyond, 2)).not.toContain('left_over');
+    expect(outOf(beyond, 'take_home').map((b) => [b.to, b.cents])).toEqual([
+      ['bucket:essentials', 199_604],
+    ]);
+    expect(into(beyond, 'bucket:flexible').map((b) => [b.from, b.cents])).toEqual([
+      ['other_deposits', 14_012],
+      ['beyond_income', 197_332],
+    ]);
+    expectEveryNodeIsItsAmount(beyond);
+  });
 
-    expect(node(noStubs, 'gross')).toMatchObject({
+  it('sends take-home that was not deposited to its own node', () => {
+    const short = layoutCashFlow(notDepositedCashflow(), 928);
+    expect(ids(short, 2)[0]).toBe('not_deposited');
+    expect(node(short, 'not_deposited')).toMatchObject({
+      name: 'Not deposited',
+      cents: 49_604,
+      color: 'flow-idle',
+    });
+    expect(outOf(short, 'take_home').map((b) => b.to)).toEqual([
+      'not_deposited',
+      'bucket:essentials',
+      'left_over',
+    ]);
+    expectEveryNodeIsItsAmount(short);
+  });
+
+  it('without a confirmed pay stub, starts from the income deposited', () => {
+    const dynamic = layoutCashFlow(dynamicCashflow(), 928);
+    expect(node(dynamic, 'gross')).toMatchObject({
       name: 'No pay stub this period',
       zero: true,
       cents: 0,
     });
-    expect(ids(noStubs, 1)).toEqual(['take-home']);
-    expect(node(noStubs, 'take-home')).toMatchObject({ name: 'Income deposited', cents: 399_208 });
-    expect(outOf(noStubs, 'gross')).toEqual([]);
-    // The scale now comes from the income.
-    expect(noStubs.scale!.centsPerPx).toBe(1_663);
+    expect(ids(dynamic, 1)).toEqual(['income_deposited', 'refunds']);
+    expect(node(dynamic, 'income_deposited')).toMatchObject({
+      name: 'Income deposited',
+      cents: 12,
+    });
+    expect(outOf(dynamic, 'gross')).toEqual([]);
   });
 
-  it('draws the sandbox month as the API gives it: a little income, spending far beyond it', () => {
-    // GUSTO PAY is money out on the sandbox, so the API counts only 4.22 of
-    // interest as income (spec 007 rule 22a) and the month overspent.
+  it('draws money back in a category as a source, and the bucket before it', () => {
+    // The sandbox's United Airlines refund (500.00) outweighed October's travel.
     const sandbox = layoutCashFlow(sandboxCashflow(), 928);
-    expect(node(sandbox, 'take-home')).toMatchObject({ name: 'Income deposited', cents: 422 });
-    expect(node(sandbox, 'bucket:left_over')).toMatchObject({
-      name: 'Spent beyond income',
-      cents: -168_541,
-      zero: true,
+    expect(ids(sandbox, 1)).toEqual(['income_deposited', 'refunds', 'beyond_income']);
+    expect(node(sandbox, 'refunds')).toMatchObject({
+      name: 'Refunds',
+      cents: 50_000,
+      categories: ['travel'],
     });
-    // Scaled to 240 px for 4.22, savings alone would be about 56,900 px tall.
-    // The tallest node sets the scale instead: savings, 1,000.00, at 240 px.
-    expect(node(sandbox, 'bucket:savings').valuePx).toBeCloseTo(TARGET_GROSS_PX, 6);
-    expect(Math.max(...sandbox.nodes.map((n) => n.valuePx))).toBeCloseTo(TARGET_GROSS_PX, 6);
-    expect(sandbox.scale!.centsPerPx).toBe(417);
-  });
-
-  it('draws spending beyond income as a dashed node with no band', () => {
-    const flow = sampleCashflow();
-    flow.spending.left_over_cents = -12_345;
-    const over = layoutCashFlow(flow, 928);
-    expect(node(over, 'bucket:left_over')).toMatchObject({
-      name: 'Spent beyond income',
-      cents: -12_345,
-      zero: true,
-      valuePx: 0,
+    expect(node(sandbox, 'bucket:flexible')).toMatchObject({
+      cents: 118_423,
+      refundsCents: 50_000,
     });
-    expect(over.links.some((l) => l.to === 'bucket:left_over')).toBe(false);
-  });
-
-  it('grows take-home to hold its bands when deposits differ from the stubs', () => {
-    const flow = sampleCashflow();
-    flow.spending.essentials_cents = 482_325;
-    const grown = layoutCashFlow(flow, 928);
-    const takeHome = node(grown, 'take-home');
-    expect(takeHome.h).toBeCloseTo(sumThickness(outOf(grown, 'take-home')), 6);
-    expect(takeHome.h).toBeGreaterThan(takeHome.valuePx);
+    expect(ids(sandbox, 3)).not.toContain('category:travel');
+    // The largest node sets the scale: spending beyond the income, 1,685.41, at 240 px.
+    expect(node(sandbox, 'beyond_income').valuePx).toBeCloseTo(TARGET_GROSS_PX, 6);
+    expect(sandbox.scale!.centsPerPx).toBe(702);
+    expectEveryNodeIsItsAmount(sandbox);
   });
 
   it('shows a $0 bucket dashed with no band, and leaves an empty Other bucket out', () => {
-    const flow = sampleCashflow();
-    flow.spending.savings_cents = 0;
-    flow.spending.categories = flow.spending.categories.filter(
-      (c) => c.category !== 'savings_investment',
-    );
-    const noSavings = layoutCashFlow(flow, 928);
-    expect(node(noSavings, 'bucket:savings')).toMatchObject({ zero: true, cents: 0 });
-    expect(noSavings.links.some((l) => l.to === 'bucket:savings')).toBe(false);
-    expect(ids(noSavings, 2)).not.toContain('bucket:other');
+    const short = layoutCashFlow(notDepositedCashflow(), 928);
+    expect(node(short, 'bucket:savings')).toMatchObject({ zero: true, cents: 0 });
+    expect(short.links.some((l) => l.to === 'bucket:savings')).toBe(false);
+    expect(ids(short, 2)).not.toContain('bucket:other');
   });
 
   it('includes the Other bucket and its categories when it has spending', () => {
-    const flow = sampleCashflow();
-    flow.spending.other_cents = 3_900;
-    flow.spending.categories.push({
-      category: 'fees',
-      bucket: 'other',
-      total_cents: 3_900,
-      count: 1,
-    });
-    const withOther = layoutCashFlow(flow, 928);
-    expect(ids(withOther, 2)).toContain('bucket:other');
-    expect(node(withOther, 'category:fees').color).toBe('flow-tax');
-    expect(outOf(withOther, 'bucket:other').map((b) => b.to)).toEqual(['category:fees']);
-  });
-
-  it('leaves out categories with no net spending (refunds cancelled them)', () => {
-    const flow = sampleCashflow();
-    flow.spending.categories.push({
-      category: 'travel',
-      bucket: 'flexible',
-      total_cents: -500,
-      count: 2,
-    });
-    expect(ids(layoutCashFlow(flow, 928), 3)).not.toContain('category:travel');
+    const september = layoutCashFlow(septemberCashflow(), 928);
+    expect(ids(september, 2)).toContain('bucket:other');
+    expect(node(september, 'category:fees').color).toBe('flow-tax');
+    expect(outOf(september, 'bucket:other').map((b) => b.to)).toEqual(['category:fees']);
   });
 
   it('has no scale when there is nothing to draw', () => {
@@ -291,6 +327,51 @@ describe('flowScale', () => {
   it('is the layout scale, whatever the width', () => {
     expect(flowScale(sampleCashflow())).toEqual(layoutCashFlow(sampleCashflow(), 1200).scale);
     expect(flowScale(emptyCashflow('2026-09-01', '2026-09-30'))).toBeNull();
+  });
+});
+
+describe('legendFor', () => {
+  const legend = (flow: CashFlow) => legendFor(layoutCashFlow(flow, 928));
+
+  it('lists the groups the diagram draws with an amount, in a fixed color order', () => {
+    expect(legend(sampleCashflow())).toEqual([
+      { color: 'plum', label: 'Gross pay' },
+      { color: 'flow-tax', label: 'Taxes and other deductions' },
+      { color: 'coral', label: 'Health premiums and flexible spending' },
+      { color: 'ink-2', label: 'Take-home' },
+      { color: 'blue', label: 'Essentials' },
+      { color: 'teal', label: 'Savings' },
+      { color: 'flow-idle', label: 'Left over' },
+    ]);
+  });
+
+  it('lists no pay stub group for a period with no stub (issue 236)', () => {
+    expect(legend(sandboxCashflow())).toEqual([
+      { color: 'coral', label: 'Flexible spending' },
+      { color: 'ink-2', label: 'Income deposited and refunds' },
+      { color: 'blue', label: 'Essentials' },
+      { color: 'teal', label: 'Savings' },
+      { color: 'flow-idle', label: 'Spent beyond income' },
+    ]);
+  });
+
+  it('names the other sources and uses when they are drawn', () => {
+    expect(legend(beyondCashflow())).toContainEqual({
+      color: 'ink-2',
+      label: 'Take-home and other deposits',
+    });
+    expect(legend(notDepositedCashflow())).toContainEqual({
+      color: 'flow-idle',
+      label: 'Not deposited and left over',
+    });
+    expect(legend(septemberCashflow())).toContainEqual({
+      color: 'flow-tax',
+      label: 'Taxes, other deductions and other spending',
+    });
+  });
+
+  it('is empty for an empty period', () => {
+    expect(legend(emptyCashflow('2026-09-01', '2026-09-30'))).toEqual([]);
   });
 });
 

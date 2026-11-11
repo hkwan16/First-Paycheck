@@ -6,6 +6,7 @@ import { spendingDb } from '@/test/msw/spending-handlers';
 import { emptyPlan, partialPlan } from '@/test/fixtures/plan';
 import { planDb } from '@/test/msw/plan-handlers';
 import { renderHookWithClient } from '@/test/render';
+import { useDecisions } from './decisions';
 import { useSetupFacts, useSetupProgress } from './setup';
 
 describe('useSetupFacts', () => {
@@ -20,7 +21,7 @@ describe('useSetupFacts', () => {
       documents: 1,
       confirmedPayStubs: 0,
       categorizationFinished: true,
-      savedDecisionCalculators: [],
+      settledDecisionCalculators: [],
     });
   });
 
@@ -81,7 +82,24 @@ describe('useSetupFacts with decisions', () => {
   it('names the calculators with a saved decision by their feature flag ids', async () => {
     savedDecision();
     const { result } = renderHookWithClient(() => useSetupFacts());
-    await waitFor(() => expect(result.current.savedDecisionCalculators).toEqual(['401k_match']));
+    await waitFor(() => expect(result.current.settledDecisionCalculators).toEqual(['401k_match']));
+  });
+
+  it('leaves out a saved decision that needs review (spec 018 rule 8, issue 222)', async () => {
+    savedDecision();
+    db.decisions[0]!.review = [
+      {
+        kind: 'changed',
+        input: 'pay_periods_per_year',
+        text: 'Your pay schedule changed from 26 to 24 paychecks a year.',
+      },
+    ];
+    const { result } = renderHookWithClient(() => ({
+      facts: useSetupFacts(),
+      decisions: useDecisions(),
+    }));
+    await waitFor(() => expect(result.current.decisions.isSuccess).toBe(true));
+    expect(result.current.facts.settledDecisionCalculators).toEqual([]);
   });
 });
 
@@ -94,8 +112,23 @@ describe('useSetupProgress with the plan', () => {
     planDb.plan.completeness = {
       saved: ['emergency_fund', 'k401_match', 'health_plans', 'w4'],
       missing: [],
+      needs_review: [],
     };
     const progress = renderHookWithClient(() => useSetupProgress());
     await waitFor(() => expect(progress.result.current.plan).toBe(true));
+  });
+
+  it('counts the decisions the plan says need review (spec 016 rule 3a)', async () => {
+    planDb.plan.completeness = {
+      saved: ['emergency_fund', 'k401_match', 'health_plans', 'w4'],
+      missing: [],
+      needs_review: ['health_plans', 'w4'],
+    };
+    const { result } = renderHookWithClient(() => ({
+      facts: useSetupFacts(),
+      progress: useSetupProgress(),
+    }));
+    await waitFor(() => expect(result.current.facts.planNeedsReviewCount).toBe(2));
+    expect(result.current.progress.plan).toBe(false);
   });
 });

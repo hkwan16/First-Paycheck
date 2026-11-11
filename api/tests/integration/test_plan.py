@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 from collections.abc import Callable
 from typing import Any
@@ -12,7 +13,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Connection
 
 from app.deps import get_now
+from db.enums import PayFrequency
 from tests.conftest import FixtureUser
+from tests.support.factories import make_document, make_pay_stub
 from tests.support.pay_stub_copies import replaced_late_october
 from tests.support.plan_user import NOW, PlanUser, seed_plan_user
 
@@ -67,7 +70,7 @@ def test_plan_for_a_new_user_is_empty(
     assert plan == {
         "as_of": "2026-10-21",
         "calendar_through": "2027-01-19",
-        "completeness": {"saved": [], "missing": ALL_CALCULATORS},
+        "completeness": {"saved": [], "missing": ALL_CALCULATORS, "needs_review": []},
         "decisions": [],
         "goals": [],
         "calendar": [],
@@ -80,7 +83,8 @@ def test_plan_lists_current_decisions_in_calculator_order(
 ) -> None:
     plan = get_plan(client_as, user_a)
     assert [d["calculator"] for d in plan["decisions"]] == ALL_CALCULATORS
-    assert plan["completeness"] == {"saved": ALL_CALCULATORS, "missing": []}
+    assert plan["completeness"] == {"saved": ALL_CALCULATORS, "missing": [], "needs_review": []}
+    assert all(decision["review"] == [] for decision in plan["decisions"])
     k401 = by_calculator(plan)["k401_match"]
     assert k401["id"] == str(plan_user.k401_id)
     assert k401["version"] == 2
@@ -219,3 +223,32 @@ def test_plan_pay_stub_skips_superseded_stub(
     stub = get_plan(client_as, user_a)["pay_stub"]
     assert stub is not None
     assert (stub["id"], stub["pay_date"], stub["gross_cents"]) == (str(new), "2026-10-15", 270_833)
+
+
+def test_plan_marks_decisions_that_need_review(
+    plan_user: PlanUser, client_as: Client, user_a: FixtureUser, db_connection: Connection
+) -> None:
+    """Rule 3a: a newer stub paid every two weeks, at the same $65,000.00 a year."""
+    before = by_calculator(get_plan(client_as, user_a))
+    make_pay_stub(
+        db_connection,
+        user_a.id,
+        make_document(db_connection, user_a.id, with_blob=False),
+        pay_frequency=PayFrequency.BIWEEKLY,
+        pay_date=dt.date(2026, 10, 30),
+        period_start=dt.date(2026, 10, 17),
+        period_end=dt.date(2026, 10, 30),
+        gross_cents=250_000,
+        net_cents=250_000 - 71_229,
+    )
+    plan = get_plan(client_as, user_a)
+    assert plan["completeness"]["needs_review"] == ALL_CALCULATORS
+    schedule = {
+        "kind": "changed",
+        "input": "pay_periods_per_year",
+        "text": "Your pay schedule changed from 24 to 26 paychecks a year.",
+    }
+    for calculator, decision in by_calculator(plan).items():
+        assert decision["review"] == [schedule], calculator
+        # What was saved is still what the plan copies; the screens decide how to show it.
+        assert decision["figures"] == before[calculator]["figures"]

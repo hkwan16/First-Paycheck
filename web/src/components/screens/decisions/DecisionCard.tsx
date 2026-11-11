@@ -116,9 +116,9 @@ export interface SaveButtonProps {
 }
 
 /**
- * A card's save action, the step's one primary button (spec 018 rules 5a and
- * 5b): "Save", "Save changes", or the pressed "Saved" once what is on screen
- * is what is saved. No version number: those belong to the Why pages and the
+ * A card's save action, the step's one primary button (spec 018 rules 5a, 5b
+ * and 5c): "Save", "Save changes", "Save again" for a decision that needs
+ * review, or the pressed "Saved" once what is on screen is what is saved. No version number: those belong to the Why pages and the
  * Plan.
  */
 export function SaveButton({ state, canSave, saving = false, onSave }: SaveButtonProps) {

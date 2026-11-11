@@ -28,6 +28,9 @@ export function GateNotice({ gate }: { gate: Gate }) {
       return (
         <Notice tone="warning" compact title="Can't check the math yet.">
           {gate.label} is {gate.reason === 'invalid' ? 'not an amount yet' : 'missing'}.
+          {gate.reason === 'missing' &&
+            gate.canBeNone &&
+            ' Confirm it as none if your stub has no such line.'}
         </Notice>
       );
     case 'none':

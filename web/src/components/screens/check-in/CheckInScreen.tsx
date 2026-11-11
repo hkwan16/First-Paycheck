@@ -11,6 +11,7 @@ import { apiErrorCode, apiErrorMessage } from '@/lib/api/errors';
 import { useCheckIn, useCheckInNow } from '@/lib/api/hooks';
 import { formatDate } from '@/lib/dates';
 import { useToday } from '@/lib/periods';
+import { monthName } from '../spending/spending-format';
 import { checkInTitle, offersCheckInNow } from './checkin-format';
 import { CheckInNowButton, CheckInNowStatus } from './CheckInNow';
 import { DeadlinesCard } from './DeadlinesCard';
@@ -30,7 +31,9 @@ const allCheckIns = (
  * the month's cash flow against the plan beside net worth and holdings (where
  * the mockup puts them), and the dates coming up. This month's open
  * check-in offers "Check in now" (the mockup's "Run again now"), which runs
- * it again and reads it back when the job finishes.
+ * it again and reads it back when the job finishes. A past check-in is a
+ * record of its date (`past`, `as_of`; spec 015 rule 9b): it says so, its
+ * findings are worded in the past, and it leaves out today's dates coming up.
  */
 export function CheckInScreen({ checkInId }: { checkInId: string }) {
   const checkIn = useCheckIn(checkInId);
@@ -71,11 +74,14 @@ export function CheckInScreen({ checkInId }: { checkInId: string }) {
 
   // Once started, the run's progress and outcome stay, even if the check-in completes meanwhile.
   const offered = offersCheckInNow(data, today) || checkInNow.jobId !== null;
+  const lead = data.past
+    ? `This is ${monthName(data.period)}’s record: we compared your pay stubs and spending with your plan on ${formatDate(data.as_of)}, and it is not checked again. You can still mark each finding done.`
+    : `We compared your pay stubs and spending with your plan on ${formatDate(data.last_run_at)}. Mark each finding done once you have dealt with it.`;
   return (
     <>
       <PageTitle
         title={checkInTitle(data.period)}
-        lead={`We compared your pay stubs and spending with your plan on ${formatDate(data.last_run_at)}. Mark each finding done once you have dealt with it.`}
+        lead={lead}
         aside={
           offered ? (
             <div className="flex flex-wrap gap-2">
@@ -93,15 +99,17 @@ export function CheckInScreen({ checkInId }: { checkInId: string }) {
       </CardErrorBoundary>
       <div className="flex flex-wrap items-start gap-6">
         <CardErrorBoundary title="Cash flow against your plan" className="flex-[1_1_440px]">
-          <PlanLinesCard cashFlow={data.cash_flow} className="flex-[1_1_440px]" />
+          <PlanLinesCard cashFlow={data.cash_flow} past={data.past} className="flex-[1_1_440px]" />
         </CardErrorBoundary>
         <CardErrorBoundary title="Net worth" className="flex-[1_1_320px]">
           <NetWorthCard className="flex-[1_1_320px]" />
         </CardErrorBoundary>
       </div>
-      <CardErrorBoundary title="Coming up">
-        <DeadlinesCard period={data.period} />
-      </CardErrorBoundary>
+      {!data.past && (
+        <CardErrorBoundary title="Coming up">
+          <DeadlinesCard period={data.period} />
+        </CardErrorBoundary>
+      )}
     </>
   );
 }

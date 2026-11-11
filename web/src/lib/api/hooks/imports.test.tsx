@@ -38,14 +38,15 @@ describe('useImportCsv', () => {
     request.progress(1, 2);
     request.respond(200, {
       account: { id: 'a1' },
-      imported: 3,
+      added: 3,
+      already_present: 0,
       categorize_job_id: 'j1',
       recurring_job_id: 'j2',
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(progress).toEqual([50]);
-    expect(result.current.data?.imported).toBe(3);
+    expect(result.current.data?.added).toBe(3);
     const invalidated = (key: readonly unknown[]) => queryClient.getQueryState(key)?.isInvalidated;
     expect(invalidated(queryKeys.accounts())).toBe(true);
     expect(invalidated([...queryKeys.cashflow(), undefined])).toBe(true);
@@ -65,7 +66,8 @@ describe('useImportCsv', () => {
     await waitFor(() => expect(xhr.requests).toHaveLength(1));
     xhr.last().respond(200, {
       account: { id: 'a1', name: 'Kept' },
-      imported: 0,
+      added: 0,
+      already_present: 0,
       categorize_job_id: 'j1',
       recurring_job_id: 'j2',
     });

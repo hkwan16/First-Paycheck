@@ -1,0 +1,27 @@
+{
+  "employer_name": {"value": "Birch Lane Clinic", "confidence": 0.99, "source_text": "BIRCH LANE CLINIC PAY STATEMENT"},
+  "pay_frequency": {"value": "biweekly", "confidence": 0.96, "source_text": "Pay Frequency Biweekly"},
+  "pay_date": {"value": "2026-09-25", "confidence": 0.98, "source_text": "Pay Date 09/25/2026"},
+  "period_start": {"value": "2026-09-12", "confidence": 0.97, "source_text": "Period 09/12/2026 - 09/25/2026"},
+  "period_end": {"value": "2026-09-25", "confidence": 0.97, "source_text": "Period 09/12/2026 - 09/25/2026"},
+  "gross_cents": {"value": 261538, "confidence": 0.99, "source_text": "Gross Pay 2,615.38"},
+  "federal_withholding_cents": {"value": 24431, "confidence": 0.97, "source_text": "Federal Income Tax 244.31"},
+  "social_security_cents": {"value": 16215, "confidence": 0.99, "source_text": "Social Security 162.15"},
+  "medicare_cents": {"value": 3792, "confidence": 0.99, "source_text": "Medicare 37.92"},
+  "state_tax_cents": {"value": 11769, "confidence": 0.95, "source_text": "CA State Tax 117.69"},
+  "retirement_contribution_cents": {"value": null, "confidence": 0.97, "source_text": null},
+  "medical_premium_cents": {"value": 6250, "confidence": 0.96, "source_text": "Medical Pretax 62.50"},
+  "net_cents": {"value": 187804, "confidence": 0.99, "source_text": "Net Pay 1,878.04"},
+  "line_items": [
+    {"label": "Gross Pay", "amount_cents": 261538, "kind": "earning", "field": "gross_cents"},
+    {"label": "Federal Income Tax", "amount_cents": 24431, "kind": "tax", "field": "federal_withholding_cents"},
+    {"label": "Social Security", "amount_cents": 16215, "kind": "tax", "field": "social_security_cents"},
+    {"label": "Medicare", "amount_cents": 3792, "kind": "tax", "field": "medicare_cents"},
+    {"label": "CA State Tax", "amount_cents": 11769, "kind": "tax", "field": "state_tax_cents"},
+    {"label": "CA SDI", "amount_cents": 3138, "kind": "tax", "field": null},
+    {"label": "Medical Pretax", "amount_cents": 6250, "kind": "pre_tax_deduction", "field": "medical_premium_cents"},
+    {"label": "Dental/Vision", "amount_cents": 8139, "kind": "pre_tax_deduction", "field": null},
+    {"label": "Net Pay", "amount_cents": 187804, "kind": "net", "field": "net_cents"}
+  ],
+  "notes": null
+}

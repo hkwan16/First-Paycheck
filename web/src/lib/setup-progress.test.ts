@@ -8,8 +8,9 @@ const empty: SetupFacts = {
   transactions: 0,
   categorizationFinished: false,
   liveCalculators: ['401k_match'],
-  savedDecisionCalculators: [],
+  settledDecisionCalculators: [],
   planMissingCount: null,
+  planNeedsReviewCount: null,
 };
 
 describe('setupProgress', () => {
@@ -47,16 +48,16 @@ describe('setupProgress', () => {
 
   it('marks decisions done when every live calculator has a saved decision', () => {
     const twoLive: SetupFacts = { ...empty, liveCalculators: ['401k_match', 'w4'] };
-    expect(setupProgress({ ...twoLive, savedDecisionCalculators: ['401k_match'] }).decisions).toBe(
-      false,
-    );
     expect(
-      setupProgress({ ...twoLive, savedDecisionCalculators: ['w4', '401k_match'] }).decisions,
+      setupProgress({ ...twoLive, settledDecisionCalculators: ['401k_match'] }).decisions,
+    ).toBe(false);
+    expect(
+      setupProgress({ ...twoLive, settledDecisionCalculators: ['w4', '401k_match'] }).decisions,
     ).toBe(true);
   });
 
   it('ignores saved decisions for calculators that are not live', () => {
-    expect(setupProgress({ ...empty, savedDecisionCalculators: ['w4'] }).decisions).toBe(false);
+    expect(setupProgress({ ...empty, settledDecisionCalculators: ['w4'] }).decisions).toBe(false);
   });
 
   it('never marks decisions done when no calculator is live', () => {
@@ -67,7 +68,7 @@ describe('setupProgress', () => {
     const progress = setupProgress({
       ...empty,
       liveCalculators: ['emergency_fund', '401k_match', 'health_plan', 'w4'],
-      savedDecisionCalculators: ['401k_match', 'w4'],
+      settledDecisionCalculators: ['401k_match', 'w4'],
     });
     expect(progress).toMatchObject({
       emergency_fund: false,
@@ -79,20 +80,44 @@ describe('setupProgress', () => {
   });
 
   it('never marks a step that is not live, even with a saved decision', () => {
-    const progress = setupProgress({ ...empty, savedDecisionCalculators: ['w4'] });
+    const progress = setupProgress({ ...empty, settledDecisionCalculators: ['w4'] });
     expect(progress.w4).toBe(false);
     expect(progress.decisions).toBe(false);
   });
 
   it('marks Decisions done with its one live step in the alpha', () => {
-    const progress = setupProgress({ ...empty, savedDecisionCalculators: ['401k_match'] });
+    const progress = setupProgress({ ...empty, settledDecisionCalculators: ['401k_match'] });
     expect(progress['401k_match']).toBe(true);
     expect(progress.decisions).toBe(true);
   });
 
+  it('a decision that needs review is not done (spec 018 rule 8, issue 222)', () => {
+    // Saved: all four. Settled: the two whose saved decision needs no review.
+    const progress = setupProgress({
+      ...empty,
+      liveCalculators: ['emergency_fund', '401k_match', 'health_plan', 'w4'],
+      settledDecisionCalculators: ['emergency_fund', '401k_match'],
+    });
+    expect(progress).toMatchObject({
+      emergency_fund: true,
+      '401k_match': true,
+      health_plan: false,
+      w4: false,
+      decisions: false,
+    });
+  });
+
   it('marks the plan done once the API says no decision is missing from it', () => {
-    expect(setupProgress({ ...empty, planMissingCount: null }).plan).toBe(false);
-    expect(setupProgress({ ...empty, planMissingCount: 1 }).plan).toBe(false);
-    expect(setupProgress({ ...empty, planMissingCount: 0 }).plan).toBe(true);
+    const settled = { ...empty, planNeedsReviewCount: 0 };
+    expect(setupProgress({ ...settled, planMissingCount: null }).plan).toBe(false);
+    expect(setupProgress({ ...settled, planMissingCount: 1 }).plan).toBe(false);
+    expect(setupProgress({ ...settled, planMissingCount: 0 }).plan).toBe(true);
+  });
+
+  it('and nothing in it needs review (spec 016 rule 3a)', () => {
+    const whole = { ...empty, planMissingCount: 0 };
+    expect(setupProgress({ ...whole, planNeedsReviewCount: null }).plan).toBe(false);
+    expect(setupProgress({ ...whole, planNeedsReviewCount: 3 }).plan).toBe(false);
+    expect(setupProgress({ ...whole, planNeedsReviewCount: 0 }).plan).toBe(true);
   });
 });

@@ -1,6 +1,7 @@
-import type { NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { REQUEST_PATH_HEADER, requestPath } from '@/lib/auth/next-path';
 import { requiresSignIn } from '@/lib/auth/protected';
+import { SIGN_OUT_PATH } from '@/lib/auth/sign-out';
 import { DECISIONS_PATH, firstDecisionRoute, signInRoute } from '@/lib/routes';
 import { updateSession } from '@/lib/supabase/proxy';
 
@@ -20,6 +21,8 @@ import { updateSession } from '@/lib/supabase/proxy';
  * validating the route's instant (prefetch) UI, which it logs as an error.
  */
 export async function proxy(request: NextRequest) {
+  // Sign-out expires the session cookies itself; a refresh here would set new ones beside them.
+  if (request.nextUrl.pathname === SIGN_OUT_PATH) return NextResponse.next();
   const path = requestPath(request.nextUrl);
   const session = await updateSession(request, { [REQUEST_PATH_HEADER]: path });
   if (session.signedIn === false && requiresSignIn(request.nextUrl.pathname)) {

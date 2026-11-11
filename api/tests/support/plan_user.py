@@ -236,15 +236,6 @@ def explain(connection: Connection, user_id: uuid.UUID, plan: PlanUser) -> None:
 
 
 def seed_plan_user(connection: Connection, client: TestClient, user_id: uuid.UUID) -> PlanUser:
-    profile = client.put(
-        "/profile",
-        json={
-            "salary_cents": SALARY_CENTS,
-            "pay_frequency": "semimonthly",
-            "filing_status": "single",
-        },
-    )
-    assert profile.status_code == 200, profile.text
     make_pay_stub(
         connection,
         user_id,
@@ -253,7 +244,19 @@ def seed_plan_user(connection: Connection, client: TestClient, user_id: uuid.UUI
         period_start=dt.date(2026, 9, 16),
         period_end=dt.date(2026, 9, 30),
     )
-    make_pay_stub(connection, user_id, make_document(connection, user_id, with_blob=False))
+    newest = make_pay_stub(connection, user_id, make_document(connection, user_id, with_blob=False))
+    # $65,000.00 typed against the Acme stub's $64,999.92 (spec 005 rule 24c), so
+    # nothing asks which salary to use.
+    profile = client.put(
+        "/profile",
+        json={
+            "salary_cents": SALARY_CENTS,
+            "pay_frequency": "semimonthly",
+            "filing_status": "single",
+            "salary_pay_stub_id": str(newest),
+        },
+    )
+    assert profile.status_code == 200, profile.text
     item = make_item(connection, user_id)
     account = make_account(
         connection,

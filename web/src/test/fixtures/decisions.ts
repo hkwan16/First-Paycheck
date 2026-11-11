@@ -6,6 +6,8 @@ import type {
   K401MatchInput,
   K401MatchResult,
   Profile,
+  ReviewReason,
+  SalaryReview,
 } from '@/lib/api/types';
 import { deepEqual } from '@/lib/deep-equal';
 import { emptyProfile, payScheduleOf, samplePayStub, stub01PayStub } from './documents';
@@ -120,8 +122,44 @@ export const sampleProfile: Profile = {
 
 export const DECISION_V1_ID = 'dec00000-0000-4000-8000-000000000001';
 
+/**
+ * Spec 005 rule 24c's question for the sample user, as `GET /profile` words
+ * it: the sample stub's $2,708.33 twice a month is $64,999.92 a year, not the
+ * saved $65,000.00 (a profile saved before the rule, which names no stub).
+ */
+export function sampleSalaryReview(overrides: Partial<SalaryReview> = {}): SalaryReview {
+  const stub = samplePayStub();
+  return {
+    pay_stub_id: stub.id,
+    pay_stub_date: stub.pay_date,
+    frequency: 'semimonthly',
+    periods_per_year: 24,
+    gross_cents: stub.gross_cents,
+    annual_salary_cents: stub.annual_salary_cents!,
+    salary_cents: sampleProfile.salary_cents!,
+    ...overrides,
+  };
+}
+
+/** Issue 222's reasons, as the API words them (spec 007 rule 19d). */
+export const SCHEDULE_CHANGED: ReviewReason = {
+  kind: 'changed',
+  input: 'pay_periods_per_year',
+  text: 'Your pay schedule changed from 26 to 24 paychecks a year.',
+};
+export const SALARY_UNCONFIRMED: ReviewReason = {
+  kind: 'salary_unconfirmed',
+  input: 'salary_cents',
+  text: 'Your newest pay stub comes to $64,999.92 a year, not the $65,000.00 in your plan details. Choose which salary to use.',
+};
+
 /** When the sample decision was saved: just before the sample clock. */
 export const SAMPLE_SAVED_AT = '2026-10-17T15:59:00Z';
+
+/** Version 2 of the sample 401(k), at 5%, saved over version 1 (issue 227). */
+export const DECISION_V2_ID = 'dec00000-0000-4000-8000-000000000002';
+/** When version 2 replaced version 1: after v1's explanation, before the sample clock. */
+export const REPLACED_AT = '2026-10-17T15:59:45Z';
 
 /** The sample's 401(k) decision: version 1, contributing 4% (the full match). */
 export function sampleDecision(overrides: Partial<Decision> = {}): Decision {
@@ -136,6 +174,7 @@ export function sampleDecision(overrides: Partial<Decision> = {}): Decision {
     result: { ...result },
     created_at: SAMPLE_SAVED_AT,
     is_current: true,
+    review: [],
     ...overrides,
   };
 }
@@ -251,6 +290,7 @@ export function sampleCalendarEvent(overrides: Partial<CalendarEvent> = {}): Cal
     due_at: '2026-10-31',
     decision_id: DECISION_V1_ID,
     status: 'upcoming',
+    overdue: false,
     ...overrides,
   };
 }

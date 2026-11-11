@@ -532,6 +532,20 @@ def test_fake_extracts_from_fixtures(db_connection: Connection, user_a: FixtureU
     ]
 
 
+def test_fake_answers_the_stub_whose_employer_line_it_reads(
+    db_connection: Connection, user_a: FixtureUser
+) -> None:
+    """The e2e stack reads two synthetic stubs (web/e2e/fixtures): the Acme one,
+    and one that prints no 401(k) line (issue 230). A stub whose employer line
+    no fixture names gets the Acme answer, as before."""
+    birch = [TextPage(number=1, text="BIRCH LANE CLINIC PAY STATEMENT\nGross Pay 2,615.38")]
+    stub = fake(db_connection).extract_pay_stub(user_a.id, birch)
+    assert stub.employer_name.value == "Birch Lane Clinic"
+    assert stub.retirement_contribution_cents.value is None
+    assert stub.net_cents.value == 187_804
+    assert fake(db_connection).extract_pay_stub(user_a.id, PAGES).net_cents.value == 199_604
+
+
 def test_a_memory_ledger_needs_no_database(user_a: FixtureUser) -> None:
     memory = MemoryLedger(clock=lambda: NOW)
     gateway_without_db = FakeGateway(settings(llm_fake=True), ledger=memory, clock=lambda: NOW)
@@ -590,8 +604,8 @@ def test_explain_sends_the_context_and_the_feedback(
 
     rows = ledger(db_connection, user_a)
     assert [(row["purpose"], row["prompt_version"]) for row in rows] == [
-        ("explain", "explain/v4"),
-        ("explain", "explain/v4"),
+        ("explain", "explain/v5"),
+        ("explain", "explain/v5"),
     ]
 
 
@@ -609,7 +623,7 @@ def test_fake_explains_with_facts_that_verify(
     assert [claim.value for claim in draft.numbers] == ["3%", "$600.00"]
     allowed = AllowedNumbers.from_decision({"missed_cents": 60_000, "contribution_pct": "3.00"})
     assert verify_explanation(draft, allowed, {"k401.employer_match"}).passed
-    assert ledger(db_connection, user_a)[0]["prompt_version"] == "explain/v4"
+    assert ledger(db_connection, user_a)[0]["prompt_version"] == "explain/v5"
 
 
 # The explain eval's rate-claim judge (spec 008 rule 24a) ---------------------------

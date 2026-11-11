@@ -1,4 +1,4 @@
-"""Check a drafted explanation against the calculator (spec 008 rule 14)."""
+"""Check a drafted explanation against the calculator (spec 008 rules 14 and 14a)."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from typing import Any
 from llm.schemas import ExplanationDraft
 from verify.allowed import AllowedNumbers
 from verify.numbers import extract_numbers
+from verify.zero_cost import zero_cost_claims
 
 __all__ = ["Verification", "verify_explanation"]
 
@@ -21,10 +22,17 @@ class Verification:
     citations_checked: int
     citations_unknown: tuple[str, ...]
     has_citation: bool
+    # Each sentence that says a cost is zero where none may be (rule 14a).
+    zero_cost_claims: tuple[str, ...] = ()
 
     @property
     def passed(self) -> bool:
-        return not self.numbers_unmatched and not self.citations_unknown and self.has_citation
+        return (
+            not self.numbers_unmatched
+            and not self.citations_unknown
+            and self.has_citation
+            and not self.zero_cost_claims
+        )
 
     def feedback(self) -> str:
         """One line per problem, for the retry; empty when the draft passed."""
@@ -38,6 +46,12 @@ class Verification:
         ]
         if not self.has_citation:
             lines.append("Cite at least one of the allowed citation keys.")
+        lines += [
+            f"The sentence {sentence!r} says the choice costs nothing per paycheck, but every"
+            " cost per paycheck in the facts is above zero; state the cost a fact gives, or"
+            " leave the sentence out."
+            for sentence in self.zero_cost_claims
+        ]
         return "\n".join(lines)
 
     def as_json(self) -> dict[str, Any]:
@@ -47,6 +61,7 @@ class Verification:
             "citations_checked": self.citations_checked,
             "citations_unknown": list(self.citations_unknown),
             "has_citation": self.has_citation,
+            "zero_cost_claims": list(self.zero_cost_claims),
         }
 
 
@@ -74,10 +89,14 @@ def verify_explanation(
             unmatched.append(claim.value)
         check(claim.label)
     unknown = tuple(key for key in draft.citation_keys if key not in allowed_citation_keys)
+    zero_costs: tuple[str, ...] = ()
+    if not allowed_numbers.zero_cost:
+        zero_costs = tuple(sentence for text in texts for sentence in zero_cost_claims(text))
     return Verification(
         numbers_checked=checked,
         numbers_unmatched=tuple(unmatched),
         citations_checked=len(draft.citation_keys),
         citations_unknown=unknown,
         has_citation=bool(draft.citation_keys),
+        zero_cost_claims=zero_costs,
     )

@@ -1,6 +1,12 @@
 import { delay, http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { dynamicCashflow, emptyCashflow, sandboxCashflow } from '@/test/fixtures/cashflow';
+import {
+  beyondCashflow,
+  dynamicCashflow,
+  emptyCashflow,
+  noIncomeCashflow,
+  sandboxCashflow,
+} from '@/test/fixtures/cashflow';
 import { SAMPLE_NOW, sampleCsvAccount, sampleTransactions } from '@/test/fixtures/sample';
 import { db, emptyDb } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
@@ -26,6 +32,16 @@ async function renderSpending(props: Parameters<typeof SpendingScreen>[0] = {}) 
 }
 
 afterEach(() => server.events.removeAllListeners());
+
+/**
+ * Picks a period once the picker offers it: its months wait for
+ * `GET /spending/months` (spec 010 rule 5d), which can answer after the rows.
+ */
+async function pickPeriod(user: Awaited<ReturnType<typeof renderSpending>>['user'], label: string) {
+  const picker = await screen.findByRole('combobox', { name: 'Period' });
+  await within(picker).findByRole('option', { name: label });
+  await user.selectOptions(picker, label);
+}
 
 /** Opens the Transactions card's whole list (it shows the newest 10 rows first). */
 async function showAll(user: Awaited<ReturnType<typeof renderSpending>>['user']) {
@@ -163,18 +179,20 @@ describe('SpendingScreen summary', () => {
     const { user } = await renderSpending();
     const picker = await screen.findByRole('combobox', { name: 'Period' });
     await waitFor(() => expect(picker).toHaveValue('2026-10'));
-    expect(
-      within(picker)
-        .getAllByRole('option')
-        .map((o) => o.textContent),
-    ).toEqual([
-      'October 2026 so far',
-      'September 2026',
-      'August 2026',
-      'July 2026',
-      'June 2026',
-      'May 2026',
-    ]);
+    await waitFor(() =>
+      expect(
+        within(picker)
+          .getAllByRole('option')
+          .map((o) => o.textContent),
+      ).toEqual([
+        'October 2026 so far',
+        'September 2026',
+        'August 2026',
+        'July 2026',
+        'June 2026',
+        'May 2026',
+      ]),
+    );
 
     await user.selectOptions(picker, 'August 2026');
     await waitFor(() =>
@@ -194,6 +212,62 @@ describe('SpendingScreen summary', () => {
       '?start=2026-08-01&end=2026-08-31',
       '?start=2026-10-01&end=2026-10-17',
     ]);
+  });
+
+  it('offers only the months the API says have something to show (issue 236)', async () => {
+    // June 2026 had no transaction and no pay stub, and the picker offered it anyway.
+    spendingDb.months = ['2026-10-01', '2026-09-01', '2026-07-01'];
+    await renderSpending();
+    const picker = await screen.findByRole('combobox', { name: 'Period' });
+    await waitFor(() =>
+      expect(
+        within(picker)
+          .getAllByRole('option')
+          .map((o) => o.textContent),
+      ).toEqual(['October 2026 so far', 'September 2026', 'July 2026']),
+    );
+  });
+
+  it('still offers the period it shows when the API lists no month', async () => {
+    spendingDb.months = [];
+    await renderSpending();
+    const picker = await screen.findByRole('combobox', { name: 'Period' });
+    await waitFor(() =>
+      expect(
+        within(picker)
+          .getAllByRole('option')
+          .map((o) => o.textContent),
+      ).toEqual(['October 1 to 17']),
+    );
+  });
+
+  it('waits for the months before offering a choice', async () => {
+    const answer = Promise.withResolvers<void>();
+    server.use(
+      http.get(apiUrl('/spending/months'), async () => {
+        await answer.promise;
+        return HttpResponse.json({ months: ['2026-10-01', '2026-09-01'] });
+      }),
+    );
+    await renderSpending();
+    const picker = screen.getByRole('combobox', { name: 'Period' });
+    // The period shown is on screen, but nothing to pick until the months arrive.
+    await waitFor(() => expect(picker).toHaveValue('2026-10'));
+    expect(picker).toBeDisabled();
+    answer.resolve();
+    await waitFor(() => expect(picker).toBeEnabled());
+    expect(within(picker).getAllByRole('option')).toHaveLength(2);
+  });
+
+  it('offers every month when the months cannot be read', async () => {
+    server.use(
+      http.get(apiUrl('/spending/months'), () =>
+        HttpResponse.json({ error: { code: 'x', message: 'Database is busy' } }, { status: 503 }),
+      ),
+    );
+    await renderSpending();
+    const picker = await screen.findByRole('combobox', { name: 'Period' });
+    await waitFor(() => expect(within(picker).getAllByRole('option')).toHaveLength(6));
   });
 
   it('opens on a given period', async () => {
@@ -327,21 +401,9 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
     );
   });
 
-  it('draws spending with no pay stub or income, with no scale to give', async () => {
+  it('draws spending with no pay stub or income, all of it from beyond the income', async () => {
     // What the e2e sandbox user's September looks like: a few charges, no deposits.
-    const flow = emptyCashflow('2026-09-01', '2026-09-30');
-    flow.spending = {
-      ...flow.spending,
-      essentials_cents: 633,
-      flexible_cents: 50_000,
-      left_over_cents: -50_633,
-      transaction_count: 3,
-      categories: [
-        { category: 'transport', bucket: 'essentials', total_cents: 633, count: 1 },
-        { category: 'travel', bucket: 'flexible', total_cents: 50_000, count: 2 },
-      ],
-    };
-    spendingDb.cashflow = flow;
+    spendingDb.cashflow = noIncomeCashflow();
     // The sample's rows are all in October, so September's table is empty.
     renderWithProviders(<SpendingScreen showSankey />);
     expect(await within(card()).findByRole('button', { name: 'Essentials $6.33' })).toBeVisible();
@@ -355,8 +417,10 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
     expect(summaryRegion()).not.toHaveTextContent(/paycheck/);
     expect(node('Income deposited $0.00')).toBeInTheDocument();
     expect(node('Flexible $500.00')).toBeInTheDocument();
-    expect(node('Spent beyond income -$506.33')).toBeInTheDocument();
-    expect(within(card()).queryByText(/1 px is about/)).not.toBeInTheDocument();
+    // A source beside the deposits, never a negative amount (spec 010 rule 5b).
+    expect(node('Spent beyond income $506.33')).toBeInTheDocument();
+    // The largest node sets the scale: 506.33 over 240 px is about $2 a pixel.
+    expect(within(card()).getByText('Scale: 1 px is about $2')).toBeInTheDocument();
   });
 
   it('draws the sandbox month the API counts money in for, at a scale its tallest node sets', async () => {
@@ -366,11 +430,67 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
     await renderSpending({ showSankey: true });
     expect(await within(card()).findByRole('button', { name: 'Savings $1,000.00' })).toBeVisible();
     expect(node('Income deposited $4.22')).toBeInTheDocument();
-    expect(node('Spent beyond income -$1,685.41')).toBeInTheDocument();
+    expect(node('Refunds $500.00')).toBeInTheDocument();
+    expect(node('Spent beyond income $1,685.41')).toBeInTheDocument();
     expect(tile('Income deposited')).toHaveTextContent('$4.22');
-    // Savings, the tallest node, is drawn 240 px tall: $1,000.00 / 240 is $4.17,
-    // shown in whole dollars. (Scaled by the $4.22 of income, it read "$0.01".)
-    expect(within(card()).getByText('Scale: 1 px is about $4')).toBeInTheDocument();
+    // The largest node, spending beyond the income, is drawn 240 px tall:
+    // $1,685.41 / 240 is $7.02, shown in whole dollars. (Scaled by the $4.22
+    // of income, it read "$0.01".)
+    expect(within(card()).getByText('Scale: 1 px is about $7')).toBeInTheDocument();
+  });
+
+  it('issue 236: draws take-home shorter than gross pay, and where the rest of the spending came from', async () => {
+    // One stub: gross 2,708.33, take-home 1,996.04; 3,240.12 deposited and 5,234.98 spent.
+    spendingDb.cashflow = beyondCashflow();
+    const { user } = await renderSpending({ showSankey: true });
+    const gross = await within(card()).findByRole('button', {
+      name: 'Gross pay, 1 stub $2,708.33',
+    });
+    const takeHome = node('Take-home $1,996.04');
+    expect(parseFloat(takeHome.style.height)).toBeLessThan(parseFloat(gross.style.height));
+    expect(node('Other deposits $1,244.08')).toBeInTheDocument();
+    expect(node('Spent beyond income $1,994.86')).toBeInTheDocument();
+    expect(within(card()).queryByRole('button', { name: /^Left over/ })).not.toBeInTheDocument();
+
+    await user.hover(node('Other deposits $1,244.08'));
+    const other = within(card()).getByRole('group', { name: 'Other deposits' });
+    expect(other).toHaveTextContent('Take-home on 1 pay stub: $1,996.04');
+    expect(other).toHaveTextContent('Income deposited in your accounts: $3,240.12');
+    await user.hover(node('Spent beyond income $1,994.86'));
+    expect(within(card()).getByRole('group', { name: 'Spent beyond income' })).toHaveTextContent(
+      'more than came in',
+    );
+  });
+
+  it('says what a refund paid for and what the bucket is before it', async () => {
+    spendingDb.cashflow = sandboxCashflow();
+    const { user } = await renderSpending({ showSankey: true });
+    await user.hover(await within(card()).findByRole('button', { name: 'Refunds $500.00' }));
+    expect(within(card()).getByRole('group', { name: 'Refunds' })).toHaveTextContent(
+      'Travel+$500.00',
+    );
+    await user.hover(node('Flexible $1,184.23'));
+    expect(within(card()).getByRole('group', { name: 'Flexible' })).toHaveTextContent(
+      'Spent before $500.00 of refunds. The summary counts $684.23 after them.',
+    );
+  });
+
+  it('lists only what the period draws in the legend (issue 236)', async () => {
+    spendingDb.cashflow = sandboxCashflow();
+    await renderSpending({ showSankey: true });
+    const legend = await within(card()).findByRole('list', { name: 'Legend' });
+    expect(
+      within(legend)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual([
+      'Flexible spending',
+      'Income deposited and refunds',
+      'Essentials',
+      'Savings',
+      'Spent beyond income',
+    ]);
+    expect(legend).not.toHaveTextContent(/Gross pay|Taxes|Health premiums|Take-home/);
   });
 
   it('says there is nothing to draw for an empty period', async () => {
@@ -548,6 +668,27 @@ describe('SpendingScreen transactions', () => {
     expect(await screen.findByRole('row', { name: /Sweetgreen/ })).toBeInTheDocument();
   });
 
+  it('clears the saved notice once another period is shown (issue 240)', async () => {
+    const { user } = await renderSpending();
+    await user.selectOptions(categoryOf('Sweetgreen'), ['Groceries']);
+    expect(await screen.findByText(/^Saved\./)).toBeInTheDocument();
+    await pickPeriod(user, 'August 2026');
+    await waitFor(() => expect(screen.queryByText(/^Saved\./)).not.toBeInTheDocument());
+  });
+
+  it('clears the saved notice when the list is opened or closed (issue 240)', async () => {
+    const { user } = await renderSpending();
+    await user.selectOptions(categoryOf('Sweetgreen'), ['Groceries']);
+    expect(await screen.findByText(/^Saved\./)).toBeInTheDocument();
+    await showAll(user);
+    expect(screen.queryByText(/^Saved\./)).not.toBeInTheDocument();
+  });
+
+  it('goes back to Confirm, the step before Spending', async () => {
+    await renderSpending();
+    expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/setup/confirm');
+  });
+
   it('continues to decisions', async () => {
     await renderSpending();
     expect(screen.getByRole('link', { name: /Use these numbers in decisions/ })).toHaveAttribute(
@@ -605,10 +746,6 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
       .getAllByRole('row')
       .slice(1);
 
-  async function pick(user: Awaited<ReturnType<typeof renderSpending>>['user'], label: string) {
-    await user.selectOptions(await screen.findByRole('combobox', { name: 'Period' }), label);
-  }
-
   it('lists only the period the summary shows, asking the API for its dates', async () => {
     db.transactions = [...db.transactions, rowOn('2026-09-20', 'Corner Bookshop', 1)];
     const reads = transactionReads();
@@ -624,7 +761,7 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
     const reads = transactionReads();
     const { user } = await renderSpending();
 
-    await pick(user, 'August 2026');
+    await pickPeriod(user, 'August 2026');
     expect(await screen.findByRole('row', { name: /August shop 1\b/ })).toBeInTheDocument();
     expect(listed()).toHaveLength(10);
     await showAll(user);
@@ -640,7 +777,7 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
     // Another period starts again from its own first page: October 1 to 17,
     // which the default read already asked for (the stand-in API answers the
     // default with those dates).
-    await pick(user, 'October 2026 so far');
+    await pickPeriod(user, 'October 2026 so far');
     await waitFor(() => expect(listed()).toHaveLength(16));
     expect(reads.filter((r) => r.start === '2026-10-01')).toEqual([OCTOBER]);
     expect(screen.queryByRole('row', { name: /August shop/ })).not.toBeInTheDocument();
@@ -655,7 +792,7 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
       }),
     );
     const { user } = await renderSpending();
-    await pick(user, 'August 2026');
+    await pickPeriod(user, 'August 2026');
 
     await waitFor(() => expect(card()).toHaveAttribute('aria-busy', 'true'));
     expect(listed()).toHaveLength(10);
@@ -691,7 +828,7 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
 
   it('names the period when it has no transactions', async () => {
     const { user } = await renderSpending();
-    await pick(user, 'July 2026');
+    await pickPeriod(user, 'July 2026');
     expect(
       await within(card()).findByText(
         'No transactions from July 1 to 31. Pick another period above.',
@@ -710,7 +847,7 @@ describe('SpendingScreen transactions follow the period (spec 003 rule 17a)', ()
       ...august(2),
     ];
     const { user } = await renderSpending({ showSankey: true });
-    await pick(user, 'August 2026');
+    await pickPeriod(user, 'August 2026');
     const flow = () => screen.getByRole('region', { name: /Where each dollar/ });
     await screen.findByRole('heading', { name: 'Where each dollar of August pay went' });
     await waitFor(() => expect(flow()).not.toHaveAttribute('aria-busy'));

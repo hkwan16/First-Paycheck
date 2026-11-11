@@ -64,11 +64,14 @@ src/app/            routes. (auth)/sign-in; (app)/setup/{link,confirm,confirm/[d
                     /setup/decisions itself is the proxy's redirect to the first live step),
                     (app)/why (index of saved decisions), (app)/why/[decisionId], (app)/plan,
                     (app)/check-in (list of check-ins), (app)/check-in/[checkInId]; (app)/error.tsx
-                    (the segment's error boundary); dev/kit
+                    (the segment's error boundary); not-found.tsx (any address with no page, in
+                    the app header, issue 237); dev/kit
 src/app/auth/callback/route.ts  exchanges the email-link code for a session
+src/app/auth/sign-out/route.ts  POST: ends this browser's session (see "Auth")
 src/proxy.ts        Next 16 proxy (formerly middleware): refreshes the Supabase session, sends
                     signed-out requests for (app) screens to /sign-in, forwards the requested path,
-                    and redirects /setup/decisions to the first live decision step
+                    and redirects /setup/decisions to the first live decision step; it leaves
+                    /auth/sign-out alone
 src/components/ui/  design system (below)
 src/components/chrome/  app frame (below)
 src/components/screens/<screen>/  one 'use client' screen component per page
@@ -77,16 +80,17 @@ src/components/sankey/  the cash-flow diagram: layout.ts, popover.ts, keyboard.t
 src/components/icons.tsx  the mockup's SVG glyphs, decorative, drawn in currentColor
 src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts, client.ts,
                     upload.ts, download.ts, keys.ts, errors.ts, hooks/), auth/ (next-path, protected,
-                    validation, errors, account), supabase/ (env, client, server, proxy),
+                    validation, errors, account, sign-out), supabase/ (env, client, server, proxy),
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
                     documents.ts, decisions.ts, decision-steps.ts, deep-equal.ts, explanations.ts,
                     escape-cancel.ts, features.ts, focus-handoff.ts, land-at-top.ts,
                     findings.ts, periods.ts,
                     setup-progress.ts, routes.ts, navigation.ts, query-client.ts, cn.ts,
-                    page-hydration.ts, page-title.ts, log-error.ts
+                    page-hydration.ts, page-title.ts, log-error.ts, timeout.ts
 src/app/dev/screens/{link,account,spending,confirm,confirm/manual,confirm/unread,confirm/benefits,confirm/extracting,
                     confirm/failed,confirm/confirmed,decisions/{emergency-fund,401k,health-plan,w4,
-                    after-alpha},why,why/fallback,why/stale,why/emergency-fund,why-index,check-in,
+                    after-alpha},why,why/fallback,why/stale,why/emergency-fund,why/replaced,
+                    why-index,check-in,
                     check-in/complete,check-in-index,plan,plan/empty}  a screen on the sample data, no
                     API (development only); `account` is Link with the header's account menu
 src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, Recharts' batched updates settled
@@ -114,7 +118,7 @@ src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, Recharts' batch
                     fixtures/plan.ts (`GET /plan` built from the decision, goal, calendar and pay
                     stub fixtures; export jobs), msw/plan-handlers.ts (`planDb`)
 e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions,
-                    plan, import, check-in, alpha; capture-setup, capture-screens, capture-demo
+                    plan, import, check-in, why, alpha; capture-setup, capture-screens, capture-demo
                     for the alpha document), support/auth.ts, support/api.ts,
                     support/spending.ts (a period with transactions), support/capture.ts (the
                     capture's upload, confirm and screenshots), support/demo.ts (the demo's
@@ -156,9 +160,11 @@ A `destructive` Button (Yes, unlink; Delete account) sits beside a safe choice t
 (Keep), so the safe choice is never the weaker one (issue 205).
 
 Chrome (`components/chrome`): `Wordmark`, `Header` (`chips`, `account` slot, `minimal`),
-`HeaderAccount` (server: "Sample data" chip and `UserMenu` from the Supabase user), `UserMenu` (the
-user chip as a disclosure button with "Sign out" and "Delete account"; see "Deleting the account"),
-`DeleteAccountConfirm`, `NavStep` (`size` md 22px, sm 18px for a decision step), `SideNav`
+`HeaderAccount` (server: "Sample data" chip, `UserMenu` and `RestoredPageGuard` from the Supabase
+user), `UserMenu` (the user chip as an APG menu button: a `role="menu"` with "Sign out" and
+"Delete account" as `menuitem`s, one Tab stop, arrows, Home, End, Escape back to the chip, Tab or a
+click elsewhere closes it; see "Auth" and "Deleting the account"), `DeleteAccountConfirm` (a native
+modal `<dialog>`), `RestoredPageGuard` (see "Auth"), `NavStep` (`size` md 22px, sm 18px for a decision step), `SideNav`
 (`current`, `done` from `lib/setup-progress.ts`, `hrefs` for id-bound screens, `calculators`;
 "Decisions" nests its four steps, see "Decisions screen"; one list, stacked at every width),
 `AppSideNav` (current item from the URL), `Shell` (header, nav column `1 1 200px` up to 240px,
@@ -218,9 +224,17 @@ or checked for a phone.
   `components/screens/link/account-format.ts`). An institution is named by `institutionName`
   (`lib/accounts.ts`: its name, else "Imported CSV" or "Linked bank") everywhere: the Link
   group heading, the account's initials tile and the Spending summary (issue 183).
+  An account's role select (`roleOptions`; `roleSelectName` names it "Role for Plaid Checking ··0000", issue 242)
+  offers "No role", only the roles its kind takes (`account.allowed_roles`, spec 002 rule
+  31a; the API refuses any other with 422 `role_not_allowed`) and "Not used" (issue 241). Its
+  transaction count is `account.transaction_count` and `first_posted_at`
+  (`transactionCountText`), never a page of transactions read to count them.
   Documents: `invalidateDocuments` after an upload or extraction, `invalidateAfterConfirm`
-  (documents, pay stubs, benefits plans, the profile and the plan) after a confirm. Decisions: `invalidateDecisions` (the list and every
+  (documents, pay stubs, benefits plans, the profile, the Spending months, the plan and the
+  decisions, whose `review` a new stub can change) after a confirm. Decisions: `invalidateDecisions` (the list and every
   `GET /decisions/{id}`) and `invalidateAfterDecision` (also calendar, plan and goals) after a save.
+  `useUpdateProfile` writes the saved profile into its cache and then `invalidateAfterProfile`
+  (the decisions and the plan): a decision's `review` reads the profile.
   `GET /plan` repeats decisions, goals, the calendar, explanation statuses and the newest pay stub,
   so whatever changes one of those invalidates `queryKeys.plan()` too (a goal change, a new
   explanation, a confirm, a sync's balances).
@@ -242,7 +256,9 @@ or checked for a phone.
   details) and invalidates that calculator's results so the card recalculates and asks to save
   again. `decisionSaveState(current, inputs, { ignore })` (`lib/decisions.ts`) drives the save
   button and badge in words with no version number (spec 018 rule 5a): unsaved ("Save", "Not
-  saved"), `dirty` ("Save changes", "Changes not saved") or `saved` ("Saved", "Saved Oct 17"),
+  saved"), `dirty` ("Save changes", "Changes not saved"), `review` ("Save again", "Needs review",
+  whatever is on screen, while the current version's `review` from the API is not empty; spec 018
+  rule 5c) or `saved` ("Saved", "Saved Oct 17"),
   comparing inputs structurally (`lib/deep-equal.ts`, so key order and object identity do not
   matter) and leaving out the `ignore` keys, inputs that are not what the person decided (the
   W-4's `W4_CONTEXT_INPUTS`, the health plan's `HEALTH_WHAT_IF_INPUTS`). The save is a step's one
@@ -285,7 +301,10 @@ or checked for a phone.
   while another loads (`keepPreviousData`). `useSpendingSummary(period?)` is the summary alone
   (setup progress reads it). A `Period` is `{ start, end }`; `null` sends no dates and the API
   reads the last complete UTC month. `lib/periods.ts` builds the picker's options from
-  `useToday()` (null on the server, so nothing reads the clock while rendering).
+  `useToday()` (null on the server, so nothing reads the clock while rendering), keeping only the
+  months `useSpendingMonths()` (`GET /spending/months`: a posted row on a counted account or a
+  confirmed pay stub) lists (`optionsWithin`, spec 010 rule 5d). The picker is disabled until the
+  months arrive, offers all six if they cannot be read, and always offers the period shown.
   The Transactions card and the diagram's category popovers list the period the summary shows
   (spec 003 rule 17a): `useTransactions(periodFilters(period))`, the chosen period or the dates
   `GET /cashflow` answered its default with (nothing until then; `NEWEST_SPENDING`, no dates,
@@ -346,7 +365,11 @@ or checked for a phone.
   `import_conflict`, and follows the two job ids the import returns. It reports an import, and
   keeps an account as the one to import into, only while the account list has that account
   (`useImportCsv` adds the imported account to the list at once), so removing the account clears
-  both (issue 173). `lib/documents.ts` maps a
+  both (issue 173). "Import into" lists only CSV accounts (`csvImportTargets`), and the result
+  says what was new and what was already there (`importResultText` over `added` and
+  `already_present`, spec 010 rule 15a, issue 231); a new file drops the last file's problems.
+  The documents card's upload warnings are superseded by the next upload or Read (issue 240).
+  `lib/documents.ts` maps a
   document's status to its badge and reason text (`documentBadge`: a confirmed pay stub that a
   newer confirm of the same paycheck superseded, `superseded` from the API, reads "Replaced by a
   newer copy" and offers no Replace, issue 199); `isReviewable`/`newestReviewable` pick what
@@ -361,9 +384,11 @@ or checked for a phone.
   from `src/test/fixtures/sample.ts` and reset after every test, so a refetch after a PATCH reads
   the new value. `emptyDb()` gives a new user; assign `db.transactions` for pagination cases;
   `server.use(...)` overrides one route for an error or a delay.
-- Spending routes (`GET /cashflow`, `GET /spending/summary`, `GET /recurring`,
-  `PATCH /recurring/{id}`) live in `src/test/msw/spending-handlers.ts` over `spendingDb`, seeded
-  from `fixtures/cashflow.ts` and reset after every test.
+- Spending routes (`GET /cashflow`, `GET /spending/summary`, `GET /spending/months`,
+  `GET /recurring`, `PATCH /recurring/{id}`) live in `src/test/msw/spending-handlers.ts` over
+  `spendingDb`, seeded from `fixtures/cashflow.ts` (`spendingDb.months` defaults to
+  `sampleSpendingMonths`, the six months the picker can offer) and reset after every test. Wait
+  for a period's option before picking it: the months can answer after the rows.
 - Check-in routes (`GET /check-ins`, `GET /check-ins/{id}`, `PATCH .../findings/{fid}`,
   `POST /check-ins`, `GET /net-worth`, `GET /holdings`) live in `src/test/msw/checkin-handlers.ts`
   over `checkinDb`, seeded from `fixtures/checkins.ts` (November open with seven findings, October
@@ -406,12 +431,24 @@ or checked for a phone.
   `afterEach`. For hooks, `renderHookWithClient(hook)` returns the `queryClient` for cache checks.
 - `DELETE /me` empties `db` (`emptyDb()`) and answers 204. A test of the sign-out paths mocks
   `@/lib/supabase/client` and `@/lib/navigation` (see `UserMenu.test.tsx`, `account.test.tsx`).
+  jsdom cannot submit a form as a navigation: catch the Sign out form's `submit` and prevent it.
+- jsdom has no `showModal()`: `src/test/dialog.ts` (installed by `setup.ts`) opens, closes and
+  cancels on Escape like a browser; the top layer, the inert page and the focus trap are checked
+  in the Playwright smoke spec.
 - `components/screens/card-boundaries.test.tsx` mocks one card per screen to throw and checks the
   rest of the screen still works; `limits.test.tsx` is the 429 and 413 table (see "Limits").
 - Third-party widgets are mocked at the module (`vi.mock('react-plaid-link', ...)`, see
   `LinkScreen.test.tsx`), and the test calls the callbacks the widget would.
 - Screen tests cannot name status colors (ESLint): test a tone through a pure helper
   (`sourceBadge`, `saveBadgeTone`) or in the `components/ui` tests.
+- Ids the handlers make (`nextId`) use the `9000` group, fixture ids the `8000` group, so a save
+  never makes a row with a fixture row's id, whichever test in a file runs first.
+- A decision that needs review: set `review` on its `db.decisions` row (`SCHEDULE_CHANGED`,
+  `SALARY_UNCONFIRMED` in `fixtures/decisions.ts`); a saved version has none. A plan's: set
+  `review` on its decisions and rebuild `completeness` with `completenessOf`.
+  `salaryQuestionOpen()` is `decisionsReady()` with `sampleSalaryReview()` on the profile (the
+  sample stub's $64,999.92 against $65,000.00); `PUT /profile` answers it when the body names its
+  stub or takes its figure.
 - Decisions: `decisionsReady()` seeds a confirmed pay stub (with `SAMPLE_ANNUAL_SALARY_CENTS` and
   `SAMPLE_RETIREMENT_CONTRIBUTION_PCT`, the API's figures for it; the confirm handler keeps them
   only for the sample's gross with its frequency or its retirement line, else null) and a profile
@@ -465,11 +502,14 @@ or checked for a phone.
 ## Deleting the account
 
 The header's account menu (`UserMenu`) has Delete account under Sign out, behind a hairline and in
-the `destructive` Button style (issue 205). It swaps the panel for
-`DeleteAccountConfirm`: what goes, a field labeled "Type delete to confirm" (focused; capitals and
-spaces around the word do not matter; Enter submits only once it says delete), Delete my account
-and Keep my account (which returns focus to Delete account). Closing the menu (Escape, a click
-elsewhere) drops the confirmation. `useDeleteAccount` calls `DELETE /me`, then
+the `destructive` Button style (issue 205). It closes the menu and opens `DeleteAccountConfirm`, a
+native `<dialog>` opened with `showModal()` (issue 242: the dialog role, named by its heading, the
+page behind inert so Tab stays inside, Escape closes it except while the deletion runs): what goes,
+a field labeled "Type delete to confirm" (focused; capitals and spaces around the word do not
+matter; Enter submits only once it says delete), Delete my account and Keep my account. Keep and
+Escape give focus back to the account chip (the menu item that opened it closed with the menu), and
+its content mounts only while open, so it never reopens half typed. `useDeleteAccount` calls
+`DELETE /me`, then
 `sessionTokens.accountDeleted()`: the local session is cleared through the Supabase client and the
 browser goes to `/sign-in?deleted=1`. Success means the page is unloading, so the button stays busy.
 A failure says "Your account was not deleted." with the reason and keeps the person signed in.
@@ -550,7 +590,25 @@ offer letter states).
   after the document ("Your pay stub", "Your benefits summary"), never with how it was read, so it
   is true whether or not the lines were sent to the model (spec 004 rule 37). The badge counts
   hidden numbers (`hiddenText`). Screen words never name internals (the AI, a pipeline, a
-  confidence score): the confidence badge reads "Check this" or "Read clearly" (issue 209).
+  confidence score): each row's badge says where its value came from (`valueBadge` in
+  `field-format.ts`, spec 005 rule 23a): "Read clearly", "Check this" (read below 0.9, or
+  nothing read), "Added up" or "Your entry" once the value differs from the one read
+  (`isEntered`); manual entry shows none (issues 209, 230).
+- **Confirm none** (rule 23b): a deduction with no value read (`canBeNone`) offers "Confirm
+  none", which confirms $0.00 (`confirmNone`); saving its editor empty does the same. Gross,
+  net and the dates still need a value, and Confirm all never fills one in.
+- **Progress survives a reload** (rules 23c-23e, issue 229): the reducer's fields go to the
+  API as a draft (`reviewDraft`, `PUT /docs/{id}/review`) after every change to a value or
+  a confirmed state, never per keystroke, through `useSaveReview` (one request at a time,
+  the newest draft wins, the state worked out during render). The screen starts from the
+  proposal and applies `document.review` (`withReviewDraft`). The count line adds
+  "Saving your progress" or "Progress saved" (`SaveStatus`), and a failed save shows
+  `ProgressNotSaved`. The draft is not confirmed data; only Confirm stores values.
+- **Confirmed values** (rule 22h, issue 243): a confirmed stub (superseded too) or summary
+  lists what was stored from it read-only under its title (`ConfirmedValues.tsx`, a
+  region named "What you confirmed"), from `document.pay_stub` or `document.plans`.
+  Link names a confirmed row by `documentSubject` ("Pay stub · Acme Corp, paid Oct 15,
+  2026") and offers View.
 - **Nothing to check**: a confirmed pay stub, a confirmed benefits summary, an offer letter and
   `/setup/confirm` with every stub confirmed are titled by their state ("Your pay stub is
   confirmed"), with the next step, never as a review (issue 209). A field opened to type starts
@@ -565,6 +623,8 @@ offer letter states).
   and vesting changed) and links to Decisions. A benefits summary nothing could be read from is
   not typed in here: Confirm and Link point to the decision cards. Its lines are not linked to
   fields, so the source pane highlights nothing (`linked={false}`).
+- **Not found**: any 404 `not_found` (an unknown id, another person's, or one that is not an id)
+  is the one "Document not found" state with Back to documents, whatever the API's message.
 - **Replaced**: a document with `replaced_by_id` (open in an old tab, or reached by Back) says it
   was replaced and links to the replacement (`confirmRoute(replaced_by_id)`) and back to the
   documents; the API refuses to confirm it (409 `document_replaced`, one of the state conflicts
@@ -598,11 +658,26 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
 - **Side nav**: "Decisions" holds a nested list of the four steps (labels from `STEP_TEXT`),
   indented behind a hairline, each a 44px link with an 18px `NavStep` (a dot, or a check once
   done). The current step has `aria-current="page"`; "Decisions" never does on a step. A step is
-  done when its calculator is live and saved (`setupProgress`, keyed by the calculator id);
+  done when its calculator is live and its saved decision needs no review (`setupProgress` over
+  `settledDecisionCalculators`, keyed by the calculator id; spec 018 rule 8, issue 222);
   "Decisions" when every live one is. A step that is not live is muted with "After alpha" under
   its label (its name ends ", After alpha") and still links to its placeholder page.
   `navKeyForPath` returns the calculator id for a step's path.
 
+- **Needs review** (spec 007 rules 19a-19e, spec 018 rule 5c, issue 222): the API reports on each
+  current decision why it needs review (`review`: what its step read, such as the pay schedule or
+  the salary, changed since the save, worded once by the API). Every card shows `ReviewNotice`,
+  "What changed", at its top: "Since you saved this on Oct 21, 2026:", the reasons of kind
+  `changed` (`reviewChanges`) and that the numbers use what you have now. The client compares no
+  context itself. Saving again from the inputs of now clears it.
+- **The salary question** (spec 005 rule 24c, spec 018 rule 5d, issue 221): while
+  `profile.salary_review` is set, the 401(k), health plan and W-4 cards show `SalaryQuestion` in
+  place of their calculator and send no calculator request: the stub's gross and schedule, its
+  yearly pay and the saved salary (`salaryQuestionText`, every figure the API's), with "Use
+  $64,999.92" (primary) and "Keep $95,000.10". Each saves the profile with `salary_pay_stub_id` set
+  to the stub, which answers it; focus then goes to the card's first control. The plan details form
+  names the newest stub only when it saves a salary other than the saved one (`salaryStubId`),
+  so saving another field never answers the question. The emergency fund reads no salary.
 - **`Match401kCard`** always renders the same `DecisionCard` frame (a region named by its title)
   and swaps its body: skeleton, error, a link to Confirm when there is no confirmed pay stub,
   `PlanDetailsForm` when the profile has no salary, match tiers, birth year or pay schedule
@@ -727,6 +802,22 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
   without `force`: the API runs again only when its stored row is stale, so a second tab gets the
   row the first wrote. A stale fallback adds a sentence to `NotWrittenNote`. Confirming a stub or summary invalidates every explanation read
   (`invalidateAfterConfirm`). Sample: `/dev/screens/why/stale`.
+- **Replaced** (`is_current` false, spec 008 rule 19c, issue 227): the eyebrow adds a "Replaced"
+  badge and the one note is `ReplacedNote`, a blue region named "About this decision" with "See
+  the current decision" (the calculator's `current` in `useDecisions`; `/why` until it loads).
+  It replaces the checked, stale or not-written note, and the page offers nothing that acts on
+  the current decision: no "Change this decision", no "What happens next", no write, Write it
+  again or Try again. What the explanation said, the saved numbers and the sources stay; with no
+  explanation a card says none was written before it was replaced. Sample:
+  `/dev/screens/why/replaced`.
+- **Index states**: each explained row reads its explanation (`useExplanation`) and shows
+  `explanationState` (`lib/explanations.ts`) as a badge in words: "Explanation up to date",
+  "Explanation out of date", "Explanation could not be written" or "Explanation not written yet".
+- **"Your numbers" labels** go through `sentenceCase` (rule 19d, issue 243): only a lowercase
+  first letter changes, so "401(k) ..." and "W-4 ..." stay as written.
+- `e2e/why.spec.ts` (project `authenticated-why`, after plan and check-in) saves two 401(k)
+  rates over each other, writes the first one's explanation, and checks the replaced page, its
+  link to the current one and the index's states against the real API.
 
 ## Check-in screen
 
@@ -749,7 +840,7 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
   line's `status` (spec 015 rule 19a: `on_plan | over | under`, null without a plan) is the API's;
   `planStatusTone` only decides whether that side matters for the line: `on_plan` is `confirmed`;
   over is a `warning` on spending lines (essentials, flexible, other) and under is `confirmed`;
-  savings, retirement, take-home and left over are the reverse (more is not a problem); health
+  savings, retirement, income and left over are the reverse (more is not a problem); health
   premiums warn on either side (they should match the chosen plan); null is neutral. That tone
   colors the planned line's `Bar` and a `Badge` beside the actual saying the status in words
   (`planStatusText`: On plan, Over plan, Under plan). The bar width is geometry (`planBarValue`:
@@ -769,8 +860,19 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
   maps the API series to rows without deriving anything. Colors (blue net worth, teal assets,
   coral liabilities) pass the dataviz palette validator; teal is under 3:1 on white, which the
   legend and the table cover.
-- **Coming up** (`DeadlinesCard`): `GET /calendar` from the first of the month to the end of the
-  next (`checkInWindow`).
+- **Coming up** (`DeadlinesCard`): `GET /calendar?to=` the end of next month (`checkInWindow`, no
+  start), so an open date that passed with nothing done is listed first, "Was due" with an `off`
+  Overdue badge from the API's `overdue` (issue 233). Only a check-in that is not `past` shows it.
+- **A past check-in is a record** (spec 015 rule 9b, issue 233). When `past` is true the lead says
+  it is the month's record as of `as_of`, not checked again; `FindingText` takes `past` and words
+  every finding in the past (and drops that day's advice: "Ask payroll to update it."); the
+  cash-flow note says the targets are the choices saved now and the month counts in full instead
+  of "This month counts up to today"; there is no Coming up card. No finding prints a count of
+  days, this month's included: `days_until` counts from the run's day. An `overdue_deadline`
+  says "It was due {date}, and is not marked done." A recurring finding with `charge_gone` adds
+  "Spending no longer counts this as a recurring charge." The deposits line is `income`, "Income
+  deposited" as on Spending (issue 235), and a line with `needs_pay_stub` reads "No pay stub yet"
+  where a line without a plan reads "No target".
 - **Check in now** (`CheckInNow.tsx`, spec 015 rule 23): `CheckInNowButton` in the title row (the
   mockup's "Run again now") and `CheckInNowStatus` under it, over one `useCheckInNow()`. The list
   always offers it; a check-in offers it only when it is this month's and open
@@ -787,12 +889,17 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
 ## Plan screen
 
 `/plan` (`PlanScreen`, from `Plan.dc.html`) is one read of `GET /plan` (spec 016). The side
-nav's "Plan and calendar" gets its done mark when the plan's `completeness.missing` is empty
-(`setupProgress`, `planMissingCount`).
+nav's "Plan and calendar" gets its done mark when the plan's `completeness.missing` and
+`completeness.needs_review` are both empty (`setupProgress`, `planMissingCount`,
+`planNeedsReviewCount`).
 
 - **Completeness**: an "n of 4 decisions saved" badge (`completenessText`, counting the API's
-  two lists; `confirmed` when nothing is missing) and "Still to decide" linking each missing
-  calculator to its step (`decisionKindRoute`).
+  lists, with ", 3 need review" or ", 1 needs review" while any does; `completenessTone`:
+  `confirmed` when nothing is missing or needs review, `warning` while any needs review) and
+  "Still to decide" linking each missing calculator to its step (`decisionKindRoute`).
+- **Needs review** (spec 016 rule 3a): a decision with `review` reasons shows a "Needs review"
+  badge, the reasons in the API's words and "Review your health plan" (its step) in place of its
+  figures, which were worked out for a paycheck that may no longer be the person's.
 - **Decisions** (`DecisionSummary`): one `DecisionCard` per saved decision in the API's order,
   with "Saved {date}", the API's `figures` by their labels (`figureText` formats by
   `kind`: money, a net cost (negative reads "$260.00 ahead"), a refund ("$0.08 refund",
@@ -806,7 +913,9 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
 - **Your paycheck** (`PaycheckCard`): the newest confirmed stub's gross and take-home tiles and
   its deductions, or a link to Confirm. **Goals** (`GoalsCard`): status badge, contribution,
   target and date, progress bar. **Next 90 days** (`PlanCalendarCard`): `calendar` through
-  `calendar_through`, each event in its decision's hue (`eventHue`) with a badge to its step.
+  `calendar_through`, each event in its decision's hue (`eventHue`) with a badge to its step;
+  an event the API marks `overdue` (an open date that passed, spec 015 rule 24, issue 233)
+  reads "Was due" with an `off` Overdue badge.
 - **Export** (`ExportCard`): Download PDF starts `useExportPlan`, shows `JobProgress` while the
   job runs, downloads once it succeeds (once per job), then says "Downloaded {name}." with
   Download again. A dead job offers Try again (a new export); a failed download offers Try
@@ -819,17 +928,23 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
 `components/sankey` draws `GET /cashflow` as the mockup does: absolutely positioned HTML buttons
 for the amounts over one SVG of cubic bands. Not d3-sankey and not a chart library.
 
-- **Layout** (`layoutCashFlow(flow, containerWidth)`) is pure geometry: four columns (gross pay;
-  withholding lines and take-home; buckets; categories), node heights from a scale fixed by a
-  240 px target for the tallest node (every column stacked from the top, so the diagram is as tall
-  as its tallest column, issue 201): gross pay (income when there is no confirmed stub), or a
-  bucket or category when spending outran that income (the Plaid sandbox deposits $4.22 in a
-  month that spends $1,689.63). No scale, and no badge, without pay or income to draw from. The
-  "1 px is about $N" badge is computed, not hand-tuned. Amounts are placed, never added or
-  re-signed: income is money in only and never negative because the API counts it so (spec 007
-  rule 22a), and "Spent beyond income" is the API's negative `left_over_cents` drawn dashed. A
-  node is as tall as its own value or the bands leaving it, whichever is more. Colors are
-  `FlowColor` token names.
+- **Layout** (`layoutCashFlow(flow, containerWidth)`) is pure geometry over `GET /cashflow`'s
+  `diagram` (spec 010 rules 5b and 5c, issue 236): the API sends every node (column, kind, key,
+  cents) and every band (source, target, cents), balanced, so the bands into and out of a node
+  add up to its amount. Four columns (gross pay; withholding lines, take-home and the other money
+  that came in: other deposits, refunds, taken out of savings, spent beyond income; buckets, not
+  deposited and left over; categories), every column stacked from the top (issue 201). A node is
+  as tall as its own amount (at least `MIN_NODE_H`, tall enough for its words), never as the
+  bands through it; each band is its cents (at least `MIN_BAND_PX`), stacked along each node in
+  the API's link order. One scale puts the largest node at 240 px, so the "1 px is about $N"
+  badge is computed; there is none only when every node is $0. A bucket with refunds is drawn
+  before them (`refundsCents`; its popover says what the summary counts after them). Hidden: a $0
+  withholding line other than the 401(k) ("401(k), not elected"), and a $0 Other bucket. Nothing
+  is added or re-signed here. The legend is `legendFor(layout)`: one item per color, naming only
+  the groups drawn with an amount, so a period with no stub lists no pay stub group. Colors are
+  `FlowColor` token names. `test/fixtures/cashflow-results.json` holds diagrams made by the API's
+  own calculator (`make-cashflow-results.py`, run like the 401(k) one), and
+  `cashflow-results.test.ts` checks the hand-written fixtures match.
   `hostW = max(880, containerWidth)`; narrower containers scroll sideways. Under 640 px the
   Spending card draws `FlowStack` (stacked bars and lists) instead.
 - **Popover** state is `flowPopoverReducer` (`popover.ts`) through `useFlowPopover`: hover opens
@@ -902,8 +1017,30 @@ previews without secrets).
 - **API calls**: `lib/api/client.ts` attaches `Authorization: Bearer <access_token>`; a 401 triggers
   one shared `refreshSession()` and a retry, and a second 401 signs out locally and goes to
   `/sign-in?next=<current path>`.
-- **Sign-out**: the header's user menu calls `signOut({ scope: 'local' })` (other devices stay signed
-  in) and fully navigates to `/sign-in`.
+- **Session reads** (issue 225): every request waits on supabase-js's `getSession()`, which waits
+  on any token refresh in flight, and that refresh has no timeout of its own. The middleware gives
+  each read and refresh `SESSION_READ_TIMEOUT_MS` (10 s, `withTimeout` from `lib/timeout.ts`);
+  one that runs out sends nothing and throws `SessionUnavailable` (an `ApiError`, status 0), so a
+  card shows its error instead of a skeleton forever, and `query-client.ts` does not retry it.
+  `sessionStatus` (`lib/api/session-status.ts`) records whether the last read answered, and
+  `SessionProblemNotice` (in the `(app)` layout) then says why nothing loads, with Reload the page
+  and Sign in again (the sign-out form, so the stuck session goes too); the next read that answers
+  hides it.
+- **Sign-out** (issue 224): the menu's Sign out drops every cached read (`queryClient.clear()`)
+  and submits a form to `POST /auth/sign-out` (`app/auth/sign-out/route.ts`), a full navigation.
+  The route asks Supabase to end this session (`scope: 'local'`: other devices stay signed in),
+  waiting at most `SIGN_OUT_TIMEOUT_MS`, then expires every Supabase cookie the request carries
+  (`isAuthCookie`) whatever Supabase answered, and answers 303 to `/sign-in` with `no-store`. So a
+  503 from Supabase (seen in production), a thrown fetch or no answer still signs the browser out.
+  The proxy skips this path, so no refreshed cookie races the expiry. POST only.
+- **Back after sign-out** (issue 224): Chrome may keep a `no-store` page in its back/forward cache
+  and show it again on Back, even after the sign-out changed the (non-HttpOnly) session cookies; that
+  showed a signed-out browser the signed-in header, nav and data. `RestoredPageGuard` (rendered by
+  `HeaderAccount`, so on every page that shows an account) hides a page as the browser keeps it
+  (`pagehide` with `persisted`; `html[data-restoring] body` in `globals.css`) and reloads one it
+  brings back (`pageshow` with `persisted`), so the server decides again. Every page response is
+  already `Cache-Control: private, no-cache, no-store` (Next sets it for these dynamic pages;
+  `sign-out.spec.ts` checks it).
 - **A deleted account** (spec 017 rule 9): its access token stays valid until it expires, and a
   write under it is a 401 `account_deleted`. The fetch middleware and the uploads skip the refresh
   for it (there is no session left to refresh), clear the local session and go to
@@ -917,8 +1054,17 @@ previews without secrets).
 ### End-to-end auth tests
 
 `e2e/auth.setup.ts` signs in through the form and saves the session to `e2e/.auth/user.json`
-(git-ignored) for the `authenticated` project, which runs `e2e/auth.spec.ts`. Set these in
-`web/.env.local` or the environment:
+(git-ignored) for the `authenticated` project, which runs `e2e/auth.spec.ts`, `e2e/not-found.spec.ts`
+(a malformed id on the Why, check-in and Confirm screens reads as not found, and the app's
+not-found page, issue 237; the id checks need `E2E_API_URL`), `e2e/sign-out.spec.ts` (issue 224)
+and `e2e/session.spec.ts` (issue 225). The last two run only against the local stack's Auth
+stand-in, which can fail on purpose for one user (`e2e/support/auth-faults.ts`: `setAuthFaults`
+through `E2E_AUTH_FAULTS_URL`, for the session user `E2E_SESSION_USER_*`): a sign-out answered
+with 503, a token refresh that never answers. `sign-out.spec.ts` turns Chromium's back/forward
+cache back on (Playwright turns it off) with Chrome's settings for keeping `no-store` pages; only a
+production server exercises the restore (`next dev`'s live-reload socket keeps pages out of that
+cache), and the test records which it got as an annotation. Set these in `web/.env.local` or the
+environment:
 
 | Variable                                                           | Needed for                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -935,16 +1081,20 @@ Tests that sign out sign in through the form first, so they never end the saved 
 tests share.
 
 `link.spec.ts` (project `authenticated-link`) unlinks everything, links Plaid's sandbox bank with
-the e2e-only button, follows the sync and sets roles; `spending.spec.ts` (project
+the e2e-only button, follows the sync and sets roles (each select named for its account, offering
+only its kind's roles, and cleared to "No role", issues 241 and 242); `spending.spec.ts` (project
 `authenticated-spending`, which depends on it) reads those transactions (on the newest month
 in the picker that has some, `support/spending.ts`: `user_good`'s rows may all be in the month so
 far, and the list keeps to the summary's period), checks that every period lists only its own
 rows or says it has none, checks that the
-diagram's buckets match the summary tiles (and that the scale badge shows only when there is
-gross pay or income to scale by: the sandbox bank's last month may deposit nothing), drives a node
-from the keyboard, changes the period and saves a category fix; `import.spec.ts` (project `authenticated-import`, after Spending)
-imports `e2e/fixtures/bank-export.csv` (five synthetic rows) into a new CSV account, imports it
-again without making a second account, imports into another new account and removes it (the panel
+diagram's buckets match the summary tiles (a bucket with refunds through its details) and that
+the scale badge shows whenever a node has an amount, checks every node taller than its words is
+its amount at one scale and the legend names no pay stub group without a stub, checks every month
+the picker offers (other than the one it opened on) has transactions or a pay stub (issue 236),
+drives a node from the keyboard, changes the period and saves a category fix; `import.spec.ts` (project `authenticated-import`, after Spending)
+imports `e2e/fixtures/bank-export.csv` (five synthetic rows) into a new CSV account ("Added 5
+transactions to ..."), imports it again without making a second account ("No new transactions: all
+5 were already in ...", issue 231), imports into another new account and removes it (the panel
 then reports nothing about it), and checks a broken file's row errors.
 Both change the e2e user's data, so they are ordered projects with serial files rather than
 parallel tests. `confirm.spec.ts` (project `authenticated-confirm`) uploads
@@ -988,11 +1138,12 @@ paycheck the later screens show. Never use a real document as a fixture.
 ### Local real-API stack
 
 `make e2e-full` (`scripts/e2e_stack.py`) runs `pnpm e2e` against a stack it starts and stops: a
-disposable `first_paycheck_e2e` database (migrated, seeded, two synthetic users), a stand-in for
+disposable `first_paycheck_e2e` database (migrated, seeded, three synthetic users), a stand-in for
 Supabase Auth that signs ES256 tokens and serves its JWKS (the web signs in through its real form;
-the API verifies the same tokens), and the API and worker with `LLM_FAKE=true`. It sets every
-variable above itself, plus `E2E_ALPHA_USER_EMAIL`/`E2E_ALPHA_USER_PASSWORD` and
-`E2E_PLAID_SANDBOX`; the web runs on `E2E_PORT` 3247. Plaid comes from `PLAID_CLIENT_ID` and
+the API verifies the same tokens) and takes faults for the session user, and the API and worker
+with `LLM_FAKE=true`. It sets every variable above itself, plus
+`E2E_ALPHA_USER_EMAIL`/`E2E_ALPHA_USER_PASSWORD`, `E2E_SESSION_USER_EMAIL`/`E2E_SESSION_USER_PASSWORD`,
+`E2E_AUTH_FAULTS_URL` and `E2E_PLAID_SANDBOX`; the web runs on `E2E_PORT` 3247. Plaid comes from `PLAID_CLIENT_ID` and
 `PLAID_SECRET` in the environment or `.env`; without them `E2E_PLAID_SANDBOX=0` skips
 `link.spec.ts` and the alpha's link steps and leaves the spending project out.
 `uv run python -m scripts.e2e_stack run -- <command>` runs any command against it (CI's `e2e`

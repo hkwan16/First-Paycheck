@@ -27,9 +27,9 @@ from checkin.findings import (
     RecurringFact,
     StubFact,
 )
+from db.calendar import open_events
 from db.enums import (
     CalculatorKind,
-    CalendarStatus,
     FindingKind,
     GoalKind,
     GoalStatus,
@@ -47,7 +47,7 @@ from db.pay_stubs import NEWEST_FIRST, current_pay_stubs
 
 __all__ = ["DEADLINE_WINDOW_DAYS", "current_decisions", "load_facts", "plan_targets", "utc_date"]
 
-# Rule 7: events due within this many days of today are upcoming deadlines.
+# Rule 7: open events due up to this many days after today are reported.
 DEADLINE_WINDOW_DAYS = 30
 
 _CURRENT = table("current_decisions", column("id"))
@@ -198,12 +198,10 @@ def _recurring(session: Session) -> list[RecurringFact]:
 
 
 def _events(session: Session, today: dt.date) -> list[EventFact]:
+    """Rule 24's open events due by the window's end, the overdue ones included."""
     rows = session.scalars(
-        select(CalendarEvent)
-        .where(
-            CalendarEvent.status == CalendarStatus.UPCOMING,
-            CalendarEvent.due_at.between(today, today + dt.timedelta(days=DEADLINE_WINDOW_DAYS)),
-        )
+        open_events()
+        .where(CalendarEvent.due_at <= today + dt.timedelta(days=DEADLINE_WINDOW_DAYS))
         .order_by(CalendarEvent.due_at, CalendarEvent.created_at, CalendarEvent.id)
     )
     return [

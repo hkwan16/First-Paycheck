@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JOB_POLL_MS } from '@/lib/api/hooks';
 import { API_BASE_URL } from '@/lib/api/base-url';
 import { installFakeXhr } from '@/test/fake-xhr';
-import { CHECKING_ID, SAMPLE_NOW, sampleAccounts, sampleJob } from '@/test/fixtures/sample';
+import {
+  CREDIT_UNION_ID,
+  SAMPLE_NOW,
+  sampleAccounts,
+  sampleCsvAccount,
+  sampleJob,
+} from '@/test/fixtures/sample';
 import { db } from '@/test/msw/db';
 import { scriptJob } from '@/test/msw/handlers';
 import { act, renderWithProviders, screen, userEvent, waitFor, within } from '@/test/render';
@@ -25,7 +31,8 @@ function jobStates(id: string, kind: 'categorize.run' | 'recurring.detect') {
 
 const IMPORTED = {
   account: { ...sampleAccounts[0]!, id: 'acct-csv', name: 'Credit union', mask: null },
-  imported: 3,
+  added: 3,
+  already_present: 0,
   categorize_job_id: '5a000000-0000-4000-8000-0000000000c1',
   recurring_job_id: '5a000000-0000-4000-8000-0000000000c2',
 };
@@ -95,9 +102,7 @@ describe('CsvImport', () => {
     // The API writes the account before it answers, so the list has it.
     db.accounts.push(IMPORTED.account);
     act(() => request.respond(200, IMPORTED));
-    const imported = await within(region()).findByText(
-      'Imported 3 transactions into Credit union.',
-    );
+    const imported = await within(region()).findByText('Added 3 transactions to Credit union.');
     expect(imported.closest('[role="status"]')).not.toBeNull();
     expect(
       within(region()).getByRole('progressbar', { name: 'Sorting into categories' }),
@@ -114,16 +119,51 @@ describe('CsvImport', () => {
   });
 
   it('adds to an account imported before, sending only its id', async () => {
+    db.accounts.push(sampleCsvAccount);
     const { xhr, user } = setup();
     const target = within(region()).getByLabelText('Import into');
-    await within(target).findByRole('option', { name: 'Chase Total Checking ··4821' });
-    await user.selectOptions(target, 'Chase Total Checking ··4821');
+    await within(target).findByRole('option', { name: 'Credit union checking' });
+    await user.selectOptions(target, 'Credit union checking');
     expect(within(region()).queryByLabelText('Account type')).not.toBeInTheDocument();
     await chooseAndImport(user);
     await waitFor(() => expect(xhr.requests).toHaveLength(1));
-    expect(xhr.last().field('account_id')).toBe(CHECKING_ID);
+    expect(xhr.last().field('account_id')).toBe(CREDIT_UNION_ID);
     expect(xhr.last().field('kind')).toBeNull();
     expect(xhr.last().field('sign')).toBe('negative_is_out');
+  });
+
+  it("offers only accounts a CSV import made, never a linked bank's, loans among them (issue 241)", async () => {
+    db.accounts.push(sampleCsvAccount, {
+      ...sampleAccounts[0]!,
+      id: 'loan-1',
+      name: 'Plaid Mortgage',
+      kind: 'loan',
+      mask: '9002',
+      role: null,
+      allowed_roles: [],
+    });
+    setup();
+    const target = within(region()).getByLabelText('Import into');
+    await within(target).findByRole('option', { name: 'Credit union checking' });
+    expect(
+      within(target)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['A new account', 'Credit union checking']);
+  });
+
+  it('says how many rows were new and how many were already there (issue 231)', async () => {
+    scriptJob(jobStates(IMPORTED.categorize_job_id, 'categorize.run'));
+    scriptJob(jobStates(IMPORTED.recurring_job_id, 'recurring.detect'));
+    // The second import of a file: the account is already there.
+    db.accounts.push(IMPORTED.account);
+    const { xhr, user } = setup();
+    await chooseAndImport(user);
+    await waitFor(() => expect(xhr.requests).toHaveLength(1));
+    act(() => xhr.last().respond(200, { ...IMPORTED, added: 0, already_present: 3 }));
+    expect(
+      await within(region()).findByText('No new transactions: all 3 were already in Credit union.'),
+    ).toBeInTheDocument();
   });
 
   it('lists the row errors of a refused file, the first 50 and how many in all', async () => {
@@ -156,6 +196,25 @@ describe('CsvImport', () => {
       'Row 4, amount: Not an amount with at most two decimal places',
     );
     expect(alert).toHaveTextContent('Showing the first 50 of 73.');
+  });
+
+  it("drops the last file's problems once another file is chosen (issue 240)", async () => {
+    const { xhr, user } = setup();
+    await chooseAndImport(user, csv('bad.csv'));
+    await waitFor(() => expect(xhr.requests).toHaveLength(1));
+    act(() =>
+      xhr.last().respond(422, {
+        error: {
+          code: 'csv_invalid',
+          message: 'The CSV has 3 problems',
+          details: { errors: [{ row: 2, column: 'date', message: 'Not a date' }], total: 3 },
+        },
+      }),
+    );
+    expect(await within(region()).findByRole('alert')).toHaveTextContent('The CSV has 3 problems');
+    await user.upload(within(region()).getByLabelText(/Choose a CSV file/), csv('good.csv'));
+    expect(within(region()).queryByRole('alert')).not.toBeInTheDocument();
+    expect(within(region()).queryByText(/The CSV has 3 problems/)).not.toBeInTheDocument();
   });
 
   it('offers to try again after another import into the same account won', async () => {

@@ -5,8 +5,10 @@ import { parseMoney } from '@/lib/money';
 import {
   cappedK401,
   DECISION_V1_ID,
+  SALARY_UNCONFIRMED,
   sampleDecision,
   sampleK401,
+  SCHEDULE_CHANGED,
   stub01K401,
 } from '@/test/fixtures/decisions';
 import {
@@ -16,7 +18,7 @@ import {
   stub01PayStub,
 } from '@/test/fixtures/documents';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
-import { db, decisionsReady, savedDecision, stub01Ready } from '@/test/msw/db';
+import { db, decisionsReady, salaryQuestionOpen, savedDecision, stub01Ready } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { act, fireEvent, renderWithProviders, screen, waitFor, within } from '@/test/render';
@@ -240,6 +242,134 @@ describe('Match401kCard and the rate the pay stub shows (spec 006 rule 14, issue
   });
 });
 
+describe('Match401kCard and a decision that needs review (spec 018 rule 5c, issue 222)', () => {
+  it('says what changed since the save, and saves again from what is on screen now', async () => {
+    savedDecision();
+    db.decisions[0]!.review = [SCHEDULE_CHANGED];
+    const seen = requests();
+    const { user } = await renderReady();
+    expect(within(card()).getByText('Needs review')).toBeInTheDocument();
+    expect(within(card()).queryByText('Changes not saved')).toBeNull();
+    const notice = within(card()).getByRole('group', { name: 'What changed' });
+    expect(notice).toHaveTextContent('Since you saved this on Oct 17, 2026:');
+    expect(within(notice).getByRole('listitem')).toHaveTextContent(SCHEDULE_CHANGED.text);
+    expect(notice).toHaveTextContent(
+      'The numbers here use what you have now. Check them and save again to update your plan.',
+    );
+
+    expect(saveButton()).toHaveTextContent('Save again');
+    await user.click(saveButton());
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
+    expect(seen.save).toEqual([expect.objectContaining({ supersedes_id: DECISION_V1_ID })]);
+    expect(within(card()).queryByRole('group', { name: 'What changed' })).toBeNull();
+  });
+});
+
+describe('Match401kCard and the salary question (spec 018 rule 5d, issue 221)', () => {
+  const question = () =>
+    within(card()).getByRole('group', { name: 'Which yearly salary should we use?' });
+
+  /** Every `PUT /profile` body, in order. */
+  function profileSaves() {
+    const saves: Record<string, unknown>[] = [];
+    server.events.on('request:start', async ({ request }) => {
+      if (new URL(request.url).pathname === '/profile' && request.method === 'PUT') {
+        saves.push(await request.clone().json());
+      }
+    });
+    return saves;
+  }
+
+  it('asks in place of the calculator, and works nothing out until it is answered', async () => {
+    salaryQuestionOpen();
+    const seen = requests();
+    renderCard();
+    await within(await screen.findByRole('region', { name: '401(k) match' })).findByRole('group', {
+      name: 'Which yearly salary should we use?',
+    });
+    expect(question()).toHaveTextContent(
+      'Your Oct 15, 2026 pay stub pays $2,708.33 twice a month, which comes to $64,999.92 a year. The salary in your plan details is $65,000.00.',
+    );
+    expect(within(card()).queryByRole('slider')).toBeNull();
+    expect(within(card()).queryByRole('group', { name: 'Your numbers' })).toBeNull();
+    await settle();
+    expect(seen.calc).toEqual([]);
+  });
+
+  it('keeps the saved salary, then calculates with it', async () => {
+    salaryQuestionOpen();
+    const saves = profileSaves();
+    const { user } = renderCard();
+    await within(await screen.findByRole('region', { name: '401(k) match' })).findByRole('group', {
+      name: 'Which yearly salary should we use?',
+    });
+    await user.click(within(question()).getByRole('button', { name: 'Keep $65,000.00' }));
+    await within(card()).findByRole('slider');
+    expect(saves).toEqual([
+      expect.objectContaining({
+        salary_cents: 6_500_000,
+        salary_pay_stub_id: samplePayStub().id,
+        filing_status: 'single',
+        birth_year: 1996,
+      }),
+    ]);
+    expect(card()).toHaveTextContent('of your $65,000 salary');
+  });
+
+  it("uses the stub's figure when asked to, as the primary action", async () => {
+    salaryQuestionOpen();
+    const saves = profileSaves();
+    const { user } = renderCard();
+    await within(await screen.findByRole('region', { name: '401(k) match' })).findByRole('group', {
+      name: 'Which yearly salary should we use?',
+    });
+    const use = within(question()).getByRole('button', { name: 'Use $64,999.92' });
+    await user.click(use);
+    await waitFor(() =>
+      expect(
+        within(card()).queryByRole('group', { name: 'Which yearly salary should we use?' }),
+      ).toBeNull(),
+    );
+    expect(saves).toEqual([
+      expect.objectContaining({
+        salary_cents: SAMPLE_ANNUAL_SALARY_CENTS,
+        salary_pay_stub_id: samplePayStub().id,
+      }),
+    ]);
+  });
+
+  it('says so when the answer cannot be saved, and keeps asking', async () => {
+    salaryQuestionOpen();
+    server.use(
+      http.put(apiUrl('/profile'), () =>
+        HttpResponse.json(
+          { error: { code: 'internal_error', message: 'internal_error' } },
+          { status: 500 },
+        ),
+      ),
+    );
+    const { user } = renderCard();
+    await within(await screen.findByRole('region', { name: '401(k) match' })).findByRole('group', {
+      name: 'Which yearly salary should we use?',
+    });
+    await user.click(within(question()).getByRole('button', { name: 'Keep $65,000.00' }));
+    expect(await within(question()).findByRole('alert')).toHaveTextContent(
+      'Could not save your answer. Try again.',
+    );
+  });
+
+  it('a decision saved before the question needs review for it too', async () => {
+    salaryQuestionOpen();
+    db.decisions = [sampleDecision({ review: [SALARY_UNCONFIRMED] })];
+    renderCard();
+    const region = await screen.findByRole('region', { name: '401(k) match' });
+    await within(region).findByRole('group', { name: 'Which yearly salary should we use?' });
+    expect(within(region).getByText('Needs review')).toBeInTheDocument();
+    // Nothing else changed, so there is nothing to list: the question says it.
+    expect(within(region).queryByRole('group', { name: 'What changed' })).toBeNull();
+  });
+});
+
 describe('Match401kCard saving', () => {
   it('saves v1, then v2 over it, with the result the calculator returned', async () => {
     decisionsReady();
@@ -375,6 +505,8 @@ describe('Match401kCard plan details', () => {
         // The stub's schedule is the schedule; it is never copied (issue 198).
         pay_frequency: null,
         salary_cents: 6_500_000,
+        // Typed beside the newest stub, so that stub's $64,999.92 asks nothing (spec 005 rule 24c).
+        salary_pay_stub_id: samplePayStub().id,
         start_date: null,
         vesting_years: null,
       },

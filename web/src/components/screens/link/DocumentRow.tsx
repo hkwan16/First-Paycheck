@@ -15,6 +15,7 @@ import { confirmRoute, decisionRouteFor } from '@/lib/routes';
 import {
   documentBadge,
   documentStatusBadge,
+  documentSubject,
   documentTypeLabel,
   hiddenText,
   statusReasonText,
@@ -79,15 +80,19 @@ export interface DocumentRowProps {
 /**
  * One row of the mockup's documents list: what the document is, where it is
  * in being read and checked, how many numbers were hidden, and what to do
- * next. A confirmed copy a newer confirm of the same paycheck replaced says
- * so and offers nothing: the newer copy is the one that counts.
+ * next. A confirmed document is named by what was confirmed from it and opens
+ * its values (issue 243). A confirmed copy a newer confirm of the same paycheck
+ * replaced says so and offers no Replace: the newer copy is the one that counts.
  */
 export function DocumentRow({ doc, jobId, starting, onRead, onReplace }: DocumentRowProps) {
   const titleId = useId();
+  const subjectId = useId();
   const fileInput = useRef<HTMLInputElement>(null);
   const label = documentTypeLabel(doc.type);
   const lower = label.toLowerCase();
   const badge = documentBadge(doc);
+  // What was confirmed from it, so two stubs tell apart (spec 005 rule 22g).
+  const subject = documentSubject(doc);
   const reason = statusReasonText(doc.status_reason);
   const reading = doc.status === 'extracting' || starting;
   const read = doc.page_count !== null;
@@ -106,7 +111,11 @@ export function DocumentRow({ doc, jobId, starting, onRead, onReplace }: Documen
   };
 
   return (
-    <div role="group" aria-labelledby={titleId} className="flex flex-col gap-3">
+    <div
+      role="group"
+      aria-labelledby={subject ? `${titleId} ${subjectId}` : titleId}
+      className="flex flex-col gap-3"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <IconTile tone={doc.type === 'benefits' ? 'plum' : 'coral'}>
@@ -114,8 +123,18 @@ export function DocumentRow({ doc, jobId, starting, onRead, onReplace }: Documen
           </IconTile>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span id={titleId} className="font-semibold">
-                {label}
+              <span>
+                <span id={titleId} className="font-semibold">
+                  {label}
+                </span>
+                {subject && (
+                  <>
+                    {' '}
+                    <span id={subjectId} className="text-ink-2">
+                      · {subject}
+                    </span>
+                  </>
+                )}
               </span>
               <Badge tone={reading ? 'blue' : badge.tone}>
                 {reading ? documentStatusBadge('extracting').label : badge.label}
@@ -156,6 +175,11 @@ export function DocumentRow({ doc, jobId, starting, onRead, onReplace }: Documen
               aria-label={doc.status === 'proposed' ? `Review ${lower}` : `Enter ${lower} fields`}
             >
               {doc.status === 'proposed' ? 'Review' : 'Enter fields'}
+            </Button>
+          )}
+          {doc.status === 'confirmed' && (
+            <Button size="sm" href={confirmRoute(doc.id)} aria-label={`View ${lower}`}>
+              View
             </Button>
           )}
           {!reading && unreadBenefits && (

@@ -1,4 +1,4 @@
-import type { ProposedField } from '@/lib/api/types';
+import type { ProposedField, ReviewDraft } from '@/lib/api/types';
 import { formatMoney, parseMoney } from '@/lib/money';
 import { parseISODate } from '@/lib/dates';
 
@@ -35,6 +35,11 @@ export interface ReviewField {
   note: string | null;
   /** Integer cents for money, an ISO date, text, or null for nothing. */
   value: FieldValue;
+  /**
+   * The value as it was read (null when nothing was read, and for every field
+   * in manual entry). A value that differs from it is the person's entry.
+   */
+  proposed: FieldValue;
   confirmed: boolean;
   /** What is being typed, or null when the field is not being edited. */
   draft: string | null;
@@ -64,6 +69,8 @@ export type ConfirmAction =
   | { type: 'draft'; key: string; text: string }
   | { type: 'save'; key: string }
   | { type: 'cancel'; key: string }
+  /** A deduction the document does not print: confirm it as $0.00 (spec 005 rule 23b). */
+  | { type: 'confirmNone'; key: string }
   | { type: 'confirmAll' };
 
 export interface InitOptions {
@@ -85,6 +92,7 @@ export function initConfirmState(
     confidence: options.manual ? null : f.confidence,
     note: options.manual ? null : f.note,
     value: options.manual ? null : f.value,
+    proposed: options.manual ? null : f.value,
     confirmed: false,
     draft: options.manual ? '' : null,
     error: null,
@@ -105,6 +113,20 @@ const isRequired = (f: Pick<ReviewField, 'kind' | 'required'>) =>
   f.required ?? (f.kind === 'money' || f.kind === 'date');
 
 const hasWhatItNeeds = (f: ReviewField) => f.value !== null || !isRequired(f);
+
+/**
+ * A deduction (role `deduction`, an amount) is a line a stub may not print at
+ * all, which means nothing was taken for it: it can be confirmed as none,
+ * $0.00 (spec 005 rule 23b). Gross pay, net pay and the dates cannot.
+ */
+export const canBeNone = (f: Pick<ReviewField, 'kind' | 'role'>) =>
+  f.kind === 'money' && f.role === 'deduction';
+
+/** The value on screen is the person's, not the one read (spec 005 rule 23a). */
+export const isEntered = (f: Pick<ReviewField, 'value' | 'proposed'>) => f.value !== f.proposed;
+
+/** What confirming a deduction as none stores. */
+const NONE_CENTS = 0;
 
 /** The text the editor opens with. */
 export function draftText(f: Pick<ReviewField, 'kind' | 'value'>): string {
@@ -216,11 +238,20 @@ export function confirmReducer(state: ConfirmState, action: ConfirmAction): Conf
     case 'save':
       return patch(state, action.key, (f) => {
         if (f.draft === null) return f;
+        // An empty deduction is a line the stub does not print: none (rule 23b).
+        if (f.draft.trim() === '' && canBeNone(f)) {
+          return { ...f, value: NONE_CENTS, confirmed: true, draft: null, error: null };
+        }
         const parsed = parseDraft(f, f.draft);
         if (!parsed.ok) return { ...f, error: parsed.error };
         if (parsed.value === null && isRequired(f)) return { ...f, error: requiredError(f) };
         return { ...f, value: parsed.value, confirmed: true, draft: null, error: null };
       });
+
+    case 'confirmNone':
+      return patch(state, action.key, (f) =>
+        canBeNone(f) ? { ...f, value: NONE_CENTS, confirmed: true, draft: null, error: null } : f,
+      );
 
     case 'cancel':
       // The value and the confirmed state were never touched by the edit.
@@ -241,8 +272,11 @@ export type Gate =
   | { status: 'ok' }
   /** Off by `differenceCents` = gross - deductions - net. */
   | { status: 'off'; differenceCents: number }
-  /** "?": an amount that takes part is being typed and is not an amount, or is missing. */
-  | { status: 'unknown'; reason: 'invalid' | 'missing'; label: string }
+  /**
+   * "?": an amount that takes part is being typed and is not an amount, or is
+   * missing; `canBeNone` when it is a deduction that can be confirmed as none.
+   */
+  | { status: 'unknown'; reason: 'invalid' | 'missing'; label: string; canBeNone: boolean }
   /** No gross and net fields: nothing to check. */
   | { status: 'none' };
 
@@ -265,12 +299,16 @@ export function mathGate(fields: readonly ReviewField[]): Gate {
       cents = null;
     } else if (f.draft !== null) {
       const parsed = parseDraft(f, f.draft);
-      if (!parsed.ok) return { status: 'unknown', reason: 'invalid', label: f.label };
+      if (!parsed.ok) {
+        return { status: 'unknown', reason: 'invalid', label: f.label, canBeNone: canBeNone(f) };
+      }
       cents = parsed.value as number | null;
     } else {
       cents = typeof f.value === 'number' ? f.value : null;
     }
-    if (cents === null) return { status: 'unknown', reason: 'missing', label: f.label };
+    if (cents === null) {
+      return { status: 'unknown', reason: 'missing', label: f.label, canBeNone: canBeNone(f) };
+    }
     difference += f.role === 'gross' ? cents : -cents;
   }
   return difference === 0 ? { status: 'ok' } : { status: 'off', differenceCents: difference };
@@ -309,6 +347,43 @@ export function summarize(state: ConfirmState): ConfirmSummary {
       confirmedCount === total &&
       editing === 0 &&
       (gate.status === 'ok' || gate.status === 'none'),
+  };
+}
+
+/**
+ * What the review keeps with the document (`PUT /docs/{id}/review`, spec 005
+ * rules 23c and 23e): each field's value and whether it is confirmed. The text
+ * of an open editor is not kept.
+ */
+export function reviewDraft(fields: readonly ReviewField[]): ReviewDraft {
+  return { fields: fields.map(({ key, value, confirmed }) => ({ key, value, confirmed })) };
+}
+
+/** A saved value that fits the field's kind: a number for amounts and counts, else text. */
+const fitsKind = (f: ReviewField, value: ReviewDraft['fields'][number]['value']) =>
+  value === null || (f.kind === 'money' || f.kind === 'number') === (typeof value === 'number');
+
+/**
+ * A review as the person left it: the state from the proposal, with each
+ * saved field's value and confirmed state (spec 005 rule 23e). A key the
+ * proposal does not have, or a value of the wrong kind, is ignored. Every
+ * editor is closed, except in manual entry a field still without a value.
+ */
+export function withReviewDraft(
+  state: ConfirmState,
+  draft: ReviewDraft | null,
+  options: Pick<InitOptions, 'manual'>,
+): ConfirmState {
+  if (!draft) return state;
+  const saved = new Map(draft.fields.map((f) => [f.key, f]));
+  return {
+    ...state,
+    fields: state.fields.map((f) => {
+      const entry = saved.get(f.key);
+      if (!entry || !fitsKind(f, entry.value)) return f;
+      const open = options.manual && entry.value === null;
+      return { ...f, value: entry.value, confirmed: entry.confirmed, draft: open ? '' : null };
+    }),
   };
 }
 

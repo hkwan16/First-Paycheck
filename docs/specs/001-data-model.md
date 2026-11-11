@@ -33,6 +33,7 @@ Alembic revisions `0001_roles` through `0006_webhook_fn`, the SQLAlchemy models 
 10. The API connects as role `app_api` and, per request, runs `SET LOCAL ROLE authenticated` and `set_config('request.jwt.claims', <claims json>, true)` inside one transaction, so `auth.uid()` resolves in every policy. `app_api` cannot bypass RLS.
 11. The privileged connection (`postgres` role) is used only by `jobs/queue.py`, `jobs/scheduler.py`, Alembic and the seed loader that runs with it before deploy.
 12. A row the user does not own reads as absent, so routes return 404, never 403.
+12a. A path id that is not a well-formed id (`/decisions/not-a-uuid`) names no row either, so it is 404 `not_found` too, never a 422 the client could fix and send again (issue 237). Every path parameter is a row's id; a malformed query parameter or body field is still 422 `validation_error`.
 
 **Exceptions to the owner policy** (each covered by its own RLS test):
 
@@ -97,7 +98,7 @@ Every job handler, after the privileged dequeue, opens a user-scoped session wit
 | `calculator_kind` | `emergency_fund`, `k401_match`, `health_plans`, `w4` |
 | `checkin_trigger` | `schedule`, `sync`, `manual` |
 | `checkin_status` | `open`, `completed` |
-| `finding_kind` | `election_mismatch`, `goal_off_pace`, `recurring_new`, `recurring_changed`, `recurring_stopped`, `pay_change`, `upcoming_deadline` (`0021_paycheck_change` removed `deduction_change`, spec 015) |
+| `finding_kind` | `election_mismatch`, `goal_off_pace`, `recurring_new`, `recurring_changed`, `recurring_stopped`, `pay_change`, `upcoming_deadline`, `overdue_deadline` (`0021_paycheck_change` removed `deduction_change` and `0022_deadline_dates` added `overdue_deadline`, spec 015) |
 | `finding_severity` | `info`, `warning`, `alert` |
 | `finding_action` | `done`, `dismissed` (`0012_checkin_findings` replaced the original `acknowledged`, `acted`, `dismissed`, spec 015) |
 | `calendar_kind` | `enrollment_deadline`, `tax_season`, `open_enrollment`, `goal_target` |
@@ -119,6 +120,7 @@ One row per user; the confirmed picture of the job and choices.
 |---|---|---|
 | `user_id` | `uuid` | Primary key, references `auth.users(id) ON DELETE CASCADE` |
 | `salary_cents` | `bigint` | Null until confirmed; `CHECK (salary_cents > 0)` |
+| `salary_pay_stub_id` | `uuid` | Null until the salary is compared with a stub; the stub it was last compared with (spec 005 rule 24c). `(salary_pay_stub_id, user_id)` references `pay_stubs (id, user_id)`, `ON DELETE SET NULL (salary_pay_stub_id)` |
 | `pay_frequency` | `pay_frequency` | Null until confirmed |
 | `filing_status` | `filing_status` | Null until confirmed |
 | `other_jobs` | `jsonb` | `NOT NULL DEFAULT '[]'`, `CHECK (jsonb_typeof(other_jobs) = 'array')`; item shape set by the W-4 spec (M7) |
@@ -144,6 +146,7 @@ One row per upload, kept after the file is deleted.
 | `confirmed_at` | `timestamptz` | Set on confirm; `CHECK ((status = 'confirmed') = (confirmed_at IS NOT NULL))` |
 | `deleted_at` | `timestamptz` | Set when the blob is deleted |
 | `replaced_by_id` | `uuid` | Null until a newer upload replaces this document (spec 004 rules 24-31); `UNIQUE`; FK `(replaced_by_id, user_id) -> documents (id, user_id)`; `CHECK (replaced_by_id <> id)`; `CHECK (replaced_by_id IS NULL OR deleted_at IS NOT NULL)` |
+| `review_draft` | `jsonb` | Null until `PUT /docs/{id}/review` saves progress through Confirm (spec 005 rules 23c-23e), and null again once the document is confirmed, replaced, read again or expired; `CHECK (jsonb_typeof(review_draft) = 'object')`. Not confirmed data |
 
 Indexes: `(user_id, created_at DESC)`. `UNIQUE (id, user_id)`.
 
@@ -228,7 +231,7 @@ One per linked institution or CSV source.
 | `kind` | `account_kind` | `NOT NULL` |
 | `name` | `text` | `NOT NULL` |
 | `mask` | `text` | Nullable; last four digits only, `CHECK (mask ~ '^[0-9]{2,4}$')` |
-| `role` | `account_role` | Nullable; partial `UNIQUE (user_id) WHERE role = 'emergency_fund'` (current savings is read from the one emergency-fund account) |
+| `role` | `account_role` | Nullable; `ck_accounts_role_fits_kind`: only a role its `kind` takes (spec 002 rule 31a); partial `UNIQUE (user_id) WHERE role = 'emergency_fund'` (current savings is read from the one emergency-fund account) |
 | `is_active` | `boolean` | `NOT NULL DEFAULT true` |
 
 `UNIQUE (id, user_id)`.
@@ -462,6 +465,10 @@ Reference data, no `user_id` (RLS exception).
 | `0018_check_in_last_run_at` | Nothing new. `check_ins.last_run_at` (spec 015 rule 9a), filled from `updated_at` for existing rows with the `updated_at` trigger off. The downgrade drops it |
 | `0020_pay_stub_superseded_by` | Nothing new but a trigger function. `pay_stubs.employer_key` and `superseded_by_id` with the same-user foreign key, `uq_pay_stubs_current_paycheck`, `UPDATE (superseded_by_id)` for `authenticated` and the `pay_stubs_supersede_only()` trigger (spec 005 rules 22a-22e, issue 190). It supersedes the stubs already stored in confirm order before creating the index. The downgrade drops them; every copy then counts again |
 | `0021_paycheck_change` | Nothing new. Folds each check-in's `deduction_change` findings into their paycheck's `pay_change` and merges the findings a newer copy of a stub made (spec 015 rule 13a, issues 194 and 202), then rebuilds `finding_kind` without `deduction_change`. The downgrade splits the lines back into `deduction_change` findings and rebuilds the type with the label |
+| `0022_deadline_dates` | Nothing new. Rebuilds `finding_kind` with `overdue_deadline` after `upcoming_deadline` and keys each `upcoming_deadline` finding by its date, `upcoming_deadline:{calendar_kind}:{due_at}`, folding a check-in's findings that then share a key (spec 015 rule 13b, issues 233 and 234). The downgrade deletes the `overdue_deadline` findings, settles each check-in's status again, keys the date findings by their event and rebuilds the type without the label |
+| `0023_salary_pay_stub` | `profiles.salary_pay_stub_id` and its same-user foreign key to `pay_stubs` (spec 005 rule 24c, issue 221). The downgrade drops the column |
+| `0024_document_review_draft` | `documents.review_draft` and its object check (spec 005 rules 23c-23e, issue 229). The downgrade drops the column |
+| `0025_account_role_fits_kind` | Nothing new. Clears every role its account's kind does not allow, then adds `ck_accounts_role_fits_kind` (spec 002 rule 31a, issue 241). The downgrade drops the check; cleared roles stay cleared |
 
 CI runs upgrade, downgrade, upgrade and `alembic check` on every pull request.
 

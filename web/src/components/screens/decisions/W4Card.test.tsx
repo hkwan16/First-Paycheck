@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CALC_DEBOUNCE_MS } from '@/lib/api/hooks';
-import { sampleDecision, stub01K401 } from '@/test/fixtures/decisions';
+import { sampleDecision, SCHEDULE_CHANGED, stub01K401 } from '@/test/fixtures/decisions';
 import { stub01PayStub } from '@/test/fixtures/documents';
 import { stub01HealthDecision } from '@/test/fixtures/planning';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
@@ -13,7 +13,7 @@ import {
   stub01W4Inputs,
   W4_DECISION_ID,
 } from '@/test/fixtures/w4';
-import { db, decisionsReady, savedDecision, stub01Ready } from '@/test/msw/db';
+import { db, decisionsReady, salaryQuestionOpen, savedDecision, stub01Ready } from '@/test/msw/db';
 import { apiUrl } from '@/test/msw/handlers';
 import { savedHealthPlan, savedW4 } from '@/test/msw/planning-handlers';
 import { server } from '@/test/msw/server';
@@ -211,6 +211,39 @@ describe('W4Card', () => {
     type('Step 3: credits for dependents, for the year', '2,200');
     await recalculated('Even at tax time');
     expect(seen.calc.at(-1)).toEqual(sampleW4Inputs({ dependents_credit_cents: 220_000 }));
+  });
+});
+
+describe('W4Card and what changed since the save (spec 018 rules 5c and 5d)', () => {
+  it('says what changed and saves again (issue 222)', async () => {
+    otherDecisionsSaved();
+    savedW4();
+    db.decisions.at(-1)!.review = [SCHEDULE_CHANGED];
+    const seen = requests();
+    const { user } = await renderReady();
+    expect(within(card()).getByText('Needs review')).toBeInTheDocument();
+    expect(within(card()).getByRole('group', { name: 'What changed' })).toHaveTextContent(
+      SCHEDULE_CHANGED.text,
+    );
+    await user.click(within(card()).getByRole('button', { name: 'Save again' }));
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^Saved$/));
+    expect(seen.save[0]).toMatchObject({ supersedes_id: W4_DECISION_ID });
+  });
+
+  it('asks which salary to use before it works out any withholding (issue 221)', async () => {
+    salaryQuestionOpen();
+    const seen = requests();
+    const { user } = renderCard();
+    const region = await screen.findByRole('region', { name: TITLE });
+    const question = await within(region).findByRole('group', {
+      name: 'Which yearly salary should we use?',
+    });
+    expect(within(region).queryByRole('group', { name: 'Filing status' })).toBeNull();
+    await settle();
+    expect(seen.calc).toEqual([]);
+
+    await user.click(within(question).getByRole('button', { name: 'Keep $65,000.00' }));
+    await within(region).findByRole('group', { name: 'Filing status' });
   });
 });
 

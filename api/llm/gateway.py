@@ -68,7 +68,7 @@ log = logging.getLogger(__name__)
 CATEGORIZE_PROMPT = ("categorize", "v3")
 EXTRACT_PAY_STUB_PROMPT = ("extract_pay_stub", "v2")
 EXTRACT_BENEFITS_PROMPT = ("extract_benefits", "v2")
-EXPLAIN_PROMPT = ("explain", "v4")
+EXPLAIN_PROMPT = ("explain", "v5")
 JUDGE_RATE_CLAIM_PROMPT = ("judge_rate_claim", "v1")
 JUDGE_WITHHOLDING_CLAIM_PROMPT = ("judge_withholding_claim", "v1")
 REQUEST_TIMEOUT_SECONDS = 120.0
@@ -677,7 +677,7 @@ class FakeGateway(Gateway):
         if prompt.schema is CategoryBatch and isinstance(content, str):
             text = self._categorize(content)
         elif prompt.schema is PayStubExtraction:
-            text = self._fixture_text("extract_pay_stub.json")
+            text = self._pay_stub(content)
         elif prompt.schema is BenefitsSummaryExtraction:
             text = self._fixture_text("extract_benefits.json")
         elif prompt.schema is ExplanationDraft and isinstance(content, str):
@@ -716,6 +716,23 @@ class FakeGateway(Gateway):
             citation_keys=[context.citations[0].key] if context.citations else [],
         )
         return draft.model_dump_json()
+
+    def _pay_stub(self, content: Content) -> str:
+        """The answer for the stub whose employer line the pages show:
+        ``extract_pay_stub.<name>.json`` when its ``employer_name.source_text``
+        is in the text sent, else ``extract_pay_stub.json`` (the Acme stub). The
+        e2e stack reads more than one synthetic stub (issue 230)."""
+        sent = (
+            content
+            if isinstance(content, str)
+            else "\n".join(str(block["text"]) for block in content if block["type"] == "text")
+        )
+        for path in sorted(self._fixtures.glob("extract_pay_stub.*.json")):
+            answer = path.read_text(encoding="utf-8")
+            line = json.loads(answer)["employer_name"]["source_text"]
+            if line and line in sent:
+                return answer
+        return self._fixture_text("extract_pay_stub.json")
 
     def _fixture_text(self, name: str) -> str:
         path = self._fixtures / name

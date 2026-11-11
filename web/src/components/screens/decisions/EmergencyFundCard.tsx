@@ -27,6 +27,7 @@ import { toneText } from '@/lib/design/tone';
 import { formatMoney, formatRate } from '@/lib/money';
 import { AmountField } from './AmountField';
 import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
+import { ReviewNotice } from './ReviewNotice';
 import {
   amountText,
   examplePlaceholder,
@@ -254,6 +255,7 @@ export function EmergencyFundCard() {
       busy={!loaded && !failed}
       badge={loaded ? <Badge tone={saveBadgeTone(state.status)}>{state.label}</Badge> : undefined}
     >
+      {loaded && !failed && current && <ReviewNotice decision={current} />}
       {body}
     </DecisionCard>
   );

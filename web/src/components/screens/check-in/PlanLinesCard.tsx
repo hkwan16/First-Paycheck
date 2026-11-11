@@ -41,7 +41,9 @@ function Line({ line }: { line: PlanLine }) {
       </td>
       <td className="py-2.5 pl-3 text-right">
         {line.plan_cents === null ? (
-          <span className="text-tiny text-ink-3">No target</span>
+          <span className="text-tiny text-ink-3">
+            {line.needs_pay_stub ? 'No pay stub yet' : 'No target'}
+          </span>
         ) : (
           <Money cents={line.plan_cents} />
         )}
@@ -66,12 +68,18 @@ function Line({ line }: { line: PlanLine }) {
  * has reached so far, colored by the API's status for it (rule 19a) and the
  * status said in words beside the actual: the client only decides which side
  * of the plan matters for the line (`planStatusTone`), never the side itself.
+ * A 401(k) or health line whose plan waits for the month's first pay stub
+ * (`needs_pay_stub`) says so instead of "No target". The card is read when the
+ * page is, so on a past check-in (`past`) it is the whole month against the
+ * choices saved now, and says that.
  */
 export function PlanLinesCard({
   cashFlow,
+  past,
   className,
 }: {
   cashFlow: CheckInCashFlow;
+  past: boolean;
   className?: string;
 }) {
   const flow = cashFlow.cash_flow;
@@ -110,7 +118,9 @@ export function PlanLinesCard({
         </tbody>
       </table>
       <p className="m-0 text-tiny text-ink-3">
-        Targets come from the choices you saved. This month counts up to today.{' '}
+        {past
+          ? `Targets come from the choices you have saved now. ${monthName(flow.start)} counts in full.`
+          : 'Targets come from the choices you saved. This month counts up to today.'}{' '}
         <Link href="/setup/spending">See your spending</Link>
       </p>
       {ledgers && <p className="m-0 text-tiny text-ink-3">{ledgers}</p>}

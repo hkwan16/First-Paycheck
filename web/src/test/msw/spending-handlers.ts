@@ -1,12 +1,12 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE_URL } from '@/lib/api/base-url';
 import type { CashFlow, RecurringCharge, RecurringPatch } from '@/lib/api/types';
-import { sampleCashflow, sampleRecurring } from '../fixtures/cashflow';
+import { sampleCashflow, sampleRecurring, sampleSpendingMonths } from '../fixtures/cashflow';
 import { SAMPLE_NOW } from '../fixtures/sample';
 
 /*
- * The M5 routes: `GET /cashflow`, `GET /spending/summary`, `GET /recurring`
- * and `PATCH /recurring/{id}`, over their own in-memory state, reset after
+ * The M5 routes: `GET /cashflow`, `GET /spending/summary`,
+ * `GET /spending/months`, `GET /recurring` and `PATCH /recurring/{id}`, over their own in-memory state, reset after
  * every test (src/test/setup.ts). `POST /accounts/import` goes over
  * XMLHttpRequest like document uploads, so tests drive it with
  * `installFakeXhr()` instead of a handler here.
@@ -16,16 +16,20 @@ export interface SpendingDb {
   /** What `GET /cashflow` answers; `spending` is also `GET /spending/summary`. */
   cashflow: CashFlow;
   recurring: RecurringCharge[];
+  /** What `GET /spending/months` answers: by default the six months the picker can offer. */
+  months: string[];
 }
 
 export const spendingDb: SpendingDb = {
   cashflow: sampleCashflow(),
   recurring: structuredClone([...sampleRecurring]),
+  months: [...sampleSpendingMonths.months],
 };
 
 export function resetSpendingDb() {
   spendingDb.cashflow = sampleCashflow();
   spendingDb.recurring = structuredClone([...sampleRecurring]);
+  spendingDb.months = [...sampleSpendingMonths.months];
 }
 
 const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
@@ -68,6 +72,8 @@ export const spendingHandlers = [
     const flow = cashflowFor(new URL(request.url));
     return flow instanceof Response ? flow : HttpResponse.json(flow.spending);
   }),
+
+  http.get(apiUrl('/spending/months'), () => HttpResponse.json({ months: spendingDb.months })),
 
   http.get(apiUrl('/recurring'), () => HttpResponse.json(spendingDb.recurring)),
 

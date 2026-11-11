@@ -88,6 +88,8 @@ export function AuthForm({ mode, next, linkError }: AuthFormProps) {
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (busy) return;
+    // A new attempt supersedes whatever the last one said (issue 240).
+    setStatus({ kind: 'idle' });
     setTouched({ email: true, password: true });
     if (validateEmail(email)) return emailRef.current?.focus();
     if (validatePassword(password, mode)) return passwordRef.current?.focus();
@@ -122,7 +124,10 @@ export function AuthForm({ mode, next, linkError }: AuthFormProps) {
 
   const onEmailLink = () => {
     if (busy) return;
-    setTouched((t) => ({ ...t, email: true }));
+    setStatus({ kind: 'idle' });
+    // A link needs no password, so a password message from an earlier submit
+    // describes nothing now (issue 240); it comes back if they submit again.
+    setTouched({ email: true, password: false });
     if (validateEmail(email)) return emailRef.current?.focus();
 
     const supabase = getSupabaseBrowserClient();

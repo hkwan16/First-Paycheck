@@ -13,6 +13,7 @@ import type {
   DecisionIn,
   DecisionSaved,
   DocumentDetail,
+  ReviewDraft,
   DocumentSummary,
   DocumentType,
   ExplainIn,
@@ -40,6 +41,7 @@ import { checkinHandlers } from './checkin-handlers';
 import { db, emptyDb } from './db';
 import {
   planningCalculators,
+  planningDb,
   planningHandlers,
   type DecisionCalculator,
   type DecisionEffects,
@@ -62,8 +64,12 @@ const appError = (status: number, code: string, message: string, details?: objec
   HttpResponse.json({ error: { code, message, ...(details ? { details } : {}) } }, { status });
 
 let sequence = 0;
+/**
+ * A new row's id. Fixture ids use the `8000` group, so a generated one never
+ * takes a fixture row's id, whichever test in a file saves first.
+ */
 const nextId = (prefix: string) =>
-  `${prefix}-0000-4000-8000-${String(++sequence).padStart(12, '0')}`;
+  `${prefix}-0000-4000-9000-${String(++sequence).padStart(12, '0')}`;
 
 /**
  * Script the states `GET /jobs/{id}` returns, one per poll; the last state
@@ -150,6 +156,9 @@ export function createDocument(type: DocumentType): DocumentSummary {
     replaced_by_id: null,
     can_read_again: false,
     superseded: false,
+    employer_name: null,
+    pay_date: null,
+    plan_names: [],
   };
   db.documents.unshift(document);
   return document;
@@ -166,7 +175,21 @@ export function replaceDocument(documentId: string): DocumentSummary {
   const created = createDocument(old.type);
   Object.assign(old, { replaced_by_id: created.id, deleted_at: old.deleted_at ?? SAMPLE_NOW });
   db.proposals.delete(old.id);
+  db.reviews.delete(old.id);
   return created;
+}
+
+/**
+ * An account as the API lists it, with its transactions counted from `db`
+ * (spec 002 rule 30a): how many, and the oldest one's date.
+ */
+function withCounts(account: Account): Account {
+  const dates = db.transactions.filter((t) => t.account_id === account.id).map((t) => t.posted_at);
+  return {
+    ...account,
+    transaction_count: dates.length,
+    first_posted_at: dates.length > 0 ? dates.reduce((a, b) => (a < b ? a : b)) : null,
+  };
 }
 
 const REPLACED = {
@@ -234,9 +257,12 @@ export function platypusAccounts(itemId: string): Account[] {
       kind: 'checking',
       mask: '0000',
       role: null,
+      allowed_roles: ['spending', 'emergency_fund'],
       is_active: true,
       balance_cents: 11_000,
       balance_as_of: SAMPLE_SYNCED_AT,
+      transaction_count: 0,
+      first_posted_at: null,
     },
     {
       id: nextId('2b000000'),
@@ -247,9 +273,12 @@ export function platypusAccounts(itemId: string): Account[] {
       kind: 'savings',
       mask: '1111',
       role: null,
+      allowed_roles: ['emergency_fund'],
       is_active: true,
       balance_cents: 21_000,
       balance_as_of: SAMPLE_SYNCED_AT,
+      transaction_count: 0,
+      first_posted_at: null,
     },
   ];
 }
@@ -290,10 +319,11 @@ const CALCULATOR_ORDER: readonly CalculatorKind[] = [
 ];
 
 /** A decision as the API reads it: current when no other version supersedes it. */
-const withCurrent = (decision: Decision): Decision => ({
-  ...decision,
-  is_current: !db.decisions.some((d) => d.supersedes_id === decision.id),
-});
+const withCurrent = (decision: Decision): Decision => {
+  const current = !db.decisions.some((d) => d.supersedes_id === decision.id);
+  // Only a current decision can need review (spec 007 rule 19b).
+  return { ...decision, is_current: current, review: current ? decision.review : [] };
+};
 
 function listDecisions(): CalculatorDecisions[] {
   return CALCULATOR_ORDER.flatMap((calculator) => {
@@ -385,6 +415,7 @@ async function saveDecision(request: Request) {
     result: { ...computed },
     created_at: SAMPLE_NOW,
     is_current: true,
+    review: [],
   };
   const chainIds = new Set(chain.map((d) => d.id));
   for (const event of db.calendar) {
@@ -450,6 +481,21 @@ async function explain(request: Request) {
 }
 
 /** `GET /profile` and `PUT /profile`: the saved profile with the pay schedule read now (rule 25a). */
+/**
+ * The salary question after a save (spec 005 rule 24c), as the API would
+ * answer it for the question a test seeded: answered once the save names its
+ * stub or takes its figure, else asked about the salary saved now.
+ */
+function salaryReviewAfter(
+  question: Profile['salary_review'],
+  salary: number | null,
+  stubId: string | null,
+): Profile['salary_review'] {
+  if (!question || salary === null) return null;
+  if (stubId === question.pay_stub_id || salary === question.annual_salary_cents) return null;
+  return { ...question, salary_cents: salary };
+}
+
 export const profileOut = (): Profile => ({
   ...db.profile,
   pay_schedule: payScheduleOf(db.payStubs[0], db.profile),
@@ -464,12 +510,15 @@ export const handlers = [
     HttpResponse.json({ status: 'ok', git_sha: 'test', alembic_revision: '0001_roles' }),
   ),
 
-  http.get(apiUrl('/accounts'), () => HttpResponse.json(db.accounts)),
+  http.get(apiUrl('/accounts'), () => HttpResponse.json(db.accounts.map(withCounts))),
 
   http.patch<{ id: string }, AccountPatch>(apiUrl('/accounts/:id'), async ({ params, request }) => {
     const account = db.accounts.find((a) => a.id === params.id);
     if (!account) return notFound('Account not found');
     const body = await request.json();
+    if (body.role && !account.allowed_roles.includes(body.role)) {
+      return appError(422, 'role_not_allowed', `This account cannot have the role ${body.role}`);
+    }
     if ('role' in body) {
       if (body.role === 'emergency_fund') {
         for (const other of db.accounts) {
@@ -479,7 +528,7 @@ export const handlers = [
       account.role = body.role ?? null;
     }
     if ('is_active' in body) account.is_active = body.is_active;
-    return HttpResponse.json(account);
+    return HttpResponse.json(withCounts(account));
   }),
 
   http.get(apiUrl('/transactions'), ({ request }) =>
@@ -610,8 +659,36 @@ export const handlers = [
     const detail: DocumentDetail = {
       ...withReadAgain(document),
       proposal: reviewable ? (db.proposals.get(document.id) ?? null) : null,
+      review: reviewable ? (db.reviews.get(document.id) ?? null) : null,
+      // What was confirmed from it (spec 005 rule 22h), superseded or not.
+      pay_stub:
+        document.status === 'confirmed'
+          ? (db.payStubs.find((s) => s.document_id === document.id) ?? null)
+          : null,
+      plans: planningDb.benefitsPlans.filter((p) => p.document_id === document.id),
     };
     return HttpResponse.json(detail);
+  }),
+
+  http.put<{ id: string }, ReviewDraft>(apiUrl('/docs/:id/review'), async ({ params, request }) => {
+    const document = db.documents.find((d) => d.id === params.id);
+    if (!document) return notFound('Document not found');
+    if (document.replaced_by_id !== null) return appError(409, REPLACED.code, REPLACED.message);
+    if (document.status === 'confirmed') {
+      return appError(409, 'document_confirmed', 'This document is already confirmed');
+    }
+    if (document.type === 'offer_letter') {
+      return appError(
+        422,
+        'wrong_document_type',
+        'This is an offer letter, which has nothing to review',
+      );
+    }
+    if (document.status !== 'proposed' && document.status !== 'manual_entry_required') {
+      return appError(409, 'document_not_ready', 'This document has not been read yet');
+    }
+    db.reviews.set(document.id, await request.json());
+    return new HttpResponse(null, { status: 204 });
   }),
 
   http.post<{ id: string }>(apiUrl('/docs/:id/extract'), ({ params }) => {
@@ -639,6 +716,7 @@ export const handlers = [
       finishExtraction(document.id),
     );
     Object.assign(document, { status: 'extracting', status_reason: null });
+    db.reviews.delete(document.id);
     return HttpResponse.json({ job_id: jobId }, { status: 202 });
   }),
 
@@ -687,10 +765,13 @@ export const handlers = [
     });
     db.payStubs.unshift(stub);
     db.proposals.delete(document.id);
+    db.reviews.delete(document.id);
     Object.assign(document, {
       status: 'confirmed',
       confirmed_at: SAMPLE_NOW,
       deleted_at: SAMPLE_NOW,
+      employer_name: stub.employer_name,
+      pay_date: stub.pay_date,
     });
     const confirmed: Confirmed = { document, pay_stub: stub, plans: [], profile_updated: false };
     return HttpResponse.json(confirmed);
@@ -708,6 +789,11 @@ export const handlers = [
 
   http.put<never, ProfileIn>(apiUrl('/profile'), async ({ request }) => {
     const body = await request.json();
+    const salary = body.salary_cents ?? null;
+    const stubId = body.salary_pay_stub_id ?? null;
+    if (stubId !== null && !db.payStubs.some((stub) => stub.id === stubId)) {
+      return notFound('Pay stub not found');
+    }
     db.profile = {
       birth_year: body.birth_year ?? null,
       dependents: body.dependents ?? 0,
@@ -719,7 +805,9 @@ export const handlers = [
       })),
       other_jobs: body.other_jobs ?? [],
       pay_frequency: body.pay_frequency ?? null,
-      salary_cents: body.salary_cents ?? null,
+      salary_cents: salary,
+      salary_pay_stub_id: stubId,
+      salary_review: salaryReviewAfter(db.profile.salary_review, salary, stubId),
       start_date: body.start_date ?? null,
       updated_at: SAMPLE_NOW,
       vesting_years: body.vesting_years ?? null,

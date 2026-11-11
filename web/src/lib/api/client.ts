@@ -5,6 +5,7 @@ import { signInRoute } from '@/lib/routes';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { createAuthMiddleware, createSessionTokens } from './auth-middleware';
 import { API_BASE_URL } from './base-url';
+import { sessionStatus } from './session-status';
 import type { paths } from './schema';
 
 /** Typed fetch client over the generated OpenAPI schema. */
@@ -26,6 +27,8 @@ export const sessionTokens = createSessionTokens({
     hardNavigate(signInRoute({ next: `${window.location.pathname}${window.location.search}` })),
   // Nothing to return to: the sign-in screen says the account and its data were deleted.
   onAccountDeleted: () => hardNavigate(signInRoute({ deleted: true })),
+  // A read that timed out shows SessionProblemNotice until one answers (issue 225).
+  onSessionReadable: sessionStatus.report,
 });
 
 // Bearer token on every request; one refresh and retry on 401, then sign in again;

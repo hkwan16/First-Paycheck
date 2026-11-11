@@ -263,8 +263,8 @@ const SURFACES: readonly Surface[] = [
     act: async (user) => {
       await chaseLoaded();
       const checking = screen.getByRole('group', { name: 'Chase Total Checking' });
-      await user.selectOptions(within(checking).getByRole('combobox', { name: 'Role' }), [
-        'Retirement',
+      await user.selectOptions(within(checking).getByRole('combobox', { name: /^Role for/ }), [
+        'Emergency fund',
       ]);
     },
     lead: 'Could not save the role.',
@@ -287,7 +287,7 @@ const SURFACES: readonly Surface[] = [
     ui: () => <RecurringCard />,
     act: async (user) => {
       const [row] = await screen.findAllByRole('listitem', { name: /Spotify/ });
-      await user.click(within(row!).getByRole('button', { name: 'Not recurring' }));
+      await user.click(within(row!).getByRole('button', { name: 'Not recurring: Spotify' }));
     },
     lead: 'Could not save Spotify.',
   },

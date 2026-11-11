@@ -29,7 +29,7 @@ class JobOut(BaseModel):
     finished_at: UtcDateTime | None
 
 
-@router.get("/{job_id}", responses=error_responses(401, 404, 422))
+@router.get("/{job_id}", responses=error_responses(401, 404))
 def get_job(job_id: uuid.UUID, session: UserSession) -> JobOut:
     """One of the user's jobs."""
     job = session.get(Job, job_id)

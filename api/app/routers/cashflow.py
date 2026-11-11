@@ -2,8 +2,9 @@
 
 Stage 1 (gross pay to deductions and take-home) comes from the confirmed pay
 stubs through the pure ``calc.cashflow.withholding``; stages 2 and 3 (take-home
-to buckets to categories) are the spending summary of the same period. The
-client draws; it never adds.
+to buckets to categories) are the spending summary of the same period, and
+``calc.cashflow.diagram`` turns both into every node and band the diagram
+draws (rule 5b). The client draws; it never adds.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.deps import Now, UserSession
 from app.errors import error_responses
 from app.routers.spending import SpendingSummary, period, summary_for
-from calc.cashflow import StubFlow, withholding
+from calc.cashflow import FlowDiagram, StubFlow, diagram, withholding
 from calc.pay_stub import PayStubAmounts
 from db.models import PayStub
 from db.pay_stubs import current_pay_stubs
@@ -46,6 +47,8 @@ class CashFlow(BaseModel):
     withholding: WithholdingTotal
     # Exactly what GET /spending/summary returns for the same period.
     spending: SpendingSummary
+    # Every node and band the diagram draws (spec 010 rule 5b).
+    diagram: FlowDiagram
 
 
 def _amounts(stub: PayStub) -> PayStubAmounts:
@@ -85,6 +88,7 @@ def cash_flow_for(session: Session, first: dt.date, last: dt.date) -> CashFlow:
         )
     )
     flow = withholding([_amounts(stub) for stub in stubs])
+    spending = summary_for(session, first, last)
     return CashFlow(
         start=first,
         end=last,
@@ -93,5 +97,11 @@ def cash_flow_for(session: Session, first: dt.date, last: dt.date) -> CashFlow:
             for stub, one in zip(stubs, flow.stubs, strict=True)
         ],
         withholding=WithholdingTotal(paycheck_count=flow.paycheck_count, **flow.total.model_dump()),
-        spending=summary_for(session, first, last),
+        spending=spending,
+        diagram=diagram(
+            flow,
+            income_cents=spending.income_cents,
+            left_over_cents=spending.left_over_cents,
+            categories=spending.categories,
+        ),
     )

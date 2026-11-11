@@ -1,7 +1,8 @@
 """Seeded generator for ``evals/fixtures/transactions.csv``: 500 synthetic,
 labeled bank transactions for the categorization suites, then 15 written by
 hand for direction (spec 003 rules 3a-3b and 5a), 13 for merchant names
-(rule 3d) and 6 for the prompt's definitions (rule 9b).
+(rule 3d), 6 for the prompt's definitions (rule 9b) and 6 for budgeting apps
+(rule 9c).
 
 Merchant descriptions mimic what banks send (store numbers, processor
 prefixes, cities, reference codes). Most merchants are ones the seed rules
@@ -17,8 +18,11 @@ directions, and two refunds, whose true label is their spending category.
 The ``NAME_CASES`` (ids 516-528) follow: businesses whose names begin with an
 ordinary word a seed rule names a merchant by (``spectrum health``,
 ``adobe grill``), and the bare descriptors the narrowed rules still label.
-The ``DEFINITION_CASES`` (ids 529-534) close the file: warehouse clubs and
-card payments no seed rule names, tax preparation, and the IRS refund deposit.
+The ``DEFINITION_CASES`` (ids 529-534) follow: warehouse clubs and card
+payments no seed rule names, tax preparation, and the IRS refund deposit.
+The ``BUDGETING_CASES`` (ids 535-540) close the file: one charge from each
+budgeting app the seed rules name, a subscription and never savings (issue
+#226: Rocket Money's $21.54 was guessed a savings transfer).
 
     uv run python -m evals.gen.transactions      # rewrite the committed CSV
 
@@ -214,6 +218,15 @@ DEFINITION_CASES: list[tuple[str, int, dt.date, str]] = [
     ("IRS TREAS 310 TAX REF", -118_000, dt.date(2026, 8, 28), "income"),
 ]
 
+BUDGETING_CASES: list[tuple[str, int, dt.date, str]] = [
+    ("Rocket Money", 2_154, dt.date(2026, 10, 28), "subscriptions"),
+    ("TRUEBILL *PREMIUM", 1_200, dt.date(2026, 8, 3), "subscriptions"),
+    ("YNAB", 1_499, dt.date(2026, 9, 15), "subscriptions"),
+    ("MONARCH MONEY", 1_499, dt.date(2026, 10, 2), "subscriptions"),
+    ("COPILOT MONEY", 1_300, dt.date(2026, 9, 21), "subscriptions"),
+    ("SIMPLIFI BY QUICKEN", 599, dt.date(2026, 8, 19), "subscriptions"),
+]
+
 
 def _fill(template: str, rng: random.Random) -> str:
     ref = "".join(rng.choices(string.ascii_uppercase, k=2)) + str(rng.randint(10, 9999))
@@ -236,7 +249,7 @@ def generate(seed: int = SEED, rows: int = ROWS) -> list[Row]:
             )
         )
     for index, (merchant_raw, amount_cents, posted_at, category) in enumerate(
-        [*SIGN_CASES, *NAME_CASES, *DEFINITION_CASES], start=rows + 1
+        [*SIGN_CASES, *NAME_CASES, *DEFINITION_CASES, *BUDGETING_CASES], start=rows + 1
     ):
         generated.append(Row(index, merchant_raw, amount_cents, posted_at, category))
     return generated
