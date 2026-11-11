@@ -37,9 +37,13 @@ __all__ = [
     "K401MatchResult",
     "MatchTier",
     "PayPeriods",
+    "RateChange",
+    "RateCosts",
     "cumulative_bounds",
     "deferral_limit_cents",
     "k401_match",
+    "rate_change",
+    "rate_costs",
     "tiers_ascending",
     "tiers_from_bands",
 ]
@@ -181,6 +185,81 @@ def _match(tiers: Sequence[MatchTier], match_base: Decimal, deferral: Decimal) -
     return total
 
 
+class RateChange(BaseModel):
+    """What moving from another rate to the chosen one takes from each paycheck
+    (spec 006 rule 15). Signed: positive when the chosen rate takes more, negative
+    when it takes less (take-home pay goes up)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    per_paycheck_cents: int
+    per_paycheck_after_tax_cents: int
+
+
+def _deferral(salary: Decimal, pct: Decimal, limit: int) -> Decimal:
+    """``E(p)`` of rule 3: the yearly deferral at ``pct``, at most the limit."""
+    return min(pct_of(salary, pct), Decimal(limit))
+
+
+def _chosen_rate(data: K401MatchInput, current: Decimal) -> Decimal:
+    """Rule 9: the marginal rate at the chosen contribution ``current``."""
+    year = tax_year(data.tax_year)
+    taxable = (
+        Decimal(data.salary_cents) - current - year.standard_deduction.cents[data.filing_status]
+    )
+    return marginal_rate(year, data.filing_status, taxable)
+
+
+def rate_change(data: K401MatchInput, from_pct: Decimal) -> RateChange:
+    """Rule 15: ``E(c) - E(from_pct)`` per paycheck, before tax and after federal
+    income tax at the rule 9 rate of the chosen contribution."""
+    year = tax_year(data.tax_year)
+    with localcontext(CONTEXT):
+        salary = Decimal(data.salary_cents)
+        limit = deferral_limit_cents(year.k401, data.age)
+        current = _deferral(salary, data.contribution_pct, limit)
+        difference = current - _deferral(salary, from_pct, limit)
+        rate = _chosen_rate(data, current)
+        periods = data.pay_periods_per_year
+        return RateChange(
+            per_paycheck_cents=round_half_up(per_period(difference, periods)),
+            per_paycheck_after_tax_cents=round_half_up(
+                per_period(difference * (1 - rate / _HUNDRED), periods)
+            ),
+        )
+
+
+class RateCosts(BaseModel):
+    """The costs an explanation states beside the decision's own result (spec 008
+    rule 7c): the chosen rate against the stub's, and the part of it above the
+    full-match rate. None where the move does not apply or changes nothing per
+    paycheck, so no cost given is zero."""
+
+    model_config = ConfigDict(frozen=True)
+
+    against_stub: RateChange | None
+    above_full_match: RateChange | None
+
+
+def _nonzero(change: RateChange) -> RateChange | None:
+    # Two rates that both reach the limit put in the same over the year.
+    return change if change.per_paycheck_cents else None
+
+
+def rate_costs(data: K401MatchInput, pay_stub_pct: Decimal | None) -> RateCosts:
+    """``rate_change`` against ``pay_stub_pct`` (None without a stub; the same rate,
+    compared by value, has no move) and against the full-match rate when the
+    chosen rate is above it."""
+    against_stub = None
+    if pay_stub_pct is not None and pay_stub_pct != data.contribution_pct:
+        against_stub = _nonzero(rate_change(data, pay_stub_pct))
+    full_pct = max((tier.employee_pct_upto for tier in data.match_tiers), default=None)
+    above = None
+    if full_pct is not None and data.contribution_pct > full_pct:
+        above = _nonzero(rate_change(data, full_pct))
+    return RateCosts(against_stub=against_stub, above_full_match=above)
+
+
 def k401_match(data: K401MatchInput) -> K401MatchResult:
     year = tax_year(data.tax_year)
     with localcontext(CONTEXT):
@@ -190,8 +269,8 @@ def k401_match(data: K401MatchInput) -> K401MatchResult:
 
         requested = pct_of(salary, data.contribution_pct)
         capped = requested > limit
-        current = min(requested, Decimal(limit))
-        full = min(pct_of(salary, full_pct), Decimal(limit))
+        current = _deferral(salary, data.contribution_pct, limit)
+        full = _deferral(salary, full_pct, limit)
 
         compensation_limit = year.k401.compensation_limit_cents
         compensation_capped = data.salary_cents > compensation_limit
@@ -200,8 +279,7 @@ def k401_match(data: K401MatchInput) -> K401MatchResult:
         match_full = round_half_up(_match(data.match_tiers, match_base, full))
 
         delta = max(_ZERO, full - current)
-        taxable = salary - current - year.standard_deduction.cents[data.filing_status]
-        rate = marginal_rate(year, data.filing_status, taxable)
+        rate = _chosen_rate(data, current)
         periods = data.pay_periods_per_year
         after_tax = per_period(delta * (1 - rate / _HUNDRED), periods)
 

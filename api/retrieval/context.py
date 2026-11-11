@@ -17,12 +17,12 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import Any
 
 from calc.health_plans import HealthPlansInput, HealthPlansResult
-from calc.k401 import K401MatchInput, K401MatchResult
+from calc.k401 import K401MatchInput, K401MatchResult, RateChange, RateCosts, rate_costs
 from calc.pay_stub import StubRate, StubWithholding, stub_rate, stub_withholding
 from calc.w4 import AtWithholding, W4Input, W4Result, at_withholding
 from db.enums import CalculatorKind
@@ -35,19 +35,22 @@ from verify.format import dollars, net_cost, percent
 from verify.numbers import extract_numbers
 
 __all__ = [
+    "ABOVE_FULL_MATCH_NOTE",
     "BENEFITS_PASSAGES",
     "BENEFITS_QUERIES",
+    "FULL_MATCH_EARNED_NOTE",
+    "LIMIT_BEFORE_FULL_MATCH_NOTE",
     "W4_NO_STUB_NOTE",
     "W4_STUB_DIFFERS_NOTE",
     "W4_STUB_SAME_NOTE",
     "ExplainSetup",
     "context_digest",
+    "context_numbers",
     "explain_context",
     "explain_setup",
     "health_notes",
     "k401_notes",
     "name_numbers",
-    "pay_stub_numbers",
     "w4_notes",
 ]
 
@@ -71,6 +74,19 @@ COMPENSATION_NOTE = (
     " on pay up to that limit."
 )
 NO_MATCH_NOTE = "The plan has no employer match."
+# Spec 008 rule 7c: why there is no cost of reaching the full match, and what
+# the part above it is. No digits, and no cost said to be zero.
+FULL_MATCH_EARNED_NOTE = (
+    "The rate chosen earns the whole match, so it needs no raise to reach the full match."
+)
+LIMIT_BEFORE_FULL_MATCH_NOTE = (
+    "The rate chosen reaches the yearly contribution limit before the full-match rate would, so"
+    " a higher rate would put in no more over the year and earn no more match."
+)
+ABOVE_FULL_MATCH_NOTE = (
+    "The rate chosen is above the full-match rate: the part above it earns no match but still"
+    " comes out of each paycheck."
+)
 # Spec 008 rule 7a: what the newest confirmed pay stub says about the chosen
 # rate. No digits, so a draft that repeats a note adds no number.
 STUB_SAME_NOTE = (
@@ -95,10 +111,21 @@ STUB_NOTES: dict[StubRate, str] = {
 }
 
 
-def k401_notes(result: K401MatchResult, *, has_match: bool) -> list[str]:
+def k401_notes(data: K401MatchInput, result: K401MatchResult, costs: RateCosts) -> list[str]:
+    """The situation after the stub note: no match; why there is no cost of
+    reaching the full match, and the part above it (rule 7c); the limits."""
     notes = []
-    if not has_match:
+    if not data.match_tiers:
         notes.append(NO_MATCH_NOTE)
+    elif result.per_paycheck_cost_delta_cents == 0:
+        if data.contribution_pct >= result.full_match_pct:
+            notes.append(FULL_MATCH_EARNED_NOTE)
+        elif result.capped:
+            notes.append(LIMIT_BEFORE_FULL_MATCH_NOTE)
+        # Else the cost of reaching the match rounds to under half a cent a
+        # paycheck: there is nothing to price and nothing to explain.
+    if costs.above_full_match is not None:
+        notes.append(ABOVE_FULL_MATCH_NOTE)
     if result.capped:
         notes.append(CAPPED_NOTE)
     if result.compensation_capped:
@@ -106,7 +133,7 @@ def k401_notes(result: K401MatchResult, *, has_match: bool) -> list[str]:
     return notes
 
 
-def pay_stub_numbers(
+def context_numbers(
     calculator: str,
     inputs: Mapping[str, Any],
     result: Mapping[str, Any],
@@ -114,13 +141,27 @@ def pay_stub_numbers(
     pay_stub_pct: Decimal | None = None,
     pay_stub_withholding_cents: int | None = None,
 ) -> dict[str, Any]:
-    """What the pay stub adds to a decision's figures, keyed for
+    """What the context adds to a decision's own figures, keyed for
     ``AllowedNumbers.from_decision`` (spec 008 rule 12): a 401(k) decision's stub
-    rate under a ``_pct`` key, read as a percentage (rule 7a); a W-4 decision's
-    stub withholding and the year's withholding and refund at it under ``_cents``
-    keys, read as money (rule 7b)."""
-    if calculator == CalculatorKind.K401_MATCH and pay_stub_pct is not None:
-        return {"pay_stub_contribution_pct": str(pay_stub_pct)}
+    rate under a ``_pct`` key, read as a percentage (rule 7a), and the costs of
+    rule 7c under ``_cents`` keys; a W-4 decision's stub withholding and the
+    year's withholding and refund at it under ``_cents`` keys, read as money
+    (rule 7b)."""
+    if calculator == CalculatorKind.K401_MATCH:
+        costs = rate_costs(K401MatchInput.model_validate(inputs), pay_stub_pct)
+        numbers: dict[str, Any] = {}
+        if pay_stub_pct is not None:
+            numbers["pay_stub_contribution_pct"] = str(pay_stub_pct)
+        for prefix, change in (
+            ("pay_stub_change", costs.against_stub),
+            ("above_full_match", costs.above_full_match),
+        ):
+            if change is not None:
+                numbers[f"{prefix}_per_paycheck_cents"] = change.per_paycheck_cents
+                numbers[f"{prefix}_per_paycheck_after_tax_cents"] = (
+                    change.per_paycheck_after_tax_cents
+                )
+        return numbers
     if calculator == CalculatorKind.W4 and pay_stub_withholding_cents is not None:
         at = at_withholding(
             W4Input.model_validate(inputs),
@@ -135,8 +176,31 @@ def pay_stub_numbers(
     return {}
 
 
+AGAINST_STUB = "at the rate you chose than at the rate your latest pay stub shows"
+TO_FULL_MATCH = "to raise the rate you chose to the full-match rate"
+
+
+def _change_facts(change: RateChange, before: str, after: str) -> list[ExplainFact]:
+    """A move's cost per paycheck before tax and its effect on take-home pay after
+    federal income tax, each named by direction and the move it prices (rule 7c)."""
+    more = change.per_paycheck_cents > 0
+    return [
+        ExplainFact(
+            label=f"{'More' if more else 'Less'} taken per paycheck before tax {before}",
+            value=dollars(abs(change.per_paycheck_cents)),
+        ),
+        ExplainFact(
+            label=(
+                f"{'Less' if more else 'More'} take-home pay per paycheck after federal income"
+                f" tax {after}"
+            ),
+            value=dollars(abs(change.per_paycheck_after_tax_cents)),
+        ),
+    ]
+
+
 def _k401_facts(
-    data: K401MatchInput, result: K401MatchResult, pay_stub_pct: Decimal | None
+    data: K401MatchInput, result: K401MatchResult, pay_stub_pct: Decimal | None, costs: RateCosts
 ) -> list[ExplainFact]:
     def fact(label: str, value: str) -> ExplainFact:
         return ExplainFact(label=label, value=value)
@@ -146,6 +210,8 @@ def _k401_facts(
         facts.append(
             fact("401(k) contribution rate your latest pay stub shows", percent(pay_stub_pct))
         )
+    if costs.against_stub is not None:
+        facts += _change_facts(costs.against_stub, AGAINST_STUB, AGAINST_STUB)
     if data.match_tiers:
         facts += [
             fact("Contribution rate that earns the full match", percent(result.full_match_pct)),
@@ -158,17 +224,31 @@ def _k401_facts(
                 dollars(result.employer_match_cents_full),
             ),
             fact("Match you miss per year at the rate you chose", dollars(result.missed_cents)),
-            fact(
-                "Extra per paycheck before tax at the full-match rate",
-                dollars(result.per_paycheck_cost_delta_cents),
-            ),
-            fact(
-                "Extra per paycheck after federal income tax",
-                dollars(result.per_paycheck_after_tax_cost_cents),
-            ),
         ]
+        # The extra needed to reach the match is a fact only when there is one:
+        # at or above it, it is zero and says nothing about the rate chosen.
+        if result.per_paycheck_cost_delta_cents > 0:
+            facts += [
+                fact(
+                    f"More taken per paycheck before tax {TO_FULL_MATCH}",
+                    dollars(result.per_paycheck_cost_delta_cents),
+                ),
+                fact(
+                    f"Less take-home pay per paycheck after federal income tax {TO_FULL_MATCH}",
+                    dollars(result.per_paycheck_after_tax_cost_cents),
+                ),
+            ]
+        if costs.above_full_match is not None:
+            facts += _change_facts(
+                costs.above_full_match,
+                "by the part of the rate you chose above the full-match rate",
+                "from the part of the rate you chose above the full-match rate",
+            )
     facts += [
-        fact("Federal marginal tax rate used", percent(result.marginal_rate_used)),
+        fact(
+            "Federal marginal income tax rate the after-tax figures use",
+            percent(result.marginal_rate_used),
+        ),
         fact(
             "Your yearly contribution at the rate you chose",
             dollars(result.employee_annual_cents_current),
@@ -644,13 +724,14 @@ def explain_context(
         raise ValueError(f"no explanation context for calculator {calculator!r} yet")
     data = K401MatchInput.model_validate(inputs)
     computed = K401MatchResult.model_validate(result)
+    costs = rate_costs(data, pay_stub_pct)
     return ExplainContext(
         calculator=calculator,
         tax_year=data.tax_year,
-        facts=_k401_facts(data, computed, pay_stub_pct),
+        facts=_k401_facts(data, computed, pay_stub_pct, costs),
         notes=[
             STUB_NOTES[stub_rate(data.contribution_pct, pay_stub_pct)],
-            *k401_notes(computed, has_match=bool(data.match_tiers)),
+            *k401_notes(data, computed, costs),
         ],
         citations=[
             ExplainCitation(key=c.key, title=c.title, passage=c.passage)
@@ -705,6 +786,18 @@ def explain_setup(
     the newest stub: its 401(k) rate (rule 7a) and what it withholds each
     paycheck on the decision's pay schedule (rule 7b)."""
     keys = frozenset(citation.key for citation in citations)
+    allowed = AllowedNumbers.from_decision(
+        inputs,
+        result,
+        name_numbers(calculator, inputs),
+        context_numbers(
+            calculator,
+            inputs,
+            result,
+            pay_stub_pct=pay_stub_pct,
+            pay_stub_withholding_cents=pay_stub_withholding_cents,
+        ),
+    )
     return ExplainSetup(
         context=explain_context(
             calculator,
@@ -715,18 +808,8 @@ def explain_setup(
             pay_stub_pct=pay_stub_pct,
             pay_stub_withholding_cents=pay_stub_withholding_cents,
         ),
-        allowed_numbers=AllowedNumbers.from_decision(
-            inputs,
-            result,
-            name_numbers(calculator, inputs),
-            pay_stub_numbers(
-                calculator,
-                inputs,
-                result,
-                pay_stub_pct=pay_stub_pct,
-                pay_stub_withholding_cents=pay_stub_withholding_cents,
-            ),
-        ),
+        # Rule 14a: no 401(k) cost the context gives is zero (rule 7c).
+        allowed_numbers=replace(allowed, zero_cost=calculator != CalculatorKind.K401_MATCH),
         citation_keys=keys,
         fallback=fallback_draft(
             calculator,

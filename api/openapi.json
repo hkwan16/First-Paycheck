@@ -6361,6 +6361,13 @@
             },
             "title": "Numbers Unmatched",
             "type": "array"
+          },
+          "zero_cost_claims": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Zero Cost Claims",
+            "type": "array"
           }
         },
         "required": [

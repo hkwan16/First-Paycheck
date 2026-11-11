@@ -40,8 +40,8 @@ def fake() -> FakeGateway:
 def test_the_decisions_cover_the_interesting_cases() -> None:
     decisions = explain.load_decisions()
     # At least 25, so one flaky draft moves a metric by under 4 points (2 tolerated).
-    assert len(decisions) == 29
-    assert len({decision.id for decision in decisions}) == 29
+    assert len(decisions) == 31
+    assert len({decision.id for decision in decisions}) == 31
     results = [decision.result for decision in decisions]
     assert any(result["capped"] for result in results)
     assert any(result["compensation_capped"] for result in results)
@@ -63,7 +63,7 @@ def test_the_decisions_cover_the_pay_stub_rate() -> None:
 
     differs = [d for d in decisions if d.pay_stub_pct is not None and d.pay_stub_pct != chosen(d)]
     same = [d for d in decisions if d.pay_stub_pct is not None and d.pay_stub_pct == chosen(d)]
-    assert len(differs) == 14
+    assert len(differs) == 16
     assert len(same) == 11
     assert len([d for d in decisions if d.pay_stub_pct is None]) == 4
     # Raised, lowered, from nothing, to nothing, uneven, and over the full match.
@@ -77,6 +77,15 @@ def test_the_decisions_cover_the_pay_stub_rate() -> None:
     assert (issue.pay_stub_pct, issue.inputs["contribution_pct"]) == (Decimal("3.00"), "5.00")
     assert issue.inputs["salary_cents"] == 9_500_010
     assert issue.result["missed_cents"] == 0
+    # Issue 223: above the full match, where reaching it costs nothing, and at it.
+    above, at = (
+        next(d for d in decisions if d.id == f"issue-223-{case}-full-match")
+        for case in ("above", "at")
+    )
+    for decision, rate in ((above, "6.00"), (at, "5.00")):
+        assert (decision.pay_stub_pct, decision.inputs["contribution_pct"]) == (Decimal(0), rate)
+        assert decision.inputs["pay_periods_per_year"] == 24
+        assert decision.result["per_paycheck_cost_delta_cents"] == 0
 
 
 def test_the_stub_rate_reaches_the_model() -> None:
@@ -111,8 +120,10 @@ def judge_lines(failures: list[str]) -> list[str]:
 
 def test_fake_drafts_verify_for_every_decision() -> None:
     result = explain.score(explain.load_decisions(), fake(), fake(), NO_CALIBRATION)
-    # The fake states the facts as given, with cents, so only whole_dollars misses:
-    # 2 of the 29 decisions state no amount of $100 or more among the fake's facts.
+    # The fake states the first facts as given, with cents, so only whole_dollars
+    # misses: 17 of the 31 decisions state no amount of $100 or more among them but
+    # an amount per paycheck (the 16 whose stub shows another rate begin with what
+    # the rate chosen costs per paycheck against it, rule 7c).
     assert result.metrics == {
         "first_try_verified": 1.0,
         "no_fallback": 1.0,
@@ -120,9 +131,9 @@ def test_fake_drafts_verify_for_every_decision() -> None:
         "rate_framing": 1.0,
         "judge_accuracy": 1.0,
         "concise": 1.0,
-        "whole_dollars": pytest.approx(2 / 29),
+        "whole_dollars": pytest.approx(17 / 31),
     }
-    assert len(result.failures) == 27
+    assert len(result.failures) == 14
     assert all(": cents on $100 or more: " in line for line in result.failures)
 
 
@@ -216,13 +227,13 @@ class Fails:
 def test_rate_framing_is_the_judges_verdict_on_the_scored_decisions() -> None:
     decisions = explain.load_decisions()
     scored = [d for d in decisions if explain.frames_rate_scored(d)]
-    assert len(scored) == 18
+    assert len(scored) == 20
     judge = FlagsSentences(CLAIM)
     result = explain.score(decisions, Claims(), judge, NO_CALIBRATION)
     assert result.metrics["first_try_verified"] == 1.0
     assert result.metrics["rate_framing"] == 0.0
     # The judge reads only the 18 scored decisions, each with its own rates.
-    assert len(judge.requests) == 18
+    assert len(judge.requests) == 20
     [issue] = [r for r, d in zip(judge.requests, scored, strict=True) if d.id == ISSUE_132]
     assert (issue.chosen_rate, issue.pay_stub_rate, issue.full_match_rate) == ("5%", "3%", "5%")
     assert issue.draft == ClaimDraft(
@@ -398,17 +409,17 @@ def test_judge_accuracy_is_the_share_of_labels_the_judge_matches() -> None:
 
 def test_one_case_is_a_decision_and_the_judged_metrics_count_only_their_own() -> None:
     """evals/CLAUDE.md: a metric tolerates one case's worth. rate_framing is a
-    share of the 18 decisions it scores, not of all 29, so one is worth 1/18;
+    share of the 20 decisions it scores, not of all 31, so one is worth 1/20;
     judge_accuracy is a share of the calibration items."""
     items = explain.load_rate_claims()
     result = explain.score(explain.load_decisions(), fake(), fake(), items)
-    assert result.cases == 29
+    assert result.cases == 31
     assert result.case_worth == {
-        "rate_framing": pytest.approx(1 / 18),
+        "rate_framing": pytest.approx(1 / 20),
         "judge_accuracy": pytest.approx(1 / len(items)),
-        # Every final row is a draft here, so one is worth 1/29 (rule 24f).
-        "concise": pytest.approx(1 / 29),
-        "whole_dollars": pytest.approx(1 / 29),
+        # Every final row is a draft here, so one is worth 1/31 (rule 24f).
+        "concise": pytest.approx(1 / 31),
+        "whole_dollars": pytest.approx(1 / 31),
     }
 
 
@@ -444,8 +455,8 @@ def test_the_live_suite_drafts_and_judges_through_one_gateway(
     assert result.cost_cents == 0
     [ledger] = ledgers
     versions = [entry.prompt_version for entry in ledger.entries]
-    assert versions.count("explain/v4") == 29
-    assert versions.count("judge_rate_claim/v1") == 18 + len(items)
+    assert versions.count("explain/v5") == 31
+    assert versions.count("judge_rate_claim/v1") == 20 + len(items)
 
 
 def test_w4_smoke_decision_is_spec_014_example_9() -> None:
@@ -473,12 +484,14 @@ def test_w4_smoke_decision_is_spec_014_example_9() -> None:
 def test_smoke_passes() -> None:
     result = explain_smoke.run(Budget(0))
     assert result.metrics == {"flow_correct": 1.0}
-    assert result.cases == 8
+    assert result.cases == 10
     assert {scenario.calculator for scenario in explain_smoke.SCENARIOS} == {"k401_match", "w4"}
     assert {scenario.decision_id for scenario in explain_smoke.SCENARIOS} == {
         None,
         "issue-132-stub-01-chose-full-match",
         "issue-181-stub-01",
+        "issue-223-above-full-match",
+        "issue-223-at-full-match",
     }
     assert result.failures == []
     assert result.cost_cents == 0

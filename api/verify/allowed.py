@@ -45,6 +45,9 @@ class AllowedNumbers:
     money_whole: frozenset[Decimal]
     percents: frozenset[Decimal]
     plain: frozenset[Decimal]
+    # Whether a draft may say a cost is zero (rule 14a): false for a 401(k)
+    # decision, whose context never gives a zero cost (rule 7c).
+    zero_cost: bool = True
 
     @classmethod
     def from_decision(cls, *documents: Mapping[str, Any]) -> AllowedNumbers:

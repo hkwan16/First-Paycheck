@@ -9,7 +9,7 @@ from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from calc.data import tax_year
-from calc.k401 import K401MatchInput, K401MatchResult, k401_match
+from calc.k401 import K401MatchInput, K401MatchResult, k401_match, rate_change
 
 # Examples per property; tests/support/hypothesis_profiles.py sets the rest.
 EXAMPLES = settings(max_examples=300)
@@ -146,3 +146,47 @@ def test_pure(data: K401MatchInput) -> None:
     second = k401_match(K401MatchInput.model_validate(data.model_dump()))
     assert first == second
     assert first.model_dump() == second.model_dump()
+
+
+# ---------------------------------------------------------------- rule 15 (issue 223)
+
+
+@EXAMPLES
+@given(inputs())
+def test_rate_change_from_the_chosen_rate_is_zero(data: K401MatchInput) -> None:
+    moved = rate_change(data, data.contribution_pct)
+    assert (moved.per_paycheck_cents, moved.per_paycheck_after_tax_cents) == (0, 0)
+
+
+@EXAMPLES
+@given(inputs(), percents(0, 10_000), percents(0, 10_000))
+def test_rate_change_rises_with_the_chosen_rate(
+    data: K401MatchInput, other: Decimal, start: Decimal
+) -> None:
+    low, high = sorted((data.contribution_pct, other))
+    lower = rate_change(with_contribution(data, low), start)
+    higher = rate_change(with_contribution(data, high), start)
+    assert lower.per_paycheck_cents <= higher.per_paycheck_cents
+
+
+@EXAMPLES
+@given(inputs(), percents(0, 10_000))
+def test_rate_change_figures_agree_in_sign_and_size(data: K401MatchInput, start: Decimal) -> None:
+    moved = rate_change(data, start)
+    before, after = moved.per_paycheck_cents, moved.per_paycheck_after_tax_cents
+    assert type(before) is int
+    assert type(after) is int
+    assert before * after >= 0
+    assert abs(after) <= abs(before)
+
+
+@EXAMPLES
+@given(inputs())
+def test_rate_change_from_the_full_match_undoes_the_cost_of_reaching_it(
+    data: K401MatchInput,
+) -> None:
+    result = k401_match(data)
+    assume(data.contribution_pct < result.full_match_pct)
+    moved = rate_change(data, result.full_match_pct)
+    assert moved.per_paycheck_cents == -result.per_paycheck_cost_delta_cents
+    assert moved.per_paycheck_after_tax_cents == -result.per_paycheck_after_tax_cost_cents
