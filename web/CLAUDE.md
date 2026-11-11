@@ -220,8 +220,8 @@ or checked for a phone.
   (`lib/accounts.ts`: its name, else "Imported CSV" or "Linked bank") everywhere: the Link
   group heading, the account's initials tile and the Spending summary (issue 183).
   Documents: `invalidateDocuments` after an upload or extraction, `invalidateAfterConfirm`
-  (documents, pay stubs, benefits plans, the profile, the plan and the decisions, whose `review` a
-  new stub can change) after a confirm. Decisions: `invalidateDecisions` (the list and every
+  (documents, pay stubs, benefits plans, the profile, the Spending months, the plan and the
+  decisions, whose `review` a new stub can change) after a confirm. Decisions: `invalidateDecisions` (the list and every
   `GET /decisions/{id}`) and `invalidateAfterDecision` (also calendar, plan and goals) after a save.
   `useUpdateProfile` writes the saved profile into its cache and then `invalidateAfterProfile`
   (the decisions and the plan): a decision's `review` reads the profile.
@@ -291,7 +291,10 @@ or checked for a phone.
   while another loads (`keepPreviousData`). `useSpendingSummary(period?)` is the summary alone
   (setup progress reads it). A `Period` is `{ start, end }`; `null` sends no dates and the API
   reads the last complete UTC month. `lib/periods.ts` builds the picker's options from
-  `useToday()` (null on the server, so nothing reads the clock while rendering).
+  `useToday()` (null on the server, so nothing reads the clock while rendering), keeping only the
+  months `useSpendingMonths()` (`GET /spending/months`: a posted row on a counted account or a
+  confirmed pay stub) lists (`optionsWithin`, spec 010 rule 5d). The picker is disabled until the
+  months arrive, offers all six if they cannot be read, and always offers the period shown.
   The Transactions card and the diagram's category popovers list the period the summary shows
   (spec 003 rule 17a): `useTransactions(periodFilters(period))`, the chosen period or the dates
   `GET /cashflow` answered its default with (nothing until then; `NEWEST_SPENDING`, no dates,
@@ -367,9 +370,11 @@ or checked for a phone.
   from `src/test/fixtures/sample.ts` and reset after every test, so a refetch after a PATCH reads
   the new value. `emptyDb()` gives a new user; assign `db.transactions` for pagination cases;
   `server.use(...)` overrides one route for an error or a delay.
-- Spending routes (`GET /cashflow`, `GET /spending/summary`, `GET /recurring`,
-  `PATCH /recurring/{id}`) live in `src/test/msw/spending-handlers.ts` over `spendingDb`, seeded
-  from `fixtures/cashflow.ts` and reset after every test.
+- Spending routes (`GET /cashflow`, `GET /spending/summary`, `GET /spending/months`,
+  `GET /recurring`, `PATCH /recurring/{id}`) live in `src/test/msw/spending-handlers.ts` over
+  `spendingDb`, seeded from `fixtures/cashflow.ts` (`spendingDb.months` defaults to
+  `sampleSpendingMonths`, the six months the picker can offer) and reset after every test. Wait
+  for a period's option before picking it: the months can answer after the rows.
 - Check-in routes (`GET /check-ins`, `GET /check-ins/{id}`, `PATCH .../findings/{fid}`,
   `POST /check-ins`, `GET /net-worth`, `GET /holdings`) live in `src/test/msw/checkin-handlers.ts`
   over `checkinDb`, seeded from `fixtures/checkins.ts` (November open with seven findings, October
@@ -882,17 +887,23 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
 `components/sankey` draws `GET /cashflow` as the mockup does: absolutely positioned HTML buttons
 for the amounts over one SVG of cubic bands. Not d3-sankey and not a chart library.
 
-- **Layout** (`layoutCashFlow(flow, containerWidth)`) is pure geometry: four columns (gross pay;
-  withholding lines and take-home; buckets; categories), node heights from a scale fixed by a
-  240 px target for the tallest node (every column stacked from the top, so the diagram is as tall
-  as its tallest column, issue 201): gross pay (income when there is no confirmed stub), or a
-  bucket or category when spending outran that income (the Plaid sandbox deposits $4.22 in a
-  month that spends $1,689.63). No scale, and no badge, without pay or income to draw from. The
-  "1 px is about $N" badge is computed, not hand-tuned. Amounts are placed, never added or
-  re-signed: income is money in only and never negative because the API counts it so (spec 007
-  rule 22a), and "Spent beyond income" is the API's negative `left_over_cents` drawn dashed. A
-  node is as tall as its own value or the bands leaving it, whichever is more. Colors are
-  `FlowColor` token names.
+- **Layout** (`layoutCashFlow(flow, containerWidth)`) is pure geometry over `GET /cashflow`'s
+  `diagram` (spec 010 rules 5b and 5c, issue 236): the API sends every node (column, kind, key,
+  cents) and every band (source, target, cents), balanced, so the bands into and out of a node
+  add up to its amount. Four columns (gross pay; withholding lines, take-home and the other money
+  that came in: other deposits, refunds, taken out of savings, spent beyond income; buckets, not
+  deposited and left over; categories), every column stacked from the top (issue 201). A node is
+  as tall as its own amount (at least `MIN_NODE_H`, tall enough for its words), never as the
+  bands through it; each band is its cents (at least `MIN_BAND_PX`), stacked along each node in
+  the API's link order. One scale puts the largest node at 240 px, so the "1 px is about $N"
+  badge is computed; there is none only when every node is $0. A bucket with refunds is drawn
+  before them (`refundsCents`; its popover says what the summary counts after them). Hidden: a $0
+  withholding line other than the 401(k) ("401(k), not elected"), and a $0 Other bucket. Nothing
+  is added or re-signed here. The legend is `legendFor(layout)`: one item per color, naming only
+  the groups drawn with an amount, so a period with no stub lists no pay stub group. Colors are
+  `FlowColor` token names. `test/fixtures/cashflow-results.json` holds diagrams made by the API's
+  own calculator (`make-cashflow-results.py`, run like the 401(k) one), and
+  `cashflow-results.test.ts` checks the hand-written fixtures match.
   `hostW = max(880, containerWidth)`; narrower containers scroll sideways. Under 640 px the
   Spending card draws `FlowStack` (stacked bars and lists) instead.
 - **Popover** state is `flowPopoverReducer` (`popover.ts`) through `useFlowPopover`: hover opens
@@ -1003,9 +1014,11 @@ the e2e-only button, follows the sync and sets roles; `spending.spec.ts` (projec
 in the picker that has some, `support/spending.ts`: `user_good`'s rows may all be in the month so
 far, and the list keeps to the summary's period), checks that every period lists only its own
 rows or says it has none, checks that the
-diagram's buckets match the summary tiles (and that the scale badge shows only when there is
-gross pay or income to scale by: the sandbox bank's last month may deposit nothing), drives a node
-from the keyboard, changes the period and saves a category fix; `import.spec.ts` (project `authenticated-import`, after Spending)
+diagram's buckets match the summary tiles (a bucket with refunds through its details) and that
+the scale badge shows whenever a node has an amount, checks every node taller than its words is
+its amount at one scale and the legend names no pay stub group without a stub, checks every month
+the picker offers (other than the one it opened on) has transactions or a pay stub (issue 236),
+drives a node from the keyboard, changes the period and saves a category fix; `import.spec.ts` (project `authenticated-import`, after Spending)
 imports `e2e/fixtures/bank-export.csv` (five synthetic rows) into a new CSV account, imports it
 again without making a second account, imports into another new account and removes it (the panel
 then reports nothing about it), and checks a broken file's row errors.

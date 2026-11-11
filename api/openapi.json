@@ -628,6 +628,9 @@
       },
       "CashFlow": {
         "properties": {
+          "diagram": {
+            "$ref": "#/components/schemas/FlowDiagram"
+          },
           "end": {
             "format": "date",
             "title": "End",
@@ -657,7 +660,8 @@
           "end",
           "pay_stubs",
           "withholding",
-          "spending"
+          "spending",
+          "diagram"
         ],
         "title": "CashFlow",
         "type": "object"
@@ -2338,6 +2342,137 @@
         ],
         "title": "FindingSeverity",
         "type": "string"
+      },
+      "FlowDiagram": {
+        "description": "Every node and band of the cash-flow diagram: the bands into a node and\nthe bands out of it each sum to its ``cents``.",
+        "properties": {
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/FlowLink"
+            },
+            "title": "Links",
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/FlowNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "nodes",
+          "links"
+        ],
+        "title": "FlowDiagram",
+        "type": "object"
+      },
+      "FlowLink": {
+        "properties": {
+          "cents": {
+            "exclusiveMinimum": 0.0,
+            "title": "Cents",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target",
+          "cents"
+        ],
+        "title": "FlowLink",
+        "type": "object"
+      },
+      "FlowNode": {
+        "properties": {
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "cents": {
+            "minimum": 0.0,
+            "title": "Cents",
+            "type": "integer"
+          },
+          "column": {
+            "enum": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "title": "Column",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "kind": {
+            "enum": [
+              "gross",
+              "line",
+              "take_home",
+              "income_deposited",
+              "other_deposits",
+              "refunds",
+              "savings_withdrawn",
+              "beyond_income",
+              "not_deposited",
+              "bucket",
+              "left_over",
+              "category"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "refunds_cents": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refunds Cents"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "key",
+          "column",
+          "cents",
+          "refunds_cents",
+          "categories"
+        ],
+        "title": "FlowNode",
+        "type": "object"
       },
       "GoalKind": {
         "enum": [
@@ -5895,6 +6030,23 @@
         "title": "SourceLine",
         "type": "object"
       },
+      "SpendingMonths": {
+        "properties": {
+          "months": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "title": "Months",
+            "type": "array"
+          }
+        },
+        "required": [
+          "months"
+        ],
+        "title": "SpendingMonths",
+        "type": "object"
+      },
       "SpendingSummary": {
         "properties": {
           "account_kinds_counted": {
@@ -9267,6 +9419,43 @@
         "summary": "Update Recurring",
         "tags": [
           "recurring"
+        ]
+      }
+    },
+    "/spending/months": {
+      "get": {
+        "description": "The months with something to show: the Spending period picker's choices.",
+        "operationId": "spending_months",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpendingMonths"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Spending Months",
+        "tags": [
+          "spending"
         ]
       }
     },

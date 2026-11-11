@@ -598,6 +598,22 @@ def spending_summary(
     return Case("GET", "/spending/summary?start=2026-09-01&end=2026-09-30", 200, body=body)
 
 
+def spending_months(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    account = a_account(connection)
+    make_transaction(connection, USER_A.id, account, posted_at=dt.date(2026, 9, 10))
+    make_pay_stub(
+        connection,
+        USER_A.id,
+        a_document(connection, with_blob=False),
+        pay_date=dt.date(2026, 8, 15),
+    )
+
+    def body(data: Any) -> None:
+        assert data == {"months": []}
+
+    return Case("GET", "/spending/months", 200, body=body)
+
+
 def get_cashflow(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
     account = a_account(connection)
     make_transaction(connection, USER_A.id, account, posted_at=dt.date(2026, 9, 10))
@@ -800,6 +816,7 @@ ROUTE_CASES: dict[tuple[str, str], Builder] = {
     ("GET", "/goals"): list_goals,
     ("PATCH", "/goals/{goal_id}"): update_goal,
     ("GET", "/spending/summary"): spending_summary,
+    ("GET", "/spending/months"): spending_months,
     ("POST", "/docs"): upload_document,
     ("GET", "/docs"): list_documents,
     ("GET", "/docs/{document_id}"): get_document,

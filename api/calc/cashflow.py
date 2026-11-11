@@ -5,6 +5,10 @@ Each confirmed pay stub becomes seven lines in a fixed order, grouped by role
 (tax, retirement, health, other), and the period's lines are summed here so
 the client never adds money. Amounts are the stubs' non-negative magnitudes.
 
+``diagram`` gives the whole diagram (rule 5b): every node's amount and every
+band's, from the period's withholding and spending summary, so what flows into
+a node equals what flows out of it and the client only draws.
+
 ``against_plan`` sets a month's actuals beside the saved decisions' targets
 for the check-in screen (spec 015 rule 19), and ``plan_status`` says which
 side of its plan each line is on (rule 19a).
@@ -20,13 +24,19 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from calc.money import pct_of, round_half_up
 from calc.pay_stub import PayStubAmounts, balance, total_cents
+from calc.spending import Bucket, CategoryTotal
 
 __all__ = [
+    "DIAGRAM_BUCKETS",
     "LINES",
     "PLAN_TOLERANCE_FLOOR_CENTS",
     "PLAN_TOLERANCE_PCT",
     "CashFlowWithholding",
     "DeductionRole",
+    "FlowDiagram",
+    "FlowLink",
+    "FlowNode",
+    "FlowNodeKind",
     "LineSpec",
     "PlanLine",
     "PlanLineKey",
@@ -37,6 +47,7 @@ __all__ = [
     "StubFlow",
     "WithholdingLine",
     "against_plan",
+    "diagram",
     "plan_status",
     "plan_tolerance",
     "withholding",
@@ -158,6 +169,215 @@ def withholding(stubs: Sequence[PayStubAmounts]) -> CashFlowWithholding:
         total_cents(flow.net_cents for flow in flows),
     )
     return CashFlowWithholding(stubs=flows, total=total, paycheck_count=len(flows))
+
+
+# ---------------------------------------------------------------- the diagram (rule 5b)
+
+FlowNodeKind = Literal[
+    "gross",
+    "line",
+    "take_home",
+    "income_deposited",
+    "other_deposits",
+    "refunds",
+    "savings_withdrawn",
+    "beyond_income",
+    "not_deposited",
+    "bucket",
+    "left_over",
+    "category",
+]
+FlowColumn = Literal[0, 1, 2, 3]
+# The buckets the diagram draws, in its order; income and transfers are no node.
+DIAGRAM_BUCKETS: tuple[Bucket, ...] = ("essentials", "flexible", "savings", "other")
+# Money back in a category that nets to money in: savings apart from the rest.
+_MONEY_BACK: tuple[tuple[FlowNodeKind, bool], ...] = (
+    ("refunds", False),
+    ("savings_withdrawn", True),
+)
+Magnitude = Annotated[int, Field(strict=True, ge=0)]
+
+
+class FlowNode(BaseModel):
+    # Every field is always sent, so the schema lists the defaulted ones as required.
+    model_config = ConfigDict(frozen=True, json_schema_serialization_defaults_required=True)
+
+    # Stable: "gross", "line:<key>", "take_home", "bucket:<bucket>", "category:<c>", ...
+    id: str
+    kind: FlowNodeKind
+    # The line, bucket or category the node stands for; None for the others.
+    key: str | None = None
+    column: FlowColumn
+    cents: Magnitude
+    # A bucket: the money in of its categories that net to money in, left out
+    # of ``cents`` (the summary's bucket total is ``cents - refunds_cents``);
+    # None when there is none, and on every other node.
+    refunds_cents: Magnitude | None = None
+    # ``refunds`` and ``savings_withdrawn``: the categories behind the amount.
+    categories: list[str] = Field(default_factory=list)
+
+
+class FlowLink(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    source: str
+    target: str
+    cents: Annotated[int, Field(strict=True, gt=0)]
+
+
+class FlowDiagram(BaseModel):
+    """Every node and band of the cash-flow diagram: the bands into a node and
+    the bands out of it each sum to its ``cents``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    # Column by column, top to bottom, as the diagram draws them.
+    nodes: list[FlowNode]
+    links: list[FlowLink]
+
+
+def _pair(sources: Sequence[FlowNode], uses: Sequence[FlowNode]) -> list[FlowLink]:
+    """Lay the two stacks side by side, in order and of the same height, and
+    make a band of each overlap of a source's slice with a use's."""
+    left = [node for node in sources if node.cents > 0]
+    right = [node for node in uses if node.cents > 0]
+    if total_cents(n.cents for n in left) != total_cents(n.cents for n in right):
+        raise ValueError("the diagram's sources and uses do not balance")
+    rest_in = [node.cents for node in left]
+    rest_out = [node.cents for node in right]
+    bands: list[FlowLink] = []
+    i = j = 0
+    while i < len(left) and j < len(right):
+        cents = min(rest_in[i], rest_out[j])
+        bands.append(FlowLink(source=left[i].id, target=right[j].id, cents=cents))
+        rest_in[i] -= cents
+        rest_out[j] -= cents
+        if rest_in[i] == 0:
+            i += 1
+        if rest_out[j] == 0:
+            j += 1
+    return bands
+
+
+def diagram(
+    flow: CashFlowWithholding,
+    *,
+    income_cents: int,
+    left_over_cents: int,
+    categories: Sequence[CategoryTotal],
+) -> FlowDiagram:
+    """The diagram of one period (spec 010 rule 5b) from its withholding, the
+    summary's deposits and left over, and its category totals.
+
+    The sources of stage 2 are the deposits (take-home and other deposits with
+    a stub), money back in a category that nets to money in, and what was
+    spent beyond all of that; the uses are take-home not deposited, the four
+    buckets (each its categories that net to money out) and what was left.
+    Raises when ``left_over_cents`` is not the deposits less the spending
+    buckets, the summary's own arithmetic.
+    """
+    drawn = [one for one in categories if one.bucket in DIAGRAM_BUCKETS]
+    if left_over_cents != income_cents - total_cents(one.total_cents for one in drawn):
+        raise ValueError("the left over is not the deposits less the spending buckets")
+    total = flow.total
+    stubs = flow.paycheck_count > 0
+
+    lines = (
+        [
+            FlowNode(
+                id=f"line:{line.key}", kind="line", key=line.key, column=1, cents=line.amount_cents
+            )
+            for line in total.lines
+        ]
+        if stubs
+        else []
+    )
+
+    sources: list[FlowNode] = []
+    if stubs:
+        sources.append(FlowNode(id="take_home", kind="take_home", column=1, cents=total.net_cents))
+        if income_cents > total.net_cents:
+            sources.append(
+                FlowNode(
+                    id="other_deposits",
+                    kind="other_deposits",
+                    column=1,
+                    cents=income_cents - total.net_cents,
+                )
+            )
+    else:
+        sources.append(
+            FlowNode(id="income_deposited", kind="income_deposited", column=1, cents=income_cents)
+        )
+    for kind, in_savings in _MONEY_BACK:
+        back = [
+            one for one in drawn if one.total_cents < 0 and (one.bucket == "savings") == in_savings
+        ]
+        if back:
+            sources.append(
+                FlowNode(
+                    id=kind,
+                    kind=kind,
+                    column=1,
+                    cents=-total_cents(one.total_cents for one in back),
+                    categories=[one.category for one in back],
+                )
+            )
+    if left_over_cents < 0:
+        sources.append(
+            FlowNode(id="beyond_income", kind="beyond_income", column=1, cents=-left_over_cents)
+        )
+
+    uses: list[FlowNode] = []
+    if stubs and total.net_cents > income_cents:
+        uses.append(
+            FlowNode(
+                id="not_deposited",
+                kind="not_deposited",
+                column=2,
+                cents=total.net_cents - income_cents,
+            )
+        )
+    category_nodes: list[FlowNode] = []
+    category_links: list[FlowLink] = []
+    for bucket in DIAGRAM_BUCKETS:
+        mine = [one for one in drawn if one.bucket == bucket]
+        spent = [one for one in mine if one.total_cents > 0]
+        back_cents = -total_cents(one.total_cents for one in mine if one.total_cents < 0)
+        bucket_node = FlowNode(
+            id=f"bucket:{bucket}",
+            kind="bucket",
+            key=bucket,
+            column=2,
+            cents=total_cents(one.total_cents for one in spent),
+            refunds_cents=back_cents or None,
+        )
+        uses.append(bucket_node)
+        for one in spent:
+            category = FlowNode(
+                id=f"category:{one.category}",
+                kind="category",
+                key=one.category,
+                column=3,
+                cents=one.total_cents,
+            )
+            category_nodes.append(category)
+            category_links.append(
+                FlowLink(source=bucket_node.id, target=category.id, cents=category.cents)
+            )
+    if left_over_cents >= 0:
+        uses.append(FlowNode(id="left_over", kind="left_over", column=2, cents=left_over_cents))
+
+    gross = FlowNode(id="gross", kind="gross", column=0, cents=total.gross_cents)
+    pay_links = [
+        FlowLink(source=gross.id, target=node.id, cents=node.cents)
+        for node in [*lines, *sources[:1]]
+        if stubs and node.cents > 0
+    ]
+    return FlowDiagram(
+        nodes=[gross, *lines, *sources, *uses, *category_nodes],
+        links=[*pay_links, *_pair(sources, uses), *category_links],
+    )
 
 
 # ---------------------------------------------------------------- against the plan (spec 015)

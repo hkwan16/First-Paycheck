@@ -15,7 +15,7 @@ import type {
   SpendingSummary,
   WithholdingLine,
 } from '@/lib/api/types';
-import { ACCOUNT_KINDS_COUNTED, CATEGORY_BUCKETS, emptyCashflow } from './cashflow';
+import { ACCOUNT_KINDS_COUNTED, CATEGORY_BUCKETS, diagramOf, emptyCashflow } from './cashflow';
 import { DECISION_V1_ID } from './decisions';
 import { CHECKING_ID, sampleJob, SAVINGS_ID } from './sample';
 
@@ -372,6 +372,7 @@ export const novemberCashflow = (): CashFlow => ({
     paycheck_count: 1,
   },
   spending: structuredClone(NOVEMBER_SPENDING),
+  diagram: diagramOf('november'),
 });
 
 const line = (

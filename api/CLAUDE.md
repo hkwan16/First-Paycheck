@@ -179,7 +179,11 @@ Rules:
   `jobs/registry.py`.
 - `sync/categorize.py`: normalization, the `RuleBook`, the `categorize.run`
   job (rules, reuse of earlier LLM labels, then 50 merchants per gateway call)
-  and `record_user_label` for `PATCH /transactions/{id}` (spec 003).
+  and `record_user_label` for `PATCH /transactions/{id}` (spec 003). The
+  rules pass also relabels an earlier LLM guess that a rule now decides (rule
+  7, issue #226: a seed rule added after the guess reaches it on the next
+  sync); a guess no rule decides keeps its label, and user labels are never
+  touched. A budgeting app's plan is `subscriptions` by seed rule (rule 9c).
   Matching takes the amount and the precedence depends on the direction
   (rule 4): money out goes user exact, user prefix, seed exact, seed prefix;
   money in goes user exact, user prefix, seed `contains` (income and transfer
@@ -519,7 +523,20 @@ Specs 009 and 010. Migration `0005_checkins` adds `recurring_charges`,
   from the pure `calc/cashflow.py:withholding` (seven fixed lines with roles
   tax, retirement, health, other, plus role and period totals) and the
   spending summary through `spending.summary_for`, the same code as `GET
-  /spending/summary`, so the two never disagree.
+  /spending/summary`, so the two never disagree. Its `diagram` is the pure
+  `calc/cashflow.py:diagram` over that withholding and summary (spec 010
+  rules 5b and 5c, issue 236): every node (gross, lines, take-home or income
+  deposited, other deposits, refunds, money taken out of savings, spending
+  beyond income, not deposited, buckets, left over, categories) and every band
+  in cents, balanced (`_pair` lays the sources and the uses side by side as
+  two stacks of one height; it raises if their totals differ), so the client
+  only draws. A category that nets to money in is no node: it is part of
+  `refunds` or `savings_withdrawn`, and its bucket is drawn before it with
+  `refunds_cents`. The check-in's cash flow carries the same `diagram`.
+- **`GET /spending/months`** (`spending_months` in `app/routers/spending.py`):
+  the first day of each month with a posted row on an active counted account
+  or a confirmed pay stub (`db/pay_stubs.py:paid_months`), newest first; the
+  Spending period picker offers only these (spec 010 rule 5d).
 - **`POST /accounts/import`** (`app/routers/accounts.py`, `sync/csv_provider.py`):
   `parse_csv` checks the whole file before any write (422 `csv_invalid` with
   `details.errors` of `{row, column, message}`), converts to positive-is-out

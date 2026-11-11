@@ -72,6 +72,8 @@ export const queryKeys = {
   /** Prefixes of every period's read (hooks/spending.ts). */
   spendingSummary: () => ['get', '/spending/summary'] as const,
   cashflow: () => ['get', '/cashflow'] as const,
+  /** The months with something to show: the Spending period picker's choices. */
+  spendingMonths: () => ['get', '/spending/months'] as const,
   recurring: () => ['get', '/recurring'] as const,
 
   /** Monthly check-ins (M8), newest first. */
@@ -104,7 +106,12 @@ export const queryKeys = {
 /** The documents list and every document's detail (its own route, so not under the list's prefix). */
 const documentReads = [queryKeys.documents(), queryKeys.document()];
 
-const spendingReads = [queryKeys.transactions(), queryKeys.spendingSummary(), queryKeys.cashflow()];
+const spendingReads = [
+  queryKeys.transactions(),
+  queryKeys.spendingSummary(),
+  queryKeys.cashflow(),
+  queryKeys.spendingMonths(),
+];
 
 /**
  * Balances and positions a sync writes (spec 015 rules 20 and 21), and the
@@ -186,6 +193,8 @@ export const invalidateAfterConfirm = (client: QueryClient) =>
     queryKeys.payStubs(),
     queryKeys.benefitsPlans(),
     queryKeys.profile(),
+    // A stub's month has something to show on Spending (spec 010 rule 5d).
+    queryKeys.spendingMonths(),
     // The plan shows the newest confirmed pay stub.
     queryKeys.plan(),
     // A new stub or summary can leave an explanation out of date (spec 008 rule 19b).

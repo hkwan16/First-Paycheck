@@ -29,6 +29,7 @@ import {
   SAMPLE_PERIOD,
   sampleCashflow,
   sampleRecurring,
+  sampleSpendingMonths,
   sampleSpendingSummary,
 } from '@/test/fixtures/cashflow';
 import {
@@ -469,6 +470,7 @@ export function seededClient(screen: SampleScreenName = 'link') {
   const period = { params: { query: { ...SAMPLE_PERIOD } } };
   seed($api.queryOptions('get', '/cashflow', period).queryKey, sampleCashflow());
   seed(queryKeys.recurring(), [...sampleRecurring]);
+  seed(queryKeys.spendingMonths(), sampleSpendingMonths);
   for (const account of sampleAccounts) {
     const { queryKey } = $api.queryOptions('get', '/transactions', {
       params: { query: { account_id: account.id, limit: ACCOUNT_COUNT_LIMIT } },

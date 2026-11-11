@@ -70,6 +70,11 @@ export type CashFlow = Schemas['CashFlow'];
 export type PayStubFlow = Schemas['PayStubFlow'];
 export type WithholdingTotal = Schemas['WithholdingTotal'];
 export type WithholdingLine = Schemas['WithholdingLine'];
+/** The diagram `GET /cashflow` draws: every node and band (spec 010 rule 5b). */
+export type FlowDiagram = Schemas['FlowDiagram'];
+export type FlowDiagramNode = Schemas['FlowNode'];
+export type FlowDiagramLink = Schemas['FlowLink'];
+export type SpendingMonths = Schemas['SpendingMonths'];
 export type RecurringCharge = Schemas['RecurringChargeOut'];
 export type RecurringPatch = Schemas['RecurringPatch'];
 export type RecurringStatus = Schemas['RecurringStatus'];

@@ -187,6 +187,8 @@ class CategorizeResult:
     """Counts of transactions, except ``batches`` (gateway calls attempted)."""
 
     rule_labeled: int = 0
+    # Earlier LLM guesses a rule now decides (spec 003 rule 7).
+    relabeled: int = 0
     reused: int = 0
     llm_labeled: int = 0
     unresolved: int = 0
@@ -227,6 +229,10 @@ def categorize_user(
     progress: Callable[[int], None] | None = None,
 ) -> CategorizeResult:
     """Label the user's uncategorized transactions: rules, reuse, then the LLM.
+
+    The rules also relabel an earlier LLM guess they now decide (spec 003
+    rule 7), so a seed rule added after the guess, or a model that guessed
+    differently, never leaves a guess behind the rule.
 
     Without a labeler (no gateway configured, spec 003 rule 12a), or once the
     API rejects the key or the model id, the rules and reuse steps still count
@@ -288,20 +294,35 @@ def categorize_user(
 def _apply_rules(
     session: Session, user_id: uuid.UUID, rules: RuleBook, result: CategorizeResult
 ) -> set[Unit]:
-    """Label what the rules decide; return the non-empty merchants and
-    directions they do not."""
-    pending = session.execute(
-        select(Transaction.id, Transaction.merchant_norm, Transaction.amount_cents).where(
-            Transaction.user_id == user_id, Transaction.category.is_(None)
+    """Label what the rules decide, uncategorized rows and earlier LLM guesses
+    alike (rules 6-7); return the non-empty merchants and directions of the
+    uncategorized rows they do not decide."""
+    candidates = session.execute(
+        select(
+            Transaction.id,
+            Transaction.merchant_norm,
+            Transaction.amount_cents,
+            Transaction.category_source,
+        ).where(
+            Transaction.user_id == user_id,
+            or_(
+                Transaction.category.is_(None),
+                Transaction.category_source == CategorySource.LLM,
+            ),
         )
     )
     by_category: dict[str, list[uuid.UUID]] = defaultdict(list)
     unknown: set[Unit] = set()
-    for txn_id, merchant_norm, amount_cents in pending:
+    for txn_id, merchant_norm, amount_cents, source in candidates:
+        guess = source == CategorySource.LLM
         rule = rules.match(merchant_norm, amount_cents=amount_cents)
         if rule is not None:
             by_category[rule.category].append(txn_id)
-        elif merchant_norm:
+            if guess:
+                result.relabeled += 1
+            else:
+                result.rule_labeled += 1
+        elif merchant_norm and not guess:
             unknown.add((merchant_norm, is_money_in(amount_cents)))
     for category, ids in by_category.items():
         session.execute(
@@ -309,7 +330,6 @@ def _apply_rules(
             .where(Transaction.id.in_(ids))
             .values(category=category, category_source=CategorySource.RULE, confidence=None)
         )
-        result.rule_labeled += len(ids)
     return unknown
 
 

@@ -533,3 +533,9 @@ id,merchant_raw,amount_cents,posted_at,category
 532,CHASE CREDIT CRD AUTOPAY,62000,2026-10-12,transfer
 533,H&R BLOCK,8900,2026-08-14,taxes
 534,IRS TREAS 310 TAX REF,-118000,2026-08-28,income
+535,Rocket Money,2154,2026-10-28,subscriptions
+536,TRUEBILL *PREMIUM,1200,2026-08-03,subscriptions
+537,YNAB,1499,2026-09-15,subscriptions
+538,MONARCH MONEY,1499,2026-10-02,subscriptions
+539,COPILOT MONEY,1300,2026-09-21,subscriptions
+540,SIMPLIFI BY QUICKEN,599,2026-08-19,subscriptions

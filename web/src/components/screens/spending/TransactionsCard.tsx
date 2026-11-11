@@ -68,8 +68,9 @@ export interface TransactionsCardProps {
  * The mockup's transactions card: the period's table, where each category
  * came from, and the category fix. A fix shows at once (useFixCategory is
  * optimistic); the notice says it was saved for the merchant from now on, or
- * that it went back. While
- * another period loads, the last rows stay on screen and the card is busy.
+ * that it went back, until the list changes under it (another period, Show
+ * all, Load more: issue 240). While another period loads, the last rows stay
+ * on screen and the card is busy.
  */
 export function TransactionsCard({ filters }: TransactionsCardProps) {
   const list = useTransactions(filters);
@@ -78,6 +79,15 @@ export function TransactionsCard({ filters }: TransactionsCardProps) {
   const [result, setResult] = useState<FixResult | null>(null);
   const [expanded, setExpanded] = useState(false);
   const tableId = useId();
+
+  // A notice is about the list it was given on: another period's list drops it
+  // (React's "adjusting state when a prop changes", without an effect).
+  const listKey = JSON.stringify(filters);
+  const [noticeFor, setNoticeFor] = useState(listKey);
+  if (listKey !== noticeFor) {
+    setNoticeFor(listKey);
+    setResult(null);
+  }
 
   const masks = useMemo(
     () => new Map((accounts ?? []).map((a) => [a.id, a.mask] as const)),
@@ -157,7 +167,10 @@ export function TransactionsCard({ filters }: TransactionsCardProps) {
             <Button
               aria-expanded={expanded}
               aria-controls={tableId}
-              onClick={() => setExpanded(!expanded)}
+              onClick={() => {
+                setResult(null);
+                setExpanded(!expanded);
+              }}
             >
               {expanded ? 'Show fewer' : 'Show all transactions'}
             </Button>
@@ -165,7 +178,13 @@ export function TransactionsCard({ filters }: TransactionsCardProps) {
         )}
         {expanded && list.hasNextPage && (
           <div>
-            <Button onClick={() => void list.fetchNextPage()} loading={list.isFetchingNextPage}>
+            <Button
+              onClick={() => {
+                setResult(null);
+                void list.fetchNextPage();
+              }}
+              loading={list.isFetchingNextPage}
+            >
               Load more transactions
             </Button>
           </div>
