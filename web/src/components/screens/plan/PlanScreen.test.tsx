@@ -81,7 +81,8 @@ describe('PlanScreen with every decision saved', () => {
     const fund = region('Emergency fund');
     expect(figure(fund, 'Target')).toHaveTextContent('$5,469.75');
     expect(figure(fund, 'Monthly contribution')).toHaveTextContent('$300.00');
-    expect(figure(fund, 'Saved so far')).toHaveTextContent('39.12%');
+    // Issue 239: the balance the fund was worked out from, not the goal's "Saved so far".
+    expect(figure(fund, 'Already saved when you decided')).toHaveTextContent('$2,140.00');
     const k401 = region('401(k) match');
     expect(figure(k401, 'Your contribution')).toHaveTextContent('4%');
     expect(figure(k401, 'Employer match a year')).toHaveTextContent('$2,600.00');

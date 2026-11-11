@@ -120,8 +120,10 @@ def test_w4_deductions_figure_names_its_step() -> None:
 
 
 def test_fund_and_401k_labels_read_as_the_cards_do() -> None:
-    """Spec 016 rule 3: \"Months to reach it\" and \"Saved so far\" as the Why page's fund card
-    says them, and \"Match you miss a year\" as the 401(k) card says it."""
+    """Spec 016 rule 3: \"Months to reach it\" as the fund card says it, and \"Match you miss
+    a year\" as the 401(k) card says it. The balance the fund was worked out from says it is
+    from when the decision was saved (issue 239): the goal's \"Saved so far\" is the linked
+    account's balance now."""
     fund = EmergencyFundInput.model_validate(
         {
             "monthly_essentials_cents": 182_325,
@@ -131,21 +133,23 @@ def test_fund_and_401k_labels_read_as_the_cards_do() -> None:
             "pay_periods_per_year": 24,
         }
     )
-    labels = [
-        figure.label
-        for figure in figures(
-            CalculatorKind.EMERGENCY_FUND,
-            fund.model_dump(mode="json"),
-            emergency_fund(fund).model_dump(mode="json"),
-        )
-    ]
-    assert labels == [
+    found = figures(
+        CalculatorKind.EMERGENCY_FUND,
+        fund.model_dump(mode="json"),
+        emergency_fund(fund).model_dump(mode="json"),
+    )
+    assert [figure.label for figure in found] == [
         "Target",
         "Monthly contribution",
         "Per paycheck",
         "Months to reach it",
-        "Saved so far",
+        "Already saved when you decided",
     ]
+    assert (found[-1].key, found[-1].kind, found[-1].value) == (
+        "inputs.current_balance_cents",
+        "money",
+        214_000,
+    )
 
 
 def test_unreachable_fund_has_a_null_months_figure() -> None:

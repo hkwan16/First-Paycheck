@@ -5,20 +5,7 @@ import { Money } from '@/components/ui/Money';
 import { StatTile } from '@/components/ui/StatTile';
 import type { PlanPayStub } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
-import { payFrequencyLabel } from './plan-format';
-
-type CentsKey = Extract<keyof PlanPayStub, `${string}_cents`>;
-
-/** The deductions in the order a pay stub prints them. */
-const LINES: readonly [CentsKey, string][] = [
-  ['federal_withholding_cents', 'Federal withholding'],
-  ['social_security_cents', 'Social Security'],
-  ['medicare_cents', 'Medicare'],
-  ['state_tax_cents', 'State tax'],
-  ['retirement_contribution_cents', '401(k)'],
-  ['medical_premium_cents', 'Medical premium'],
-  ['other_deductions_cents', 'Other deductions'],
-];
+import { PAYCHECK_LINES, PAYCHECK_TILES, payFrequencyLabel } from './plan-format';
 
 /**
  * "Your paycheck", from the plan paper's stat row: the newest confirmed pay
@@ -49,18 +36,18 @@ export function PaycheckCard({ payStub }: { payStub: PlanPayStub | null }) {
             <StatTile
               size="sm"
               tone="plum"
-              label="Gross pay"
+              label={PAYCHECK_TILES.gross}
               value={<Money cents={payStub.gross_cents} />}
             />
             <StatTile
               size="sm"
               tone="coral"
-              label="Take-home pay"
+              label={PAYCHECK_TILES.net}
               value={<Money cents={payStub.net_cents} />}
             />
           </div>
           <KVList>
-            {LINES.map(([key, label]) => (
+            {PAYCHECK_LINES.map(([key, label]) => (
               <KV key={key} label={label} value={<Money cents={payStub[key]} />} />
             ))}
           </KVList>

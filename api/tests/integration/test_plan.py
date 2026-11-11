@@ -112,7 +112,7 @@ def test_every_figure_is_the_field_its_key_names(
         30_000,
         15_000,
         12,
-        "39.13",
+        214_000,
     ]
     assert [f["value"] for f in decisions["k401_match"]["figures"]] == [
         "4.00",
