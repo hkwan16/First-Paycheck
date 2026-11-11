@@ -70,7 +70,7 @@ function figuresOf(decision: Decision): PlanFigure[] {
         f('inputs.monthly_contribution_cents', 'Monthly contribution', 'money'),
         f('result.per_paycheck_contribution_cents', 'Per paycheck', 'money'),
         f('result.months_to_target', 'Months to reach it', 'count'),
-        f('result.funded_pct', 'Saved so far', 'percent'),
+        f('inputs.current_balance_cents', 'Already saved when you decided', 'money'),
       ];
     case 'k401_match':
       return [

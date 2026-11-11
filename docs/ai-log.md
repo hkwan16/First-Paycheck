@@ -727,3 +727,20 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above, on `fix/usability-spending`.
 
 **Time saved or lost:** Not measured.
+
+## 2026-11-11: the plan PDF's words disagreed with the Plan page and with themselves (issue 239)
+
+**Task:** From the November 9 production pass: the PDF printed "Not explained yet" under the emergency fund, which is never explained; "Saved so far 51.79%" in the decision and "Saved so far No linked account" in its goal; and "401(k) contribution" and "Form W-4" where the Plan page says "401(k) match" and "W-4, federal only".
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Spec first, reproduce on the local stack by exporting from the Plan screen, failing tests first; plain words a first-time employee can read.
+
+**What it produced:** Spec 016 rule 11a, a table of what the PDF prints beside what the Plan page says. `export/html.py` takes the web's calculator names, the "Your paycheck" card's labels, the Plan page's explanation lines on page 1 and the Why page's notes on page 2, "Saved Oct 21, 2026" in place of "Version 2", "Still to decide" and "Next 90 days", no explanation line for an emergency fund, and no "Saved so far" row for a goal with no balance (as the Plan page). The emergency fund's plan figure became `inputs.current_balance_cents`, "Already saved when you decided", on both surfaces. `plan-pdf-words.test.ts` reads the API's HTML fixture so a rename on one side fails the web tests.
+
+**What was wrong:**
+- The two "Saved so far" were different numbers: the decision's `funded_pct` is the balance typed when the decision was saved, the goal's is the linked account's balance now, null without an account. The label, not the arithmetic, was the bug.
+- The PDF had its own copies of every name (`CALCULATOR_TITLES`, the paycheck rows) and nothing tied them to the web, so the web's plain-language pass (PRs 211 to 216) never reached it.
+- Printing a saved date made the byte-for-byte fixture depend on the day the suite runs: Postgres stamps `created_at` with the real start of the test transaction. The HTML tests set each decision's `created_at` to the plan user's `NOW` before rendering.
+
+**How it was caught:** The tester's notes, then the local stack: `plan.spec.ts` exported the PDF from the Plan screen and its text, read back from `plan_exports` with pdfplumber, showed all three before the fix; the new HTML tests and the web cross-check failed first.

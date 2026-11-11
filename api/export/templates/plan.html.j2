@@ -74,10 +74,10 @@ td.gap { width: 6%; border-top: 0; }
 {% set stub = plan.pay_stub %}
   <table>
     <tr><td class="label">Pay date</td><td class="num">{{ stub.pay_date | long_date }}</td><td class="gap"></td><td class="label">Gross pay</td><td class="num">{{ stub.gross_cents | money }}</td></tr>
-    <tr><td class="label">Federal income tax</td><td class="num">{{ stub.federal_withholding_cents | money }}</td><td class="gap"></td><td class="label">Social Security</td><td class="num">{{ stub.social_security_cents | money }}</td></tr>
+    <tr><td class="label">Federal withholding</td><td class="num">{{ stub.federal_withholding_cents | money }}</td><td class="gap"></td><td class="label">Social Security</td><td class="num">{{ stub.social_security_cents | money }}</td></tr>
     <tr><td class="label">Medicare</td><td class="num">{{ stub.medicare_cents | money }}</td><td class="gap"></td><td class="label">State tax</td><td class="num">{{ stub.state_tax_cents | money }}</td></tr>
-    <tr><td class="label">401(k) contribution</td><td class="num">{{ stub.retirement_contribution_cents | money }}</td><td class="gap"></td><td class="label">Medical premium</td><td class="num">{{ stub.medical_premium_cents | money }}</td></tr>
-    <tr><td class="label">Other deductions</td><td class="num">{{ stub.other_deductions_cents | money }}</td><td class="gap"></td><td class="label"><strong>Net pay</strong></td><td class="num"><strong>{{ stub.net_cents | money }}</strong></td></tr>
+    <tr><td class="label">401(k)</td><td class="num">{{ stub.retirement_contribution_cents | money }}</td><td class="gap"></td><td class="label">Medical premium</td><td class="num">{{ stub.medical_premium_cents | money }}</td></tr>
+    <tr><td class="label">Other deductions</td><td class="num">{{ stub.other_deductions_cents | money }}</td><td class="gap"></td><td class="label"><strong>Take-home pay</strong></td><td class="num"><strong>{{ stub.net_cents | money }}</strong></td></tr>
   </table>
   <p class="muted">From your newest confirmed pay stub.</p>
 {% else %}
@@ -89,7 +89,7 @@ td.gap { width: 6%; border-top: 0; }
   <h2>Decisions</h2>
 {% for decision in plan.decisions %}
   <div class="decision">
-    <div class="decision-head"><span class="name">{{ loop.index }}. {{ calculator_titles[decision.calculator] }}</span><span class="muted">Version {{ decision.version }}</span></div>
+    <div class="decision-head"><span class="name">{{ loop.index }}. {{ calculator_titles[decision.calculator] }}</span><span class="muted">Saved {{ decision.created_at | utc_day | long_date }}</span></div>
 {% if decision.review %}
     <p class="review">Needs review: {% for reason in decision.review %}{{ reason.text }}{% if not loop.last %} {% endif %}{% endfor %}</p>
     <p class="muted">{{ review_note }}</p>
@@ -100,17 +100,19 @@ td.gap { width: 6%; border-top: 0; }
 {% endfor %}
     </table>
 {% endif %}
+{% if decision.calculator in explained_calculators %}
 {% if decision.explanation.stale %}
     <p class="status stale">{{ stale_label }}</p>
 {% else %}
     <p class="status {{ decision.explanation.status }}">{{ explanation_labels[decision.explanation.status] }}</p>
+{% endif %}
 {% endif %}
   </div>
 {% else %}
   <p class="muted">No decisions saved yet.</p>
 {% endfor %}
 {% if plan.completeness.missing %}
-  <p class="muted">Not saved yet: {% for kind in plan.completeness.missing %}{{ calculator_titles[kind] }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>
+  <p class="muted">Still to decide: {% for kind in plan.completeness.missing %}{{ calculator_titles[kind] }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>
 {% endif %}
 </section>
 
@@ -119,7 +121,8 @@ td.gap { width: 6%; border-top: 0; }
 {% for goal in plan.goals %}
   <table>
     <tr><td class="label"><strong>{{ goal_titles[goal.kind] }}</strong></td><td class="num">{{ goal_statuses[goal.status] }}</td><td class="gap"></td><td class="label">Target</td><td class="num">{{ goal.target_amount_cents | money }}</td></tr>
-    <tr><td class="label">Monthly contribution</td><td class="num">{{ goal.monthly_contribution_cents | money }}</td><td class="gap"></td><td class="label">Saved so far</td><td class="num">{% if goal.current_balance_cents is not none %}{{ goal.current_balance_cents | money }} ({{ goal.progress_pct | pct }}){% else %}No linked account{% endif %}</td></tr>
+{# Without a balance (no linked account, or none read yet) the Plan page shows no progress, and neither does this. #}
+    <tr><td class="label">Monthly contribution</td><td class="num">{{ goal.monthly_contribution_cents | money }}</td><td class="gap"></td>{% if goal.current_balance_cents is not none %}<td class="label">Saved so far</td><td class="num">{{ goal.current_balance_cents | money }} ({{ goal.progress_pct | pct }})</td>{% else %}<td></td><td></td>{% endif %}</tr>
 {% if goal.target_date and goal.status != 'paused' %}
     <tr><td class="label">On pace for</td><td class="num">{{ goal.target_date | long_date }}</td><td class="gap"></td><td></td><td></td></tr>
 {% endif %}
@@ -129,32 +132,32 @@ td.gap { width: 6%; border-top: 0; }
 {% endfor %}
 </section>
 
-<p class="footnote">Every amount comes from First Paycheck's calculators and your confirmed pay stub. Federal income tax only; state tax is not computed. Not tax advice.</p>
+<p class="footnote">First Paycheck worked out every amount from your confirmed pay stub and what you entered. It covers federal income tax only, not state tax. Not tax advice.</p>
 
 <section class="page-break">
-  <h2>Decision calendar</h2>
+  <h2>Next 90 days</h2>
 {% if plan.calendar %}
   <table class="calendar">
 {% for event in plan.calendar %}
     <tr><td class="date">{{ event.due_at | long_date }}</td><td>{{ event.title }}{% if event.overdue %} <span class="overdue">Overdue</span>{% endif %}{% if event.decision_id in decision_calculators %} <span class="what">&#183; {{ calculator_titles[decision_calculators[event.decision_id]] }}</span>{% endif %}</td></tr>
 {% endfor %}
   </table>
-  <p class="muted">Upcoming through {{ plan.calendar_through | long_date }}.</p>
+  <p class="muted">Through {{ plan.calendar_through | long_date }}.</p>
 {% else %}
-  <p class="muted">Nothing is due in the next 90 days.</p>
+  <p class="muted">Nothing is due by {{ plan.calendar_through | long_date }}.</p>
 {% endif %}
 </section>
 
 <section>
   <h2>Why, with sources</h2>
-{% set explained = plan.decisions | selectattr("explanation.status", "ne", "none") | list %}
+{% set explained = plan.decisions | selectattr("calculator", "in", explained_calculators) | selectattr("explanation.status", "ne", "none") | list %}
 {% for decision in explained %}
   <div class="why">
     <h3>{{ calculator_titles[decision.calculator] }}</h3>
 {% if decision.explanation.stale %}
     <p class="status stale">{{ stale_label }}</p>
 {% else %}
-    <p class="status {{ decision.explanation.status }}">{{ explanation_labels[decision.explanation.status] }}</p>
+    <p class="status {{ decision.explanation.status }}">{{ why_labels[decision.explanation.status] }}</p>
     <p class="concept">{{ decision.explanation.concept }}</p>
 {% for paragraph in decision.explanation.text.split("\n\n") %}
     <p>{{ paragraph }}</p>
