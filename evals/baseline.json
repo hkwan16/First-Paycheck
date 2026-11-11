@@ -12,7 +12,7 @@
     "llm_accuracy": 1.0
   },
   "categorization-rules": {
-    "rules_coverage": 0.7796296296296297,
+    "rules_coverage": 0.7806215722120659,
     "rules_precision": 1.0
   },
   "checkin": {
