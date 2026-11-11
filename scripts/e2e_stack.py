@@ -9,7 +9,7 @@ What it starts, in order:
 1. A disposable Postgres database, ``E2E_DATABASE_URL`` (default
    ``postgresql://localhost:5432/first_paycheck_e2e``; its name must contain
    ``e2e``): dropped and recreated, the test auth shim installed, migrated to
-   head, seeded (as ``make seed``), and four fixture users added to
+   head, seeded (as ``make seed``), and five fixture users added to
    ``auth.users``. ``app_api`` gets a login password made for this run.
 2. ``FakeSupabaseAuth`` on 127.0.0.1:``E2E_AUTH_PORT``: a stand-in for
    Supabase Auth with the routes supabase-js uses (password and refresh-token
@@ -113,16 +113,20 @@ class FixtureUsers(NamedTuple):
     ``schedule``: a fresh account for ``schedule-change.spec.ts``, whose pay
     stubs change schedule under saved decisions (issues 221 and 222).
     ``session``: the account the session specs inject Auth faults for
-    (E2E_SESSION_USER_*), so no fault reaches another spec's user."""
+    (E2E_SESSION_USER_*), so no fault reaches another spec's user.
+    ``day``: a fresh account for ``persons-day.spec.ts``, whose browser runs in
+    a zone whose date is not UTC's (spec 019, issue 232), so no other spec's
+    user takes that zone."""
 
     shared: FixtureUser
     alpha: FixtureUser
     schedule: FixtureUser
     session: FixtureUser
+    day: FixtureUser
 
 
 def fixture_users() -> FixtureUsers:
-    """The three synthetic users, with passwords made for this run."""
+    """The synthetic users, with passwords made for this run."""
     return FixtureUsers(
         shared=FixtureUser(
             uuid.UUID("00000000-0000-4000-8000-0000000000e2"),
@@ -142,6 +146,11 @@ def fixture_users() -> FixtureUsers:
         session=FixtureUser(
             uuid.UUID("00000000-0000-4000-8000-0000000000c5"),
             "session@example.com",
+            secrets.token_urlsafe(24),
+        ),
+        day=FixtureUser(
+            uuid.UUID("00000000-0000-4000-8000-0000000000d4"),
+            "day@example.com",
             secrets.token_urlsafe(24),
         ),
     )
@@ -615,6 +624,8 @@ def playwright_environment(
             "E2E_SCHEDULE_USER_PASSWORD": users.schedule.password,
             "E2E_SESSION_USER_EMAIL": users.session.email,
             "E2E_SESSION_USER_PASSWORD": users.session.password,
+            "E2E_DAY_USER_EMAIL": users.day.email,
+            "E2E_DAY_USER_PASSWORD": users.day.password,
             "E2E_AUTH_FAULTS_URL": f"{auth_url}{FAULTS_PATH}",
             "E2E_PLAID_SANDBOX": "1" if config.plaid_configured else "0",
         }

@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from sqlalchemy import ColumnElement, Date, case, func, select
 from sqlalchemy.orm import Session
 
-from app.deps import Now, UserSession
+from app.deps import Day, UserSession
 from app.errors import AppError, error_responses
 from calc.spending import Bucket, CategorySum, CategoryTotal, summarize
 from db.accounts import (
@@ -155,12 +155,13 @@ def _ledger_rows(session: Session, start: dt.date, end: dt.date) -> LedgerRowsSk
 @router.get("/summary", responses=error_responses(401, 422))
 def spending_summary(
     session: UserSession,
-    now: Now,
+    day: Day,
     start: Annotated[dt.date | None, Query(description="First day, inclusive")] = None,
     end: Annotated[dt.date | None, Query(description="Last day, inclusive")] = None,
 ) -> SpendingSummary:
-    """Income, spending by bucket and what is left over; the last full UTC month by default."""
-    first, last = period(start, end, now.date())
+    """Income, spending by bucket and what is left over; by default the last full month
+    before the person's today."""
+    first, last = period(start, end, day.today)
     return summary_for(session, first, last)
 
 

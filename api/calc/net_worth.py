@@ -61,7 +61,7 @@ class Snapshot(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     account_id: uuid.UUID
-    # The snapshot's UTC date.
+    # The snapshot's date in the person's zone (spec 019 rule 3).
     as_of: dt.date
     balance_cents: int
 
@@ -170,10 +170,14 @@ def net_worth(
     today: dt.date,
     months: int,
 ) -> NetWorth:
-    """Rule 20: assets minus liabilities, now and at the end of each of ``months`` months."""
+    """Rule 20: assets minus liabilities, now and at the end of each of ``months`` months.
+
+    ``snapshots`` come in the order they were taken: of two on one date the later
+    is the newer (the sort by date is stable), whatever its balance.
+    """
     known = {account.account_id for account in accounts}
     history: dict[uuid.UUID, list[Snapshot]] = defaultdict(list)
-    for snapshot in sorted(snapshots, key=lambda s: (s.as_of, s.balance_cents)):
+    for snapshot in sorted(snapshots, key=lambda s: s.as_of):
         if snapshot.account_id in known:
             history[snapshot.account_id].append(snapshot)
 

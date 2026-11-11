@@ -6,8 +6,9 @@ with the transaction if the worker dies. A tick requeues running jobs whose
 heartbeat is more than 10 minutes old (as a failed attempt, so the usual
 backoff and the 5-attempt limit apply), prunes finished ticks older than an
 hour, expires uploads left unconfirmed for 7 days and deletes day-old
-rate-limit counters (spec 004 rule 21), queues the month's
-``checkin.monthly`` job for every user still without one (spec 015 rule 14),
+rate-limit counters (spec 004 rule 21), queues each person's month's
+``checkin.monthly`` job for every user still without one (spec 015 rule 14,
+spec 019 rule 13),
 and queues the next tick 60 seconds out. ``worker_status`` tells
 ``GET /health`` whether the worker is alive from the same rows (spec 002
 rule 38). This module may use the privileged
@@ -18,6 +19,8 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import uuid
+from collections import defaultdict
 from typing import Any, Literal
 
 from sqlalchemy import Connection, text
@@ -25,6 +28,7 @@ from sqlalchemy import Connection, text
 from app.ratelimit import prune_counters
 from checkin.engine import checkin_key, monthly_payload
 from db.enums import JobKind, JobStatus
+from db.person_day import person_day_at, zone_for
 from export import store as export_store
 from ingest import store
 from jobs import queue
@@ -78,12 +82,17 @@ def _requeue_stale(connection: Connection) -> tuple[int, int]:
     return requeued, dead
 
 
+_USER_ZONES = text(
+    "SELECT u.id, p.time_zone FROM auth.users AS u"
+    " LEFT JOIN public.profiles AS p ON p.user_id = u.id"
+)
+
 _QUEUE_CHECK_INS = text(
     """
     INSERT INTO jobs (user_id, kind, payload, idempotency_key)
     SELECT u.id, 'checkin.monthly', CAST(:payload AS jsonb), :key
     FROM auth.users AS u
-    WHERE NOT EXISTS (
+    WHERE u.id = ANY(:user_ids) AND NOT EXISTS (
       SELECT 1 FROM jobs AS j WHERE j.user_id = u.id AND j.idempotency_key = :key)
     ON CONFLICT (user_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
     """
@@ -91,18 +100,25 @@ _QUEUE_CHECK_INS = text(
 
 
 def _queue_check_ins(connection: Connection, now: dt.datetime) -> int:
-    """Spec 015 rule 14: one ``checkin.monthly`` job per user and UTC month.
+    """Spec 015 rule 14: one ``checkin.monthly`` job per user and month, the month
+    being the person's at ``now`` in their own zone (spec 019 rule 13).
 
-    The first tick of a month reaches every user; a later one only a user
+    The first tick of a person's month reaches them; a later one only a user
     still without the month's job (the worker was down on the 1st, or the user
-    signed up since). Users are read across accounts, so this runs here, on
-    the privileged connection.
+    signed up since). Users and their zones are read across accounts, so this
+    runs here, on the privileged connection, with one insert per distinct month.
     """
-    month = now.astimezone(dt.UTC).date().replace(day=1)
-    payload = json.dumps(monthly_payload(month, "schedule"), sort_keys=True)
-    queued: int = connection.execute(
-        _QUEUE_CHECK_INS, {"payload": payload, "key": checkin_key(month)}
-    ).rowcount
+    by_month: dict[dt.date, list[uuid.UUID]] = defaultdict(list)
+    for user_id, time_zone in connection.execute(_USER_ZONES):
+        month = person_day_at(now, zone_for(time_zone, user_id=user_id)).month
+        by_month[month].append(user_id)
+    queued = 0
+    for month, user_ids in sorted(by_month.items()):
+        payload = json.dumps(monthly_payload(month, "schedule"), sort_keys=True)
+        queued += connection.execute(
+            _QUEUE_CHECK_INS,
+            {"payload": payload, "key": checkin_key(month), "user_ids": user_ids},
+        ).rowcount
     return queued
 
 

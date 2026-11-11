@@ -295,7 +295,8 @@ def test_defaults_to_the_last_complete_month(
 def test_january_defaults_to_last_december(
     app: FastAPI, client_as: Client, user_a: FixtureUser
 ) -> None:
-    app.dependency_overrides[get_now] = lambda: dt.datetime(2027, 1, 1, 0, 0, tzinfo=dt.UTC)
+    # 00:00 EST on January 1: a person with no zone reads as New York (spec 019 rule 1).
+    app.dependency_overrides[get_now] = lambda: dt.datetime(2027, 1, 1, 5, 0, tzinfo=dt.UTC)
     body = client_as(user_a).get("/spending/summary").json()
     assert (body["start"], body["end"]) == ("2026-12-01", "2026-12-31")
 

@@ -13,9 +13,9 @@ from sync.categories import CATEGORIES
 from sync.categorize import RuleBook, apply_rules, normalize_merchant
 
 
-def test_seed_file_has_about_250_valid_rows() -> None:
+def test_seed_file_has_about_300_valid_rows() -> None:
     rules = read_seed_rules()
-    assert 230 <= len(rules) <= 300
+    assert 230 <= len(rules) <= 330
     for rule in rules:
         assert rule.merchant_norm == normalize_merchant(rule.merchant_norm), rule
         assert rule.category in CATEGORIES
@@ -35,6 +35,7 @@ def test_seed_file_has_about_250_valid_rows() -> None:
         "phone_internet",
         "income",
         "transfer",
+        "cash",
     ],
 )
 def test_seed_covers_the_core_categories(category: str) -> None:
@@ -157,6 +158,58 @@ def test_seed_rules_name_the_merchant(raw: str, amount_cents: int, category: str
     )
     assert found is not None, raw
     assert found.category == category
+
+
+@pytest.mark.parametrize(
+    ("raw", "amount_cents", "category"),
+    [
+        # Spec 003 rule 9d (issue #250): cash withdrawn is spending, `cash`.
+        ("ATM WITHDRAWAL 001234 10/31 100 MAIN ST", 6_000, "cash"),
+        ("ATM WITHDRAWAL", 2_000, "cash"),
+        ("NON-CHASE ATM WITHDRAW 552301 09/26 OAKLAND CA", 10_000, "cash"),
+        ("ATM WITHDRAW 0412", 4_000, "cash"),
+        ("ATM CASH WITHDRAWAL 0921", 4_000, "cash"),
+        ("ATM W/D 0042 SEATTLE WA", 8_000, "cash"),
+        ("CASH WITHDRAWAL TELLER 0042", 30_000, "cash"),
+        ("WITHDRAWAL ATM 2231 BROADWAY", 6_000, "cash"),
+        # A withdrawal reversed is money in at the same descriptor: it nets the cash.
+        ("ATM WITHDRAWAL 001234 10/31 100 MAIN ST", -6_000, "cash"),
+        # A fee for the withdrawal is a fee, by the longer rule (rule 4).
+        ("ATM WITHDRAWAL FEE", 300, "fees"),
+        ("CASH WITHDRAWAL FEE 1031", 500, "fees"),
+        ("ATM FEE 1031", 300, "fees"),
+        # What stays a transfer: the person's own accounts, a peer, a cash deposit.
+        ("ONLINE TRANSFER TO SAV 4567", 20_000, "transfer"),
+        ("ONLINE TRANSFER TO CHK 7731", 20_000, "transfer"),
+        ("CREDIT CARD 3333 PAYMENT *//", 2_500, "transfer"),
+        ("ZELLE TO JOHN", 2_000, "transfer"),
+        ("CASH DEPOSIT", -49_600, "transfer"),
+    ],
+)
+def test_seed_rules_call_cash_withdrawn_cash(raw: str, amount_cents: int, category: str) -> None:
+    found = apply_rules(
+        normalize_merchant(raw), RuleBook(read_seed_rules()), amount_cents=amount_cents
+    )
+    assert found is not None, raw
+    assert found.category == category
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        # Spec 003 rule 9d: banks begin card purchases with "withdrawal" (the
+        # dynamic sandbox's game and liquor store), and an ATM deposit with "atm",
+        # so neither word alone is a rule; the model reads the whole description.
+        "WITHDRAWAL DEBIT CARD CONSUMER DEBIT PULSZ 252-291-2362 VA DATE 04/12",
+        "WITHDRAWAL 02178293119 POS POUR CHOICES",
+        "ATM DEPOSIT 1031 MAIN ST",
+        "ATM CASH DEPOSIT 1031",
+        "BKOFAMERICA ATM 10/31 #000004321 WITHDRWL MAIN ST",
+    ],
+)
+def test_a_withdrawal_word_alone_is_no_cash_rule(raw: str) -> None:
+    found = apply_rules(normalize_merchant(raw), RuleBook(read_seed_rules()), amount_cents=5_000)
+    assert found is None, (raw, found)
 
 
 @pytest.mark.parametrize(

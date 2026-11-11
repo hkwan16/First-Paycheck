@@ -34,11 +34,13 @@ async function openIndex(page: Page) {
   await expect(list(page).or(emptyState(page))).toBeVisible({ timeout: 30_000 });
 }
 
-/** Today's month as the list names it ("October 2026"), in UTC like the API's clock. */
+/**
+ * Today's month as the list names it ("October 2026"), in the browser's zone,
+ * which is this one's: the app saves it and the API checks in on that
+ * month (spec 019 rules 5 and 9).
+ */
 const thisMonth = () =>
-  new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
-    new Date(),
-  );
+  new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date());
 
 test('checks in now from the list, then lists this month’s check-in', async ({ page }) => {
   await openIndex(page);

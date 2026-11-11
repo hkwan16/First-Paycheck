@@ -12,7 +12,7 @@ Part B lets a user bring in an account they will not link through Plaid: `POST /
 
 ### `GET /cashflow`
 
-`start` and `end`, inclusive ISO dates, with exactly the rules of `GET /spending/summary` (spec 007 part B): both or neither, `start <= end`, at most 366 days, and the last complete UTC calendar month by default.
+`start` and `end`, inclusive ISO dates, with exactly the rules of `GET /spending/summary` (spec 007 part B): both or neither, `start <= end`, at most 366 days, and the last complete calendar month before the person's today by default (spec 019).
 
 ### `GET /spending/months`
 
@@ -82,7 +82,7 @@ No parameters.
 
 ### `GET /spending/months` (`SpendingMonths`)
 
-- `months`: the first day of each UTC calendar month with at least one posted transaction on an active `checking`, `savings` or `credit` account (the rows the summary reads, spec 007 rule 21a) or a current confirmed pay stub paid in it (rule 1), newest first, each once.
+- `months`: the first day of each calendar month with at least one posted transaction on an active `checking`, `savings` or `credit` account (the rows the summary reads, spec 007 rule 21a) or a current confirmed pay stub paid in it (rule 1), newest first, each once.
 
 ### `POST /accounts/import` (`CsvImport`)
 
@@ -175,8 +175,9 @@ Amounts in cents. Links are written `source -> target cents`.
 | D4 | `test_take_home_not_deposited` | One mockup stub (net 199,604); deposits 150,000; housing 100,000; left over 50,000 | `take_home` 199,604, `not_deposited` 49,604, `left_over` 50,000 | `take_home -> not_deposited` 49,604; `take_home -> bucket:essentials` 100,000; `take_home -> left_over` 50,000 |
 | D5 | `test_money_taken_out_of_savings` | No stub; deposits 300,000; housing 150,000; savings_investment -50,000; left over 200,000 | `income_deposited` 300,000, `savings_withdrawn` 50,000 (categories `savings_investment`); `bucket:savings` 0 with `refunds_cents` 50,000; `left_over` 200,000 | `income_deposited -> bucket:essentials` 150,000; `income_deposited -> left_over` 150,000; `savings_withdrawn -> left_over` 50,000 |
 | D6 | `test_an_empty_period` | No stub, no transactions | `gross` 0, `income_deposited` 0, the four buckets 0, `left_over` 0 | none |
+| D7 | `test_cash_withdrawn_is_drawn_as_spending` | Issue #250, spec 007's cash example: no stub; deposits 200,000; housing 100,000, dining 2,500, cash 6,000, transfer 20,000 (essentials 100,000, flexible 8,500, left over 91,500) | `income_deposited` 200,000; `category:cash` 6,000 under `bucket:flexible` 8,500; no node for the transfer; `left_over` 91,500 | `income_deposited ->` essentials 100,000, flexible 8,500, `left_over` 91,500; `bucket:flexible ->` `category:dining` 2,500, `category:cash` 6,000 |
 
-Working: D1, the sources stack `take_home` [0, 199,604), `other_deposits` [199,604, 324,012), `beyond_income` [324,012, 523,498); the uses stack essentials [0, 310,000), flexible [310,000, 521,344), savings [521,344, 523,498). Each band is an overlap: `other_deposits` meets essentials over [199,604, 310,000), 110,396, and flexible over [310,000, 324,012), 14,012; `beyond_income` meets flexible over [324,012, 521,344), 197,332, and savings, 2,154; flexible gets `14,012 + 197,332 = 211,344`. Both stacks are 523,498: `max(199,604, 324,012) + 0 + 199,486`. D3: flexible's positive categories are `51,633 + 58,940 + 7,850 = 118,423`, the summary's 68,423 plus the 50,000 refund; the sources are `422 + 50,000 + 168,541 = 218,963 = 540 + 118,423 + 100,000`. D4: `max(199,604, 150,000) = 199,604 = 49,604 + 100,000 + 50,000`. D5: `300,000 + 50,000 = 150,000 + 0 + 200,000`.
+Working: D1, the sources stack `take_home` [0, 199,604), `other_deposits` [199,604, 324,012), `beyond_income` [324,012, 523,498); the uses stack essentials [0, 310,000), flexible [310,000, 521,344), savings [521,344, 523,498). Each band is an overlap: `other_deposits` meets essentials over [199,604, 310,000), 110,396, and flexible over [310,000, 324,012), 14,012; `beyond_income` meets flexible over [324,012, 521,344), 197,332, and savings, 2,154; flexible gets `14,012 + 197,332 = 211,344`. Both stacks are 523,498: `max(199,604, 324,012) + 0 + 199,486`. D3: flexible's positive categories are `51,633 + 58,940 + 7,850 = 118,423`, the summary's 68,423 plus the 50,000 refund; the sources are `422 + 50,000 + 168,541 = 218,963 = 540 + 118,423 + 100,000`. D4: `max(199,604, 150,000) = 199,604 = 49,604 + 100,000 + 50,000`. D5: `300,000 + 50,000 = 150,000 + 0 + 200,000`. D7: `200,000 = 100,000 + 8,500 + 91,500`; the cash taken out is spending (spec 003 rule 9d), so it is a band like dining's, while the 20,000 moved to savings is in no node (spec 007 rule 23).
 
 ### Months (`api/tests/integration/test_cashflow.py`, rule 5d)
 

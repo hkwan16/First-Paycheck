@@ -79,11 +79,6 @@ def long_date(value: dt.date) -> str:
     return f"{value:%b} {value.day}, {value.year}"
 
 
-def utc_day(value: dt.datetime) -> dt.date:
-    """The UTC day of an instant, as the plan's other dates are (spec 016 rule 11)."""
-    return value.astimezone(dt.UTC).date()
-
-
 def figure_value(figure: PlanFigure) -> str:
     value = figure.value
     if figure.kind == "money" and isinstance(value, int):
@@ -114,7 +109,6 @@ def _environment() -> Environment:
         money=dollars,
         pct=lambda value: percent(Decimal(value)),
         long_date=long_date,
-        utc_day=utc_day,
         figure=figure_value,
     )
     return environment
@@ -123,14 +117,14 @@ def _environment() -> Environment:
 _ENVIRONMENT = _environment()
 
 
-def render_html(plan: PlanOut, prepared_at: dt.datetime) -> str:
-    """The page for ``plan``, prepared at ``prepared_at`` (its UTC date is printed)."""
+def render_html(plan: PlanOut) -> str:
+    """The page for ``plan``, prepared on its ``as_of``, the person's today (spec 019)."""
     calculators: dict[uuid.UUID, CalculatorKind] = {
         decision.id: decision.calculator for decision in plan.decisions
     }
     return _ENVIRONMENT.get_template("plan.html.j2").render(
         plan=plan,
-        prepared_on=utc_day(prepared_at),
+        prepared_on=plan.as_of,
         calculator_titles=CALCULATOR_TITLES,
         # An emergency fund is never explained (spec 011), so it has no explanation line.
         explained_calculators={kind for kind in CalculatorKind if is_explainable(kind)},

@@ -10,7 +10,10 @@ over a generated OpenAPI client, and Supabase Auth. The visual target is Mockup 
   integer cents and is only formatted (`lib/money.ts`, `<Money>`); never add, split, round for
   logic, or compare amounts here. Arithmetic belongs in `api/calc/`. The one exception is the
   Confirm screen's consistency check (`mathGate`, below): a display-side gate over the person's
-  own entries, with the server's 422 as the authority.
+  own entries, with the server's 422 as the authority. The one comparison a form makes is a typed
+  value against an entry limit the API publishes in `openapi.json` (`lib/entry-limits.ts`, read
+  back by its test; spec 018 rule 5e): never one amount against another, and never a limit that
+  depends on the tax year. Those are the API's, shown from its `details.errors`.
 - **Tokens only.** Colors, radii, shadows, type sizes and durations are the `@theme` tokens in
   `src/app/globals.css`. No raw hex anywhere else in `src/`; `src/lib/design/tokens.test.ts` and
   ESLint both enforce it.
@@ -82,6 +85,7 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     upload.ts, download.ts, keys.ts, errors.ts, hooks/), auth/ (next-path, protected,
                     validation, errors, account, sign-out), supabase/ (env, client, server, proxy),
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
+                    entry-limits.ts,
                     documents.ts, decisions.ts, decision-steps.ts, deep-equal.ts, explanations.ts,
                     escape-cancel.ts, features.ts, focus-handoff.ts, land-at-top.ts,
                     findings.ts, periods.ts,
@@ -118,9 +122,10 @@ src/test/           setup.ts (jest-dom, MSW lifecycle, db reset, Recharts' batch
                     fixtures/plan.ts (`GET /plan` built from the decision, goal, calendar and pay
                     stub fixtures; export jobs), msw/plan-handlers.ts (`planDb`)
 e2e/                Playwright specs (smoke, auth.setup, auth, link, confirm, spending, decisions,
-                    plan, import, check-in, why, alpha; capture-setup, capture-screens, capture-demo
-                    for the alpha document), support/auth.ts, support/api.ts,
-                    support/spending.ts (a period with transactions), support/capture.ts (the
+                    plan, import, check-in, why, alpha, persons-day; capture-setup, capture-screens,
+                    capture-demo for the alpha document), support/auth.ts, support/api.ts,
+                    support/spending.ts (a period with transactions), support/days.ts (a zone
+                    whose date is not UTC's, and calendar dates in it), support/capture.ts (the
                     capture's upload, confirm and screenshots), support/demo.ts (the demo's
                     captions, pointer and MP4), fixtures/ (synthetic
                     acme-paystub.pdf and the script that makes it, bank-export.csv), baselines
@@ -160,7 +165,8 @@ A `destructive` Button (Yes, unlink; Delete account) sits beside a safe choice t
 (Keep), so the safe choice is never the weaker one (issue 205).
 
 Chrome (`components/chrome`): `Wordmark`, `Header` (`chips`, `account` slot, `minimal`),
-`HeaderAccount` (server: "Sample data" chip, `UserMenu` and `RestoredPageGuard` from the Supabase
+`TimeZoneSync` (renders nothing: saves the browser's time zone on the profile, see "The
+person's day"), `HeaderAccount` (server: "Sample data" chip, `UserMenu` and `RestoredPageGuard` from the Supabase
 user), `UserMenu` (the user chip as an APG menu button: a `role="menu"` with "Sign out" and
 "Delete account" as `menuitem`s, one Tab stop, arrows, Home, End, Escape back to the chip, Tab or a
 click elsewhere closes it; see "Auth" and "Deleting the account"), `DeleteAccountConfirm` (a native
@@ -195,7 +201,10 @@ or checked for a phone.
   `apiErrorMessage(error, fallback)`, never by printing the object. It shows the API's message
   only when it reads as a sentence for people (`isPersonMessage`: no word with an underscore,
   such as `emergency_fund` or a field path), else the caller's fallback (spec 008 rule 22a,
-  issue 162), so write a fallback that stands on its own.
+  issue 162), so write a fallback that stands on its own. A 422 `validation_error` also carries
+  `details.errors`, each `{ path, message }` at its place in the body (spec 007 rule 2a):
+  `fieldProblems(error)` reads them, so a form shows each beside its field (`planRefusal` in
+  `health-plan-format.ts` maps `['plans', i, field]` onto the plan table).
 - **Limits** (M10): every write route can answer 429 `rate_limited` (with Retry-After, which the
   API exposes through CORS) and 413 `body_too_large`. `apiErrorMessage` turns any 429 into the one
   sentence `rateLimitMessage` makes, "You have reached the limit for now. Try again in about 20
@@ -235,6 +244,16 @@ or checked for a phone.
   `GET /decisions/{id}`) and `invalidateAfterDecision` (also calendar, plan and goals) after a save.
   `useUpdateProfile` writes the saved profile into its cache and then `invalidateAfterProfile`
   (the decisions and the plan): a decision's `review` reads the profile.
+- **The person's day** (spec 019, issue 232): the API dates everything by the person's day in
+  the profile's `time_zone` (America/New_York until the browser reports one). `useToday()`
+  (`hooks/profile.ts`) is `GET /profile`'s `today`, null until it answers; never date anything
+  with `new Date()` (a timestamp's display in the viewer's zone, `formatDate`, is fine). No
+  request sends a "today". `TimeZoneSync` (chrome, in the `(app)` layout, after the page
+  hydrates) sends `Intl.DateTimeFormat().resolvedOptions().timeZone` with `useSaveTimeZone()`
+  (`PUT /profile/time-zone`) when it differs from the saved zone, each zone at most once per
+  page load (a refused one is logged once); the saved profile goes into its cache and
+  `invalidateAfterTimeZone` reads everything else again. A sample screen that shows a date
+  from today seeds `queryKeys.profile()` (`sampleProfile`, October 17).
   `GET /plan` repeats decisions, goals, the calendar, explanation statuses and the newest pay stub,
   so whatever changes one of those invalidates `queryKeys.plan()` too (a goal change, a new
   explanation, a confirm, a sync's balances).
@@ -249,6 +268,10 @@ or checked for a phone.
   query (`SampleScreen`) with that shape. Pass `null` inputs while the form is incomplete. Its `staleTime` is
   `'static'` when the client default is (the sample QueryClient), so it never reads the clock
   while rendering; otherwise `Infinity`, which still lets a 422 refetch it.
+  `useCalcCheck(path)` asks a calculator once, as a mutation, whether it takes inputs before
+  they go on screen (the health plan table's Compare, spec 012 rule 18b); it rejects with the
+  `ApiError` and on success seeds the `useCalc` cache for the same body, so showing them asks
+  nothing again. Build the check's body exactly as the card's `useCalc` inputs will be.
 - **Decisions**: `useDecisions`, `useDecision(id)`, `useCalendar`, and
   `useSaveDecision(calculator)`, which posts `{ calculator, inputs, result, supersedes_id }` with
   `supersedes_id` set to the current version's id. A 409 `decision_conflict` (someone saved first)
@@ -300,8 +323,8 @@ or checked for a phone.
   reads its tiles and its diagram from that one response, and keeps the last period on screen
   while another loads (`keepPreviousData`). `useSpendingSummary(period?)` is the summary alone
   (setup progress reads it). A `Period` is `{ start, end }`; `null` sends no dates and the API
-  reads the last complete UTC month. `lib/periods.ts` builds the picker's options from
-  `useToday()` (null on the server, so nothing reads the clock while rendering), keeping only the
+  reads the person's last complete month. `lib/periods.ts` builds the picker's options from
+  `useToday()` (the person's today from `GET /profile`, null until it answers), keeping only the
   months `useSpendingMonths()` (`GET /spending/months`: a posted row on a counted account or a
   confirmed pay stub) lists (`optionsWithin`, spec 010 rule 5d). The picker is disabled until the
   months arrive, offers all six if they cannot be read, and always offers the period shown.
@@ -737,7 +760,19 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
   chosen plan (a 422 `plan_not_selected` says so); a new table (Use your benefits summary, an
   edited one) keeps the choice when it still has the chosen plan with every term the same, in
   whatever place (`choiceAmong`, issue 168), and drops it otherwise; an enrollment deadline adds a calendar event,
-  shown under the card.
+  shown under the card. Compare these plans checks the typed plans with the API first
+  (`useCalcCheck` over `inputsFor`, the same builder as the decided inputs; spec 012 rule 18b,
+  issue 228): the button is busy until it answers, and a 422 keeps the table open with each
+  `details.errors` entry beside its plan's field in the API's words (which name the plan) and the
+  comparison, the choice and the badge unchanged. Only a 200 closes it. The MSW handler refuses
+  as the API does (plan fields first, then the year's employer HSA limit), so a test of a new
+  typed table needs its case in `make-health-plans-results.py`.
+- **Field messages** (spec 018 rule 5e, issue 238): every amount goes through `readAmount`
+  (`decision-format.ts`, options `example`, `max` and `positive`) with the field's limit from
+  `lib/entry-limits.ts`, and says the actual problem: not an amount ("Enter an amount, like
+  1,823.25."), more than two decimals, or outside the range it states ("Enter an amount from $0
+  to $100,000.00."). The plan details' birth year is 1900 to the person's year less 14
+  (`latestBirthYear` over the year of `profile.today`, the API's `PUT /profile` rule; spec 019).
 - **Pay schedule** (spec 005 rule 25a, issue 198): every card reads
   `profile.pay_schedule.periods_per_year`, the schedule the API resolves (the newest stub's when it
   prints one, else the profile's), never the profile's `pay_frequency` or the stub's on their own.
@@ -876,7 +911,7 @@ opens the newest open check-in, else the list (`checkInNavHref`; `/check-in` unt
 - **Check in now** (`CheckInNow.tsx`, spec 015 rule 23): `CheckInNowButton` in the title row (the
   mockup's "Run again now") and `CheckInNowStatus` under it, over one `useCheckInNow()`. The list
   always offers it; a check-in offers it only when it is this month's and open
-  (`offersCheckInNow` with `useToday()`), because `POST /check-ins` runs the request clock's month
+  (`offersCheckInNow` with `useToday()`), because `POST /check-ins` runs the person's month
   and leaves a completed check-in as it is. While the job runs, `JobProgress` ("Checking in"; a
   dead job says "Nothing was changed." with Try again); a refused start says "Could not check in
   now." and `apiErrorMessage` (the 429 sentence). A polite status line, always rendered, says the
@@ -901,7 +936,8 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
   badge, the reasons in the API's words and "Review your health plan" (its step) in place of its
   figures, which were worked out for a paycheck that may no longer be the person's.
 - **Decisions** (`DecisionSummary`): one `DecisionCard` per saved decision in the API's order,
-  with "Saved {date}", the API's `figures` by their labels (`figureText` formats by
+  with "Saved {date}" from `saved_on` (the person's day of the save, the date the PDF prints;
+  never `created_at` in the browser's zone), the API's `figures` by their labels (`figureText` formats by
   `kind`: money, a net cost (negative reads "$260.00 ahead"), a refund ("$0.08 refund",
   "$3,918.70 due"), a percentage as stored, a count,
   text; a null `months_to_target` reads "Not within 10 years"; a value of the wrong type throws rather than guessing), and the explanation:
@@ -1099,7 +1135,10 @@ drives a node from the keyboard, changes the period and saves a category fix; `i
 imports `e2e/fixtures/bank-export.csv` (five synthetic rows) into a new CSV account ("Added 5
 transactions to ..."), imports it again without making a second account ("No new transactions: all
 5 were already in ...", issue 231), imports into another new account and removes it (the panel
-then reports nothing about it), and checks a broken file's row errors.
+then reports nothing about it), imports an ATM withdrawal and a transfer to savings dated the last
+day of last month into a new account and checks on Spending that the withdrawal is "Cash" and adds
+its $60.00 to the Flexible tile while the transfer stays out (issue 250; then removes the account),
+and checks a broken file's row errors.
 Both change the e2e user's data, so they are ordered projects with serial files rather than
 parallel tests. `confirm.spec.ts` (project `authenticated-confirm`) uploads
 `e2e/fixtures/acme-paystub.pdf`, a synthetic stub with an example SSN the API must redact and a
@@ -1142,7 +1181,7 @@ paycheck the later screens show. Never use a real document as a fixture.
 ### Local real-API stack
 
 `make e2e-full` (`scripts/e2e_stack.py`) runs `pnpm e2e` against a stack it starts and stops: a
-disposable `first_paycheck_e2e` database (migrated, seeded, three synthetic users), a stand-in for
+disposable `first_paycheck_e2e` database (migrated, seeded, five synthetic users), a stand-in for
 Supabase Auth that signs ES256 tokens and serves its JWKS (the web signs in through its real form;
 the API verifies the same tokens) and takes faults for the session user, and the API and worker
 with `LLM_FAKE=true`. It sets every variable above itself, plus
@@ -1164,6 +1203,15 @@ links the sandbox bank and fixes a category, uploads and confirms the Acme stub,
 Spending tiles, goes on to Decisions (the emergency fund step) and through its footer to the 401(k),
 saves it at 4% as v1 and a change as v2, and expects the note "We checked every
 number here..." with an irs.gov source (what the fake model produces).
+
+`persons-day.spec.ts` (project `persons-day`, issue 232) is a new user (`E2E_DAY_USER_*`, made
+per run by the stack) whose browser runs in a zone whose date is not UTC's while the test runs
+(`zoneOffTheUtcDate` in `support/days.ts`: Los Angeles before 06:00 UTC, Pago Pago before 10:00,
+else Kiritimati; spec 019, "The e2e test's zone"). The stack shares the real clock, so the test
+moves the browser's zone instead of the clock. It waits for the first page to save that zone on
+the profile, then checks the browser's date everywhere a date comes from the clock: Spending's
+"so far" period, the plan's As of and Through dates and a deadline due today not overdue, the
+PDF's file name, and the month's check-in and its Coming up date.
 
 ### Alpha capture and demo recording
 

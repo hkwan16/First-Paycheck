@@ -1,9 +1,11 @@
-import { useSyncExternalStore } from 'react';
 import type { Period } from '@/lib/api/hooks/spending';
 
 /*
- * The Spending screen's period choices: whole calendar months in UTC, as the
- * API counts them. Date arithmetic only; no amounts.
+ * The Spending screen's period choices: whole calendar months, counted from
+ * the person's today that `GET /profile` answers (`useToday()` in
+ * `@/lib/api/hooks`, spec 019 rule 6), never the browser's clock. Plain
+ * calendar-date arithmetic only (done on UTC dates so no zone moves a day);
+ * no amounts.
  */
 
 export interface PeriodOption {
@@ -72,16 +74,4 @@ export function optionsWithin(
 export function selectedPeriodKey(chosen: Period | null, answered: Period | undefined): string {
   if (chosen) return monthKey(chosen.start);
   return answered ? monthKey(answered.start) : '';
-}
-
-const noop = () => () => {};
-const todayUtc = () => new Date().toISOString().slice(0, 10);
-const onServer = () => null;
-
-/**
- * Today's UTC date, `YYYY-MM-DD`, on the client; null on the server and while
- * hydrating, so the HTML never depends on whose clock rendered it.
- */
-export function useToday(): string | null {
-  return useSyncExternalStore(noop, todayUtc, onServer);
 }

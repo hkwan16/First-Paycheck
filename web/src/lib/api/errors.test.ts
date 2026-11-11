@@ -3,6 +3,7 @@ import {
   ApiError,
   apiErrorCode,
   apiErrorMessage,
+  fieldProblems,
   formatWait,
   isApiErrorBody,
   parseRetryAfter,
@@ -159,5 +160,27 @@ describe('parseRetryAfter', () => {
     expect(parseRetryAfter(null, now)).toBeNull();
     expect(parseRetryAfter('soon', now)).toBeNull();
     expect(parseRetryAfter('-5', now)).toBeNull();
+  });
+});
+
+describe('fieldProblems (spec 007 rule 2a)', () => {
+  const body = (details: unknown, code = 'validation_error') => ({
+    error: { code, message: 'refused', details },
+  });
+
+  it("lists a validation error's problems with their place in the body", () => {
+    const errors = [
+      { path: ['plans', 1, 'oop_max_cents'], message: 'Gold PPO: enter a maximum.' },
+      { path: [], message: 'Something about the whole body.' },
+    ];
+    expect(fieldProblems(new ApiError(422, body({ errors })))).toEqual(errors);
+  });
+
+  it('is null for any other refusal, or a body it cannot read', () => {
+    expect(fieldProblems(new ApiError(422, body({ errors: [] }, 'result_mismatch')))).toBeNull();
+    expect(fieldProblems(new ApiError(422, body(null)))).toBeNull();
+    expect(fieldProblems(new ApiError(422, body({ errors: [{ path: 'plans' }] })))).toBeNull();
+    expect(fieldProblems(new ApiError(500, null))).toBeNull();
+    expect(fieldProblems(new Error('offline'))).toBeNull();
   });
 });

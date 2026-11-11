@@ -89,7 +89,7 @@ td.gap { width: 6%; border-top: 0; }
   <h2>Decisions</h2>
 {% for decision in plan.decisions %}
   <div class="decision">
-    <div class="decision-head"><span class="name">{{ loop.index }}. {{ calculator_titles[decision.calculator] }}</span><span class="muted">Saved {{ decision.created_at | utc_day | long_date }}</span></div>
+    <div class="decision-head"><span class="name">{{ loop.index }}. {{ calculator_titles[decision.calculator] }}</span><span class="muted">Saved {{ decision.saved_on | long_date }}</span></div>
 {% if decision.review %}
     <p class="review">Needs review: {% for reason in decision.review %}{{ reason.text }}{% if not loop.last %} {% endif %}{% endfor %}</p>
     <p class="muted">{{ review_note }}</p>

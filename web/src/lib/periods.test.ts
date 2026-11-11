@@ -1,6 +1,5 @@
-import { renderHook } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { monthKey, periodOptions, selectedPeriodKey, useToday } from './periods';
+import { describe, expect, it } from 'vitest';
+import { monthKey, periodOptions, selectedPeriodKey } from './periods';
 
 describe('monthKey', () => {
   it('is the year and month of a calendar date', () => {
@@ -52,14 +51,5 @@ describe('selectedPeriodKey', () => {
     );
     expect(selectedPeriodKey(null, { start: '2026-09-01', end: '2026-09-30' })).toBe('2026-09');
     expect(selectedPeriodKey(null, undefined)).toBe('');
-  });
-});
-
-describe('useToday', () => {
-  afterEach(() => vi.useRealTimers());
-
-  it("is today's UTC date on the client", () => {
-    vi.useFakeTimers({ now: new Date('2026-10-17T23:30:00-07:00') });
-    expect(renderHook(() => useToday()).result.current).toBe('2026-10-18');
   });
 });

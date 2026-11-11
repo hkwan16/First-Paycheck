@@ -115,6 +115,7 @@ WRITE_ROUTE_POLICIES: dict[str, Limit | str] = {
     "update_goal": _OWN_ROW,
     "update_finding": _OWN_ROW,
     "put_profile": _OWN_ROW,
+    "put_time_zone": _OWN_ROW,
     "save_review": (
         "replaces one document's review draft, a bounded body (at most 200 fields); the"
         " screen sends one per change, never per keystroke"

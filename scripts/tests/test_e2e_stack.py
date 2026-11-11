@@ -405,6 +405,8 @@ def test_playwright_environment_points_the_web_at_the_stack() -> None:
     assert env["E2E_SCHEDULE_USER_PASSWORD"] == users.schedule.password
     assert env["E2E_SESSION_USER_EMAIL"] == users.session.email
     assert env["E2E_SESSION_USER_PASSWORD"] == users.session.password
+    assert env["E2E_DAY_USER_EMAIL"] == users.day.email
+    assert env["E2E_DAY_USER_PASSWORD"] == users.day.password
     # Only the stand-in takes faults (e2e/support/auth-faults.ts); a hosted project has none.
     assert env["E2E_AUTH_FAULTS_URL"] == f"http://127.0.0.1:54347{e2e_stack.FAULTS_PATH}"
     assert env["E2E_PLAID_SANDBOX"] == "0"
@@ -422,8 +424,8 @@ def test_playwright_environment_points_the_web_at_the_stack() -> None:
 
 def test_fixture_users_are_distinct_and_get_fresh_passwords() -> None:
     first, second = e2e_stack.fixture_users(), e2e_stack.fixture_users()
-    assert len({user.id for user in first}) == len(first) == 4
-    assert len({user.email for user in first}) == 4
+    assert len({user.id for user in first}) == len(first) == 5
+    assert len({user.email for user in first}) == 5
     assert first.shared.id == second.shared.id
     assert first.shared.password != second.shared.password
     assert len(first.alpha.password) >= 20

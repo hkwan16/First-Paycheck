@@ -155,6 +155,8 @@ export function planDecision(
     calculator: decision.calculator,
     version: decision.version,
     created_at: decision.created_at,
+    // The sample's saves are mid-afternoon UTC, the same day in New York.
+    saved_on: decision.created_at.slice(0, 10),
     inputs: structuredClone(decision.inputs),
     result: structuredClone(decision.result),
     figures: figuresOf(decision),

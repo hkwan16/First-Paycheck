@@ -23,7 +23,7 @@ from sync.provider import (
     TransactionsNotReady,
 )
 from tests.conftest import FixtureUser
-from tests.support.factories import make_item
+from tests.support.factories import make_item, make_time_zone
 from tests.support.fake_provider import (
     BROKERAGE,
     CHECKING,
@@ -319,6 +319,17 @@ def test_holdings_are_upserted_and_pruned(harness: Harness) -> None:
         ("vxus", 20_000, NOW.date()),
     ]
     assert result.holdings == 2
+
+
+def test_a_holding_without_a_date_is_dated_the_persons_today(harness: Harness) -> None:
+    """Spec 019 rule 9: 06:27 UTC on November 10 is still November 9 in Los Angeles."""
+    make_time_zone(harness.connection, harness.user.id, "America/Los_Angeles")
+    harness.run(
+        FakeProvider(accounts=[BROKERAGE], pages={None: page("c1")}, holdings=[holding("vti", 1)]),
+        now=dt.datetime(2026, 11, 10, 6, 27, tzinfo=dt.UTC),
+    )
+    [row] = harness.query("SELECT as_of FROM holdings")
+    assert row.as_of == dt.date(2026, 11, 9)
 
 
 def test_missing_item_is_a_no_op(harness: Harness) -> None:

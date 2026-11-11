@@ -89,7 +89,8 @@ export function DecisionSummary({ decision }: { decision: PlanDecision }) {
         review ? (
           <Badge tone={saveBadgeTone('review')}>Needs review</Badge>
         ) : (
-          <Badge>Saved {formatDate(decision.created_at)}</Badge>
+          // The person's day of the save, as the PDF prints it (spec 016 rule 11a, spec 019).
+          <Badge>Saved {formatDate(decision.saved_on)}</Badge>
         )
       }
     >

@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from db.enums import CategorySource, JobKind, SyncStatus
 from db.enums import SyncProvider as SyncProviderKind
 from db.models import Account, BalanceSnapshot, Holding, SyncItem, Transaction, role_fits_kind
+from db.person_day import person_day
 from jobs import queue
 from jobs.errors import RetryLater
 from sync.categorize import normalize_merchant
@@ -239,7 +240,14 @@ def _write(
         removed=removed,
         skipped=skipped,
         balances=_insert_snapshots(session, user_id, account_ids, fetched.balances, now),
-        holdings=_upsert_holdings(session, user_id, account_ids, fetched.holdings, now.date()),
+        # A holding the provider does not date is the person's today (spec 019 rule 9).
+        holdings=_upsert_holdings(
+            session,
+            user_id,
+            account_ids,
+            fetched.holdings,
+            person_day(session, user_id, now).today,
+        ),
     )
 
 

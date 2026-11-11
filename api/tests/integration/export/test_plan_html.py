@@ -12,9 +12,10 @@ from sqlalchemy import Connection, text
 from app.db import user_session_for
 from app.decision_review import ReviewReason
 from app.plan import PlanExplanation, PlanOut, build_plan
+from db.person_day import PersonDay, person_day
 from export.html import REVIEW_NOTE, STALE_LABEL, render_html
 from tests.conftest import FixtureUser
-from tests.support.factories import make_document
+from tests.support.factories import make_document, make_time_zone
 from tests.support.plan_user import NOW, PlanUser
 
 FIXTURE = Path(__file__).parent.parent.parent / "fixtures" / "export" / "plan.html"
@@ -24,30 +25,39 @@ NO_EXPLANATION = PlanExplanation(
 )
 
 
-def saved_at(plan: PlanOut, when: dt.datetime) -> PlanOut:
-    """``plan`` with every decision saved at ``when``."""
+def saved_at(plan: PlanOut, when: dt.datetime, day: PersonDay) -> PlanOut:
+    """``plan`` with every decision saved at ``when``, dated on ``day``'s zone as
+    ``build_plan`` dates it (spec 019 rule 3)."""
     return plan.model_copy(
         update={
             "decisions": [
-                decision.model_copy(update={"created_at": when}) for decision in plan.decisions
+                decision.model_copy(update={"created_at": when, "saved_on": day.day_of(when)})
+                for decision in plan.decisions
             ]
         }
     )
 
 
-def plan_of(connection: Connection, user: FixtureUser) -> PlanOut:
-    """The user's plan, its decisions saved at ``NOW`` as spec 016's plan user's are.
+def day_of(connection: Connection, user: FixtureUser, now: dt.datetime = NOW) -> PersonDay:
+    with user_session_for(user.id, bind=connection) as session:
+        return person_day(session, user.id, now)
+
+
+def plan_of(connection: Connection, user: FixtureUser, when: dt.datetime = NOW) -> PlanOut:
+    """The user's plan as of ``NOW``, its decisions saved at ``when`` (``NOW``, as
+    spec 016's plan user's are).
 
     Postgres stamps ``created_at`` with the real start of the test's transaction,
     which no fixture can freeze, so the page would print a different saved date
     every day the suite runs.
     """
+    day = day_of(connection, user)
     with user_session_for(user.id, bind=connection) as session:
-        return saved_at(build_plan(session, NOW.date()), NOW)
+        return saved_at(build_plan(session, day), when, day)
 
 
 def plan_html(connection: Connection, user: FixtureUser) -> str:
-    return render_html(plan_of(connection, user), NOW)
+    return render_html(plan_of(connection, user))
 
 
 def test_html_matches_the_fixture(
@@ -81,8 +91,9 @@ def test_an_overdue_date_is_marked(
 ) -> None:
     """Spec 016 rules 6 and 11 (issue 233): printed on 2026-11-02, the three
     2026-10-31 dates nobody settled are listed and marked Overdue."""
+    day = day_of(db_connection, user_a, dt.datetime(2026, 11, 2, 16, 0, tzinfo=dt.UTC))
     with user_session_for(user_a.id, bind=db_connection) as session:
-        html = render_html(build_plan(session, dt.date(2026, 11, 2)), NOW)
+        html = render_html(build_plan(session, day))
     assert html.count('<span class="overdue">Overdue</span>') == 3
     assert "Oct 31, 2026" in html
     assert 'class="overdue"' not in plan_html(db_connection, user_a)
@@ -135,10 +146,15 @@ def test_the_pdf_names_calculators_as_the_plan_page_does(
     ]
     assert html.count('<span class="muted">Saved Oct 21, 2026</span>') == 4
     assert "Version" not in html
-    # The UTC day of the save, as the preparation date is (spec 016 rule 11).
+    # The person's day of the save, as the preparation date is (spec 016 rule 11,
+    # spec 019 rule 3): 23:30 PDT on October 21 is October 22 in New York, the
+    # default zone, and still October 21 for a person in Los Angeles.
     late = dt.datetime(2026, 10, 21, 23, 30, tzinfo=dt.timezone(dt.timedelta(hours=-7)))
-    next_day = render_html(saved_at(plan_of(db_connection, user_a), late), NOW)
-    assert next_day.count('<span class="muted">Saved Oct 22, 2026</span>') == 4
+    eastern = render_html(plan_of(db_connection, user_a, late))
+    assert eastern.count('<span class="muted">Saved Oct 22, 2026</span>') == 4
+    make_time_zone(db_connection, user_a.id, "America/Los_Angeles")
+    pacific = render_html(plan_of(db_connection, user_a, late))
+    assert pacific.count('<span class="muted">Saved Oct 21, 2026</span>') == 4
     assert re.findall(r"<h3>([^<]+)</h3>", html) == [
         "401(k) match",
         "Health plan",
@@ -196,7 +212,7 @@ def test_explanation_lines_use_the_plan_page_words(
             ]
         }
     )
-    html = render_html(unexplained, NOW)
+    html = render_html(unexplained)
     assert (
         "Explained under Why, with sources. We checked every number in it against the"
         " decision you saved." in decision_block(html, "2. 401(k) match")
@@ -264,7 +280,7 @@ def test_page_one_speaks_plainly(
             )
         )
     for variant in variants:
-        page_one = text_of(pages(render_html(variant, NOW))[0])
+        page_one = text_of(pages(render_html(variant))[0])
         assert not INTERNALS.search(page_one), INTERNALS.search(page_one)
 
 
@@ -294,8 +310,7 @@ def test_a_decision_that_needs_review_prints_the_note(
     plan_user: PlanUser, db_connection: Connection, user_a: FixtureUser
 ) -> None:
     """Spec 016 rule 3a: its figures were worked out before the change, so none print."""
-    with user_session_for(user_a.id, bind=db_connection) as session:
-        plan = build_plan(session, NOW.date())
+    plan = plan_of(db_connection, user_a)
     reason = ReviewReason(
         kind="changed",
         input="pay_periods_per_year",
@@ -307,7 +322,7 @@ def test_a_decision_that_needs_review_prints_the_note(
         else decision
         for decision in plan.decisions
     ]
-    html = render_html(plan.model_copy(update={"decisions": decisions}), NOW)
+    html = render_html(plan.model_copy(update={"decisions": decisions}))
     assert "Needs review: Your pay schedule changed from 24 to 26 paychecks a year." in html
     assert html.count(REVIEW_NOTE) == 1
     # The health plan's figures are left out; the other decisions keep theirs.

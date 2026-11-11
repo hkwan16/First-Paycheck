@@ -319,6 +319,10 @@ export const emptyProfile: Profile = {
   salary_pay_stub_id: null,
   salary_review: null,
   start_date: null,
+  // No zone reported yet: the API dates by America/New_York (spec 019 rule 4),
+  // where SAMPLE_NOW is noon on October 17.
+  time_zone: null,
+  today: SAMPLE_NOW.slice(0, 10),
   updated_at: null,
   vesting_years: null,
 };

@@ -32,6 +32,7 @@ from calc.pay_dates import (
     frequency_named,
     next_pay_date,
 )
+from calc.types import STORED
 from calc.w4 import W4Input
 from db.enums import (
     AccountRole,
@@ -127,8 +128,11 @@ def reproject_goal(session: Session, goal: Goal, today: dt.date) -> dt.date | No
     decision = session.get(Decision, goal.decision_id) if goal.decision_id else None
     if decision is None or decision.calculator != CalculatorKind.EMERGENCY_FUND:
         return None
+    # The decision's stored inputs (spec 007 rule 2b); PATCH /goals held the new
+    # contribution to its entry limit (spec 011 rule 8a).
     inputs = EmergencyFundInput.model_validate(
-        {**decision.inputs, "monthly_contribution_cents": goal.monthly_contribution_cents}
+        {**decision.inputs, "monthly_contribution_cents": goal.monthly_contribution_cents},
+        context=STORED,
     )
     first = _next_pay_date(session, decision.user_id, inputs.pay_periods_per_year, today)
     return _target_date(first, emergency_fund(inputs))

@@ -167,6 +167,19 @@ def test_snapshots_of_unknown_accounts_are_ignored() -> None:
     assert result.net_worth_cents == 547_754
 
 
+def test_newest_snapshot_of_a_day_is_the_last_taken() -> None:
+    """Spec 019 example 21a, spec 015 rule 20: of two snapshots on one date (two
+    syncs that day, or two instants one zone puts on the same date) the later
+    taken is the newer, whatever its balance."""
+    taken_in_order = [snap(CHECKING, "2026-10-31", 120_000), snap(CHECKING, "2026-10-31", 80_000)]
+    result = net_worth(ACCOUNTS, taken_in_order, today=dt.date(2026, 11, 10), months=2)
+    assert [(p.month, p.net_worth_cents) for p in result.series] == [
+        (dt.date(2026, 10, 1), 80_000),
+        (dt.date(2026, 11, 1), 80_000),
+    ]
+    assert result.net_worth_cents == 80_000
+
+
 def test_a_snapshot_after_today_is_not_counted_yet() -> None:
     later = snap(CHECKING, "2026-11-20", 999_999)
     result = net_worth(ACCOUNTS, [*SNAPSHOTS, later], today=TODAY, months=1)

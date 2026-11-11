@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.plan import build_plan
+from db.person_day import person_day
 from export import store
 from export.html import render_html
 from export.pdf import render_pdf
@@ -24,9 +25,10 @@ def run(ctx: JobContext) -> dict[str, Any]:
     with ctx.user_session() as session:
         if store.get(session, ctx.job.id) is not None:
             return SKIPPED
-        plan = build_plan(session, now.date())
+        # As of the person's today (spec 019 rule 12): the date the PDF prints.
+        plan = build_plan(session, person_day(session, ctx.user_id, now))
     ctx.progress(30)
-    pdf = render_pdf(render_html(plan, now))
+    pdf = render_pdf(render_html(plan))
     ctx.progress(90)
     with ctx.user_session() as session:
         stored = store.put(
@@ -34,4 +36,4 @@ def run(ctx: JobContext) -> dict[str, Any]:
         )
     if not stored:
         return SKIPPED
-    return {"size_bytes": len(pdf)}
+    return {"size_bytes": len(pdf), "prepared_on": plan.as_of.isoformat()}

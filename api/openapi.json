@@ -742,6 +742,7 @@
               "personal_care",
               "education",
               "gifts_donations",
+              "cash",
               "fees",
               "taxes",
               "debt_payment",
@@ -2038,7 +2039,7 @@
           },
           "monthly_contribution_cents": {
             "description": "What the user adds each month",
-            "maximum": 100000000000.0,
+            "maximum": 100000000.0,
             "minimum": 0.0,
             "title": "Monthly Contribution Cents",
             "type": "integer"
@@ -2046,7 +2047,7 @@
           "monthly_essentials_cents": {
             "description": "Essential spending per month, as the user confirmed it",
             "exclusiveMinimum": 0.0,
-            "maximum": 100000000000.0,
+            "maximum": 100000000.0,
             "title": "Monthly Essentials Cents",
             "type": "integer"
           },
@@ -2874,7 +2875,7 @@
           "monthly_contribution_cents": {
             "anyOf": [
               {
-                "maximum": 100000000000.0,
+                "maximum": 100000000.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -2984,7 +2985,7 @@
             "title": "Coinsurance Pct"
           },
           "deductible_cents": {
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "minimum": 0.0,
             "title": "Deductible Cents",
             "type": "integer"
@@ -3013,14 +3014,14 @@
           },
           "oop_max_cents": {
             "description": "The out-of-pocket maximum",
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "minimum": 0.0,
             "title": "Oop Max Cents",
             "type": "integer"
           },
           "premium_per_period_cents": {
             "description": "The employee's premium per paycheck",
-            "maximum": 100000000000.0,
+            "maximum": 100000000.0,
             "minimum": 0.0,
             "title": "Premium Per Period Cents",
             "type": "integer"
@@ -3044,7 +3045,7 @@
         "properties": {
           "employee_hsa_cents": {
             "description": "What the user plans to put into an HSA in the year themselves",
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "minimum": 0.0,
             "title": "Employee Hsa Cents",
             "type": "integer"
@@ -3102,7 +3103,7 @@
           "salary_cents": {
             "description": "Annual salary, for the marginal rate",
             "exclusiveMinimum": 0.0,
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "title": "Salary Cents",
             "type": "integer"
           },
@@ -3455,7 +3456,7 @@
           "salary_cents": {
             "description": "Annual base salary in cents",
             "exclusiveMinimum": 0.0,
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "title": "Salary Cents",
             "type": "integer"
           },
@@ -4663,6 +4664,11 @@
             "title": "Review",
             "type": "array"
           },
+          "saved_on": {
+            "format": "date",
+            "title": "Saved On",
+            "type": "string"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -4673,6 +4679,7 @@
           "calculator",
           "version",
           "created_at",
+          "saved_on",
           "inputs",
           "result",
           "figures",
@@ -5347,7 +5354,7 @@
             "anyOf": [
               {
                 "exclusiveMinimum": 0.0,
-                "maximum": 100000000000.0,
+                "maximum": 1000000000.0,
                 "type": "integer"
               },
               {
@@ -5480,7 +5487,7 @@
             "anyOf": [
               {
                 "exclusiveMinimum": 0.0,
-                "maximum": 100000000000.0,
+                "maximum": 1000000000.0,
                 "type": "integer"
               },
               {
@@ -5524,6 +5531,24 @@
             ],
             "title": "Start Date"
           },
+          "time_zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IANA zone the browser last reported (spec 019 rule 5), null before the first report; dates are then taken in America/New_York.",
+            "title": "Time Zone"
+          },
+          "today": {
+            "description": "The person's today in their zone (spec 019 rule 2). Computed on read.",
+            "format": "date",
+            "title": "Today",
+            "type": "string"
+          },
           "updated_at": {
             "anyOf": [
               {
@@ -5552,6 +5577,8 @@
         },
         "required": [
           "updated_at",
+          "time_zone",
+          "today",
           "pay_schedule",
           "salary_review"
         ],
@@ -6104,6 +6131,7 @@
               "personal_care",
               "education",
               "gifts_donations",
+              "cash",
               "fees",
               "taxes",
               "debt_payment",
@@ -6472,6 +6500,25 @@
         "title": "TierProposal",
         "type": "object"
       },
+      "TimeZoneIn": {
+        "additionalProperties": false,
+        "description": "The browser's zone, ``Intl.DateTimeFormat().resolvedOptions().timeZone``.",
+        "properties": {
+          "time_zone": {
+            "examples": [
+              "America/Los_Angeles"
+            ],
+            "maxLength": 64,
+            "title": "Time Zone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "time_zone"
+        ],
+        "title": "TimeZoneIn",
+        "type": "object"
+      },
       "TransactionOut": {
         "properties": {
           "account_id": {
@@ -6504,6 +6551,7 @@
                   "personal_care",
                   "education",
                   "gifts_donations",
+                  "cash",
                   "fees",
                   "taxes",
                   "debt_payment",
@@ -6738,7 +6786,7 @@
           "current_withholding_per_paycheck_cents": {
             "anyOf": [
               {
-                "maximum": 100000000000.0,
+                "maximum": 100000000.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -6752,7 +6800,7 @@
           "deductions_cents": {
             "default": 0,
             "description": "Step 4(b), for the year",
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "minimum": 0.0,
             "title": "Deductions Cents",
             "type": "integer"
@@ -6760,7 +6808,7 @@
           "dependents_credit_cents": {
             "default": 0,
             "description": "Step 3, for the year",
-            "maximum": 100000000000.0,
+            "maximum": 10000000.0,
             "minimum": 0.0,
             "title": "Dependents Credit Cents",
             "type": "integer"
@@ -6768,7 +6816,7 @@
           "expected_deductions_cents": {
             "anyOf": [
               {
-                "maximum": 100000000000.0,
+                "maximum": 1000000000.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -6782,7 +6830,7 @@
           "extra_withholding_cents": {
             "default": 0,
             "description": "Step 4(c), per paycheck",
-            "maximum": 100000000000.0,
+            "maximum": 100000000.0,
             "minimum": 0.0,
             "title": "Extra Withholding Cents",
             "type": "integer"
@@ -6800,7 +6848,7 @@
           "health_premium_per_paycheck_cents": {
             "default": 0,
             "description": "Pre-tax health premium per paycheck, from the saved health plan",
-            "maximum": 100000000000.0,
+            "maximum": 100000000.0,
             "minimum": 0.0,
             "title": "Health Premium Per Paycheck Cents",
             "type": "integer"
@@ -6829,7 +6877,7 @@
           "other_income_cents": {
             "default": 0,
             "description": "Step 4(a), for the year",
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "minimum": 0.0,
             "title": "Other Income Cents",
             "type": "integer"
@@ -6837,7 +6885,7 @@
           "other_jobs_wages_cents": {
             "default": 0,
             "description": "The household's other jobs' annual wages, for the projection",
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "minimum": 0.0,
             "title": "Other Jobs Wages Cents",
             "type": "integer"
@@ -6845,7 +6893,7 @@
           "other_jobs_withholding_cents": {
             "default": 0,
             "description": "Federal income tax those jobs withhold in the year",
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "minimum": 0.0,
             "title": "Other Jobs Withholding Cents",
             "type": "integer"
@@ -6863,7 +6911,7 @@
           "salary_cents": {
             "description": "Annual salary from this job",
             "exclusiveMinimum": 0.0,
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "title": "Salary Cents",
             "type": "integer"
           },
@@ -7733,7 +7781,7 @@
     },
     "/cashflow": {
       "get": {
-        "description": "Gross-to-net lines of each pay stub and the spending summary; the last full UTC\nmonth by default.",
+        "description": "Gross-to-net lines of each pay stub and the spending summary; by default the last\nfull month before the person's today.",
         "operationId": "get_cashflow",
         "parameters": [
           {
@@ -9504,7 +9552,7 @@
         ]
       },
       "put": {
-        "description": "Replace the profile.",
+        "description": "Replace the profile, except its time zone.",
         "operationId": "put_profile",
         "requestBody": {
           "content": {
@@ -9564,6 +9612,63 @@
           }
         ],
         "summary": "Put Profile",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/profile/time-zone": {
+      "put": {
+        "description": "Save the browser's time zone, making the profile when there is none (spec 019 rule 5).",
+        "operationId": "put_time_zone",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimeZoneIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Put Time Zone",
         "tags": [
           "profile"
         ]
@@ -9728,7 +9833,7 @@
     },
     "/spending/summary": {
       "get": {
-        "description": "Income, spending by bucket and what is left over; the last full UTC month by default.",
+        "description": "Income, spending by bucket and what is left over; by default the last full month\nbefore the person's today.",
         "operationId": "spending_summary",
         "parameters": [
           {
@@ -10210,6 +10315,7 @@
                     "personal_care",
                     "education",
                     "gifts_donations",
+                    "cash",
                     "fees",
                     "taxes",
                     "debt_payment",

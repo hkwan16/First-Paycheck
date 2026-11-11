@@ -24,6 +24,7 @@ from typing import Any
 from calc.health_plans import HealthPlansInput, HealthPlansResult
 from calc.k401 import K401MatchInput, K401MatchResult, RateChange, RateCosts, rate_costs
 from calc.pay_stub import StubRate, StubWithholding, stub_rate, stub_withholding
+from calc.types import STORED
 from calc.w4 import AtWithholding, W4Input, W4Result, at_withholding
 from db.enums import CalculatorKind
 from llm.schemas import ExplainCitation, ExplainContext, ExplainFact, ExplanationDraft
@@ -148,7 +149,7 @@ def context_numbers(
     year's withholding and refund at it under ``_cents`` keys, read as money
     (rule 7b)."""
     if calculator == CalculatorKind.K401_MATCH:
-        costs = rate_costs(K401MatchInput.model_validate(inputs), pay_stub_pct)
+        costs = rate_costs(K401MatchInput.model_validate(inputs, context=STORED), pay_stub_pct)
         numbers: dict[str, Any] = {}
         if pay_stub_pct is not None:
             numbers["pay_stub_contribution_pct"] = str(pay_stub_pct)
@@ -164,7 +165,7 @@ def context_numbers(
         return numbers
     if calculator == CalculatorKind.W4 and pay_stub_withholding_cents is not None:
         at = at_withholding(
-            W4Input.model_validate(inputs),
+            W4Input.model_validate(inputs, context=STORED),
             W4Result.model_validate(result),
             pay_stub_withholding_cents,
         )
@@ -691,7 +692,7 @@ def explain_context(
     it is on the decision's pay schedule, else None (rule 7b); only a ``w4``
     decision uses it."""
     if calculator == CalculatorKind.HEALTH_PLANS:
-        plans = HealthPlansInput.model_validate(inputs)
+        plans = HealthPlansInput.model_validate(inputs, context=STORED)
         compared = HealthPlansResult.model_validate(result)
         return ExplainContext(
             calculator=calculator,
@@ -705,7 +706,7 @@ def explain_context(
             benefits_passages=[passage.text for passage in passages],
         )
     if calculator == CalculatorKind.W4:
-        entries = W4Input.model_validate(inputs)
+        entries = W4Input.model_validate(inputs, context=STORED)
         projected = W4Result.model_validate(result)
         return ExplainContext(
             calculator=calculator,
@@ -722,7 +723,7 @@ def explain_context(
         )
     if calculator != CalculatorKind.K401_MATCH:
         raise ValueError(f"no explanation context for calculator {calculator!r} yet")
-    data = K401MatchInput.model_validate(inputs)
+    data = K401MatchInput.model_validate(inputs, context=STORED)
     computed = K401MatchResult.model_validate(result)
     costs = rate_costs(data, pay_stub_pct)
     return ExplainContext(
