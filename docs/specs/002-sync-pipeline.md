@@ -1,6 +1,6 @@
 # 002: Sync pipeline, Plaid, webhooks and jobs
 
-Status: Implemented, M1; the sandbox user fields of rule 27 added after M10; rules 9a, 11a and 11b (transactions Plaid has not made available yet, and the page log) added after issue #213. The live Plaid sandbox tests (`tests/integration/test_plaid_sandbox.py`, marked `plaid_sandbox`) pass against Plaid's sandbox with the keys in `.env`, last run on 2026-11-01 for `user_good`, `user_transactions_dynamic` and a `user_custom` item with no transactions; `scripts/record_plaid_fixtures.py` recorded `tests/fixtures/plaid/recorded/`.
+Status: Implemented, M1; the sandbox user fields of rule 27 added after M10; rules 9a, 11a and 11b (transactions Plaid has not made available yet, and the page log) added after issue #213. Rule 30a (each account's transaction count) and rules 31a-31c (roles by account kind; clearing a role) added for issue 241, replacing rule 31's "a role does not depend on the account's kind". The live Plaid sandbox tests (`tests/integration/test_plaid_sandbox.py`, marked `plaid_sandbox`) pass against Plaid's sandbox with the keys in `.env`, last run on 2026-11-01 for `user_good`, `user_transactions_dynamic` and a `user_custom` item with no transactions; `scripts/record_plaid_fixtures.py` recorded `tests/fixtures/plaid/recorded/`.
 
 ## Goal
 
@@ -106,7 +106,22 @@ Bring a user's bank data into First Paycheck and keep it current. A linked insti
 28. `DELETE /sync/items/{id}` asks Plaid to remove the item (best effort: a Plaid failure, an undecryptable token or an unconfigured Plaid is logged, not returned) with no transaction open, then deletes the row; `ON DELETE CASCADE` removes its accounts, transactions, snapshots and holdings (spec 001 rule 25). The response's `recurring_job_id` is the `recurring.detect` job the unlink queues (or the one already queued), so the client can wait for it and then refresh recurring charges and the check-in. The full unlink path, including the derived data it retracts, is spec 017 rules 11-16.
 29. `POST /sync/items/{id}/sync` returns the already-queued `sync.incremental` job for that item when there is one, otherwise a new one. A CSV item is 422 `not_plaid_item` and queues nothing: it has no provider to pull from (its data arrives only through `POST /accounts/import`, spec 010), so a queued sync could only fail.
 30. `GET /accounts` lists the user's accounts ordered by institution, then name, each with its latest balance snapshot (`balance_cents`, `balance_as_of`, null when none), institution name and `provider` (`plaid` or `csv`, its sync item's provider), so a client can tell an imported account from a linked one: only a Plaid item can be synced on demand.
-31. `PATCH /accounts/{id}` accepts `role` (an `account_role` or null) and `is_active`; omitted fields are unchanged. Assigning `emergency_fund` moves it: the user's previous emergency-fund account loses the role in the same transaction (spec 001 allows one). A role does not depend on the account's kind: a `loan` takes the same roles a `credit` account does.
+30a. **Transactions per account.** Each account in `GET /accounts` (and the `PATCH` and CSV import responses) also carries `transaction_count`, how many transactions it holds, pending ones included, and `first_posted_at`, the date of its oldest one (null with none), counted in the same query. The Link screen's "125 transactions since Sep 2026" reads them. Before this rule it read one page of `GET /transactions` per account (`limit=200`) and counted the rows, so it asked once per account and an account with more than 200 transactions could only say "200+".
+31. `PATCH /accounts/{id}` accepts `role` (an `account_role` the account's kind allows, rule 31a, or null) and `is_active`; omitted fields are unchanged. Assigning `emergency_fund` moves it: the user's previous emergency-fund account loses the role in the same transaction (spec 001 allows one).
+31a. **Roles by account kind** (issue 241). A role says what the account is for in the plan, so each kind takes only the roles that describe it:
+
+    | Kind | Roles it can have | Why |
+    |---|---|---|
+    | `checking` | `spending`, `emergency_fund` | Money spent from day to day; some people keep the emergency fund in a checking account of its own |
+    | `savings` | `emergency_fund` | Cash set aside: what an emergency fund is |
+    | `credit` | `spending` | A card is spent with; it holds no savings |
+    | `loan` | none | Money owed: not spent from, saved in or invested |
+    | `investment` | `retirement` | Investments can be kept for retirement; their value moves, so they are no emergency fund |
+    | `retirement` | `retirement` | |
+
+    `AccountOut.allowed_roles` lists the roles the account's kind allows, in `account_role` order, so a client offers those and no others. `PATCH` with a role the kind does not allow is 422 `role_not_allowed` and changes nothing. The table lives in `db/enums.py` (`ROLES_BY_KIND`); the check constraint `ck_accounts_role_fits_kind` (migration `0025_account_role_fits_kind`) holds the database to it, and a test keeps the two equal. The migration first clears any role an account's kind does not allow: before issue 241 every kind was offered every role, so a loan could be marked the emergency fund, and the emergency fund card would have read its balance as savings. A sync never trips the constraint: when a provider reports an account under a new kind that does not allow its role, the upsert clears the role with it (`pipeline._upsert_accounts`).
+31b. **Clearing a role.** `role: null` clears it and keeps the account active. The Link screen's role select offers "No role" (which sends `{role: null, is_active: true}`), the kind's roles and "Not used" (`{role: null, is_active: false}`), so every choice can be undone; before issue 241 the select's "Choose a role" was a disabled option, so a role once set could only be swapped for another.
+31c. Every role select on Link is named for its account ("Role for Plaid Checking ··0000"), as Unlink is named for its institution (issue 242).
 
 ### Jobs (`jobs/`)
 

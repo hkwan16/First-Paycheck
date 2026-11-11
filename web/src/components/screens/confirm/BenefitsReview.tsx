@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useId, useReducer, type Dispatch, type ReactNode } from 'react';
+import { useCallback, useId, useReducer, useState, type Dispatch, type ReactNode } from 'react';
 import { PageTitle } from '@/components/chrome/PageTitle';
 import { StepFooter } from '@/components/chrome/StepFooter';
 import { Bar } from '@/components/ui/Bar';
@@ -8,12 +8,20 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Notice } from '@/components/ui/Notice';
 import { apiErrorMessage } from '@/lib/api/errors';
-import { useConfirmDocument } from '@/lib/api/hooks';
+import { useConfirmDocument, useSaveReview } from '@/lib/api/hooks';
 import type { Confirmed, DocumentDetail, Proposal } from '@/lib/api/types';
 import { formatNumber } from '@/lib/money';
 import { benefitsValues, initBenefitsState, reviewSections } from './benefits-fields';
-import { confirmReducer, summarize, type ConfirmAction, type ReviewField } from './confirmReducer';
+import {
+  confirmReducer,
+  reviewDraft,
+  summarize,
+  withReviewDraft,
+  type ConfirmAction,
+  type ReviewField,
+} from './confirmReducer';
 import { FieldRow } from './FieldRow';
+import { ProgressNotSaved, SaveStatus } from './ReviewProgress';
 import { SourcePane } from './SourcePane';
 
 export interface BenefitsReviewProps {
@@ -46,8 +54,14 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export function BenefitsReview({ document, proposal, onConfirmed }: BenefitsReviewProps) {
   const titleId = useId();
   const sourceId = useId();
-  const [state, dispatchState] = useReducer(confirmReducer, proposal, initBenefitsState);
+  const [initial] = useState(() =>
+    withReviewDraft(initBenefitsState(proposal), document.review, { manual: false }),
+  );
+  const [state, dispatchState] = useReducer(confirmReducer, initial);
   const summary = summarize(state);
+  // Progress is kept with the document as on a pay stub (spec 005 rule 23e).
+  const [start] = useState(() => reviewDraft(initial.fields));
+  const progress = useSaveReview(document.id, reviewDraft(state.fields), start);
   const sections = reviewSections(state.fields);
   const confirm = useConfirmDocument();
 
@@ -106,6 +120,7 @@ export function BenefitsReview({ document, proposal, onConfirmed }: BenefitsRevi
               <div className="text-small text-ink-3">
                 <span className="tabular-nums">{formatNumber(summary.confirmedCount)}</span> of{' '}
                 <span className="tabular-nums">{formatNumber(summary.total)}</span> confirmed
+                <SaveStatus state={progress} />
               </div>
             </div>
             <Button
@@ -143,6 +158,7 @@ export function BenefitsReview({ document, proposal, onConfirmed }: BenefitsRevi
             )}
           </Section>
 
+          <ProgressNotSaved state={progress} />
           {confirm.isError && (
             <Notice tone="warning" compact role="alert">
               Could not save these fields.{' '}

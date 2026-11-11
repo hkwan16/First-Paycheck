@@ -309,6 +309,19 @@ def confirm_document(
     return Case("POST", f"/docs/{document}/confirm", 404, json={"pay_stub": values}, after=after)
 
 
+def save_review(connection: Connection, client_as: Callable[[FixtureUser], TestClient]) -> Case:
+    document = a_document(connection, status="proposed", proposal={"fields": []})
+    draft = {"fields": [{"key": "gross_cents", "value": 1, "confirmed": True}]}
+
+    def after(conn: Connection) -> None:
+        stored = conn.execute(
+            text("SELECT review_draft FROM documents WHERE id = :id"), {"id": document}
+        ).scalar_one()
+        assert stored is None
+
+    return Case("PUT", f"/docs/{document}/review", 404, json=draft, after=after)
+
+
 def list_benefits_plans(
     connection: Connection, client_as: Callable[[FixtureUser], TestClient]
 ) -> Case:
@@ -822,6 +835,7 @@ ROUTE_CASES: dict[tuple[str, str], Builder] = {
     ("GET", "/docs/{document_id}"): get_document,
     ("POST", "/docs/{document_id}/extract"): extract_document,
     ("POST", "/docs/{document_id}/confirm"): confirm_document,
+    ("PUT", "/docs/{document_id}/review"): save_review,
     ("GET", "/pay-stubs"): list_pay_stubs,
     ("GET", "/benefits-plans"): list_benefits_plans,
     ("GET", "/profile"): get_profile,

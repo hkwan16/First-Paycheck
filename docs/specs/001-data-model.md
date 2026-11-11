@@ -146,6 +146,7 @@ One row per upload, kept after the file is deleted.
 | `confirmed_at` | `timestamptz` | Set on confirm; `CHECK ((status = 'confirmed') = (confirmed_at IS NOT NULL))` |
 | `deleted_at` | `timestamptz` | Set when the blob is deleted |
 | `replaced_by_id` | `uuid` | Null until a newer upload replaces this document (spec 004 rules 24-31); `UNIQUE`; FK `(replaced_by_id, user_id) -> documents (id, user_id)`; `CHECK (replaced_by_id <> id)`; `CHECK (replaced_by_id IS NULL OR deleted_at IS NOT NULL)` |
+| `review_draft` | `jsonb` | Null until `PUT /docs/{id}/review` saves progress through Confirm (spec 005 rules 23c-23e), and null again once the document is confirmed, replaced, read again or expired; `CHECK (jsonb_typeof(review_draft) = 'object')`. Not confirmed data |
 
 Indexes: `(user_id, created_at DESC)`. `UNIQUE (id, user_id)`.
 
@@ -230,7 +231,7 @@ One per linked institution or CSV source.
 | `kind` | `account_kind` | `NOT NULL` |
 | `name` | `text` | `NOT NULL` |
 | `mask` | `text` | Nullable; last four digits only, `CHECK (mask ~ '^[0-9]{2,4}$')` |
-| `role` | `account_role` | Nullable; partial `UNIQUE (user_id) WHERE role = 'emergency_fund'` (current savings is read from the one emergency-fund account) |
+| `role` | `account_role` | Nullable; `ck_accounts_role_fits_kind`: only a role its `kind` takes (spec 002 rule 31a); partial `UNIQUE (user_id) WHERE role = 'emergency_fund'` (current savings is read from the one emergency-fund account) |
 | `is_active` | `boolean` | `NOT NULL DEFAULT true` |
 
 `UNIQUE (id, user_id)`.
@@ -466,6 +467,8 @@ Reference data, no `user_id` (RLS exception).
 | `0021_paycheck_change` | Nothing new. Folds each check-in's `deduction_change` findings into their paycheck's `pay_change` and merges the findings a newer copy of a stub made (spec 015 rule 13a, issues 194 and 202), then rebuilds `finding_kind` without `deduction_change`. The downgrade splits the lines back into `deduction_change` findings and rebuilds the type with the label |
 | `0022_deadline_dates` | Nothing new. Rebuilds `finding_kind` with `overdue_deadline` after `upcoming_deadline` and keys each `upcoming_deadline` finding by its date, `upcoming_deadline:{calendar_kind}:{due_at}`, folding a check-in's findings that then share a key (spec 015 rule 13b, issues 233 and 234). The downgrade deletes the `overdue_deadline` findings, settles each check-in's status again, keys the date findings by their event and rebuilds the type without the label |
 | `0023_salary_pay_stub` | `profiles.salary_pay_stub_id` and its same-user foreign key to `pay_stubs` (spec 005 rule 24c, issue 221). The downgrade drops the column |
+| `0024_document_review_draft` | `documents.review_draft` and its object check (spec 005 rules 23c-23e, issue 229). The downgrade drops the column |
+| `0025_account_role_fits_kind` | Nothing new. Clears every role its account's kind does not allow, then adds `ck_accounts_role_fits_kind` (spec 002 rule 31a, issue 241). The downgrade drops the check; cleared roles stay cleared |
 
 CI runs upgrade, downgrade, upgrade and `alembic check` on every pull request.
 

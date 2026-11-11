@@ -67,7 +67,7 @@ def test_import_creates_an_account(
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["imported"] == 3
+    assert (body["added"], body["already_present"]) == (3, 0)
     account = body["account"]
     assert (account["name"], account["kind"], account["balance_cents"]) == (
         "Credit union",
@@ -109,7 +109,8 @@ def test_reimport_is_idempotent(
     again = upload(client, FILE_A, account_id=first["account"]["id"])
 
     assert again.status_code == 200, again.text
-    assert again.json()["imported"] == 3
+    # Issue 231: the second import adds nothing, and says so.
+    assert (again.json()["added"], again.json()["already_present"]) == (0, 3)
     assert again.json()["account"]["id"] == first["account"]["id"]
     assert len(transactions(db_connection, user_a)) == 3
     assert scalar(db_connection, "SELECT count(*) FROM sync_items") == 1
@@ -126,6 +127,7 @@ def test_overlap_adds_only_new_rows(
 
     assert response.status_code == 200, response.text
     assert len(transactions(db_connection, user_a)) == 4
+    assert (response.json()["added"], response.json()["already_present"]) == (1, 1)
     assert response.json()["account"]["balance_cents"] == 292395
 
 

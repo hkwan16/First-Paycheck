@@ -15,6 +15,7 @@ import { useAccounts, useImportCsv, useJob } from '@/lib/api/hooks';
 import type { AccountKind, AmountSign, CsvImport as CsvImported } from '@/lib/api/types';
 import { csvProblems, UploadError, type CsvImportTarget, type CsvProblem } from '@/lib/api/upload';
 import { formatNumber } from '@/lib/money';
+import { csvImportTargets, importResultText } from './account-format';
 
 const CSV_ACCEPT = '.csv,text/csv';
 
@@ -34,11 +35,10 @@ function problemText({ row, column, message }: CsvProblem): string {
 function ImportJobs({ result }: { result: CsvImported }) {
   const categorize = useJob(result.categorize_job_id);
   const recurring = useJob(result.recurring_job_id);
-  const noun = result.imported === 1 ? 'transaction' : 'transactions';
   return (
     <div className="flex flex-col gap-3">
       <Notice tone="confirmed" compact role="status">
-        Imported {formatNumber(result.imported)} {noun} into {result.account.name}.
+        {importResultText(result)}
       </Notice>
       <JobProgress
         label="Sorting into categories"
@@ -123,7 +123,7 @@ export function CsvImport({ id }: { id?: string }) {
   const nameId = useId();
   const institutionId = useId();
   const listed = useAccounts().data;
-  const accounts = listed ?? [];
+  const targets = csvImportTargets(listed ?? []);
   const upload = useImportCsv();
   // An account can be removed (Remove on the Link screen) after it was chosen
   // here or imported into: once the list no longer has it, neither does the
@@ -139,9 +139,13 @@ export function CsvImport({ id }: { id?: string }) {
   const [institution, setInstitution] = useState('');
   const [sign, setSign] = useState<AmountSign>('negative_is_out');
   const [percent, setPercent] = useState(0);
+  // The file the last import was of: its refusal is about that file only, so
+  // choosing another drops it (issue 240).
+  const [sent, setSent] = useState<File | null>(null);
 
   const start = () => {
     if (!file) return;
+    setSent(file);
     const account: CsvImportTarget = accountId
       ? { id: accountId }
       : { kind, name, institutionName: institution };
@@ -196,7 +200,7 @@ export function CsvImport({ id }: { id?: string }) {
               onChange={(event) => setAccountId(event.currentTarget.value)}
             >
               <option value="">A new account</option>
-              {accounts.map((account) => (
+              {targets.map((account) => (
                 <option key={account.id} value={account.id}>
                   {[account.name, maskLabel(account.mask)].filter(Boolean).join(' ')}
                 </option>
@@ -283,7 +287,7 @@ export function CsvImport({ id }: { id?: string }) {
       {upload.isPending && file && (
         <Bar label={`Uploading ${file.name}`} tone="blue" value={percent} />
       )}
-      {upload.isError && file && (
+      {upload.isError && file && file === sent && (
         <ImportError error={upload.error} fileName={file.name} onRetry={start} />
       )}
       {upload.isSuccess && !gone(upload.data.account.id) && (

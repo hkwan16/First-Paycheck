@@ -16,6 +16,13 @@ const ACCOUNT = 'E2E CSV Checking';
 const BANK = 'E2E Credit Union';
 const ROWS = 5;
 
+/** What the panel says after importing the five rows (spec 010 rule 15a, issue 231). */
+const added = (account: string) => `Added ${ROWS} transactions to ${account}.`;
+const alreadyThere = (account: string) =>
+  `No new transactions: all ${ROWS} were already in ${account}.`;
+/** Any import result, for checking that none is left. */
+const ANY_RESULT = /^(Added \d+ transactions? to |No new transactions: )/;
+
 test.describe.configure({ mode: 'serial' });
 test.skip(!e2eUser(), NO_E2E_USER);
 test.skip(!e2eApiUrl(), NO_E2E_API);
@@ -36,8 +43,8 @@ async function expectJobsDone(panel: Locator) {
 
 test('imports the export into a new account and follows both jobs', async ({ page }) => {
   const panel = await openImport(page);
-  const existing = page.getByRole('group', { name: ACCOUNT });
-  if ((await existing.count()) > 0) {
+  const existing = (await page.getByRole('group', { name: ACCOUNT }).count()) > 0;
+  if (existing) {
     await panel.getByLabel('Import into').selectOption({ label: ACCOUNT });
   } else {
     await panel.getByLabel('Account type').selectOption('Checking');
@@ -47,7 +54,8 @@ test('imports the export into a new account and follows both jobs', async ({ pag
   await panel.getByLabel(/Choose a CSV file/).setInputFiles(FIXTURE);
   await panel.getByRole('button', { name: 'Import CSV' }).click();
 
-  await expect(panel.getByText(`Imported ${ROWS} transactions into ${ACCOUNT}.`)).toBeVisible({
+  // Run on its own after an earlier run, the account already has the five rows.
+  await expect(panel.getByText(existing ? alreadyThere(ACCOUNT) : added(ACCOUNT))).toBeVisible({
     timeout: 30_000,
   });
   await expectJobsDone(panel);
@@ -60,16 +68,18 @@ test('imports the export into a new account and follows both jobs', async ({ pag
   await expect(card.getByRole('button', { name: `Unlink ${BANK}` })).toHaveCount(0);
 });
 
-test('importing the same file again adds no second account', async ({ page }) => {
+test('importing the same file again adds no second account and says every row was already there (issue 231)', async ({
+  page,
+}) => {
+  // Before issue 231 this said "Imported 5 transactions into E2E CSV Checking." again.
   const panel = await openImport(page);
   await panel.getByLabel('Import into').selectOption({ label: ACCOUNT });
   await expect(panel.getByLabel('Account type')).toHaveCount(0);
   await panel.getByLabel(/Choose a CSV file/).setInputFiles(FIXTURE);
   await panel.getByRole('button', { name: 'Import CSV' }).click();
 
-  await expect(
-    panel.getByText(new RegExp(`^Imported \\d+ transactions? into ${ACCOUNT}\\.$`)),
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(panel.getByText(alreadyThere(ACCOUNT))).toBeVisible({ timeout: 30_000 });
+  await expect(panel.getByText(/^Added /)).toHaveCount(0);
   await expectJobsDone(panel);
   await expect(page.getByRole('group', { name: ACCOUNT })).toHaveCount(1);
 });
@@ -86,16 +96,12 @@ test('removing the account an import made clears what the panel said about it', 
   await panel.getByLabel('Bank name (optional)').fill(bank);
   await panel.getByLabel(/Choose a CSV file/).setInputFiles(FIXTURE);
   await panel.getByRole('button', { name: 'Import CSV' }).click();
-  await expect(panel.getByText(`Imported ${ROWS} transactions into ${account}.`)).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(panel.getByText(added(account))).toBeVisible({ timeout: 30_000 });
   await expectJobsDone(panel);
   // Once more into it, so the panel names it as the account to import into.
   await panel.getByLabel('Import into').selectOption({ label: account });
   await panel.getByRole('button', { name: 'Import CSV' }).click();
-  await expect(
-    panel.getByText(new RegExp(`^Imported \\d+ transactions? into ${account}\\.$`)),
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(panel.getByText(alreadyThere(account))).toBeVisible({ timeout: 30_000 });
   await expect(panel.getByLabel('Import into')).not.toHaveValue('');
 
   const card = page.getByRole('region', { name: 'Bank accounts' });
@@ -103,7 +109,7 @@ test('removing the account an import made clears what the panel said about it', 
   await card.getByRole('button', { name: `Yes, remove ${bank}` }).click();
   await expect(page.getByRole('group', { name: account })).toHaveCount(0, { timeout: 30_000 });
 
-  await expect(panel.getByText(/^Imported \d+ transactions? into /)).toHaveCount(0);
+  await expect(panel.getByText(ANY_RESULT)).toHaveCount(0);
   await expect(panel.getByRole('progressbar', { name: 'Sorting into categories' })).toHaveCount(0);
   await expect(panel.getByLabel('Import into')).toHaveValue('');
 });

@@ -45,31 +45,3 @@ export function useUpdateAccount() {
     onSettled: () => invalidateAccounts(queryClient),
   });
 }
-
-/** Up to this many transactions are counted per account; more reads "200+". */
-export const ACCOUNT_COUNT_LIMIT = 200;
-
-export interface AccountTransactionCount {
-  /** Rows in the first page: exact when `more` is false. */
-  count: number;
-  more: boolean;
-  /** The oldest posted_at counted, or null for an account with none. */
-  since: string | null;
-}
-
-/**
- * How many transactions an account has, for the Link screen's
- * "94 transactions since July". A row count from one page of
- * `GET /transactions` (newest first), so the oldest row is the last one.
- */
-export function useAccountTransactionCount(accountId: string): AccountTransactionCount | undefined {
-  const { data } = $api.useQuery('get', '/transactions', {
-    params: { query: { account_id: accountId, limit: ACCOUNT_COUNT_LIMIT } },
-  });
-  if (!data) return undefined;
-  return {
-    count: data.items.length,
-    more: data.next_cursor !== null,
-    since: data.items.at(-1)?.posted_at ?? null,
-  };
-}

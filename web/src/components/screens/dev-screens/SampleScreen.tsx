@@ -19,7 +19,7 @@ import { SpendingScreen } from '@/components/screens/spending/SpendingScreen';
 import { WhyIndexScreen } from '@/components/screens/why/WhyIndexScreen';
 import { WhyScreen } from '@/components/screens/why/WhyScreen';
 import { $api } from '@/lib/api/client';
-import { ACCOUNT_COUNT_LIMIT, periodFilters } from '@/lib/api/hooks';
+import { periodFilters } from '@/lib/api/hooks';
 import { queryKeys } from '@/lib/api/keys';
 import type { CheckInDetail, Decision } from '@/lib/api/types';
 import { CALCULATORS, type CalculatorId } from '@/lib/features';
@@ -59,6 +59,7 @@ import {
   manualEntryProposal,
   PAY_STUB_DOC_ID,
   sampleBenefitsDocument,
+  confirmedDocumentDetail,
   sampleDocument,
   sampleDocumentDetail,
   samplePayStub,
@@ -455,13 +456,7 @@ export function seededClient(screen: SampleScreenName = 'link') {
       null,
     ),
   );
-  seed(
-    queryKeys.document(CONFIRMED_DOC_ID),
-    sampleDocumentDetail(
-      { id: CONFIRMED_DOC_ID, status: 'confirmed', confirmed_at: SAMPLE_NOW },
-      null,
-    ),
-  );
+  seed(queryKeys.document(CONFIRMED_DOC_ID), confirmedDocumentDetail({ id: CONFIRMED_DOC_ID }));
   // The Spending screen's list for the sample period (spec 003 rule 17a).
   seed(queryKeys.transactionPages(periodFilters(SAMPLE_PERIOD)), {
     pages: [{ items: [...sampleTransactions], next_cursor: null }],
@@ -471,15 +466,6 @@ export function seededClient(screen: SampleScreenName = 'link') {
   seed($api.queryOptions('get', '/cashflow', period).queryKey, sampleCashflow());
   seed(queryKeys.recurring(), [...sampleRecurring]);
   seed(queryKeys.spendingMonths(), sampleSpendingMonths);
-  for (const account of sampleAccounts) {
-    const { queryKey } = $api.queryOptions('get', '/transactions', {
-      params: { query: { account_id: account.id, limit: ACCOUNT_COUNT_LIMIT } },
-    });
-    seed(queryKey, {
-      items: sampleTransactions.filter((t) => t.account_id === account.id),
-      next_cursor: null,
-    });
-  }
   SCREENS[screen].seed?.(seed);
   return client;
 }

@@ -11,7 +11,7 @@ import type {
   ProposedField,
   SourceLine,
 } from '@/lib/api/types';
-import { SAMPLE_SYNCED_AT } from './sample';
+import { SAMPLE_NOW, SAMPLE_SYNCED_AT } from './sample';
 
 /*
  * The Confirm mockup's pay stub (docs/mockup/Confirm.dc.html) in the API's
@@ -175,6 +175,9 @@ export function sampleDocument(overrides: Partial<DocumentSummary> = {}): Docume
     deleted_at: null,
     replaced_by_id: null,
     superseded: false,
+    employer_name: null,
+    pay_date: null,
+    plan_names: [],
     ...overrides,
   };
   return { ...document, can_read_again: overrides.can_read_again ?? canReadAgain(document) };
@@ -184,7 +187,14 @@ export function sampleDocumentDetail(
   overrides: Partial<DocumentDetail> = {},
   proposal: Proposal | null = sampleProposal,
 ): DocumentDetail {
-  return { ...sampleDocument(overrides), proposal, ...overrides };
+  return {
+    ...sampleDocument(overrides),
+    proposal,
+    review: null,
+    pay_stub: null,
+    plans: [],
+    ...overrides,
+  };
 }
 
 /** The benefits summary the Link mockup lists below the pay stub (uploaded just before it). */
@@ -237,6 +247,30 @@ export function samplePayStub(overrides: Partial<PayStub> = {}): PayStub {
     retirement_contribution_pct: SAMPLE_RETIREMENT_CONTRIBUTION_PCT,
     ...overrides,
   };
+}
+
+/**
+ * The sample stub once confirmed, as `GET /docs` lists it: named by its employer
+ * and pay date (spec 005 rule 22g). Its file was deleted on confirm.
+ */
+export function confirmedDocument(overrides: Partial<DocumentSummary> = {}): DocumentSummary {
+  return sampleDocument({
+    status: 'confirmed',
+    confirmed_at: SAMPLE_NOW,
+    deleted_at: SAMPLE_NOW,
+    employer_name: sampleValues.employer_name,
+    pay_date: sampleValues.pay_date,
+    ...overrides,
+  });
+}
+
+/** `GET /docs/{id}` of the confirmed sample stub, with the values confirmed (rule 22h). */
+export function confirmedDocumentDetail(overrides: Partial<DocumentSummary> = {}): DocumentDetail {
+  const document = confirmedDocument(overrides);
+  return sampleDocumentDetail(
+    { ...document, pay_stub: samplePayStub({ document_id: document.id }) },
+    null,
+  );
 }
 
 /**

@@ -486,4 +486,12 @@ def test_list_is_newest_first(
         "replaced_by_id",
         "can_read_again",
         "superseded",
+        "employer_name",
+        "pay_date",
+        "plan_names",
     }
+    assert (listed[0]["employer_name"], listed[0]["pay_date"], listed[0]["plan_names"]) == (
+        None,
+        None,
+        [],
+    )

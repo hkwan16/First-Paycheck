@@ -363,10 +363,12 @@ export const planningHandlers = [
       };
     }
     db.proposals.delete(document.id);
+    db.reviews.delete(document.id);
     Object.assign(document, {
       status: 'confirmed',
       confirmed_at: SAMPLE_NOW,
       deleted_at: SAMPLE_NOW,
+      plan_names: plans.map((plan) => plan.name),
     });
     const confirmed: Confirmed = {
       document,

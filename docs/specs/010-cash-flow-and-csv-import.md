@@ -1,6 +1,6 @@
 # 010: Cash flow and CSV import
 
-Status: Implemented, M5. Settles spec 001 open question 5 (CSV transaction ids). Rules 5b-5d (the diagram's every node and band from the API, and `GET /spending/months`) added on November 9 (issue #236): on the production e2e account's October the diagram drew "Gross pay, 1 stub $2,708.33" about 157 px tall and "Take-home $1,996.04" about 300 px, because the client sized take-home by the $5,234.98 of spending drawn out of it, which the $3,240.12 deposited could not pay for either; the legend listed the pay stub groups in months with no stub, and the picker offered June 2026, a month with no transaction.
+Status: Implemented, M5. Settles spec 001 open question 5 (CSV transaction ids). Rule 15a (`added` and `already_present` in place of `imported`) added for issue 231; rule 17's import targets on Link narrowed to CSV accounts for issue 241. Rules 5b-5d (the diagram's every node and band from the API, and `GET /spending/months`) added on November 9 (issue #236): on the production e2e account's October the diagram drew "Gross pay, 1 stub $2,708.33" about 157 px tall and "Take-home $1,996.04" about 300 px, because the client sized take-home by the $5,234.98 of spending drawn out of it, which the $3,240.12 deposited could not pay for either; the legend listed the pay stub groups in months with no stub, and the picker offered June 2026, a month with no transaction.
 
 ## Goal
 
@@ -86,7 +86,7 @@ No parameters.
 
 ### `POST /accounts/import` (`CsvImport`)
 
-200 with `account` (an `AccountOut`, as `GET /accounts` lists it, with the latest balance), `imported` (data rows written, new or updated), `categorize_job_id` and `recurring_job_id` (the queued `categorize.run` and `recurring.detect` jobs, for the client to poll).
+200 with `account` (an `AccountOut`, as `GET /accounts` lists it, with the latest balance), `added` (the file's rows the account did not have, now new transactions) and `already_present` (the file's rows the account already had, rule 15a), `categorize_job_id` and `recurring_job_id` (the queued `categorize.run` and `recurring.detect` jobs, for the client to poll).
 
 | Status | Code | When |
 |---|---|---|
@@ -124,10 +124,12 @@ No parameters.
 14. **Errors.** Every row is checked; the first 50 errors are returned in file order as `{row, column, message}` (`column` is the role, such as `date`, or null for the whole file), and the message counts all of them. Nothing is written when there is any error.
 15. **Transaction ids** (settles spec 001 open question 5). `provider_txn_id = "csv-" + sha256("<date>|<amount_cents>|<description>|<n>")[:32]` in hex, where `n` is the row's occurrence number (1, 2, ...) among rows of the file with the same date, signed amount and trimmed description. Re-importing a file, or an overlapping export that covers whole days, writes no duplicates; two identical purchases on one day stay two transactions.
 
+15a. **Added and already there** (issue 231). Every data row of a valid file is either `added` (no transaction of the target account has its `provider_txn_id`, so the import makes one) or `already_present` (one has: an earlier import of the same rows, rule 15, which this import leaves as it was), so `added + already_present` is the file's row count. The route counts them before the write, inside the import's transaction, from the account's own ids; a new account has none. Before issue 231 the response had one count, `imported`, of every row written, new or not, so importing the same file twice said "Imported 5 transactions" both times though the second import added none. The Link screen says both: "Added 5 transactions to E2E CSV Checking.", "Added 1 transaction to E2E CSV Checking. 4 were already there.", or "No new transactions: all 5 were already in E2E CSV Checking."
+
 ### Part B: the import
 
 16. The route parses and validates the whole file before touching the database.
-17. **Target account.** Without `account_id`, the import creates a `sync_items` row (`provider = 'csv'`, no `provider_item_id`, no access token) and, through the pipeline, one account with `provider_account_id = 'csv'`, the given `kind` and `name`. With `account_id`, the account must be visible to the user (else 404) and belong to a CSV item (else 422 `not_csv_account`); its name and kind are kept.
+17. **Target account.** Without `account_id`, the import creates a `sync_items` row (`provider = 'csv'`, no `provider_item_id`, no access token) and, through the pipeline, one account with `provider_account_id = 'csv'`, the given `kind` and `name`. With `account_id`, the account must be visible to the user (else 404) and belong to a CSV item (else 422 `not_csv_account`); its name and kind are kept. The Link screen's "Import into" list therefore offers only CSV accounts (`provider = 'csv'`) besides "A new account": a linked bank's accounts, loans among them, fill from the bank, and the API would refuse them (issue 241; before it every account was listed).
 18. **One pipeline.** The import is `pipeline.run_sync` (spec 002 rules 10-16) with `CsvProvider`: one account, one page with every row in `added` (no `modified` or `removed`), `has_more = false`, `next_cursor = "csv-" + sha256(file bytes)` in hex, the balance of rule 13, no holdings. Upserts, the balance snapshot, the cursor and the follow-up `categorize.run` and `recurring.detect` jobs are the pipeline's.
 19. **One transaction.** Unlike a Plaid sync, the CSV provider makes no network call, so the whole import (the new item, the pipeline's reads and writes, the queued jobs) runs in the request's single user session and commits once: a failure leaves nothing behind.
 20. The response's job ids are the queued `categorize.run` and `recurring.detect` jobs (`enqueue_unless_queued` returns the pipeline's).
@@ -210,9 +212,9 @@ Working for row 1: under `negative_is_out`, `-15.49` is 1549 cents out; `1,996.0
 
 | # | Test | Setup | Expected |
 |---|---|---|---|
-| 1 | `test_import_creates_an_account` | File A, `kind = checking`, `name = Credit union` | 200, `imported = 3`; `GET /accounts` shows "Credit union", checking, balance 297605; three transactions with the signs of parsing example 1; both job ids are queued jobs of those kinds |
-| 2 | `test_reimport_is_idempotent` | File A, then File A again with `account_id` | Still three transactions, one account, one CSV item |
-| 3 | `test_overlap_adds_only_new_rows` | File A, then a file with A's 2026-10-03 row and a 2026-10-04 row | Four transactions |
+| 1 | `test_import_creates_an_account` | File A, `kind = checking`, `name = Credit union` | 200, `added = 3`, `already_present = 0`; `GET /accounts` shows "Credit union", checking, balance 297605; three transactions with the signs of parsing example 1; both job ids are queued jobs of those kinds |
+| 2 | `test_reimport_is_idempotent` | File A, then File A again with `account_id` | Still three transactions, one account, one CSV item; the second import says `added = 0`, `already_present = 3` |
+| 3 | `test_overlap_adds_only_new_rows` | File A, then a file with A's 2026-10-03 row and a 2026-10-04 row | Four transactions; the second import says `added = 1`, `already_present = 1` |
 | 4 | `test_invalid_file_writes_nothing` | Parsing example 4's file | 422 `csv_invalid` with three errors; no sync item, account or job |
 | 5 | `test_plaid_account_is_refused` | `account_id` of a Plaid account | 422 `not_csv_account` |
 | 6 | `test_inconsistent_fields` | `account_id` with `kind`; neither | 422 each |

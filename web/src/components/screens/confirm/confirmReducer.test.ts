@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest';
 import type { ProposedField } from '@/lib/api/types';
 import { manualEntryProposal, sampleFields, sampleValues } from '@/test/fixtures/documents';
 import {
+  canBeNone,
   confirmReducer,
   initConfirmState,
+  isEntered,
   mathGate,
   parseDraft,
   payStubValues,
+  reviewDraft,
   summarize,
+  withReviewDraft,
   type ConfirmAction,
   type ConfirmState,
 } from './confirmReducer';
@@ -100,6 +104,93 @@ describe('confirmReducer', () => {
     );
     expect(field(saved, 'gross_cents').error).toBe('Enter an amount, like 1,234.56');
     expect(field(saved, 'pay_date').error).toBe('Enter a date');
+  });
+
+  describe('a deduction the stub does not print (spec 005 rule 23b, issue 230)', () => {
+    const no401k = () =>
+      initConfirmState(
+        sampleFields.map((f) =>
+          f.key === 'retirement_contribution_cents' ? { ...f, value: null } : f,
+        ),
+        { manual: false },
+      );
+
+    it('confirms it as none, $0.00, in one step, and that value is the person entry', () => {
+      const state = run(no401k(), { type: 'confirmNone', key: 'retirement_contribution_cents' });
+      expect(field(state, 'retirement_contribution_cents')).toMatchObject({
+        value: 0,
+        confirmed: true,
+        draft: null,
+        error: null,
+      });
+      expect(isEntered(field(state, 'retirement_contribution_cents'))).toBe(true);
+      expect(mathGate(state.fields)).toEqual({ status: 'ok' });
+    });
+
+    it('saves its editor left empty as none', () => {
+      const state = run(
+        no401k(),
+        { type: 'edit', key: 'retirement_contribution_cents' },
+        { type: 'save', key: 'retirement_contribution_cents' },
+      );
+      expect(field(state, 'retirement_contribution_cents')).toMatchObject({
+        value: 0,
+        confirmed: true,
+        error: null,
+      });
+    });
+
+    it('is never confirmed as none by confirm-all', () => {
+      const state = run(no401k(), { type: 'confirmAll' });
+      expect(field(state, 'retirement_contribution_cents')).toMatchObject({
+        value: null,
+        confirmed: false,
+      });
+    });
+
+    it('offers none only for a deduction: gross, net and the dates still need a value', () => {
+      const fields = no401k().fields;
+      expect(fields.filter(canBeNone).map((f) => f.key)).toEqual([
+        'federal_withholding_cents',
+        'social_security_cents',
+        'medicare_cents',
+        'state_tax_cents',
+        'retirement_contribution_cents',
+        'medical_premium_cents',
+        'other_deductions_cents',
+      ]);
+      const gross = initConfirmState(
+        sampleFields.map((f) => (f.key === 'gross_cents' ? { ...f, value: null } : f)),
+        { manual: false },
+      );
+      expect(run(gross, { type: 'confirmNone', key: 'gross_cents' })).toEqual(gross);
+    });
+
+    it('says the math waits on a deduction that can be confirmed as none', () => {
+      expect(mathGate(no401k().fields)).toEqual({
+        status: 'unknown',
+        reason: 'missing',
+        label: '401(k) contribution',
+        canBeNone: true,
+      });
+    });
+  });
+
+  it('knows which values the person entered rather than read (issue 230)', () => {
+    const read = proposed();
+    expect(read.fields.some(isEntered)).toBe(false);
+    const confirmed = run(read, { type: 'confirmAll' });
+    expect(confirmed.fields.some(isEntered)).toBe(false);
+    const edit = (state: ConfirmState, text: string) =>
+      run(
+        state,
+        { type: 'edit', key: 'gross_cents' },
+        { type: 'draft', key: 'gross_cents', text },
+        { type: 'save', key: 'gross_cents' },
+      );
+    expect(isEntered(field(edit(read, '2,708.34'), 'gross_cents'))).toBe(true);
+    // Saving the value that was read leaves it as read.
+    expect(isEntered(field(edit(edit(read, '2,708.34'), '2,708.33'), 'gross_cents'))).toBe(false);
   });
 
   it('edit opens a draft from the current value and selects the field', () => {
@@ -281,6 +372,7 @@ describe('mathGate', () => {
       status: 'unknown',
       reason: 'invalid',
       label: 'Gross pay',
+      canBeNone: false,
     });
   });
 
@@ -289,6 +381,7 @@ describe('mathGate', () => {
       status: 'unknown',
       reason: 'missing',
       label: 'Gross pay',
+      canBeNone: false,
     });
   });
 
@@ -343,6 +436,83 @@ describe('mathGate', () => {
         ).fields,
       ),
     ).toEqual({ status: 'none' });
+  });
+});
+
+describe('review drafts (spec 005 rules 23c-23e, issue 229)', () => {
+  it('keeps each value and whether it is confirmed, never the text of an open editor', () => {
+    const state = run(
+      proposed(),
+      { type: 'edit', key: 'gross_cents' },
+      { type: 'draft', key: 'gross_cents', text: '2,708.34' },
+      { type: 'save', key: 'gross_cents' },
+      { type: 'toggle', key: 'net_cents' },
+      { type: 'edit', key: 'medicare_cents' },
+      { type: 'draft', key: 'medicare_cents', text: '1' },
+    );
+    const draft = reviewDraft(state.fields);
+    expect(draft.fields).toHaveLength(14);
+    expect(draft.fields.find((f) => f.key === 'gross_cents')).toEqual({
+      key: 'gross_cents',
+      value: 270_834,
+      confirmed: true,
+    });
+    expect(draft.fields.find((f) => f.key === 'net_cents')).toMatchObject({ confirmed: true });
+    expect(draft.fields.find((f) => f.key === 'medicare_cents')).toEqual({
+      key: 'medicare_cents',
+      value: 3_927,
+      confirmed: false,
+    });
+  });
+
+  it('restores a saved draft over the proposal, as the person left it', () => {
+    const before = run(
+      proposed(),
+      { type: 'edit', key: 'gross_cents' },
+      { type: 'draft', key: 'gross_cents', text: '2,708.34' },
+      { type: 'save', key: 'gross_cents' },
+      { type: 'confirmAll' },
+      { type: 'toggle', key: 'net_cents' },
+    );
+    const restored = withReviewDraft(proposed(), reviewDraft(before.fields), { manual: false });
+    expect(summarize(restored).confirmedCount).toBe(13);
+    expect(field(restored, 'gross_cents')).toMatchObject({ value: 270_834, confirmed: true });
+    expect(isEntered(field(restored, 'gross_cents'))).toBe(true);
+    expect(field(restored, 'net_cents').confirmed).toBe(false);
+    expect(restored.fields.every((f) => f.draft === null)).toBe(true);
+  });
+
+  it('ignores keys the proposal does not have and values of the wrong kind', () => {
+    const restored = withReviewDraft(
+      proposed(),
+      {
+        fields: [
+          { key: 'bonus_cents', value: 1, confirmed: true },
+          { key: 'gross_cents', value: 'lots', confirmed: true },
+          { key: 'pay_date', value: 5, confirmed: true },
+        ],
+      },
+      { manual: false },
+    );
+    expect(restored).toEqual(proposed());
+  });
+
+  it('leaves a field still without a value open for typing in manual entry', () => {
+    const restored = withReviewDraft(
+      manual(),
+      { fields: [{ key: 'gross_cents', value: 270_833, confirmed: true }] },
+      { manual: true },
+    );
+    expect(field(restored, 'gross_cents')).toMatchObject({
+      value: 270_833,
+      confirmed: true,
+      draft: null,
+    });
+    expect(field(restored, 'net_cents')).toMatchObject({ value: null, draft: '' });
+  });
+
+  it('starts from the proposal when nothing was saved', () => {
+    expect(withReviewDraft(proposed(), null, { manual: false })).toEqual(proposed());
   });
 });
 

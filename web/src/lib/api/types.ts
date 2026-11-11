@@ -29,6 +29,8 @@ export type DocumentStatus = Schemas['DocumentStatus'];
 export type DocumentStatusReason = Schemas['DocumentStatusReason'];
 export type DocumentSummary = Schemas['DocumentOut'];
 export type DocumentDetail = Schemas['DocumentDetail'];
+/** Progress through a Confirm review, kept with the document (spec 005 rule 23c). */
+export type ReviewDraft = Schemas['ReviewDraft'];
 export type DocumentCreated = Schemas['DocumentCreated'];
 export type Proposal = Schemas['Proposal'];
 export type ProposedField = Schemas['ProposedField'];

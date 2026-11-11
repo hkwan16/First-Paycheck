@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useId, useReducer, type Dispatch } from 'react';
+import { useCallback, useId, useReducer, useState, type Dispatch } from 'react';
 import { PageTitle } from '@/components/chrome/PageTitle';
 import { StepFooter } from '@/components/chrome/StepFooter';
 import { Bar } from '@/components/ui/Bar';
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Notice } from '@/components/ui/Notice';
 import { apiErrorMessage } from '@/lib/api/errors';
-import { PayStubUnbalanced, useConfirmDocument } from '@/lib/api/hooks';
+import { PayStubUnbalanced, useConfirmDocument, useSaveReview } from '@/lib/api/hooks';
 import type { DocumentDetail, PayStubValues, Proposal } from '@/lib/api/types';
 import { formatNumber } from '@/lib/money';
 import { statusReasonText } from '@/lib/documents';
@@ -17,12 +17,15 @@ import {
   confirmReducer,
   initConfirmState,
   payStubValues,
+  reviewDraft,
   summarize,
+  withReviewDraft,
   type ConfirmAction,
 } from './confirmReducer';
 import { FIELD_CHOICES } from './field-format';
 import { FieldRow } from './FieldRow';
 import { GateNotice, ServerDiff } from './MathNotice';
+import { ProgressNotSaved, SaveStatus } from './ReviewProgress';
 import { ReadAgain } from './ReadAgain';
 import { SourcePane } from './SourcePane';
 
@@ -34,17 +37,26 @@ export interface ConfirmReviewProps {
 /**
  * Review of one pay stub: the fields card and the source pane side by side,
  * then the footer. Its state lives in `confirmReducer`, created once per
- * document, so a refetch of the document never drops what the person typed.
+ * document from the proposal and the progress saved with it (spec 005 rule
+ * 23e), so a refetch never drops what the person typed and a reload keeps
+ * what they entered and confirmed. Every change is saved as it happens.
  */
 export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
   const router = useRouter();
   const titleId = useId();
   const sourceId = useId();
   const manual = document.status === 'manual_entry_required';
-  const [state, dispatchState] = useReducer(confirmReducer, undefined, () =>
-    initConfirmState(proposal.fields ?? [], { manual, choices: FIELD_CHOICES }),
+  const [initial] = useState(() =>
+    withReviewDraft(
+      initConfirmState(proposal.fields ?? [], { manual, choices: FIELD_CHOICES }),
+      document.review,
+      { manual },
+    ),
   );
+  const [state, dispatchState] = useReducer(confirmReducer, initial);
   const summary = summarize(state);
+  const [start] = useState(() => reviewDraft(initial.fields));
+  const progress = useSaveReview(document.id, reviewDraft(state.fields), start);
   const confirm = useConfirmDocument({ onConfirmed: () => router.push('/setup/spending') });
 
   // Stable, so a memoized FieldRow renders again only when its own field changes.
@@ -102,6 +114,7 @@ export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
               <div className="text-small text-ink-3">
                 <span className="tabular-nums">{formatNumber(summary.confirmedCount)}</span> of{' '}
                 <span className="tabular-nums">{formatNumber(summary.total)}</span> confirmed
+                <SaveStatus state={progress} />
               </div>
             </div>
             <Button
@@ -130,6 +143,7 @@ export function ConfirmReview({ document, proposal }: ConfirmReviewProps) {
           <div aria-live="polite">
             <GateNotice gate={summary.gate} />
           </div>
+          <ProgressNotSaved state={progress} />
           {confirm.error instanceof PayStubUnbalanced ? (
             <ServerDiff balance={confirm.error.balance} />
           ) : (

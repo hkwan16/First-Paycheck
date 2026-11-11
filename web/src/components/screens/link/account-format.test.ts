@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { sampleAccounts, sampleCsvAccount } from '@/test/fixtures/sample';
 import {
+  csvImportTargets,
   groupByInstitution,
+  importResultText,
   institutionInitials,
   ownedText,
   patchForRole,
   removalWords,
+  roleOptions,
+  roleSelectName,
   roleValue,
   transactionCountText,
 } from './account-format';
@@ -35,9 +39,52 @@ describe('account roles', () => {
     expect(roleValue({ ...checking, role: 'spending', is_active: false })).toBe('unused');
   });
 
-  it('sends both fields, so "Not used" also clears the role', () => {
+  it('sends both fields, so "Not used" also clears the role and "No role" keeps it active', () => {
     expect(patchForRole('retirement')).toEqual({ role: 'retirement', is_active: true });
     expect(patchForRole('unused')).toEqual({ role: null, is_active: false });
+    // Issue 241: a role once set can be cleared.
+    expect(patchForRole('')).toEqual({ role: null, is_active: true });
+  });
+
+  it("offers no role, the kind's roles from the API, and not used (issue 241)", () => {
+    expect(roleOptions({ ...checking, allowed_roles: ['spending', 'emergency_fund'] })).toEqual([
+      { value: '', label: 'No role' },
+      { value: 'spending', label: 'Spending' },
+      { value: 'emergency_fund', label: 'Emergency fund' },
+      { value: 'unused', label: 'Not used' },
+    ]);
+    expect(roleOptions({ allowed_roles: [] })).toEqual([
+      { value: '', label: 'No role' },
+      { value: 'unused', label: 'Not used' },
+    ]);
+  });
+
+  it('names each select for its account (issue 242)', () => {
+    expect(roleSelectName(checking)).toBe('Role for Chase Total Checking ··4821');
+    expect(roleSelectName({ ...checking, mask: null })).toBe('Role for Chase Total Checking');
+  });
+});
+
+describe('csvImportTargets', () => {
+  it("offers only accounts a CSV import made, never a linked bank's (issue 241)", () => {
+    const loan = { ...checking, id: 'loan', kind: 'loan' as const, name: 'Plaid Mortgage' };
+    expect(csvImportTargets([checking, loan, sampleCsvAccount, savings])).toEqual([
+      sampleCsvAccount,
+    ]);
+  });
+});
+
+describe('importResultText', () => {
+  const account = { ...sampleCsvAccount, name: 'E2E CSV Checking' };
+  it.each([
+    [5, 0, 'Added 5 transactions to E2E CSV Checking.'],
+    [1, 0, 'Added 1 transaction to E2E CSV Checking.'],
+    [1, 4, 'Added 1 transaction to E2E CSV Checking. 4 were already there.'],
+    [3, 1, 'Added 3 transactions to E2E CSV Checking. 1 was already there.'],
+    [0, 5, 'No new transactions: all 5 were already in E2E CSV Checking.'],
+    [0, 1, 'No new transactions: the one in the file was already in E2E CSV Checking.'],
+  ])('%i added and %i already there reads %j (issue 231)', (added, present, text) => {
+    expect(importResultText({ account, added, already_present: present })).toBe(text);
   });
 });
 
@@ -87,10 +134,14 @@ describe('removalWords', () => {
 
 describe('transactionCountText', () => {
   it.each([
-    [{ count: 16, more: false, since: '2026-10-01' }, '16 transactions since Oct 2026'],
-    [{ count: 1, more: false, since: '2026-07-04' }, '1 transaction since Jul 2026'],
-    [{ count: 200, more: true, since: '2026-08-01' }, '200+ transactions'],
-    [{ count: 0, more: false, since: null }, 'No transactions yet'],
+    [{ transaction_count: 16, first_posted_at: '2026-10-01' }, '16 transactions since Oct 2026'],
+    [{ transaction_count: 1, first_posted_at: '2026-07-04' }, '1 transaction since Jul 2026'],
+    // The API counts them all: never "200+" (spec 002 rule 30a).
+    [
+      { transaction_count: 1_205, first_posted_at: '2025-08-01' },
+      '1,205 transactions since Aug 2025',
+    ],
+    [{ transaction_count: 0, first_posted_at: null }, 'No transactions yet'],
   ])('%j reads %s', (count, text) => {
     expect(transactionCountText(count)).toBe(text);
   });

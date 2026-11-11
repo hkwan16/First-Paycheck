@@ -33,15 +33,18 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    and_,
     column,
     func,
+    or_,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, QueryableAttribute, mapped_column
 from sqlalchemy.sql.elements import ColumnElement
 
 from db.enums import (
+    ROLES_BY_KIND,
     AccountKind,
     AccountRole,
     CalculatorKind,
@@ -132,7 +135,7 @@ class Profile(Base):
         # The upper bound (the current year) is the route's: a CHECK cannot read the clock.
         CheckConstraint("birth_year >= 1900", name="birth_year_after_1900"),
         # The stub the salary was last compared with (spec 005 rule 24c). The
-        # column list keeps user_id; migration 0022 writes it by hand.
+        # column list keeps user_id; migration 0023 writes it by hand.
         ForeignKeyConstraint(
             ["salary_pay_stub_id", "user_id"],
             ["pay_stubs.id", "pay_stubs.user_id"],
@@ -198,6 +201,28 @@ class SyncItem(Base):
     updated_at: Mapped[dt.datetime] = _updated_at()
 
 
+def _role_fits_kind_sql() -> str:
+    """``ck_accounts_role_fits_kind``: no role, or one ``ROLES_BY_KIND`` gives the kind
+    (spec 002 rule 31a). Migration 0025 writes the same text."""
+    allowed = [
+        f"(kind = '{kind.value}' AND role IN ({', '.join(f"'{r.value}'" for r in roles)}))"
+        for kind, roles in ROLES_BY_KIND.items()
+        if roles
+    ]
+    return " OR ".join(["role IS NULL", *allowed])
+
+
+def role_fits_kind(
+    kind: ColumnElement[Any] | QueryableAttribute[Any],
+    role: ColumnElement[Any] | QueryableAttribute[Any],
+) -> ColumnElement[bool]:
+    """The same rule as an expression, for the sync's account upsert."""
+    return or_(
+        role.is_(None),
+        *(and_(kind == k, role.in_(roles)) for k, roles in ROLES_BY_KIND.items() if roles),
+    )
+
+
 class Account(Base):
     __tablename__ = "accounts"
     __table_args__ = (
@@ -209,6 +234,7 @@ class Account(Base):
             ondelete="CASCADE",
         ),
         CheckConstraint("mask ~ '^[0-9]{2,4}$'", name="mask_digits"),
+        CheckConstraint(_role_fits_kind_sql(), name="role_fits_kind"),
         Index(
             "uq_accounts_one_emergency_fund",
             "user_id",
@@ -475,6 +501,7 @@ class Document(Base):
             name="status_reason_when_stuck",
         ),
         CheckConstraint("jsonb_typeof(proposal) = 'object'", name="proposal_object"),
+        CheckConstraint("jsonb_typeof(review_draft) = 'object'", name="review_draft_object"),
         # A replacement is the same user's upload, and replaces at most one
         # document; a replaced document no longer has its file (spec 004 rules 24-25).
         ForeignKeyConstraint(["replaced_by_id", "user_id"], ["documents.id", "documents.user_id"]),
@@ -511,6 +538,10 @@ class Document(Base):
     deleted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     # The upload that replaced this one; GET /docs lists only documents without one.
     replaced_by_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    # Progress through the Confirm review (app/routers/docs.py ReviewDraft, spec
+    # 005 rules 23c-23e): what the person has entered and confirmed so far. Not
+    # confirmed data; cleared with the proposal. None is SQL NULL, never JSON null.
+    review_draft: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
     created_at: Mapped[dt.datetime] = _created_at()
     updated_at: Mapped[dt.datetime] = _updated_at()
 

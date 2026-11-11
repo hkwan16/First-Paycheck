@@ -13,7 +13,7 @@ from sqlalchemy import Connection, text
 from sqlalchemy.orm import Session
 
 from app.db import user_session_for
-from db.enums import CategorySource
+from db.enums import AccountKind, CategorySource
 from jobs.errors import RetryLater
 from sync.pipeline import SyncItemSecrets, run_sync
 from sync.provider import (
@@ -281,6 +281,20 @@ def test_account_upsert_keeps_user_fields(harness: Harness) -> None:
     harness.run(FakeProvider(accounts=[CHECKING], pages={"c1": page("c2")}))
     row = harness.query("SELECT name, role, is_active FROM accounts")[0]
     assert tuple(row) == ("Plaid Checking", "spending", False)
+
+
+def test_a_new_kind_that_does_not_allow_the_role_clears_it(harness: Harness) -> None:
+    """Spec 002 rule 31a: a provider that reports an account under another kind
+    never trips ck_accounts_role_fits_kind; a role the new kind allows stays."""
+    harness.run(FakeProvider(accounts=[CHECKING], pages={None: page("c1")}))
+    harness.connection.execute(text("UPDATE accounts SET role = 'spending'"))
+    as_credit = CHECKING.model_copy(update={"kind": AccountKind.CREDIT})
+    harness.run(FakeProvider(accounts=[as_credit], pages={"c1": page("c2")}))
+    assert tuple(harness.query("SELECT kind, role FROM accounts")[0]) == ("credit", "spending")
+
+    as_loan = CHECKING.model_copy(update={"kind": AccountKind.LOAN})
+    harness.run(FakeProvider(accounts=[as_loan], pages={"c2": page("c3")}))
+    assert tuple(harness.query("SELECT kind, role FROM accounts")[0]) == ("loan", None)
 
 
 def test_holdings_are_upserted_and_pruned(harness: Harness) -> None:

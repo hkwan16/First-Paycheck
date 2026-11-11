@@ -60,8 +60,9 @@ export interface paths {
     head?: never;
     /**
      * Update Account
-     * @description Set an account's role or active flag. Making an account the emergency
-     *     fund takes the role from the user's previous one.
+     * @description Set an account's role or active flag. Only a role the account's kind
+     *     allows; making an account the emergency fund takes the role from the user's
+     *     previous one.
      */
     patch: operations['update_account'];
     trace?: never;
@@ -425,6 +426,27 @@ export interface paths {
      * @description Queue reading the document; returns the running job while one is in flight.
      */
     post: operations['extract_document'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/docs/{document_id}/review': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Save Review
+     * @description Keep the person's progress through the review with the document, so a
+     *     reload loses nothing (spec 005 rule 23c). Not confirmed data.
+     */
+    put: operations['save_review'];
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -993,10 +1015,14 @@ export interface components {
     AccountKind: 'checking' | 'savings' | 'credit' | 'loan' | 'investment' | 'retirement';
     /** AccountOut */
     AccountOut: {
+      /** Allowed Roles */
+      allowed_roles: components['schemas']['AccountRole'][];
       /** Balance As Of */
       balance_as_of: string | null;
       /** Balance Cents */
       balance_cents: number | null;
+      /** First Posted At */
+      first_posted_at: string | null;
       /**
        * Id
        * Format: uuid
@@ -1018,6 +1044,8 @@ export interface components {
        * Format: uuid
        */
       sync_item_id: string;
+      /** Transaction Count */
+      transaction_count: number;
     };
     /**
      * AccountPatch
@@ -1395,13 +1423,15 @@ export interface components {
     /** CsvImport */
     CsvImport: {
       account: components['schemas']['AccountOut'];
+      /** Added */
+      added: number;
+      /** Already Present */
+      already_present: number;
       /**
        * Categorize Job Id
        * Format: uuid
        */
       categorize_job_id: string;
-      /** Imported */
-      imported: number;
       /**
        * Recurring Job Id
        * Format: uuid
@@ -1568,6 +1598,8 @@ export interface components {
       confirmed_at: string | null;
       /** Deleted At */
       deleted_at: string | null;
+      /** Employer Name */
+      employer_name: string | null;
       /**
        * Id
        * Format: uuid
@@ -1575,11 +1607,19 @@ export interface components {
       id: string;
       /** Page Count */
       page_count: number | null;
+      /** Pay Date */
+      pay_date: string | null;
+      pay_stub: components['schemas']['PayStubOut'] | null;
+      /** Plan Names */
+      plan_names: string[];
+      /** Plans */
+      plans: components['schemas']['BenefitsPlanOut'][];
       proposal: components['schemas']['Proposal'] | null;
       /** Redaction Count */
       redaction_count: number;
       /** Replaced By Id */
       replaced_by_id: string | null;
+      review: components['schemas']['ReviewDraft'] | null;
       status: components['schemas']['DocumentStatus'];
       status_reason: components['schemas']['DocumentStatusReason'] | null;
       /** Superseded */
@@ -1599,6 +1639,8 @@ export interface components {
       confirmed_at: string | null;
       /** Deleted At */
       deleted_at: string | null;
+      /** Employer Name */
+      employer_name: string | null;
       /**
        * Id
        * Format: uuid
@@ -1606,6 +1648,10 @@ export interface components {
       id: string;
       /** Page Count */
       page_count: number | null;
+      /** Pay Date */
+      pay_date: string | null;
+      /** Plan Names */
+      plan_names: string[];
       /** Redaction Count */
       redaction_count: number;
       /** Replaced By Id */
@@ -1645,6 +1691,20 @@ export interface components {
      * @enum {string}
      */
     DocumentType: 'pay_stub' | 'offer_letter' | 'benefits';
+    /**
+     * DraftField
+     * @description One field as the review holds it: the value on screen and whether the
+     *     person confirmed it. Integer cents, an ISO date, text or a percentage string,
+     *     or null; never validated as a confirmed value (that is confirm's job).
+     */
+    DraftField: {
+      /** Confirmed */
+      confirmed: boolean;
+      /** Key */
+      key: string;
+      /** Value */
+      value: number | string | null;
+    };
     /** ElectionMismatchPayload */
     ElectionMismatchPayload: {
       /** Actual Cents */
@@ -3215,6 +3275,15 @@ export interface components {
       match_tiers: components['schemas']['MatchTier-Input'][];
       /** Vesting Years */
       vesting_years?: number | null;
+    };
+    /**
+     * ReviewDraft
+     * @description Progress through a Confirm review (spec 005 rules 23c-23e). Not confirmed
+     *     data: nothing but the Confirm screen reads it.
+     */
+    ReviewDraft: {
+      /** Fields */
+      fields: components['schemas']['DraftField'][];
     };
     /**
      * ReviewReason
@@ -4843,6 +4912,66 @@ export interface operations {
       };
       /** @description Too Many Requests */
       429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  save_review: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        document_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReviewDraft'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
         headers: {
           [name: string]: unknown;
         };

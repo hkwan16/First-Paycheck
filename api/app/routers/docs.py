@@ -9,10 +9,21 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from collections import defaultdict
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Annotated, Self
 
-from fastapi import APIRouter, File, Form, UploadFile, status
-from pydantic import BaseModel, ConfigDict, model_validator
+from fastapi import APIRouter, File, Form, Response, UploadFile, status
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    StringConstraints,
+    model_validator,
+)
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
@@ -102,11 +113,57 @@ class DocumentOut(BaseModel):
     # A newer confirm of the same paycheck superseded the stub confirmed from this
     # document (spec 005 rule 22f), so that copy no longer counts.
     superseded: bool
+    # What was confirmed from it, so a list of documents tells them apart (spec 005
+    # rule 22g): the stub's employer and pay date, a summary's plan names in order.
+    employer_name: str | None
+    pay_date: dt.date | None
+    plan_names: list[str]
+
+
+# A review field's key: the proposal's (``gross_cents``) or the benefits review's
+# (``plans.1.deductible_cents``, spec 005 rule 23c).
+DraftKey = Annotated[str, StringConstraints(min_length=1, max_length=100, pattern=r"^[a-z0-9_.]+$")]
+DraftText = Annotated[str, StringConstraints(max_length=200)]
+MAX_DRAFT_FIELDS = 200
+
+
+class DraftField(BaseModel):
+    """One field as the review holds it: the value on screen and whether the
+    person confirmed it. Integer cents, an ISO date, text or a percentage string,
+    or null; never validated as a confirmed value (that is confirm's job)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: DraftKey
+    value: StrictInt | DraftText | None
+    confirmed: StrictBool
+
+
+class ReviewDraft(BaseModel):
+    """Progress through a Confirm review (spec 005 rules 23c-23e). Not confirmed
+    data: nothing but the Confirm screen reads it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    fields: Annotated[list[DraftField], Field(max_length=MAX_DRAFT_FIELDS)]
+
+    @model_validator(mode="after")
+    def _distinct_keys(self) -> Self:
+        if len({field.key for field in self.fields}) != len(self.fields):
+            raise ValueError("each field key appears once")
+        return self
 
 
 class DocumentDetail(DocumentOut):
     # What was read, for review: set while proposed or manual_entry_required.
     proposal: Proposal | None
+    # What the person has entered and confirmed so far, while reviewable; null
+    # before anything was saved (spec 005 rule 23c).
+    review: ReviewDraft | None
+    # What was confirmed from it, to view read-only (spec 005 rule 22h): the stub,
+    # superseded or not, or the summary's plans in order.
+    pay_stub: PayStubOut | None
+    plans: list[BenefitsPlanOut]
 
 
 class ExtractionQueued(BaseModel):
@@ -136,27 +193,50 @@ class Confirmed(BaseModel):
     profile_updated: bool
 
 
-def _out(document: Document, *, superseded: bool) -> DocumentOut:
-    return DocumentOut(
-        id=document.id,
-        type=document.type,
-        status=document.status,
-        status_reason=document.status_reason,
-        redaction_count=document.redaction_count,
-        page_count=document.page_count,
-        uploaded_at=document.created_at,
-        confirmed_at=document.confirmed_at,
-        deleted_at=document.deleted_at,
-        replaced_by_id=document.replaced_by_id,
-        can_read_again=can_read_again(document),
-        superseded=superseded,
-    )
+@dataclass(frozen=True)
+class _Confirmations:
+    """What was confirmed from a list of documents, read in one query per table."""
+
+    stubs: dict[uuid.UUID, PayStub]
+    plans: dict[uuid.UUID, list[BenefitsPlan]]
+
+    @classmethod
+    def of(cls, session: UserSession, documents: Sequence[Document]) -> _Confirmations:
+        ids = [document.id for document in documents]
+        plans: dict[uuid.UUID, list[BenefitsPlan]] = defaultdict(list)
+        if ids:
+            for plan in session.scalars(
+                select(BenefitsPlan)
+                .where(BenefitsPlan.document_id.in_(ids))
+                .order_by(BenefitsPlan.document_id, BenefitsPlan.position)
+            ):
+                if plan.document_id is not None:
+                    plans[plan.document_id].append(plan)
+        return cls(stubs=pay_stubs.confirmed_from(session, ids), plans=dict(plans))
+
+    def out(self, document: Document) -> DocumentOut:
+        stub = self.stubs.get(document.id)
+        return DocumentOut(
+            id=document.id,
+            type=document.type,
+            status=document.status,
+            status_reason=document.status_reason,
+            redaction_count=document.redaction_count,
+            page_count=document.page_count,
+            uploaded_at=document.created_at,
+            confirmed_at=document.confirmed_at,
+            deleted_at=document.deleted_at,
+            replaced_by_id=document.replaced_by_id,
+            can_read_again=can_read_again(document),
+            superseded=stub is not None and stub.superseded_by_id is not None,
+            employer_name=stub.employer_name if stub is not None else None,
+            pay_date=stub.pay_date if stub is not None else None,
+            plan_names=[plan.name for plan in self.plans.get(document.id, [])],
+        )
 
 
 def _out_one(session: UserSession, document: Document) -> DocumentOut:
-    return _out(
-        document, superseded=document.id in pay_stubs.superseded_documents(session, [document.id])
-    )
+    return _Confirmations.of(session, [document]).out(document)
 
 
 def can_read_again(document: Document) -> bool:
@@ -279,6 +359,7 @@ def _retire(
     if document.deleted_at is None:
         document.deleted_at = now
     document.proposal = None
+    document.review_draft = None
     document.replaced_by_id = replaced_by.id
 
 
@@ -291,8 +372,8 @@ def list_documents(session: UserSession) -> list[DocumentOut]:
         .order_by(Document.created_at.desc(), Document.id.desc())
         .limit(LIST_LIMIT)
     ).all()
-    superseded = pay_stubs.superseded_documents(session, [document.id for document in documents])
-    return [_out(document, superseded=document.id in superseded) for document in documents]
+    confirmations = _Confirmations.of(session, documents)
+    return [confirmations.out(document) for document in documents]
 
 
 @router.get("/{document_id}", responses=error_responses(401, 404))
@@ -301,12 +382,26 @@ def get_document(document_id: uuid.UUID, session: UserSession) -> DocumentDetail
     document = session.get(Document, document_id)
     if document is None:
         raise NotFound("Document not found")
+    reviewable = document.status in REVIEWABLE
     proposal = (
         Proposal.stored(document.proposal, document.type.value)
-        if document.status in REVIEWABLE and document.proposal is not None
+        if reviewable and document.proposal is not None
         else None
     )
-    return DocumentDetail(**_out_one(session, document).model_dump(), proposal=proposal)
+    review = (
+        ReviewDraft.model_validate(document.review_draft)
+        if reviewable and document.review_draft is not None
+        else None
+    )
+    confirmations = _Confirmations.of(session, [document])
+    stub = confirmations.stubs.get(document.id)
+    return DocumentDetail(
+        **confirmations.out(document).model_dump(),
+        proposal=proposal,
+        review=review,
+        pay_stub=PayStubOut.of(stub) if stub is not None else None,
+        plans=[BenefitsPlanOut.of(plan) for plan in confirmations.plans.get(document.id, [])],
+    )
 
 
 @router.post(
@@ -347,7 +442,32 @@ def extract_document(
     document.status = DocumentStatus.EXTRACTING
     document.status_reason = None
     document.extract_job_id = job_id
+    # A new reading writes a new proposal; progress on the old one does not carry over.
+    document.review_draft = None
     return ExtractionQueued(job_id=job_id)
+
+
+@router.put(
+    "/{document_id}/review",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses=error_responses(401, 404, 409, 422),
+)
+def save_review(document_id: uuid.UUID, body: ReviewDraft, session: UserSession) -> None:
+    """Keep the person's progress through the review with the document, so a
+    reload loses nothing (spec 005 rule 23c). Not confirmed data."""
+    document = _locked(session, document_id)
+    if document.type not in EXTRACTABLE:
+        raise AppError(
+            f"This is {_DOCUMENT_NAMES[document.type]}, which has nothing to review",
+            code="wrong_document_type",
+            status_code=422,
+        )
+    if document.status not in REVIEWABLE:
+        raise AppError(
+            "This document has not been read yet", code="document_not_ready", status_code=409
+        )
+    document.review_draft = body.model_dump(mode="json")
 
 
 @router.post("/{document_id}/confirm", responses=error_responses(401, 404, 409, 422))
@@ -383,6 +503,7 @@ def confirm_document(
         )
     store.delete(session, document.id)
     document.status = DocumentStatus.CONFIRMED
+    document.review_draft = None
     document.status_reason = None
     document.confirmed_at = now
     document.deleted_at = now
