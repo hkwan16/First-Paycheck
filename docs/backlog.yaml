@@ -2184,3 +2184,351 @@ issues:
     priority: High
     status: done
     # Fixed November 2: PR 217. An empty cursor raises TransactionsNotReady and the sync waits (spec 002 rules 9a, 11a, 11b).
+
+  # Findings from the November 9 end-to-end pass on production with Claude in
+  # Chrome (the e2e account, desktop width).
+  - title: "The 401(k) and W-4 steps use the old stub's salary with the new stub's pay schedule"
+    body: >-
+      The e2e account has two confirmed stubs: Apr 10 (gross $3,653.85,
+      biweekly) and Oct 15 (gross $2,708.33, twice a month). The 401(k) step
+      says "of your $95,000 salary" and its plan details show yearly salary
+      95,000.10 ($3,653.85 x 26) beside "Twice a month, 24 paychecks a year.
+      From your pay stub of Oct 15, 2026", whose own salary is $64,999.92. The
+      W-4 step shows "Taxed pay in each paycheck $3,756.42", more than the Oct
+      15 stub's whole gross pay, and compares that stub's withholding x 24 with
+      the tax on a $95,000 year. No screen flags the disagreement. Likely
+      cause: the salary is a saved profile value set once, while the schedule
+      is read from the newest stub (spec 005 rule 25a). Change the spec first.
+      Done when a newer confirmed stub whose yearly pay differs from the saved
+      salary makes the 401(k) and W-4 steps say so and ask the person which
+      salary to use, nothing is computed from a salary and a schedule that
+      come from different stubs without that confirmation, and a test fails
+      on today's code.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: High
+    status: done
+    # Fixed November 10: PR 245. The salary question asks which figure to use; nothing follows the newest stub silently (spec 005 rule 24c).
+  - title: "The plan shows health plan and W-4 results from the old pay schedule as current"
+    body: >-
+      After the newest stub moved the e2e account from 26 to 24 paychecks a
+      year, the health plan and W-4 steps open as "Changes not saved" with
+      nothing touched, while the side nav ticks both as done and the plan says
+      "4 of 4 decisions saved". The plan and its PDF show the saved results as
+      current: health plan premiums $104.00 a year ($4 x 26; the step now says
+      $96) and "Federal tax withheld per paycheck with your new W-4 $423.16"
+      (x 26 = $11,002.16) under a stub paid twice a month, where the step now
+      says $458.50. The only hint is about the explanation being out of date.
+      Done when a saved decision whose inputs have changed since it was saved
+      is marked as needing review in the step, the side nav, the plan and the
+      PDF, the step says what changed, and the plan does not present its
+      per-paycheck figures as current; with a test that fails on today's code.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: High
+    status: done
+    # Fixed November 10: PR 245. A saved decision whose inputs changed says Needs review, on its card, the plan and the PDF (spec 007 rules 19a-19e).
+  - title: "A checked 401(k) explanation says going above the full match costs nothing"
+    body: >-
+      With a 401(k) decision saved at 6% (full match at 5%, salary $95,000.10),
+      the written explanation under the green "We checked every number here"
+      banner says "Going from the full-match rate to 6% would cost no extra per
+      paycheck, before or after federal income tax", and the PDF repeats it.
+      The real cost is about $39.58 a paycheck before tax. The calculator's
+      "extra per paycheck for the full match $0.00" is the extra needed to
+      reach the match, and the model restated it as the cost of going above
+      it; the number check passes because no figure is wrong (the same class
+      as issues 132 and 181). At 5% the text says "Switching from the 5% you
+      chose to the full-match rate costs no extra per paycheck". Neither says
+      what the choice costs against the stub's current rate. Done when the
+      explain facts carry what the chosen rate costs per paycheck against the
+      rate on the stub, each fact's label says what it measures, an
+      explanation for a rate above the match cannot claim it costs nothing,
+      and an eval case covers a rate above the full match.
+    labels: ["area:api", "area:evals", "type:bug"]
+    milestone: M10
+    priority: High
+    status: done
+    # Fixed November 10: PR 246. A 401(k) rise is never explained as costing nothing: relabeled cost facts, prompt explain/v5 and the zero-cost check.
+  - title: "Back after Sign out shows the signed-in app"
+    body: >-
+      On /setup/link, Sign out lands on /sign-in with the auth cookie gone, and
+      the browser's Back button then shows /setup/link with the signed-in
+      header (the account email, Sign out, Delete account) and the side nav.
+      Whether the account list was also restored was not captured. Full
+      navigations while signed out redirect to /sign-in correctly. One sign
+      out also got a 503 from Supabase's logout call. Likely cause: the sign
+      out navigates on the client, so Back restores the page from the browser
+      or router cache, and the query cache is not cleared. Done when Back
+      after Sign out never shows signed-in content, the cached data is
+      cleared on sign out, a failed logout call still signs the browser out,
+      and an e2e test covers it.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: High
+    status: done
+    # Fixed November 10: PR 249. Sign out expires the session cookies on the server, and a page restored by Back checks the session again.
+  - title: "The app can hang on loading skeletons when the session read never resolves"
+    body: >-
+      Seen once: in a tab whose session had been idle for hours, /plan and
+      /setup/link showed "Loading your accounts" and "Loading your documents"
+      for over 60 seconds with no request to the API at all, while a manual
+      fetch to the API from the same page answered in 2.6 seconds. A reload
+      fixed it and it did not recur. Unconfirmed guess: getSession() in
+      web/src/lib/api/auth-middleware.ts never resolved (token refresh or the
+      Supabase auth lock) and nothing times out. Reproduce it first. Done when
+      a session read that does not resolve ends in an error the person can
+      act on, not an endless skeleton, with a test.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: in_progress
+    # Partly fixed November 10: PR 249. A hung session read now ends in a notice with Reload and Sign in again. What happened on production was not captured, so this stays open.
+  - title: "Rocket Money is still categorized as a savings transfer"
+    body: >-
+      Spending for October 2026 lists "Oct 28 Rocket Money, Our guess, -$21.54"
+      as Savings transfer, and it is the whole of "Savings $21.54, Savings rate
+      1%". Issue 136 covered this. Find out whether existing rows were never
+      relabeled after the model change (139) or the model still guesses this
+      way, and fix that cause. Done when a subscription to a budgeting app is
+      not counted as savings, for new rows and for rows already categorized.
+    labels: ["area:api", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: done
+    # Fixed November 10: PR 248. Budgeting apps are subscriptions by seed rule, and the categorize job relabels earlier guesses, never a person's choice.
+  - title: "A replaced decision's Why page looks current"
+    body: >-
+      After saving the 401(k) at 6%, writing its explanation and saving 5%,
+      /why/<the 6% decision> still reads "Why contribute 6% to your 401(k)"
+      with the green checked banner and "Change this decision", and nothing
+      says a newer version replaced it. The API exposes is_current (spec 007)
+      and the Why screen does not read it. The Why index also marks neither an
+      out-of-date explanation nor a missing one. Done when a replaced
+      decision's Why page says so and links to the current one, and the index
+      shows each explanation's state.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: done
+    # Fixed November 10: PR 246. A replaced decision's Why page and the Why index say Replaced and link to the current version.
+  - title: "Edit plans closes on a deductible above the out-of-pocket maximum and clears the plan choice"
+    body: >-
+      In the health plan step's Edit plans, an out-of-pocket maximum of 100
+      with a deductible of 2,050 is accepted by the form. It closes, the
+      comparison is replaced by "A plan's deductible must not be more than its
+      out-of-pocket maximum" with no plan named, and the plan choice is
+      cleared. An empty name, a negative premium and coinsurance of 150 are
+      caught inline; an employer HSA amount of 99,999 was not flagged. Done
+      when the form catches these inline next to the field, names the plan,
+      and stays open with the earlier comparison and choice intact.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+  - title: "Reloading the Confirm review discards every confirmation and edit"
+    body: >-
+      On /setup/confirm/<id>, after editing Gross pay and confirming 13 of 14
+      fields, a reload shows "0 of 14 confirmed" and the read value again,
+      with no warning. Done when progress through a review survives a reload,
+      or the page warns before the work is lost.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: done
+    # Fixed November 10: PR 247. Confirm saves a review draft (PUT /docs/{id}/review) that survives a reload.
+  - title: "A pay stub with no 401(k) line blocks Confirm until the person types 0"
+    body: >-
+      A stub with no 401(k) line shows "Not found - Type it if the document
+      shows it." with a blue "Read clearly" badge. Confirm opens an empty
+      editor, an empty save says "Enter an amount, like 1,234.56", and "Can't
+      check the math yet. 401(k) contribution is missing." stays until 0 is
+      typed; nothing says to enter 0. After typing, the row still says "Read
+      clearly", and so does an edited Gross pay. Related to issue 193. Done
+      when a field the stub does not have can be confirmed as none in one
+      step, and a value the person typed is labeled as theirs, not as read
+      clearly.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: done
+    # Fixed November 10: PR 247. A stub with no 401(k) line is confirmed with Confirm none.
+  - title: "Re-importing the same CSV reports transactions that were not added"
+    body: >-
+      Importing web/e2e/fixtures/bank-export.csv into the same account twice
+      says "Imported 5 transactions" both times, while the account stays at 5
+      transactions (spec 010 rule 15 de-duplicates correctly). Done when the
+      message reports how many rows were added and how many were already
+      there.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+    status: done
+    # Fixed November 10: PR 247. The import says how many rows were added and how many were already there.
+  - title: "Dates and day counts follow the UTC day, not the person's"
+    body: >-
+      At 22:27 Pacific on November 9, Spending said "November 1 to 10", the
+      plan said "As of Nov 10, 2026" and "Through Feb 8, 2027", and the PDF
+      was named and dated November 10, while the same session showed local
+      dates elsewhere ("Saved Nov 9"). The November check-in said "in 6 days"
+      and, after Check in now, "in 5 days". The plan's as_of is UTC by spec
+      016. Change the specs first. Done when today, the current period and
+      every day count use one definition of the person's day on every screen
+      and in the PDF.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+  - title: "Past check-ins count days from their own date and miss overdue items"
+    body: >-
+      The October check-in opened on November 9 says "Give your employer your
+      updated Form W-4 - Due Nov 6, 2026, in 6 days" and "Health plan
+      enrollment deadline - Due Nov 25, 2026, in 25 days", both counted from
+      October 31; its cash flow card says "This month counts up to today"; and
+      it lists "Interest looks like a monthly charge of $111.47", which
+      Spending no longer treats as recurring (issue 200). The November
+      check-in's Coming up list starts with the Nov 6 W-4 item with no overdue
+      cue and no finding for it, and the plan's Next 90 days omits it. Done
+      when a past check-in reads as a record of its date, day counts are from
+      today or absent, and an item past its due date is shown as overdue in
+      the check-in and the plan.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: done
+    # Fixed November 10: PR 244. A past check-in is a record of its date, and a date that passed unsettled is an overdue finding.
+  - title: "Check in now reports findings changes the person cannot see"
+    body: >-
+      After saving a new 401(k) version, Check in now says "1 new finding. 1
+      finding no longer applies." while the three cards read the same before
+      and after, because the reminder for the old version was swapped for the
+      new version's. Done when a finding that only moved to a newer version of
+      the same decision is not counted as new or gone.
+    labels: ["area:api", "type:bug"]
+    milestone: M10
+    priority: Low
+    status: done
+    # Fixed November 10: PR 244. A reminder is keyed by its date, so a new decision version no longer repeats it.
+  - title: "The check-in calls bank deposits take-home pay"
+    body: >-
+      The October check-in shows "Take-home pay $3,240.12". Spending calls the
+      same figure "Income deposited", and the Oct 15 stub's take-home is
+      $1,996.04. Done when the check-in uses the same name as Spending for
+      deposits and keeps take-home for the pay stub figure.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: done
+    # Fixed November 10: PR 244. The deposits line is Income deposited.
+  - title: "The cash flow diagram draws Take-home taller than Gross pay"
+    body: >-
+      For October at 1344 px wide, "Gross pay, 1 stub $2,708.33" is about 157
+      px tall and "Take-home $1,996.04" about 300 px, because the node is
+      sized by what flows out of it ($5,234.98 of spending). The legend also
+      lists the pay stub groups for periods with no stub, and the period
+      picker offers June 2026, which has no transactions. Done when every
+      node's height matches the amount on its label, spending beyond take-home
+      is shown as coming from somewhere else, and the legend and the picker
+      list only what the period has.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
+    status: done
+    # Fixed November 10: PR 248. The API builds every node and band of the diagram at one scale (spec 010 rules 5b-5d).
+  - title: "Bad ids and unknown routes show a generic error or the bare Next.js 404"
+    body: >-
+      /why/not-a-uuid says "We could not load the explanation. Reload the page
+      to try again." where a well-formed unknown id says "Decision not found".
+      /no-such-page shows the default Next.js 404 with no app header or link
+      home; web/src/app has no not-found.tsx. Done when both read as not found
+      in the app's own layout with a way back.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+    status: done
+    # Fixed November 10: PR 249. A malformed id is a 404 like an unknown one, and each screen has its own not-found page.
+  - title: "Decision forms accept out-of-range values or show the wrong message"
+    body: >-
+      Emergency fund essential spending of 99999999999999 or 1,234.567 says
+      "Enter an amount above $0, like 1,823.25." The 401(k) plan details
+      accept a birth year of 2020 (1800 and 2030 are rejected). W-4 step 3
+      credits of 999999 are accepted. Done when each field has a sensible
+      range and its message names the actual problem.
+    labels: ["area:web", "area:api", "type:bug"]
+    milestone: M10
+    priority: Low
+  - title: "The plan PDF's wording disagrees with itself and the web plan"
+    body: >-
+      The PDF says "Emergency fund Version 3 ... Not explained yet", although
+      an emergency fund never has a written explanation (issue 161). Its
+      decisions section says "Saved so far 51.79%" where its goals section
+      says "Saved so far No linked account". It uses "401(k) contribution" and
+      "Form W-4" where the web plan says "401(k) match" and "W-4, federal
+      only". Done when the PDF and the web plan use the same names and the
+      PDF's sections agree.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+  - title: "Status messages stay on screen after a later action"
+    body: >-
+      Link: "bank-export.csv was not uploaded. Upload a PDF, PNG or JPEG."
+      stays after the next upload succeeds, and the CSV panel keeps the last
+      file's "The CSV has 3 problems" after a new file is chosen. Sign in:
+      "Enter your password." stays after "Email me a sign-in link" fails on a
+      bad email. Spending: "Saved. Wawa will be Other from now on." stays
+      through later, unrelated actions. Done when each message clears once the
+      action it describes is superseded.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+    status: in_progress
+    # Partly fixed November 10: PRs 247, 248 and 249. The Confirm, Link, Spending and account-menu messages are fixed; the other screens are still to check.
+  - title: "Account roles cannot be cleared, and loan accounts are offered roles and CSV imports"
+    body: >-
+      Once an account has a role, "Choose a role" is disabled, so the role
+      cannot be cleared. Loan accounts offer "Spending", "Emergency fund" and
+      "Retirement", and the CSV "Import into" list offers the Plaid loan
+      accounts. Done when a role can be cleared and each account type is
+      offered only the roles and imports that make sense for it.
+    labels: ["area:web", "area:api", "type:bug"]
+    milestone: M10
+    priority: Low
+    status: done
+    # Fixed November 10: PR 247. Each account kind is offered only its roles, a role can be cleared, and imports go to CSV accounts.
+  - title: "Repeated controls share one accessible name, and the account menu and delete dialog have no roles"
+    body: >-
+      Spending's recurring list has several buttons named just "Not recurring"
+      and "Rename", and Link has seven selects all labelled "Role". The Delete
+      account confirmation has no role="dialog" and the account menu no
+      role="menu". Done when each repeated control's name includes the thing
+      it acts on (as "Unlink First Platypus Bank" does) and both have the
+      right roles and keyboard behavior.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+    status: in_progress
+    # Partly fixed November 10: PRs 247, 248 and 249. Repeated controls on Link and Spending are named, the account menu is a menu button and Delete account a dialog; the other screens are still to check.
+  - title: "A confirmed document cannot be told apart or opened again"
+    body: >-
+      Documents rows say only "Pay stub - Confirmed - 1 page - uploaded 8 days
+      ago", with no employer or pay date, and a confirmed stub's values cannot
+      be viewed again. The Why page's "Your numbers" labels also mix case
+      ("401(k) rate on your pay stub now", "rate you chose"). Done when each
+      confirmed document's row names its employer and pay date and opens a
+      read-only view of its confirmed values, and the Why labels share one
+      case.
+    labels: ["area:web", "type:bug"]
+    milestone: M10
+    priority: Low
+    status: in_progress
+    # Partly fixed November 10: PRs 246 and 247. Confirmed rows name the employer and pay date and open a read-only view; the Why labels share one case. Left open until checked on production.
+  - title: "Cash withdrawals are counted as transfers, not spending"
+    body: >-
+      An ATM or cash withdrawal is categorized "Transfer between accounts", so
+      it is left out of the month's spending and the safe-to-spend figure is
+      too high by the cash taken out. Spec 003 does not say which it is.
+      Decided November 10: cash withdrawn counts as spending in a "Cash"
+      category. Done when spec 003 says so, a withdrawal is categorized "Cash"
+      and counted in spending and cash flow, and a transfer between the
+      person's own accounts still is not.
+    labels: ["area:api", "area:web", "type:bug"]
+    milestone: M10
+    priority: Medium
