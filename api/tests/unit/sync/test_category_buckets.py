@@ -38,5 +38,7 @@ def test_bucket_assignments() -> None:
         "personal_care",
         "education",
         "gifts_donations",
+        # Spec 003 rule 9d (issue #250): cash withdrawn is spending, not a transfer.
+        "cash",
     }
     assert members("other") == {"debt_payment", "fees", "taxes", "other"}

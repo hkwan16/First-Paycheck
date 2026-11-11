@@ -1,8 +1,8 @@
 """Seeded generator for ``evals/fixtures/transactions.csv``: 500 synthetic,
 labeled bank transactions for the categorization suites, then 15 written by
 hand for direction (spec 003 rules 3a-3b and 5a), 13 for merchant names
-(rule 3d), 6 for the prompt's definitions (rule 9b) and 6 for budgeting apps
-(rule 9c).
+(rule 3d), 6 for the prompt's definitions (rule 9b), 6 for budgeting apps
+(rule 9c) and 7 for cash withdrawn (rule 9d).
 
 Merchant descriptions mimic what banks send (store numbers, processor
 prefixes, cities, reference codes). Most merchants are ones the seed rules
@@ -20,9 +20,12 @@ ordinary word a seed rule names a merchant by (``spectrum health``,
 ``adobe grill``), and the bare descriptors the narrowed rules still label.
 The ``DEFINITION_CASES`` (ids 529-534) follow: warehouse clubs and card
 payments no seed rule names, tax preparation, and the IRS refund deposit.
-The ``BUDGETING_CASES`` (ids 535-540) close the file: one charge from each
+The ``BUDGETING_CASES`` (ids 535-540) follow: one charge from each
 budgeting app the seed rules name, a subscription and never savings (issue
 #226: Rocket Money's $21.54 was guessed a savings transfer).
+The ``CASH_CASES`` (ids 541-547) close the file: cash withdrawals, which are
+spending in ``cash`` (issue #250: ``categorize/v3`` called them transfers), a
+withdrawal fee and a transfer to the person's own checking account.
 
     uv run python -m evals.gen.transactions      # rewrite the committed CSV
 
@@ -227,6 +230,20 @@ BUDGETING_CASES: list[tuple[str, int, dt.date, str]] = [
     ("SIMPLIFI BY QUICKEN", 599, dt.date(2026, 8, 19), "subscriptions"),
 ]
 
+# Written by hand, appended after BUDGETING_CASES (spec 003 rule 9d, issue
+# #250): cash withdrawn is spending, `cash`; a fee for it is a fee, and a move
+# to the person's own account is still a transfer. The Bank of America
+# descriptor is one no seed rule names, so it goes to the model.
+CASH_CASES: list[tuple[str, int, dt.date, str]] = [
+    ("ATM WITHDRAWAL 001234 10/14 100 MAIN ST", 6_000, dt.date(2026, 10, 14), "cash"),
+    ("NON-CHASE ATM WITHDRAW 552301 09/26 OAKLAND CA", 10_000, dt.date(2026, 9, 26), "cash"),
+    ("ATM CASH WITHDRAWAL 0921", 4_000, dt.date(2026, 9, 21), "cash"),
+    ("CASH WITHDRAWAL TELLER 0042", 30_000, dt.date(2026, 8, 12), "cash"),
+    ("ATM WITHDRAWAL FEE", 300, dt.date(2026, 10, 14), "fees"),
+    ("BKOFAMERICA ATM 10/31 #000004321 WITHDRWL MAIN ST", 8_000, dt.date(2026, 10, 31), "cash"),
+    ("ONLINE TRANSFER TO CHK 7731", 20_000, dt.date(2026, 10, 2), "transfer"),
+]
+
 
 def _fill(template: str, rng: random.Random) -> str:
     ref = "".join(rng.choices(string.ascii_uppercase, k=2)) + str(rng.randint(10, 9999))
@@ -249,7 +266,8 @@ def generate(seed: int = SEED, rows: int = ROWS) -> list[Row]:
             )
         )
     for index, (merchant_raw, amount_cents, posted_at, category) in enumerate(
-        [*SIGN_CASES, *NAME_CASES, *DEFINITION_CASES, *BUDGETING_CASES], start=rows + 1
+        [*SIGN_CASES, *NAME_CASES, *DEFINITION_CASES, *BUDGETING_CASES, *CASH_CASES],
+        start=rows + 1,
     ):
         generated.append(Row(index, merchant_raw, amount_cents, posted_at, category))
     return generated

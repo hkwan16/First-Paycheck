@@ -1095,7 +1095,10 @@ drives a node from the keyboard, changes the period and saves a category fix; `i
 imports `e2e/fixtures/bank-export.csv` (five synthetic rows) into a new CSV account ("Added 5
 transactions to ..."), imports it again without making a second account ("No new transactions: all
 5 were already in ...", issue 231), imports into another new account and removes it (the panel
-then reports nothing about it), and checks a broken file's row errors.
+then reports nothing about it), imports an ATM withdrawal and a transfer to savings dated the last
+day of last month into a new account and checks on Spending that the withdrawal is "Cash" and adds
+its $60.00 to the Flexible tile while the transfer stays out (issue 250; then removes the account),
+and checks a broken file's row errors.
 Both change the e2e user's data, so they are ordered projects with serial files rather than
 parallel tests. `confirm.spec.ts` (project `authenticated-confirm`) uploads
 `e2e/fixtures/acme-paystub.pdf`, a synthetic stub with an example SSN the API must redact and a
