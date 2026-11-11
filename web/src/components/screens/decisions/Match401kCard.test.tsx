@@ -655,6 +655,22 @@ describe('Match401kCard plan details', () => {
     await user.click(within(form).getByRole('button', { name: 'Cancel' }));
     expect(within(card()).getByRole('slider')).toBeInTheDocument();
   });
+
+  it('refuses a birth year too recent for someone starting a job, saving nothing (issue 238)', async () => {
+    savedDecision();
+    const before = structuredClone(db.profile);
+    const { user } = await renderReady();
+    await user.click(within(card()).getByRole('button', { name: 'Change plan details' }));
+    const form = within(card()).getByRole('form', { name: 'Your plan details' });
+    const birthYear = within(form).getByLabelText('Year you were born');
+    await user.clear(birthYear);
+    await user.type(birthYear, '2020');
+    await user.click(within(form).getByRole('button', { name: 'Save plan details' }));
+
+    // The sample clock reads 2026, so the latest birth year is 2012.
+    expect(birthYear).toHaveAccessibleDescription('Enter a year from 1900 to 2012.');
+    expect(db.profile).toEqual(before);
+  });
 });
 
 describe('Match401kCard focus (issue 167)', () => {

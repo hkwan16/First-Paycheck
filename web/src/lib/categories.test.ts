@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '@/lib/api/schema';
+import { CATEGORY_BUCKETS } from '@/test/fixtures/cashflow';
 import { BUCKETS, CATEGORIES, categoryGroups, categoryInfo, categoryLabel } from './categories';
 
 type Category = components['schemas']['CategoryPatch']['category'];
@@ -24,6 +25,7 @@ const API_CATEGORIES: readonly Category[] = [
   'personal_care',
   'education',
   'gifts_donations',
+  'cash',
   'fees',
   'taxes',
   'debt_payment',
@@ -52,7 +54,20 @@ describe('categories', () => {
       expect(categoryInfo(id).bucket).toBe('flexible');
     }
     expect(categoryInfo('savings_investment').bucket).toBe('savings');
-    expect(categoryInfo('transfer').bucket).toBe('other');
+    expect(categoryInfo('transfer').bucket).toBe('transfer');
+  });
+
+  it('files cash withdrawn under Flexible, as the API counts it (spec 003 rule 9d, issue 250)', () => {
+    expect(categoryInfo('cash')).toEqual({ label: 'Cash', bucket: 'flexible' });
+  });
+
+  it("puts every category in the API's bucket, so only a transfer reads as not spending", () => {
+    // `CATEGORY_BUCKETS` in api/sync/categories.py, as GET /spending/summary sends it.
+    for (const [id, bucket] of Object.entries(CATEGORY_BUCKETS)) {
+      expect(categoryInfo(id as Category).bucket, id).toBe(bucket);
+    }
+    expect(BUCKETS.transfer.label).toBe('Not spending');
+    expect(BUCKETS.other.label).toBe('Other spending');
   });
 
   it('gives each bucket a swatch color: plum income, blue essentials, coral flexible, teal savings', () => {
@@ -61,6 +76,7 @@ describe('categories', () => {
     expect(BUCKETS.flexible.swatch).toBe('coral');
     expect(BUCKETS.savings.swatch).toBe('teal');
     expect(BUCKETS.other.swatch).toBe('flow-tax');
+    expect(BUCKETS.transfer.swatch).toBe('flow-tax');
   });
 
   it('groups categories by bucket for the select, each category once', () => {
@@ -71,6 +87,7 @@ describe('categories', () => {
       'flexible',
       'savings',
       'other',
+      'transfer',
     ]);
     const ids = groups.flatMap((g) => g.categories.map((c) => c.id));
     expect(ids.sort()).toEqual([...API_CATEGORIES].sort());

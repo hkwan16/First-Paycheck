@@ -141,8 +141,70 @@ def test_health_plans_refuses_employer_hsa_on_a_ppo(client: TestClient) -> None:
     assert response.status_code == 422
     # The validator's sentence, as the health plan step shows it (spec 008 rule 22a).
     assert response.json()["error"]["message"] == (
-        "Only a high-deductible plan can have an employer HSA contribution"
+        "Gold PPO: only a high-deductible plan can have an employer HSA contribution."
     )
+
+
+def test_health_plans_names_the_plan_and_field_a_refusal_is_about(client: TestClient) -> None:
+    """Issue 228: the plan table shows each refusal beside its field (spec 012 rule 18b)."""
+    low = {**B, "deductible_cents": 205_000, "oop_max_cents": 10_000}
+    rich = {**A, "employer_hsa_cents": 9_999_900}
+    response = client.post("/calc/health-plans", json=payload([rich, low], 6_500_000, 0))
+    assert response.status_code == 422, response.text
+    error = response.json()["error"]
+    assert error["code"] == "validation_error"
+    assert error["details"]["errors"] == [
+        {
+            "path": ["plans", 1, "oop_max_cents"],
+            "message": (
+                "Gold PPO: enter an out-of-pocket maximum of at least the deductible, $2,050.00."
+            ),
+        }
+    ]
+    # The year's HSA limit is checked once every plan reads.
+    fixed = {**low, "oop_max_cents": 300_000}
+    response = client.post("/calc/health-plans", json=payload([rich, fixed], 6_500_000, 0))
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["details"]["errors"] == [
+        {
+            "path": ["plans", 0, "employer_hsa_cents"],
+            "message": (
+                "Bronze HSA: enter an employer HSA contribution up to $4,400.00,"
+                " the 2026 HSA limit for one person."
+            ),
+        }
+    ]
+
+
+W4_BASE: dict[str, Any] = {
+    "salary_cents": 5_000_000,
+    "pay_periods_per_year": 26,
+    "filing_status": "single",
+    "tax_year": 2026,
+}
+
+
+@pytest.mark.parametrize(
+    ("path", "body", "field"),
+    [
+        # Each of these answered 500 before issue 238: the result overflowed its Cents.
+        (
+            "/calc/emergency-fund",
+            {**EMERGENCY_FUND, "target_months": 12},
+            "monthly_essentials_cents",
+        ),
+        ("/calc/w4", W4_BASE, "other_income_cents"),
+        ("/calc/w4", W4_BASE, "extra_withholding_cents"),
+        ("/calc/w4", W4_BASE, "other_jobs_wages_cents"),
+    ],
+)
+def test_an_amount_beyond_its_entry_limit_is_422_not_500(
+    client: TestClient, path: str, body: dict[str, Any], field: str
+) -> None:
+    response = client.post(path, json={**body, field: 100_000_000_000})
+    assert response.status_code == 422, response.text
+    (problem,) = response.json()["error"]["details"]["errors"]
+    assert problem["path"] == [field]
 
 
 W4_EXAMPLE_5: dict[str, Any] = {

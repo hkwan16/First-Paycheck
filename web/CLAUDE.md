@@ -10,7 +10,10 @@ over a generated OpenAPI client, and Supabase Auth. The visual target is Mockup 
   integer cents and is only formatted (`lib/money.ts`, `<Money>`); never add, split, round for
   logic, or compare amounts here. Arithmetic belongs in `api/calc/`. The one exception is the
   Confirm screen's consistency check (`mathGate`, below): a display-side gate over the person's
-  own entries, with the server's 422 as the authority.
+  own entries, with the server's 422 as the authority. The one comparison a form makes is a typed
+  value against an entry limit the API publishes in `openapi.json` (`lib/entry-limits.ts`, read
+  back by its test; spec 018 rule 5e): never one amount against another, and never a limit that
+  depends on the tax year. Those are the API's, shown from its `details.errors`.
 - **Tokens only.** Colors, radii, shadows, type sizes and durations are the `@theme` tokens in
   `src/app/globals.css`. No raw hex anywhere else in `src/`; `src/lib/design/tokens.test.ts` and
   ESLint both enforce it.
@@ -82,6 +85,7 @@ src/lib/            api/ (schema.d.ts, types.ts, base-url.ts, auth-middleware.ts
                     upload.ts, download.ts, keys.ts, errors.ts, hooks/), auth/ (next-path, protected,
                     validation, errors, account, sign-out), supabase/ (env, client, server, proxy),
                     design/ (tone.ts, tokens.ts), money.ts, dates.ts, accounts.ts, categories.ts,
+                    entry-limits.ts,
                     documents.ts, decisions.ts, decision-steps.ts, deep-equal.ts, explanations.ts,
                     escape-cancel.ts, features.ts, focus-handoff.ts, land-at-top.ts,
                     findings.ts, periods.ts,
@@ -195,7 +199,10 @@ or checked for a phone.
   `apiErrorMessage(error, fallback)`, never by printing the object. It shows the API's message
   only when it reads as a sentence for people (`isPersonMessage`: no word with an underscore,
   such as `emergency_fund` or a field path), else the caller's fallback (spec 008 rule 22a,
-  issue 162), so write a fallback that stands on its own.
+  issue 162), so write a fallback that stands on its own. A 422 `validation_error` also carries
+  `details.errors`, each `{ path, message }` at its place in the body (spec 007 rule 2a):
+  `fieldProblems(error)` reads them, so a form shows each beside its field (`planRefusal` in
+  `health-plan-format.ts` maps `['plans', i, field]` onto the plan table).
 - **Limits** (M10): every write route can answer 429 `rate_limited` (with Retry-After, which the
   API exposes through CORS) and 413 `body_too_large`. `apiErrorMessage` turns any 429 into the one
   sentence `rateLimitMessage` makes, "You have reached the limit for now. Try again in about 20
@@ -249,6 +256,10 @@ or checked for a phone.
   query (`SampleScreen`) with that shape. Pass `null` inputs while the form is incomplete. Its `staleTime` is
   `'static'` when the client default is (the sample QueryClient), so it never reads the clock
   while rendering; otherwise `Infinity`, which still lets a 422 refetch it.
+  `useCalcCheck(path)` asks a calculator once, as a mutation, whether it takes inputs before
+  they go on screen (the health plan table's Compare, spec 012 rule 18b); it rejects with the
+  `ApiError` and on success seeds the `useCalc` cache for the same body, so showing them asks
+  nothing again. Build the check's body exactly as the card's `useCalc` inputs will be.
 - **Decisions**: `useDecisions`, `useDecision(id)`, `useCalendar`, and
   `useSaveDecision(calculator)`, which posts `{ calculator, inputs, result, supersedes_id }` with
   `supersedes_id` set to the current version's id. A 409 `decision_conflict` (someone saved first)
@@ -737,7 +748,19 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
   chosen plan (a 422 `plan_not_selected` says so); a new table (Use your benefits summary, an
   edited one) keeps the choice when it still has the chosen plan with every term the same, in
   whatever place (`choiceAmong`, issue 168), and drops it otherwise; an enrollment deadline adds a calendar event,
-  shown under the card.
+  shown under the card. Compare these plans checks the typed plans with the API first
+  (`useCalcCheck` over `inputsFor`, the same builder as the decided inputs; spec 012 rule 18b,
+  issue 228): the button is busy until it answers, and a 422 keeps the table open with each
+  `details.errors` entry beside its plan's field in the API's words (which name the plan) and the
+  comparison, the choice and the badge unchanged. Only a 200 closes it. The MSW handler refuses
+  as the API does (plan fields first, then the year's employer HSA limit), so a test of a new
+  typed table needs its case in `make-health-plans-results.py`.
+- **Field messages** (spec 018 rule 5e, issue 238): every amount goes through `readAmount`
+  (`decision-format.ts`, options `example`, `max` and `positive`) with the field's limit from
+  `lib/entry-limits.ts`, and says the actual problem: not an amount ("Enter an amount, like
+  1,823.25."), more than two decimals, or outside the range it states ("Enter an amount from $0
+  to $100,000.00."). The plan details' birth year is 1900 to the current UTC year less 14
+  (`latestBirthYear`, the API's `PUT /profile` rule).
 - **Pay schedule** (spec 005 rule 25a, issue 198): every card reads
   `profile.pay_schedule.periods_per_year`, the schedule the API resolves (the newest stub's when it
   prints one, else the profile's), never the profile's `pay_frequency` or the stub's on their own.
@@ -1099,7 +1122,10 @@ drives a node from the keyboard, changes the period and saves a category fix; `i
 imports `e2e/fixtures/bank-export.csv` (five synthetic rows) into a new CSV account ("Added 5
 transactions to ..."), imports it again without making a second account ("No new transactions: all
 5 were already in ...", issue 231), imports into another new account and removes it (the panel
-then reports nothing about it), and checks a broken file's row errors.
+then reports nothing about it), imports an ATM withdrawal and a transfer to savings dated the last
+day of last month into a new account and checks on Spending that the withdrawal is "Cash" and adds
+its $60.00 to the Flexible tile while the transfer stays out (issue 250; then removes the account),
+and checks a broken file's row errors.
 Both change the e2e user's data, so they are ordered projects with serial files rather than
 parallel tests. `confirm.spec.ts` (project `authenticated-confirm`) uploads
 `e2e/fixtures/acme-paystub.pdf`, a synthetic stub with an example SSN the API must redact and a

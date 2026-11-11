@@ -23,6 +23,7 @@ from app.routers.explain import CitationOut, current_setup, is_explainable, is_s
 from app.routers.goals import GoalOut, goal_out
 from app.types import UtcDateTime
 from calc.registry import calculator
+from calc.types import STORED
 from db.calendar import open_events
 from db.enums import CalculatorKind, PayFrequency
 from db.models import CalendarEvent, Decision, Explanation, Goal
@@ -225,7 +226,7 @@ def figures(
     wrong field.
     """
     spec = calculator(kind)
-    spec.input_model.model_validate(inputs)
+    spec.input_model.model_validate(inputs, context=STORED)
     spec.result_model.model_validate(result)
     return _FIGURES[kind]({"inputs": inputs, "result": result})
 

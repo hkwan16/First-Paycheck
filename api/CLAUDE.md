@@ -86,6 +86,15 @@ Rules:
 - Raise `AppError` (or `NotFound`, `Unauthorized`); every error leaves as
   `{"error": {"code", "message"}}`. Document error statuses on a route with
   `responses=error_responses(404, 422)`.
+- A 422 `validation_error` from a request body also carries `details.errors`,
+  `[{path, message}]`, `path` the field's place in the body without `body`
+  (spec 007 rule 2a), so a form shows each message beside its field. A route
+  that validates more itself raises the same shape: `errors.field_error(path,
+  message)` for one field (`PUT /profile`'s birth year), `errors.validation_error(
+  exc.errors(), prefix=...)` for a pydantic `ValidationError` (`POST /decisions`
+  prefixes `inputs`). A model validator that refuses one field raises
+  `ValidationError.from_exception_data` with that field's `loc` (calc's HSA limit:
+  calc cannot import `pydantic_core`, so the error details are plain dicts).
 - Operation ids are route function names. After a route or schema change run
   `make types` and commit `api/openapi.json`; a unit test and CI fail on drift.
 
@@ -113,7 +122,8 @@ Rules:
   `model` = settings purpose, `effort`, `max_tokens`, `schema`), loaded and
   validated by `llm/prompts/__init__.py`. A released prompt file is never
   edited; a change is a new version.
-- One public method per prompt: `categorize` (`categorize/v3`),
+- One public method per prompt: `categorize` (`categorize/v4`: v3 with `cash` defined and
+  ATM withdrawals out of `transfer`, spec 003 rule 9d, issue 250),
   `extract_pay_stub` (`extract_pay_stub/v2`: a dash or `0.00` printed on a line is 0
   tied to that line, not null; spec 005 rule 1a, issue 195), `extract_benefits`
   (`extract_benefits/v2`), `explain` (`explain/v5`), `judge_rate_claim`
@@ -201,7 +211,16 @@ Rules:
   rule (`target optical`). `tests/unit/test_seed_rules.py` lists the names
   each way; check a new seed row against them. The model
   labels each merchant and direction separately (`CategorizeItem.direction`,
-  `categorize/v3`) and may call money in a refund. What a category means
+  `categorize/v4`) and may call money in a refund. Cash withdrawn is spending:
+  `cash`, a `flexible` category (spec 003 rule 9d, issue #250), by seed prefix
+  rules on the bank language (`atm withdrawal`, `cash withdrawal`, ...; never
+  the bare `withdrawal`, which banks put before card purchases, nor `atm`), so
+  an earlier `transfer` guess for one is relabeled by the rules pass; only money
+  between the person's own accounts, peers and cash deposits stay `transfer`. A
+  new category goes in `sync/categories.py` (list and `CATEGORY_BUCKETS`), a new
+  prompt version that names it, `web/src/lib/categories.ts` and `make types`; a
+  released prompt keeps the categories it had (`test_prompts.py:ADDED_AFTER`).
+  What a category means
   (a membership to a public radio station or another nonprofit is
   `gifts_donations`, issue #146) is the prompt's; which merchant a
   description names is the seed rules' (spec 003 rule 9a), and the two agree
@@ -337,6 +356,18 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
 - `AppError` takes `details` (machine-readable, e.g. the confirm diff) and
   `headers` (e.g. `Retry-After`). Money types and two-place percentages shared
   by calculators and request models live in `calc/types.py`.
+- **Entry limits** (spec 007 rules 2a and 2b, issue 238): what a person may
+  type is bounded tighter than `Cents`, so a typo is a 422 naming the range,
+  never an overflow's 500. Put the limit on the field's type as an
+  `EntryLimit` (`yearly(what)`, `monthly(what)`, `per_paycheck(what)`, or one
+  of its own like W-4 Step 3's), whose sentence is the message and whose
+  maximum lands in `openapi.json` (the web mirrors it in `lib/entry-limits.ts`
+  and a test reads it back). Stored inputs are read with
+  `model_validate(..., context=STORED)`, which skips entry limits, so a version
+  saved under an older limit still reads; `tests/unit/test_stored_inputs.py`
+  fails on a read without it outside `POST /calc/*` and `POST /decisions`.
+  `tests/unit/calc/test_entry_limits.py` checks every input within the limits
+  computes.
 - Swagger UI is at `/api-docs`: `/docs` is the documents API.
 - The request clock is the `Now` dependency (`app/deps.py:get_now`); tests
   override it to freeze time (the upload rate limit is per clock hour, UTC).

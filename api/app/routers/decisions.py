@@ -20,7 +20,7 @@ from app import decision_effects, ratelimit
 from app.auth import CurrentUser
 from app.decision_review import ReviewContext, ReviewReason, load_context, review
 from app.deps import Now, UserSession
-from app.errors import AppError, NotFound, error_responses, validation_message
+from app.errors import AppError, NotFound, error_responses, validation_error
 from app.types import UtcDateTime
 from calc.registry import Calculator, UnknownCalculator, calculator
 from db.enums import CalculatorKind
@@ -92,11 +92,7 @@ def _recompute(spec: Calculator, body: DecisionIn) -> tuple[BaseModel, BaseModel
     try:
         inputs = spec.input_model.model_validate(body.inputs)
     except ValidationError as exc:
-        raise AppError(
-            validation_message(exc.errors(), prefix=("inputs",)),
-            code="validation_error",
-            status_code=422,
-        ) from exc
+        raise validation_error(exc.errors(), prefix=("inputs",)) from exc
     computed = spec.run(inputs)
     try:
         sent = spec.result_model.model_validate(body.result)

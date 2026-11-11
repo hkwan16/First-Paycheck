@@ -31,6 +31,7 @@ import {
 } from '@/lib/decisions';
 import { formatMoney, formatRate } from '@/lib/money';
 import { decisionStepRoute, whyRoute } from '@/lib/routes';
+import { MAX_PERIOD_CENTS, MAX_STEP3_CREDITS_CENTS, MAX_YEARLY_CENTS } from '@/lib/entry-limits';
 import { AmountField } from './AmountField';
 import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
 import {
@@ -64,30 +65,40 @@ type AmountKey =
 /** The amounts, plus the expected deductions (empty means "the Step 4(b) entry"). */
 type TextKey = AmountKey | 'expected_deductions_cents';
 
-const FIELDS: Record<AmountKey, { label: string; example: string; hint?: string }> = {
-  other_jobs_wages_cents: { label: "Other jobs' wages a year", example: '20,000.00' },
+/** Each amount's label, example and the most the API takes for it (spec 014 rule 16a). */
+const FIELDS: Record<AmountKey, { label: string; example: string; max: number; hint?: string }> = {
+  other_jobs_wages_cents: {
+    label: "Other jobs' wages a year",
+    example: '20,000.00',
+    max: MAX_YEARLY_CENTS,
+  },
   other_jobs_withholding_cents: {
     label: "Other jobs' withholding a year",
     example: '390.00',
+    max: MAX_YEARLY_CENTS,
   },
   dependents_credit_cents: {
     label: 'Step 3: credits for dependents, for the year',
     example: '2,200.00',
+    max: MAX_STEP3_CREDITS_CENTS,
     hint: 'The total from Step 3 of the form, for children and other dependents.',
   },
   other_income_cents: {
     label: 'Step 4(a): other income for the year',
     example: '2,000.00',
+    max: MAX_YEARLY_CENTS,
     hint: 'Interest, dividends and other income with no tax taken out.',
   },
   deductions_cents: {
     label: 'Step 4(b): deductions for the year',
     example: '5,000.00',
+    max: MAX_YEARLY_CENTS,
     hint: 'From the Deductions Worksheet that comes with the form.',
   },
   extra_withholding_cents: {
     label: 'Step 4(c): extra withholding each paycheck',
     example: '50.00',
+    max: MAX_PERIOD_CENTS,
     hint: 'Extra tax taken out of every paycheck, on top of the rest.',
   },
 };
@@ -153,9 +164,15 @@ export function W4Card() {
     texts[key] ??
     amountText(key === 'expected_deductions_cents' ? saved?.[key] : (saved?.[key] ?? 0));
   const reads = Object.fromEntries(
-    AMOUNT_KEYS.map((key) => [key, readAmount(textOf(key), { example: FIELDS[key].example })]),
+    AMOUNT_KEYS.map((key) => [
+      key,
+      readAmount(textOf(key), { example: FIELDS[key].example, max: FIELDS[key].max }),
+    ]),
   ) as Record<AmountKey, ReturnType<typeof readAmount>>;
-  const expectedRead = readAmount(textOf('expected_deductions_cents'), { example: '5,000.00' });
+  const expectedRead = readAmount(textOf('expected_deductions_cents'), {
+    example: '5,000.00',
+    max: MAX_YEARLY_CENTS,
+  });
   const statusValue = status ?? saved?.filing_status ?? profile.data?.filing_status ?? null;
   const jobsValue = multipleJobs ?? saved?.multiple_jobs ?? false;
   const showMore =

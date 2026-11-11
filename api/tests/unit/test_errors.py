@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, model_validator
 
 from app.errors import AppError, NotFound, Unauthorized, install_error_handlers
+from calc.types import MAX_PERIOD_CENTS, EntryLimit
 
 
 class Payload(BaseModel):
@@ -24,6 +26,16 @@ class Range(BaseModel):
         if self.low_cents > self.high_cents:
             raise ValueError("The low end must not be more than the high end")
         return self
+
+
+class Batch(BaseModel):
+    items: list[Payload]
+
+
+class Limited(BaseModel):
+    monthly_cents: Annotated[
+        int, EntryLimit(MAX_PERIOD_CENTS, "Enter an amount up to $1,000,000.00 a month.")
+    ]
 
 
 def build_app() -> FastAPI:
@@ -49,6 +61,14 @@ def build_app() -> FastAPI:
 
     @router.post("/range")
     def range_(body: Range) -> Range:
+        return body
+
+    @router.post("/batch")
+    def batch(body: Batch) -> Batch:
+        return body
+
+    @router.post("/limited")
+    def limited(body: Limited) -> Limited:
         return body
 
     @router.get("/things/{thing_id}")
@@ -118,7 +138,35 @@ def test_a_validators_own_sentence_is_the_message() -> None:
         "error": {
             "code": "validation_error",
             "message": "The low end must not be more than the high end",
+            "details": {
+                "errors": [
+                    {"path": [], "message": "The low end must not be more than the high end"}
+                ]
+            },
         }
+    }
+
+
+def test_each_problem_is_listed_with_its_place_in_the_body() -> None:
+    """Spec 007 rule 2a: a form shows each message beside its field, so each
+    problem carries its path, without the "body" a client never sends."""
+    response = client.post("/batch", json={"items": [{"amount_cents": 1}, {"amount_cents": "x"}]})
+    assert response.status_code == 422
+    (problem,) = response.json()["error"]["details"]["errors"]
+    assert problem["path"] == ["items", 1, "amount_cents"]
+    assert problem["message"].startswith("Input should be a valid integer")
+
+
+def test_an_entry_limit_is_a_sentence_on_its_field() -> None:
+    """Spec 007 rule 2a: an entry limit's refusal is written for people, like a
+    validator's own sentence, and stays on its field."""
+    response = client.post("/limited", json={"monthly_cents": 100_000_001})
+    assert response.status_code == 422
+    sentence = "Enter an amount up to $1,000,000.00 a month."
+    assert response.json()["error"] == {
+        "code": "validation_error",
+        "message": sentence,
+        "details": {"errors": [{"path": ["monthly_cents"], "message": sentence}]},
     }
 
 

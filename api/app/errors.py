@@ -120,19 +120,74 @@ async def _http_error(_: Request, error: Exception) -> JSONResponse:
     )
 
 
+def _sentence(item: Any) -> str | None:
+    """A validator's own ``ValueError`` (an entry limit's too): a sentence for
+    people (spec 008 rule 22a), sent as it is."""
+    ctx = item.get("ctx") or {}
+    if item.get("type") == "value_error" and isinstance(ctx.get("error"), ValueError):
+        return str(ctx["error"])
+    return None
+
+
 def validation_message(errors: Sequence[Any], prefix: Sequence[str] = ()) -> str:
-    """Pydantic errors as one message. A validator's own ``ValueError`` is a
-    sentence for people (spec 008 rule 22a) and goes as it is; any other error
-    names its field path, which only a client's developer reads."""
+    """Pydantic errors as one message. A validator's own sentence goes as it is;
+    any other error names its field path, which only a client's developer reads."""
     parts = []
     for item in errors:
-        ctx = item.get("ctx") or {}
-        if item.get("type") == "value_error" and isinstance(ctx.get("error"), ValueError):
-            parts.append(str(ctx["error"]))
+        sentence = _sentence(item)
+        if sentence is not None:
+            parts.append(sentence)
             continue
         location = ".".join(str(part) for part in (*prefix, *item.get("loc", ())))
         parts.append(f"{location}: {item.get('msg', 'invalid')}")
     return "; ".join(parts)
+
+
+def validation_details(errors: Sequence[Any], prefix: Sequence[str | int] = ()) -> dict[str, Any]:
+    """Each problem with its place in the body (spec 007 rule 2a), so a form can
+    show it beside its field: ``{"errors": [{"path": [...], "message": ...}]}``."""
+    return {
+        "errors": [
+            {
+                "path": [*prefix, *item.get("loc", ())],
+                "message": _sentence(item) or str(item.get("msg", "invalid")),
+            }
+            for item in errors
+        ]
+    }
+
+
+def validation_error(errors: Sequence[Any], prefix: Sequence[str] = ()) -> AppError:
+    """A 422 ``validation_error`` for a body a route validates itself (``POST
+    /decisions``' inputs), shaped like the framework's own."""
+    return AppError(
+        validation_message(errors, prefix=prefix),
+        code="validation_error",
+        status_code=422,
+        details=validation_details(errors, prefix=prefix),
+    )
+
+
+def field_error(path: Sequence[str | int], message: str) -> AppError:
+    """A 422 ``validation_error`` a route finds itself, on one field: ``message``
+    is a sentence naming what is allowed (spec 007 rule 2a)."""
+    return AppError(
+        message,
+        code="validation_error",
+        status_code=422,
+        details={"errors": [{"path": list(path), "message": message}]},
+    )
+
+
+def _body_errors(errors: Sequence[Any]) -> list[Any]:
+    """The errors as the client sent the request: a body field's path without
+    the leading ``body``."""
+    return [
+        {**item, "loc": tuple(item.get("loc", ()))[1:]}
+        if tuple(item.get("loc", ()))[:1] == ("body",)
+        else item
+        for item in errors
+    ]
 
 
 def _names_no_row(errors: Sequence[Any]) -> bool:
@@ -152,6 +207,7 @@ async def _validation_error(_: Request, error: Exception) -> JSONResponse:
             "validation_error",
             validation_message(exc.errors())
             or "That request could not be read. Check what you entered and try again.",
+            validation_details(_body_errors(exc.errors())) if exc.errors() else None,
         ),
         status_code=422,
     )

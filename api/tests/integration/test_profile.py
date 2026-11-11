@@ -130,16 +130,51 @@ def test_profiles_are_per_user(client_as: Client, user_a: FixtureUser, user_b: F
     assert client_as(user_b).get("/profile").json() == {**OUT_DEFAULTS, "updated_at": None}
 
 
-def test_birth_year_up_to_the_current_year(
+def test_birth_year_of_someone_old_enough_to_work(
     app: FastAPI, client_as: Client, user_a: FixtureUser
 ) -> None:
-    """Spec 006 open question 2: the year the user was born, never in the future."""
+    """Spec 006 open question 2 (issue 238): 1900 to the current year less 14, the
+    youngest age most employers may hire; a birth year of 2020 was saved before."""
     app.dependency_overrides[get_now] = lambda: dt.datetime(2026, 10, 21, 12, 0, tzinfo=dt.UTC)
     client = client_as(user_a)
-    assert client.put("/profile", json={"birth_year": 2027}).status_code == 422
-    saved = client.put("/profile", json={"birth_year": 2026})
+    sentence = "Enter a birth year from 1900 to 2012."
+    for year in (2013, 2020, 2026):
+        response = client.put("/profile", json={"birth_year": year})
+        assert response.status_code == 422, response.text
+        assert response.json()["error"] == {
+            "code": "validation_error",
+            "message": sentence,
+            "details": {"errors": [{"path": ["birth_year"], "message": sentence}]},
+        }
+    assert client.get("/profile").json()["updated_at"] is None
+    saved = client.put("/profile", json={"birth_year": 2012})
     assert saved.status_code == 200, saved.text
-    assert client.get("/profile").json()["birth_year"] == 2026
+    assert client.get("/profile").json()["birth_year"] == 2012
+
+
+def test_salary_up_to_the_yearly_entry_limit(client_as: Client, user_a: FixtureUser) -> None:
+    """Spec 006 rule 13a: a salary the calculators would refuse is not saved."""
+    client = client_as(user_a)
+    response = client.put("/profile", json={**FULL, "salary_cents": 1_000_000_001})
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["details"]["errors"] == [
+        {"path": ["salary_cents"], "message": "Enter a salary up to $10,000,000.00 a year."}
+    ]
+    saved = client.put("/profile", json={**FULL, "salary_cents": 1_000_000_000})
+    assert saved.status_code == 200, saved.text
+
+
+def test_a_salary_saved_before_the_limit_still_reads(
+    db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Spec 007 rule 2b: a limit added later never makes a saved row unreadable."""
+    db_connection.execute(
+        text("INSERT INTO profiles (user_id, salary_cents) VALUES (:u, :salary)"),
+        {"u": user_a.id, "salary": 5_000_000_000},
+    )
+    response = client_as(user_a).get("/profile")
+    assert response.status_code == 200, response.text
+    assert response.json()["salary_cents"] == 5_000_000_000
 
 
 # ---------------------------------------------------------------- pay schedule (rule 25a)
