@@ -7,7 +7,9 @@ import type {
   Profile,
   ProfileIn,
 } from '@/lib/api/types';
-import { formatMoney, parseMoney } from '@/lib/money';
+import { latestBirthYear, MAX_YEARLY_CENTS, MIN_BIRTH_YEAR } from '@/lib/entry-limits';
+import { formatMoney } from '@/lib/money';
+import { readAmount } from './decision-format';
 
 /*
  * The plan details the 401(k) card needs from the profile: salary, filing
@@ -49,9 +51,6 @@ export type PlanDetailsResult =
 
 /** The most tiers the API accepts. */
 export const MAX_TIERS = 5;
-
-/** The earliest birth year `PUT /profile` accepts. */
-export const MIN_BIRTH_YEAR = 1900;
 
 /**
  * The examples the salary and birth year fields show, in their placeholders
@@ -133,27 +132,37 @@ export function draftFromProfile(profile: Profile, payStub: PayStub | undefined)
 }
 
 const PERCENT = /^\d{1,3}(?:\.\d{1,2})?$/;
+/** A percentage typed with more than two digits after the point: "4.555". */
+const PERCENT_TOO_PRECISE = /^\d{1,3}\.\d{3,}$/;
 
 const isPercent = (text: string) => PERCENT.test(text) && Number(text) > 0 && Number(text) <= 100;
 
 const YEAR = /^\d{4}$/;
 
 export interface ReadOptions {
-  /** The confirmed pay stub's tax year, which bounds the birth year (no negative age). */
-  taxYear?: number;
+  /**
+   * The year it is (UTC, as the API counts it), which ends the birth years
+   * `PUT /profile` takes (`latestBirthYear`, spec 006 open question 2).
+   */
+  currentYear: number;
   /** The form asks for the pay schedule (no `stubSchedule`); otherwise it is left out. */
   askSchedule?: boolean;
 }
 
-/** The draft as profile fields, or what to fix. */
+/** The draft as profile fields, or what to fix, naming the actual problem (spec 018 rule 5e). */
 export function readPlanDetails(
   draft: PlanDetailsDraft,
-  { taxYear, askSchedule: asked = false }: ReadOptions = {},
+  { currentYear, askSchedule: asked = false }: ReadOptions,
 ): PlanDetailsResult {
   const errors: Partial<Record<PlanDetailsField, string>> = {};
-  const salary = parseMoney(draft.salary);
-  if (salary === null || salary <= 0) {
-    errors.salary = `Enter your yearly salary, like ${SALARY_EXAMPLE}.`;
+  const salaryRead = readAmount(draft.salary, {
+    example: SALARY_EXAMPLE,
+    max: MAX_YEARLY_CENTS,
+    positive: true,
+  });
+  const salary = salaryRead.cents;
+  if (salary === null) {
+    errors.salary = salaryRead.error ?? `Enter your yearly salary, like ${SALARY_EXAMPLE}.`;
   }
   if (!draft.filingStatus) errors.filingStatus = 'Choose your filing status.';
   if (asked && !draft.payFrequency) errors.payFrequency = SCHEDULE_ERROR;
@@ -162,7 +171,11 @@ export function readPlanDetails(
     employerPct: tier.employerPct.trim(),
     uptoPct: tier.uptoPct.trim(),
   }));
-  if (!tiers.every((tier) => isPercent(tier.employerPct) && isPercent(tier.uptoPct))) {
+  const percentages = tiers.flatMap((tier) => [tier.employerPct, tier.uptoPct]);
+  if (percentages.some((pct) => PERCENT_TOO_PRECISE.test(pct))) {
+    errors.tiers =
+      'Enter each percentage with at most two digits after the decimal point, like 4.5.';
+  } else if (!percentages.every(isPercent)) {
     errors.tiers = 'Enter each percentage as a number above 0 and up to 100, like 4 or 4.5.';
   } else if (
     tiers.some((tier, i) => i > 0 && Number(tier.uptoPct) <= Number(tiers[i - 1]!.uptoPct))
@@ -172,10 +185,11 @@ export function readPlanDetails(
 
   const birthText = draft.birthYear.trim();
   const birthYear = Number(birthText);
-  if (!YEAR.test(birthText) || birthYear < MIN_BIRTH_YEAR) {
+  const latest = latestBirthYear(currentYear);
+  if (!YEAR.test(birthText)) {
     errors.birthYear = `Enter the year you were born, like ${BIRTH_YEAR_EXAMPLE}.`;
-  } else if (taxYear !== undefined && birthYear > taxYear) {
-    errors.birthYear = `Enter a year no later than ${taxYear}.`;
+  } else if (birthYear < MIN_BIRTH_YEAR || birthYear > latest) {
+    errors.birthYear = `Enter a year from ${MIN_BIRTH_YEAR} to ${latest}.`;
   }
 
   if (Object.keys(errors).length > 0 || salary === null) return { ok: false, errors };

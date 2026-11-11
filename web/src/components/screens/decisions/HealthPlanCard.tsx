@@ -13,6 +13,7 @@ import { apiErrorMessage } from '@/lib/api/errors';
 import {
   useBenefitsPlans,
   useCalc,
+  useCalcCheck,
   useCalendar,
   useDecisions,
   usePayStubs,
@@ -24,6 +25,7 @@ import { useFocusHandoff } from '@/lib/focus-handoff';
 import { formatDate } from '@/lib/dates';
 import { asHealthPlansInputs, currentDecision, decisionSaveState } from '@/lib/decisions';
 import { decisionStepRoute, whyRoute } from '@/lib/routes';
+import { MAX_YEARLY_CENTS } from '@/lib/entry-limits';
 import { AmountField } from './AmountField';
 import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
 import {
@@ -37,7 +39,9 @@ import {
   choiceAmong,
   HEALTH_TERMS,
   HEALTH_WHAT_IF_INPUTS,
+  planRefusal,
   plansFromBenefits,
+  type PlanRefusal,
   USAGE_DEFAULTS,
   usageLabel,
   USAGES,
@@ -100,7 +104,7 @@ export function HealthPlanCard() {
   const usageValue =
     usage ?? saved?.expected_usage ?? profile.data?.expected_healthcare_usage ?? 'medium';
   const hsaValue = hsa ?? amountText(saved?.employee_hsa_cents ?? 0);
-  const hsaRead = readAmount(hsaValue, { example: '1,000.00' });
+  const hsaRead = readAmount(hsaValue, { example: '1,000.00', max: MAX_YEARLY_CENTS });
   const selectedValue = selected !== undefined ? selected : (saved?.selected_plan_index ?? null);
   const deadlineValue =
     deadline ?? (saved ? (saved.enrollment_deadline ?? '') : (fromBenefits?.deadline ?? ''));
@@ -118,32 +122,44 @@ export function HealthPlanCard() {
   const question = profile.data?.salary_review ?? null;
   const showForm = editing || plans === null;
 
-  // Everything the decision reads is there. The plan table opening in place of the
-  // comparison changes none of it (spec 012 rule 18a).
-  const decidable =
+  // What the comparison reads rather than asks, once it is all there.
+  const context =
     loaded &&
-    plans !== null &&
     payStub !== undefined &&
     periods !== null &&
     salary !== null &&
     filing !== null &&
-    question === null;
-  const decided: HealthPlansInput | null =
-    decidable && hsaRead.cents !== null
+    question === null
       ? {
-          plans,
           pay_periods_per_year: periods,
           salary_cents: salary,
           filing_status: filing,
           tax_year: payStub.tax_year,
-          employee_hsa_cents: hsaRead.cents,
-          expected_usage: usageValue,
-          usage_low_cents: scenarios.low,
-          usage_medium_cents: scenarios.medium,
-          usage_high_cents: scenarios.high,
-          selected_plan_index: selectedValue,
-          enrollment_deadline: deadlineValue || null,
         }
+      : null;
+  /** The calculator's inputs for these plans and this choice, with the rest on screen. */
+  const inputsFor = (
+    compared: HealthPlanOption[],
+    choice: number | null,
+    employeeHsaCents: number,
+  ): HealthPlansInput | null =>
+    context && {
+      plans: compared,
+      ...context,
+      employee_hsa_cents: employeeHsaCents,
+      expected_usage: usageValue,
+      usage_low_cents: scenarios.low,
+      usage_medium_cents: scenarios.medium,
+      usage_high_cents: scenarios.high,
+      selected_plan_index: choice,
+      enrollment_deadline: deadlineValue || null,
+    };
+  // Everything the decision reads is there. The plan table opening in place of the
+  // comparison changes none of it (spec 012 rule 18a).
+  const decidable = context !== null && plans !== null;
+  const decided =
+    plans !== null && hsaRead.cents !== null
+      ? inputsFor(plans, selectedValue, hsaRead.cents)
       : null;
   // Calculated only while the comparison is on screen.
   const inputs = showForm ? null : decided;
@@ -165,6 +181,23 @@ export function HealthPlanCard() {
       setSelected(choiceAmong(plans, selectedValue, next));
       setEditing(false);
     });
+  // Typed plans go on screen only once the API takes them (spec 012 rule 18b, issue
+  // 228): until then the table stays open, each refusal beside its field, and the
+  // comparison, the choice and the badge are as they were. The answer is the
+  // comparison's own result, so showing the plans asks nothing again.
+  const check = useCalcCheck(HEALTH_CALC_PATH);
+  const comparePlans = async (next: HealthPlanOption[]): Promise<PlanRefusal | null> => {
+    const body = inputsFor(next, choiceAmong(plans, selectedValue, next), hsaRead.cents ?? 0);
+    if (body !== null) {
+      try {
+        await check.mutateAsync(body);
+      } catch (error) {
+        return planRefusal(error, next.length);
+      }
+    }
+    applyPlans(next, 'typed');
+    return null;
+  };
 
   const event = calendar.data?.find(
     (e) => e.kind === 'enrollment_deadline' && current && e.decision_id === current.id,
@@ -226,7 +259,7 @@ export function HealthPlanCard() {
         <PlanOptionsForm
           ref={focus.target('plans-form')}
           initial={plans}
-          onCompare={(next) => applyPlans(next, 'typed')}
+          onCompare={comparePlans}
           onCancel={
             plans !== null
               ? () => {

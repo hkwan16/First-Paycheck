@@ -15,6 +15,7 @@ from typing import Any
 from calc.health_plans import HealthPlansInput, HealthPlansResult
 from calc.k401 import K401MatchInput, K401MatchResult, RateChange, rate_costs
 from calc.pay_stub import StubRate, StubWithholding, stub_rate, stub_withholding
+from calc.types import STORED
 from calc.w4 import W4Input, W4Result, at_withholding
 from llm.schemas import ExplanationDraft, NumberClaim
 from verify.format import dollars, net_cost, percent
@@ -378,7 +379,7 @@ def fallback_draft(
     ``pay_stub_withholding_cents`` (rule 7b) is what that stub withholds each
     paycheck on the decision's pay schedule, None otherwise, read for ``w4`` only."""
     if calculator == "w4":
-        entries = W4Input.model_validate(inputs)
+        entries = W4Input.model_validate(inputs, context=STORED)
         projected = W4Result.model_validate(result)
         text, claims = _w4(entries, projected, pay_stub_withholding_cents)
         return ExplanationDraft(
@@ -389,7 +390,7 @@ def fallback_draft(
             citation_keys=[key for key in projected.citation_keys if key in allowed_citation_keys],
         )
     if calculator == "health_plans":
-        plans = HealthPlansInput.model_validate(inputs)
+        plans = HealthPlansInput.model_validate(inputs, context=STORED)
         compared = HealthPlansResult.model_validate(result)
         text, claims = _health(plans, compared)
         return ExplanationDraft(
@@ -401,7 +402,7 @@ def fallback_draft(
         )
     if calculator != "k401_match":
         raise ValueError(f"no fallback text for calculator {calculator!r} yet")
-    data = K401MatchInput.model_validate(inputs)
+    data = K401MatchInput.model_validate(inputs, context=STORED)
     computed = K401MatchResult.model_validate(result)
     text, claims = _k401(data, computed, pay_stub_pct)
     return ExplanationDraft(

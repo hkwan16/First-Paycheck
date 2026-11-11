@@ -70,6 +70,32 @@ export function apiErrorCode(error: unknown): string | undefined {
   return typeof error.error.code === 'string' ? error.error.code : undefined;
 }
 
+/** One problem in a refused body, at its place in the body (`['plans', 1, 'oop_max_cents']`). */
+export interface FieldProblem {
+  path: (string | number)[];
+  message: string;
+}
+
+const isFieldProblem = (value: unknown): value is FieldProblem =>
+  isRecord(value) &&
+  Array.isArray(value.path) &&
+  value.path.every((part) => typeof part === 'string' || typeof part === 'number') &&
+  typeof value.message === 'string';
+
+/**
+ * A 422 `validation_error`'s problems, each with its path, so a form can show
+ * each message beside its field (spec 007 rule 2a: `details.errors`); null for
+ * any other failure, or a body that does not have them.
+ */
+export function fieldProblems(error: unknown): FieldProblem[] | null {
+  if (!isRecord(error) || !isRecord(error.error) || error.error.code !== 'validation_error') {
+    return null;
+  }
+  const details = error.error.details;
+  const problems = isRecord(details) ? details.errors : undefined;
+  return Array.isArray(problems) && problems.every(isFieldProblem) ? problems : null;
+}
+
 /** A word with an underscore inside: a field, a code or an enum value (`emergency_fund`). */
 const IDENTIFIER = /\b[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+\b/;
 

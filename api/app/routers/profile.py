@@ -18,12 +18,12 @@ from sqlalchemy.orm import Session
 
 from app.auth import CurrentUser
 from app.deps import Now, UserSession
-from app.errors import AppError, NotFound, error_responses
+from app.errors import NotFound, error_responses, field_error
 from app.pay_schedule import PaySchedule, pay_schedule
 from app.salary_review import SalaryReview, load_salary_review
 from app.types import UtcDateTime
 from calc.k401 import MAX_TIERS, MatchTier, tiers_ascending
-from calc.types import PositiveCents
+from calc.types import STORED, PositiveCents, Salary
 from db.enums import FilingStatus, HealthcareUsage, PayFrequency
 from db.models import Profile
 from db.pay_stubs import find_pay_stub
@@ -31,6 +31,14 @@ from db.pay_stubs import find_pay_stub
 router = APIRouter(prefix="/profile", tags=["profile"])
 
 MIN_BIRTH_YEAR = 1900
+# The youngest age the Fair Labor Standards Act lets most employers hire: First
+# Paycheck is for someone starting a job (spec 006 open question 2, issue 238).
+MIN_WORKING_AGE = 14
+
+
+def latest_birth_year(year: int) -> int:
+    """The last birth year ``PUT /profile`` takes in ``year``: 2012 in 2026."""
+    return year - MIN_WORKING_AGE
 
 
 class OtherJob(BaseModel):
@@ -44,7 +52,7 @@ class OtherJob(BaseModel):
 class ProfileFields(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    salary_cents: PositiveCents | None = None
+    salary_cents: Salary | None = None
     # The stub the salary was last compared with (spec 005 rule 24c).
     salary_pay_stub_id: uuid.UUID | None = None
     pay_frequency: PayFrequency | None = None
@@ -55,7 +63,8 @@ class ProfileFields(BaseModel):
     start_date: dt.date | None = None
     match_tiers: list[MatchTier] = Field(default_factory=list, max_length=MAX_TIERS)
     vesting_years: int | None = Field(default=None, ge=0, le=10, strict=True)
-    # The year the user was born; at most the current year (checked by the route).
+    # The year the user was born; at most the current year less MIN_WORKING_AGE
+    # (checked by the route, which knows the year).
     birth_year: int | None = Field(default=None, ge=MIN_BIRTH_YEAR, strict=True)
 
     @model_validator(mode="after")
@@ -92,13 +101,15 @@ def _out(session: Session, profile: Profile | None) -> ProfileOut:
         if profile is None
         else {name: getattr(profile, name) for name in ProfileFields.model_fields}
     )
+    # A row saved before an entry limit tightened still reads (spec 007 rule 2b).
     return ProfileOut.model_validate(
         {
             **saved,
             "updated_at": None if profile is None else profile.updated_at,
             "pay_schedule": pay_schedule(session, profile),
             "salary_review": load_salary_review(session, profile),
-        }
+        },
+        context=STORED,
     )
 
 
@@ -111,10 +122,9 @@ def get_profile(session: UserSession, user: CurrentUser) -> ProfileOut:
 @router.put("", responses=error_responses(401, 404, 422))
 def put_profile(body: ProfileIn, session: UserSession, user: CurrentUser, now: Now) -> ProfileOut:
     """Replace the profile."""
-    if body.birth_year is not None and body.birth_year > now.year:
-        raise AppError(
-            f"The birth year must be at most {now.year}", code="validation_error", status_code=422
-        )
+    latest = latest_birth_year(now.year)
+    if body.birth_year is not None and body.birth_year > latest:
+        raise field_error(("birth_year",), f"Enter a birth year from {MIN_BIRTH_YEAR} to {latest}.")
     if (
         body.salary_pay_stub_id is not None
         and find_pay_stub(session, body.salary_pay_stub_id) is None

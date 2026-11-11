@@ -83,7 +83,8 @@ export function PlanDetailsForm({
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const read = readPlanDetails(draft, {
-      taxYear: payStub?.tax_year,
+      // The year as the API counts it (UTC), read when the person saves.
+      currentYear: new Date().getUTCFullYear(),
       askSchedule: fromStub === null,
     });
     if (!read.ok) {

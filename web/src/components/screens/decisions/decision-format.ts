@@ -91,25 +91,52 @@ export interface ReadAmount {
   error: string | null;
 }
 
+export interface ReadAmountOptions {
+  /** What to type, in the messages: "1,823.25". */
+  example: string;
+  /** The most the API takes for the field, in cents (`lib/entry-limits.ts`). */
+  max: number;
+  /** Refuse $0, for amounts the calculator needs above zero. */
+  positive?: boolean;
+}
+
+/** An amount's shape, however many digits follow the point: sign, dollars, cents. */
+const AMOUNT_SHAPE = /^-?\$?(\d{1,3}(?:,\d{3})+|\d*)(?:\.(\d*))?$/;
+
 /**
- * An amount a person typed on a card, as cents (`parseMoney`), or what to fix.
- * Empty is not an error: the field is simply not filled in yet. `positive`
- * refuses $0 for amounts the calculator needs above zero.
+ * An amount a person typed on a card, as cents (`parseMoney`), or what to fix,
+ * naming the actual problem (spec 018 rule 5e, issue 238): not an amount, more
+ * than two digits after the point, or outside the field's range, which the
+ * message states. Empty is not an error: the field is not filled in yet.
+ * Comparing what was typed with the range the API publishes is the only
+ * comparison a card makes with an amount.
  */
 export function readAmount(
   text: string,
-  { example, positive = false }: { example: string; positive?: boolean },
+  { example, max, positive = false }: ReadAmountOptions,
 ): ReadAmount {
-  if (text.trim() === '') return { cents: null, error: null };
-  const cents = parseMoney(text);
-  const ok = cents !== null && (positive ? cents > 0 : cents >= 0);
-  if (ok) return { cents, error: null };
-  return {
-    cents: null,
-    error: positive
-      ? `Enter an amount above $0, like ${example}.`
-      : `Enter an amount, like ${example}.`,
-  };
+  const typed = text.trim();
+  if (typed === '') return { cents: null, error: null };
+  const shape = AMOUNT_SHAPE.exec(typed);
+  const [, dollarsTyped = '', centsTyped] = shape ?? [];
+  if (!shape || centsTyped === '' || (dollarsTyped === '' && centsTyped === undefined)) {
+    return { cents: null, error: `Enter an amount, like ${example}.` };
+  }
+  if ((centsTyped ?? '').length > 2) {
+    return {
+      cents: null,
+      error: `Enter at most two digits after the decimal point, like ${example}.`,
+    };
+  }
+  // Null here is only a number too large to hold exactly: out of range too.
+  const cents = parseMoney(typed);
+  if (cents !== null && cents <= max && (positive ? cents > 0 : cents >= 0)) {
+    return { cents, error: null };
+  }
+  const range = positive
+    ? `above $0 and up to ${formatMoney(max)}`
+    : `from $0 to ${formatMoney(max)}`;
+  return { cents: null, error: `Enter an amount ${range}.` };
 }
 
 /**

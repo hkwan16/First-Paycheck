@@ -86,6 +86,15 @@ Rules:
 - Raise `AppError` (or `NotFound`, `Unauthorized`); every error leaves as
   `{"error": {"code", "message"}}`. Document error statuses on a route with
   `responses=error_responses(404, 422)`.
+- A 422 `validation_error` from a request body also carries `details.errors`,
+  `[{path, message}]`, `path` the field's place in the body without `body`
+  (spec 007 rule 2a), so a form shows each message beside its field. A route
+  that validates more itself raises the same shape: `errors.field_error(path,
+  message)` for one field (`PUT /profile`'s birth year), `errors.validation_error(
+  exc.errors(), prefix=...)` for a pydantic `ValidationError` (`POST /decisions`
+  prefixes `inputs`). A model validator that refuses one field raises
+  `ValidationError.from_exception_data` with that field's `loc` (calc's HSA limit:
+  calc cannot import `pydantic_core`, so the error details are plain dicts).
 - Operation ids are route function names. After a route or schema change run
   `make types` and commit `api/openapi.json`; a unit test and CI fail on drift.
 
@@ -337,6 +346,18 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
 - `AppError` takes `details` (machine-readable, e.g. the confirm diff) and
   `headers` (e.g. `Retry-After`). Money types and two-place percentages shared
   by calculators and request models live in `calc/types.py`.
+- **Entry limits** (spec 007 rules 2a and 2b, issue 238): what a person may
+  type is bounded tighter than `Cents`, so a typo is a 422 naming the range,
+  never an overflow's 500. Put the limit on the field's type as an
+  `EntryLimit` (`yearly(what)`, `monthly(what)`, `per_paycheck(what)`, or one
+  of its own like W-4 Step 3's), whose sentence is the message and whose
+  maximum lands in `openapi.json` (the web mirrors it in `lib/entry-limits.ts`
+  and a test reads it back). Stored inputs are read with
+  `model_validate(..., context=STORED)`, which skips entry limits, so a version
+  saved under an older limit still reads; `tests/unit/test_stored_inputs.py`
+  fails on a read without it outside `POST /calc/*` and `POST /decisions`.
+  `tests/unit/calc/test_entry_limits.py` checks every input within the limits
+  computes.
 - Swagger UI is at `/api-docs`: `/docs` is the documents API.
 - The request clock is the `Now` dependency (`app/deps.py:get_now`); tests
   override it to freeze time (the upload rate limit is per clock hour, UTC).

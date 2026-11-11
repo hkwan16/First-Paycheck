@@ -727,3 +727,25 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Fix:** As above, on `fix/usability-spending`.
 
 **Time saved or lost:** Not measured.
+
+## 2026-11-11: Decision forms took out-of-range values and the plan table closed on a refusal (issues 228, 238)
+
+**Task:** Edit plans on the health plan step took a deductible above the out-of-pocket maximum: the table closed, the comparison was replaced by an unnamed message and the choice was cleared, and an employer HSA of $99,999 went through. Elsewhere, essentials of `99999999999999` or `1,234.567` both read "Enter an amount above $0, like 1,823.25.", the 401(k) plan details saved a birth year of 2020, and W-4 Step 3 calculated 999,999.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Spec first, reproduce each bug end to end on the local stack and keep it as a Playwright regression, failing tests, then the root cause; validation in the API as a 422 with a clear message, mirrored by the form.
+
+**What it produced:** Entry limits in `calc/types.py` (spec 007 rules 2a and 2b): an `EntryLimit` on each input's type (yearly amounts at most $10,000,000.00, monthly and per-paycheck ones at most $1,000,000.00, Step 3 at most $100,000.00, an employer HSA at most the year's self-only limit), whose sentence is the 422's message and whose maximum is in `openapi.json`. Stored decisions are read with `context=STORED`, which skips them, and an AST test holds every read to it. Every body 422 now carries `details.errors` with each problem's path. The health plan calculator's relation checks moved onto the fields and name the plan. `PUT /profile` takes birth years from 1900 to the current year less 14. On the web, `readAmount` gives one message per problem with the field's range (mirrored in `lib/entry-limits.ts`, read back from `openapi.json` by a test), and Compare these plans asks `POST /calc/health-plans` first through `useCalcCheck`, keeping the table open with each refusal beside its field.
+
+**What was wrong:**
+- The first `EntryLimit` built a `pydantic_core` schema, which `calc/` may not import; it now delegates to `AfterValidator`, and the HSA limit's located error passes plain dicts to `ValidationError.from_exception_data`.
+- Some inputs within the old `Cents` bound overflowed a result's `Cents` and answered 500 (essentials of $1 billion times 12 months; a $1 billion Step 4(a)). The Hypothesis test "every input within the limits computes" now covers that.
+- The e2e test first expected the out-of-pocket and HSA errors at once, but pydantic runs the HSA check over the whole body only after the plans' fields pass, so it now checks them one after the other.
+- The MSW handler for `POST /calc/health-plans` did not refuse anything, so one existing card test, which edited a premium, now needed its case in `make-health-plans-results.py`.
+
+**How it was caught:** The two new `decisions.spec.ts` tests failing on the local stack before the fix (the table closed with "A plan's deductible must not be more than its out-of-pocket maximum" and "Choose the plan you will enroll in to save."; the essentials description "Enter an amount above $0, like 1,823.25."); failing unit and integration tests per rule.
+
+**Fix:** As above, on `fix/decision-form-validation`.
+
+**Time saved or lost:** Not measured.
