@@ -81,7 +81,8 @@ describe('PlanScreen with every decision saved', () => {
     const fund = region('Emergency fund');
     expect(figure(fund, 'Target')).toHaveTextContent('$5,469.75');
     expect(figure(fund, 'Monthly contribution')).toHaveTextContent('$300.00');
-    expect(figure(fund, 'Saved so far')).toHaveTextContent('39.12%');
+    // Issue 239: the balance the fund was worked out from, not the goal's "Saved so far".
+    expect(figure(fund, 'Already saved when you decided')).toHaveTextContent('$2,140.00');
     const k401 = region('401(k) match');
     expect(figure(k401, 'Your contribution')).toHaveTextContent('4%');
     expect(figure(k401, 'Employer match a year')).toHaveTextContent('$2,600.00');
@@ -97,6 +98,20 @@ describe('PlanScreen with every decision saved', () => {
     );
     // Issue 209: the sign picks the words; no "negative is owed".
     expect(figure(w4, 'At tax time with your new W-4')).toHaveTextContent('$0.08 refund');
+  });
+
+  it('dates a save on the day the API answers, the person’s, not the browser’s (issue 232)', async () => {
+    // 05:30 on October 22 in Tokyo is still October 21 in UTC and in the Americas:
+    // the PDF prints saved_on, so the page must too (spec 016 rule 11a, spec 019 rule 3).
+    const plan = samplePlan();
+    plan.decisions[1] = {
+      ...plan.decisions[1]!,
+      created_at: '2026-10-21T20:30:00Z',
+      saved_on: '2026-10-22',
+    };
+    planDb.plan = plan;
+    await open();
+    expect(within(region('401(k) match')).getByText('Saved Oct 22, 2026')).toBeInTheDocument();
   });
 
   it('says a health plan that comes out ahead is that much ahead, with no minus sign', async () => {

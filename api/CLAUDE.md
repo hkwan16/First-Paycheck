@@ -88,6 +88,15 @@ Rules:
 - Raise `AppError` (or `NotFound`, `Unauthorized`); every error leaves as
   `{"error": {"code", "message"}}`. Document error statuses on a route with
   `responses=error_responses(404, 422)`.
+- A 422 `validation_error` from a request body also carries `details.errors`,
+  `[{path, message}]`, `path` the field's place in the body without `body`
+  (spec 007 rule 2a), so a form shows each message beside its field. A route
+  that validates more itself raises the same shape: `errors.field_error(path,
+  message)` for one field (`PUT /profile`'s birth year), `errors.validation_error(
+  exc.errors(), prefix=...)` for a pydantic `ValidationError` (`POST /decisions`
+  prefixes `inputs`). A model validator that refuses one field raises
+  `ValidationError.from_exception_data` with that field's `loc` (calc's HSA limit:
+  calc cannot import `pydantic_core`, so the error details are plain dicts).
 - Operation ids are route function names. After a route or schema change run
   `make types` and commit `api/openapi.json`; a unit test and CI fail on drift.
 
@@ -115,7 +124,8 @@ Rules:
   `model` = settings purpose, `effort`, `max_tokens`, `schema`), loaded and
   validated by `llm/prompts/__init__.py`. A released prompt file is never
   edited; a change is a new version.
-- One public method per prompt: `categorize` (`categorize/v3`),
+- One public method per prompt: `categorize` (`categorize/v4`: v3 with `cash` defined and
+  ATM withdrawals out of `transfer`, spec 003 rule 9d, issue 250),
   `extract_pay_stub` (`extract_pay_stub/v2`: a dash or `0.00` printed on a line is 0
   tied to that line, not null; spec 005 rule 1a, issue 195), `extract_benefits`
   (`extract_benefits/v2`), `explain` (`explain/v5`), `judge_rate_claim`
@@ -203,7 +213,16 @@ Rules:
   rule (`target optical`). `tests/unit/test_seed_rules.py` lists the names
   each way; check a new seed row against them. The model
   labels each merchant and direction separately (`CategorizeItem.direction`,
-  `categorize/v3`) and may call money in a refund. What a category means
+  `categorize/v4`) and may call money in a refund. Cash withdrawn is spending:
+  `cash`, a `flexible` category (spec 003 rule 9d, issue #250), by seed prefix
+  rules on the bank language (`atm withdrawal`, `cash withdrawal`, ...; never
+  the bare `withdrawal`, which banks put before card purchases, nor `atm`), so
+  an earlier `transfer` guess for one is relabeled by the rules pass; only money
+  between the person's own accounts, peers and cash deposits stay `transfer`. A
+  new category goes in `sync/categories.py` (list and `CATEGORY_BUCKETS`), a new
+  prompt version that names it, `web/src/lib/categories.ts` and `make types`; a
+  released prompt keeps the categories it had (`test_prompts.py:ADDED_AFTER`).
+  What a category means
   (a membership to a public radio station or another nonprofit is
   `gifts_donations`, issue #146) is the prompt's; which merchant a
   description names is the seed rules' (spec 003 rule 9a), and the two agree
@@ -339,6 +358,18 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
 - `AppError` takes `details` (machine-readable, e.g. the confirm diff) and
   `headers` (e.g. `Retry-After`). Money types and two-place percentages shared
   by calculators and request models live in `calc/types.py`.
+- **Entry limits** (spec 007 rules 2a and 2b, issue 238): what a person may
+  type is bounded tighter than `Cents`, so a typo is a 422 naming the range,
+  never an overflow's 500. Put the limit on the field's type as an
+  `EntryLimit` (`yearly(what)`, `monthly(what)`, `per_paycheck(what)`, or one
+  of its own like W-4 Step 3's), whose sentence is the message and whose
+  maximum lands in `openapi.json` (the web mirrors it in `lib/entry-limits.ts`
+  and a test reads it back). Stored inputs are read with
+  `model_validate(..., context=STORED)`, which skips entry limits, so a version
+  saved under an older limit still reads; `tests/unit/test_stored_inputs.py`
+  fails on a read without it outside `POST /calc/*` and `POST /decisions`.
+  `tests/unit/calc/test_entry_limits.py` checks every input within the limits
+  computes.
 - Swagger UI is at `/api-docs`: `/docs` is the documents API.
 - The request clock is the `Now` dependency (`app/deps.py:get_now`); tests
   override it to freeze time (the upload rate limit is per clock hour, UTC).
@@ -365,7 +396,8 @@ and asks the gateway, `GET /docs/{id}` shows the proposal, `POST
   `calendar_through`, `overdue` and `days_until`, the Spending and cash flow
   default periods, the check-in period and its `as_of`, recurring detection's
   today, a holding's fallback date, net worth's newest snapshot per day, the
-  PDF's preparation date and file name, the birth year's upper bound.
+  PDF's preparation date and file name, each decision's `saved_on` on the plan
+  and the PDF, the birth year's upper bound. `build_plan` takes the `PersonDay`.
 - Still UTC on purpose: the LLM budget day and the rate-limit hours (cost
   guards over every user alike), the `.ics` `DTSTAMP` (RFC 5545), retention
   and export expiry ages (durations), and stored timestamps.
@@ -660,8 +692,8 @@ kinds `goal_contribution` and `goal_review`, `profiles.birth_year` and
   the PDF, where the plan's cost figures have kind `net_cost`. Citations:
   `db/seed/irs_citations/health_plans.yaml`. An emergency-fund decision has no
   IRS citation to give, so explaining one is 422 `explanation_unavailable`.
-- **Birth year.** `profiles.birth_year` (1900 to the current year, the upper
-  bound checked in `PUT /profile`) settles spec 006 open question 2; the
+- **Birth year.** `profiles.birth_year` (1900 to the person's year less 14,
+  `latest_birth_year(day.today.year)`, the upper bound checked in `PUT /profile`) settles spec 006 open question 2; the
   401(k) calculator still takes `age`, which the client derives as
   `tax_year - birth_year`.
 
@@ -823,6 +855,15 @@ table `plan_exports` (`enable_rls`, SELECT and INSERT only).
   everything) with no session open, and stores it in a second session; a rerun
   keeps the first PDF. `GET /plan/export/{job_id}` streams it only when the job
   is a succeeded `plan.export` of the user and the row exists, else 404.
+- **The Plan page's words** (spec 016 rule 11a, issue 239). The PDF says what the web
+  Plan page says: `export/html.py:CALCULATOR_TITLES` is the web's `CALCULATOR_LABELS`
+  ("401(k) match", "W-4, federal only"), the paycheck lines are the "Your paycheck"
+  card's, each decision shows "Saved <saved_on>" (`PlanDecision.saved_on`, the person's day of
+  `created_at`, which the Plan page prints too; no version number), the explanation
+  lines are the Plan page's (`EXPLANATION_LABELS`) and, on page 2, the Why page's notes
+  (`WHY_LABELS`), and an emergency fund (not `is_explainable`) prints no explanation line.
+  A word change on either side changes the other; `web/.../plan/plan-pdf-words.test.ts`
+  reads `tests/fixtures/export/plan.html` to catch a name or paycheck label that drifts.
 - **Worker only.** `app/` never imports `export.html`, `export.pdf`, `jinja2`
   or `weasyprint`, and `import app.main` loads none of them
   (`tests/unit/test_boundaries.py`). `export/store.py` is the only module that
@@ -836,6 +877,9 @@ table `plan_exports` (`enable_rls`, SELECT and INSERT only).
   decisions through the API at 2026-10-21 15:00 UTC and writes fixed
   explanations. `tests/fixtures/export/plan.html` is the expected page byte for
   byte; review a template change by rendering it and replacing the fixture.
+  Postgres stamps `decisions.created_at` with the test transaction's real start,
+  so `test_plan_html.py:plan_of` sets every decision's `created_at` (and its
+  `saved_on`, in the person's zone) to `NOW` before rendering; without it the printed saved dates change every day the suite runs.
   PDF tests take the `weasyprint` fixture: they skip when pango cannot load and
   fail in CI, which installs pango and runs `tests/*/export` in the image too.
   On macOS run them with `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib uv run

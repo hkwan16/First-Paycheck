@@ -1271,6 +1271,7 @@ export interface components {
         | 'personal_care'
         | 'education'
         | 'gifts_donations'
+        | 'cash'
         | 'fees'
         | 'taxes'
         | 'debt_payment'
@@ -2879,6 +2880,11 @@ export interface components {
       };
       /** Review */
       review: components['schemas']['ReviewReason'][];
+      /**
+       * Saved On
+       * Format: date
+       */
+      saved_on: string;
       /** Version */
       version: number;
     };
@@ -3378,6 +3384,7 @@ export interface components {
         | 'personal_care'
         | 'education'
         | 'gifts_donations'
+        | 'cash'
         | 'fees'
         | 'taxes'
         | 'debt_payment'
@@ -3566,6 +3573,7 @@ export interface components {
             | 'personal_care'
             | 'education'
             | 'gifts_donations'
+            | 'cash'
             | 'fees'
             | 'taxes'
             | 'debt_payment'
@@ -6068,6 +6076,7 @@ export interface operations {
               | 'personal_care'
               | 'education'
               | 'gifts_donations'
+              | 'cash'
               | 'fees'
               | 'taxes'
               | 'debt_payment'

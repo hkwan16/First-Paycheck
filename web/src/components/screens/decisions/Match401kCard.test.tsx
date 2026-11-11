@@ -655,6 +655,41 @@ describe('Match401kCard plan details', () => {
     await user.click(within(form).getByRole('button', { name: 'Cancel' }));
     expect(within(card()).getByRole('slider')).toBeInTheDocument();
   });
+
+  it('refuses a birth year too recent for someone starting a job, saving nothing (issue 238)', async () => {
+    savedDecision();
+    const before = structuredClone(db.profile);
+    const { user } = await renderReady();
+    await user.click(within(card()).getByRole('button', { name: 'Change plan details' }));
+    const form = within(card()).getByRole('form', { name: 'Your plan details' });
+    const birthYear = within(form).getByLabelText('Year you were born');
+    await user.clear(birthYear);
+    await user.type(birthYear, '2020');
+    await user.click(within(form).getByRole('button', { name: 'Save plan details' }));
+
+    // The sample clock reads 2026, so the latest birth year is 2012.
+    expect(birthYear).toHaveAccessibleDescription('Enter a year from 1900 to 2012.');
+    expect(db.profile).toEqual(before);
+  });
+
+  it('counts the latest birth year from the person’s year, not the browser’s or UTC’s (issue 232)', async () => {
+    // 21:00 Pacific on New Year's Eve: 2027 in UTC and New York, still 2026 for the
+    // person, whose today the API answers (spec 019 rule 6), so 2013 is too recent.
+    vi.setSystemTime(new Date('2027-01-01T05:00:00Z'));
+    savedDecision();
+    db.profile.today = '2026-12-31';
+    const before = structuredClone(db.profile);
+    const { user } = await renderReady();
+    await user.click(within(card()).getByRole('button', { name: 'Change plan details' }));
+    const form = within(card()).getByRole('form', { name: 'Your plan details' });
+    const birthYear = within(form).getByLabelText('Year you were born');
+    await user.clear(birthYear);
+    await user.type(birthYear, '2013');
+    await user.click(within(form).getByRole('button', { name: 'Save plan details' }));
+
+    expect(birthYear).toHaveAccessibleDescription('Enter a year from 1900 to 2012.');
+    expect(db.profile).toEqual(before);
+  });
 });
 
 describe('Match401kCard focus (issue 167)', () => {

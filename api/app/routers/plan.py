@@ -47,7 +47,7 @@ def prepared_on(result: dict[str, Any] | None, created_at: dt.datetime) -> str:
 @router.get("", responses=error_responses(401))
 def get_plan(session: UserSession, day: Day) -> PlanOut:
     """Every current decision with its figures, the goals, the next 90 days and the pay stub."""
-    return build_plan(session, day.today)
+    return build_plan(session, day)
 
 
 @router.get(

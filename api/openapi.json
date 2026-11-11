@@ -742,6 +742,7 @@
               "personal_care",
               "education",
               "gifts_donations",
+              "cash",
               "fees",
               "taxes",
               "debt_payment",
@@ -2038,7 +2039,7 @@
           },
           "monthly_contribution_cents": {
             "description": "What the user adds each month",
-            "maximum": 100000000000.0,
+            "maximum": 100000000.0,
             "minimum": 0.0,
             "title": "Monthly Contribution Cents",
             "type": "integer"
@@ -2046,7 +2047,7 @@
           "monthly_essentials_cents": {
             "description": "Essential spending per month, as the user confirmed it",
             "exclusiveMinimum": 0.0,
-            "maximum": 100000000000.0,
+            "maximum": 100000000.0,
             "title": "Monthly Essentials Cents",
             "type": "integer"
           },
@@ -2874,7 +2875,7 @@
           "monthly_contribution_cents": {
             "anyOf": [
               {
-                "maximum": 100000000000.0,
+                "maximum": 100000000.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -2984,7 +2985,7 @@
             "title": "Coinsurance Pct"
           },
           "deductible_cents": {
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "minimum": 0.0,
             "title": "Deductible Cents",
             "type": "integer"
@@ -3013,14 +3014,14 @@
           },
           "oop_max_cents": {
             "description": "The out-of-pocket maximum",
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "minimum": 0.0,
             "title": "Oop Max Cents",
             "type": "integer"
           },
           "premium_per_period_cents": {
             "description": "The employee's premium per paycheck",
-            "maximum": 100000000000.0,
+            "maximum": 100000000.0,
             "minimum": 0.0,
             "title": "Premium Per Period Cents",
             "type": "integer"
@@ -3044,7 +3045,7 @@
         "properties": {
           "employee_hsa_cents": {
             "description": "What the user plans to put into an HSA in the year themselves",
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "minimum": 0.0,
             "title": "Employee Hsa Cents",
             "type": "integer"
@@ -3102,7 +3103,7 @@
           "salary_cents": {
             "description": "Annual salary, for the marginal rate",
             "exclusiveMinimum": 0.0,
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "title": "Salary Cents",
             "type": "integer"
           },
@@ -3455,7 +3456,7 @@
           "salary_cents": {
             "description": "Annual base salary in cents",
             "exclusiveMinimum": 0.0,
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "title": "Salary Cents",
             "type": "integer"
           },
@@ -4663,6 +4664,11 @@
             "title": "Review",
             "type": "array"
           },
+          "saved_on": {
+            "format": "date",
+            "title": "Saved On",
+            "type": "string"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -4673,6 +4679,7 @@
           "calculator",
           "version",
           "created_at",
+          "saved_on",
           "inputs",
           "result",
           "figures",
@@ -5347,7 +5354,7 @@
             "anyOf": [
               {
                 "exclusiveMinimum": 0.0,
-                "maximum": 100000000000.0,
+                "maximum": 1000000000.0,
                 "type": "integer"
               },
               {
@@ -5480,7 +5487,7 @@
             "anyOf": [
               {
                 "exclusiveMinimum": 0.0,
-                "maximum": 100000000000.0,
+                "maximum": 1000000000.0,
                 "type": "integer"
               },
               {
@@ -6124,6 +6131,7 @@
               "personal_care",
               "education",
               "gifts_donations",
+              "cash",
               "fees",
               "taxes",
               "debt_payment",
@@ -6543,6 +6551,7 @@
                   "personal_care",
                   "education",
                   "gifts_donations",
+                  "cash",
                   "fees",
                   "taxes",
                   "debt_payment",
@@ -6777,7 +6786,7 @@
           "current_withholding_per_paycheck_cents": {
             "anyOf": [
               {
-                "maximum": 100000000000.0,
+                "maximum": 100000000.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -6791,7 +6800,7 @@
           "deductions_cents": {
             "default": 0,
             "description": "Step 4(b), for the year",
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "minimum": 0.0,
             "title": "Deductions Cents",
             "type": "integer"
@@ -6799,7 +6808,7 @@
           "dependents_credit_cents": {
             "default": 0,
             "description": "Step 3, for the year",
-            "maximum": 100000000000.0,
+            "maximum": 10000000.0,
             "minimum": 0.0,
             "title": "Dependents Credit Cents",
             "type": "integer"
@@ -6807,7 +6816,7 @@
           "expected_deductions_cents": {
             "anyOf": [
               {
-                "maximum": 100000000000.0,
+                "maximum": 1000000000.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -6821,7 +6830,7 @@
           "extra_withholding_cents": {
             "default": 0,
             "description": "Step 4(c), per paycheck",
-            "maximum": 100000000000.0,
+            "maximum": 100000000.0,
             "minimum": 0.0,
             "title": "Extra Withholding Cents",
             "type": "integer"
@@ -6839,7 +6848,7 @@
           "health_premium_per_paycheck_cents": {
             "default": 0,
             "description": "Pre-tax health premium per paycheck, from the saved health plan",
-            "maximum": 100000000000.0,
+            "maximum": 100000000.0,
             "minimum": 0.0,
             "title": "Health Premium Per Paycheck Cents",
             "type": "integer"
@@ -6868,7 +6877,7 @@
           "other_income_cents": {
             "default": 0,
             "description": "Step 4(a), for the year",
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "minimum": 0.0,
             "title": "Other Income Cents",
             "type": "integer"
@@ -6876,7 +6885,7 @@
           "other_jobs_wages_cents": {
             "default": 0,
             "description": "The household's other jobs' annual wages, for the projection",
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "minimum": 0.0,
             "title": "Other Jobs Wages Cents",
             "type": "integer"
@@ -6884,7 +6893,7 @@
           "other_jobs_withholding_cents": {
             "default": 0,
             "description": "Federal income tax those jobs withhold in the year",
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "minimum": 0.0,
             "title": "Other Jobs Withholding Cents",
             "type": "integer"
@@ -6902,7 +6911,7 @@
           "salary_cents": {
             "description": "Annual salary from this job",
             "exclusiveMinimum": 0.0,
-            "maximum": 100000000000.0,
+            "maximum": 1000000000.0,
             "title": "Salary Cents",
             "type": "integer"
           },
@@ -10306,6 +10315,7 @@
                     "personal_care",
                     "education",
                     "gifts_donations",
+                    "cash",
                     "fees",
                     "taxes",
                     "debt_payment",

@@ -10,20 +10,25 @@ contribution, ``P`` pay periods, ``H`` the 120-month horizon.
 from __future__ import annotations
 
 from decimal import Decimal, localcontext
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from calc.money import CONTEXT, per_period, round_half_up
-from calc.types import Cents, PayPeriods, PositiveCents, ResultPercent
+from calc.types import Cents, PayPeriods, PositiveCents, ResultPercent, monthly
 
 __all__ = [
     "HORIZON_MONTHS",
     "MAX_TARGET_MONTHS",
     "EmergencyFundInput",
     "EmergencyFundResult",
+    "MonthlyContribution",
     "emergency_fund",
     "funded_pct",
 ]
+
+# Rule 8a: a monthly transfer, here and in PATCH /goals (rule 17).
+MonthlyContribution = Annotated[Cents, monthly("Enter a transfer")]
 
 # Rule 4: the longest projection, in months (10 years).
 HORIZON_MONTHS = 120
@@ -37,7 +42,7 @@ class EmergencyFundInput(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    monthly_essentials_cents: PositiveCents = Field(
+    monthly_essentials_cents: Annotated[PositiveCents, monthly("Enter essential spending")] = Field(
         description="Essential spending per month, as the user confirmed it"
     )
     target_months: int = Field(
@@ -47,7 +52,9 @@ class EmergencyFundInput(BaseModel):
         description="Months of essentials the fund should hold; 3 to 6 is suggested",
     )
     current_balance_cents: Cents = Field(description="What the fund holds today")
-    monthly_contribution_cents: Cents = Field(description="What the user adds each month")
+    monthly_contribution_cents: MonthlyContribution = Field(
+        description="What the user adds each month"
+    )
     pay_periods_per_year: PayPeriods
 
 

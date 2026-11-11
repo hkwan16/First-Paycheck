@@ -25,6 +25,7 @@ import { formatDate } from '@/lib/dates';
 import { asEmergencyFundInputs, currentDecision, decisionSaveState } from '@/lib/decisions';
 import { toneText } from '@/lib/design/tone';
 import { formatMoney, formatRate } from '@/lib/money';
+import { MAX_BALANCE_CENTS, MAX_PERIOD_CENTS } from '@/lib/entry-limits';
 import { AmountField } from './AmountField';
 import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
 import { ReviewNotice } from './ReviewNotice';
@@ -99,9 +100,16 @@ export function EmergencyFundCard() {
   const contributionValue =
     contribution ?? amountText(goalContribution ?? saved?.monthly_contribution_cents);
 
-  const essentialsRead = readAmount(essentialsValue, { example: '1,823.25', positive: true });
-  const balanceRead = readAmount(balanceValue, { example: '2,140.00' });
-  const contributionRead = readAmount(contributionValue, { example: CONTRIBUTION_EXAMPLE });
+  const essentialsRead = readAmount(essentialsValue, {
+    example: '1,823.25',
+    max: MAX_PERIOD_CENTS,
+    positive: true,
+  });
+  const balanceRead = readAmount(balanceValue, { example: '2,140.00', max: MAX_BALANCE_CENTS });
+  const contributionRead = readAmount(contributionValue, {
+    example: CONTRIBUTION_EXAMPLE,
+    max: MAX_PERIOD_CENTS,
+  });
 
   // The spending summary and accounts only fill in starting values; the card waits for them.
   const loaded =

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { ApiError } from '@/lib/api/errors';
 import type { PlanPair } from '@/lib/api/types';
 import {
   BRONZE_HSA,
@@ -25,6 +26,7 @@ import {
   hsaEffect,
   MAX_PLANS,
   pairText,
+  planRefusal,
   plansFromBenefits,
   readPlanDrafts,
   USAGE_DEFAULTS,
@@ -279,6 +281,67 @@ describe('plan drafts', () => {
           employerHsa: 'Enter an amount, like 600.00.',
         },
       ],
+    });
+  });
+});
+
+describe('plan drafts and their ranges (spec 012 rule 12a, spec 018 rule 5e)', () => {
+  const gold = draftFromOption(GOLD_PPO);
+
+  it.each([
+    ['premium', '1,000,000.01', 'Enter an amount from $0 to $1,000,000.00.'],
+    ['deductible', '10,000,000.01', 'Enter an amount from $0 to $10,000,000.00.'],
+    ['oopMax', '99999999999999', 'Enter an amount from $0 to $10,000,000.00.'],
+    ['premium', '62.505', 'Enter at most two digits after the decimal point, like 62.50.'],
+    ['coinsurance', '20.555', 'Enter at most two digits after the decimal point, like 20.'],
+    ['coinsurance', '150', 'Enter a percentage from 0 to 100, like 20.'],
+  ] as const)('says what is wrong with a %s of %j', (field, text, error) => {
+    expect(readPlanDrafts([{ ...gold, [field]: text }])).toEqual({
+      ok: false,
+      errors: [{ [field]: error }],
+    });
+  });
+
+  it('leaves a deductible above the maximum to the API, which decides it (rule 18b)', () => {
+    const read = readPlanDrafts([{ ...gold, deductible: '2,050.00', oopMax: '100' }]);
+    expect(read.ok).toBe(true);
+  });
+});
+
+describe('planRefusal (spec 012 rule 18b, issue 228)', () => {
+  const refused = (errors: { path: (string | number)[]; message: string }[]) =>
+    new ApiError(422, {
+      error: { code: 'validation_error', message: 'refused', details: { errors } },
+    });
+
+  it("puts each of the API's problems beside its field in its plan", () => {
+    const oop = 'Gold PPO: enter an out-of-pocket maximum of at least the deductible, $2,050.00.';
+    const hsa =
+      'Bronze HSA: enter an employer HSA contribution up to $4,400.00, the 2026 HSA limit for one person.';
+    expect(
+      planRefusal(
+        refused([
+          { path: ['plans', 1, 'oop_max_cents'], message: oop },
+          { path: ['plans', 0, 'employer_hsa_cents'], message: hsa },
+        ]),
+        2,
+      ),
+    ).toEqual({ errors: [{ employerHsa: hsa }, { oopMax: oop }], message: null });
+  });
+
+  it('says anything that is not about a field of a plan above the buttons', () => {
+    expect(
+      planRefusal(
+        refused([{ path: ['employee_hsa_cents'], message: 'Enter your own HSA contribution.' }]),
+        1,
+      ),
+    ).toEqual({ errors: [{}], message: 'Enter your own HSA contribution.' });
+  });
+
+  it('says the plans could not be checked when the API gave no answer to read', () => {
+    expect(planRefusal(new ApiError(500, null), 1)).toEqual({
+      errors: [{}],
+      message: 'Could not check these plans. Try again.',
     });
   });
 });

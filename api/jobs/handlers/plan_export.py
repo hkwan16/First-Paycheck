@@ -26,7 +26,7 @@ def run(ctx: JobContext) -> dict[str, Any]:
         if store.get(session, ctx.job.id) is not None:
             return SKIPPED
         # As of the person's today (spec 019 rule 12): the date the PDF prints.
-        plan = build_plan(session, person_day(session, ctx.user_id, now).today)
+        plan = build_plan(session, person_day(session, ctx.user_id, now))
     ctx.progress(30)
     pdf = render_pdf(render_html(plan))
     ctx.progress(90)

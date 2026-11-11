@@ -19,7 +19,8 @@ from sqlalchemy import Connection, text
 
 from app.db import user_session_for
 from app.deps import get_now
-from db.enums import CalendarKind, JobKind, PayFrequency
+from calc.registry import calculator
+from db.enums import CalculatorKind, CalendarKind, JobKind, PayFrequency
 from jobs import queue
 from tests.conftest import FixtureUser
 from tests.support.checkin_jobs import checkin_jobs, findings, run_all
@@ -27,6 +28,7 @@ from tests.support.factories import (
     make_account,
     make_calendar_event,
     make_check_in,
+    make_decision,
     make_document,
     make_item,
     make_pay_stub,
@@ -354,9 +356,61 @@ def test_net_worth_dates_snapshots_on_the_persons_day(
 def test_birth_year_bound_is_the_persons_year(
     clock: list[dt.datetime], client_as: Client, pacific: FixtureUser, user_b: FixtureUser
 ) -> None:
+    """Spec 006 open question 2 (issue 238): the latest birth year is the person's
+    year less 14, and the year is the person's (spec 019 rule 9), not UTC's."""
     # 21:00 PST on December 31, 2026; 00:00 EST on January 1, 2027.
     clock[0] = dt.datetime(2027, 1, 1, 5, 0, tzinfo=dt.UTC)
-    refused = client_as(pacific).put("/profile", json={"birth_year": 2027})
-    assert refused.status_code == 422
-    assert refused.json()["error"]["message"] == "The birth year must be at most 2026"
-    assert client_as(user_b).put("/profile", json={"birth_year": 2027}).status_code == 200
+    refused = client_as(pacific).put("/profile", json={"birth_year": 2013})
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["error"] == {
+        "code": "validation_error",
+        "message": "Enter a birth year from 1900 to 2012.",
+        "details": {
+            "errors": [{"path": ["birth_year"], "message": "Enter a birth year from 1900 to 2012."}]
+        },
+    }
+    assert client_as(pacific).put("/profile", json={"birth_year": 2012}).status_code == 200
+    # Already 2027 in New York: 2013 is a year a 14-year-old was born in.
+    assert client_as(user_b).put("/profile", json={"birth_year": 2013}).status_code == 200
+
+
+def test_a_refused_time_zone_names_its_field(
+    clock: list[dt.datetime], client_as: Client, user_a: FixtureUser
+) -> None:
+    """Spec 007 rule 2a's shape, so a form could show the message beside the field."""
+    response = client_as(user_a).put("/profile/time-zone", json={"time_zone": "Mars/Olympus"})
+    message = "Choose a time zone from the IANA list, such as America/Los_Angeles."
+    assert response.json()["error"]["details"] == {
+        "errors": [{"path": ["time_zone"], "message": message}]
+    }
+
+
+# ---------------------------------------------------------------- a decision's saved date (26)
+
+# 22:30 PDT on October 21; 05:30 UTC and 01:30 EDT on October 22.
+SAVED_LATE = dt.datetime(2026, 10, 22, 5, 30, tzinfo=dt.UTC)
+
+
+def test_a_decision_is_saved_on_the_persons_day(
+    clock: list[dt.datetime],
+    client_as: Client,
+    pacific: FixtureUser,
+    user_b: FixtureUser,
+    db_connection: Connection,
+) -> None:
+    """Spec 016 rule 11a and spec 019 rule 3: the Plan page's and the PDF's "Saved"
+    date is the person's day of ``created_at``, not its UTC day."""
+    k401 = calculator(CalculatorKind.K401_MATCH)
+    result = k401.run(k401.input_model.model_validate(K401_V1)).model_dump(mode="json")
+    for user in (pacific, user_b):
+        make_decision(
+            db_connection,
+            user.id,
+            CalculatorKind.K401_MATCH,
+            K401_V1,
+            result=result,
+            created_at=SAVED_LATE,
+        )
+    saved = get(client_as(pacific), "/plan")["decisions"][0]
+    assert (saved["created_at"], saved["saved_on"]) == ("2026-10-22T05:30:00Z", "2026-10-21")
+    assert get(client_as(user_b), "/plan")["decisions"][0]["saved_on"] == "2026-10-22"

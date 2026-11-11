@@ -49,6 +49,12 @@ test('reads the saved decisions back with their figures and the next 90 days', a
   const k401 = page.getByRole('region', { name: '401(k) match' });
   await expect(k401.getByText('Your contribution')).toBeVisible();
   await expect(k401.getByText(/^Saved /)).toBeVisible();
+  // Issue 239: the balance the fund was worked out from, not the goal's "Saved so far".
+  await expect(
+    page
+      .getByRole('region', { name: 'Emergency fund' })
+      .getByText('Already saved when you decided'),
+  ).toBeVisible();
   await expect(page.getByRole('region', { name: 'Your paycheck' })).toContainText('Take-home pay');
   await expect(page.getByRole('region', { name: 'Next 90 days' })).toContainText(/Through /);
   // Spec 018: each date's badge opens its decision's step; Back goes to the last step.

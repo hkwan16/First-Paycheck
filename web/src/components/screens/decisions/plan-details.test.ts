@@ -10,9 +10,14 @@ import {
   salaryStubId,
   stubSchedule,
   type PlanDetailsDraft,
+  type ReadOptions,
 } from './plan-details';
 
 const stub = samplePayStub();
+
+/** Read in 2026, when the latest birth year is 2012 (spec 006 open question 2). */
+const read = (details: PlanDetailsDraft, options: Partial<ReadOptions> = {}) =>
+  readPlanDetails(details, { currentYear: 2026, ...options });
 
 const draft = (overrides: Partial<PlanDetailsDraft> = {}): PlanDetailsDraft => ({
   salary: '65,000.00',
@@ -106,7 +111,7 @@ describe('readPlanDetails', () => {
       { employerPct: '100', uptoPct: '3' },
       { employerPct: '50', uptoPct: '5.5' },
     ];
-    expect(readPlanDetails(draft({ salary: '$60,000', tiers }), { askSchedule: true })).toEqual({
+    expect(read(draft({ salary: '$60,000', tiers }), { askSchedule: true })).toEqual({
       ok: true,
       values: {
         salary_cents: 6_000_000,
@@ -122,7 +127,7 @@ describe('readPlanDetails', () => {
   });
 
   it('says what to fix for each missing or unreadable field', () => {
-    const result = readPlanDetails(
+    const result = read(
       {
         salary: 'sixty',
         filingStatus: null,
@@ -135,7 +140,7 @@ describe('readPlanDetails', () => {
     expect(result).toEqual({
       ok: false,
       errors: {
-        salary: 'Enter your yearly salary, like 65,000.00.',
+        salary: 'Enter an amount, like 65,000.00.',
         filingStatus: 'Choose your filing status.',
         payFrequency: 'Choose how often you are paid.',
         tiers: 'Enter each percentage as a number above 0 and up to 100, like 4 or 4.5.',
@@ -145,34 +150,68 @@ describe('readPlanDetails', () => {
   });
 
   it('leaves the schedule out when the stub states it, so the profile keeps its own', () => {
-    const read = readPlanDetails(draft({ payFrequency: null }), { askSchedule: false });
-    expect(read.ok && 'pay_frequency' in read.values).toBe(false);
-    expect(read.ok).toBe(true);
+    const result = read(draft({ payFrequency: null }), { askSchedule: false });
+    expect(result.ok && 'pay_frequency' in result.values).toBe(false);
+    expect(result.ok).toBe(true);
   });
 
-  it.each(['96', '1899', 'nineteen', '1996.5'])('refuses the birth year %j', (birthYear) => {
-    expect(readPlanDetails(draft({ birthYear }))).toEqual({
+  it.each(['96', 'nineteen', '1996.5'])('refuses the birth year %j', (birthYear) => {
+    expect(read(draft({ birthYear }))).toEqual({
       ok: false,
       errors: { birthYear: 'Enter the year you were born, like 1996.' },
     });
   });
 
-  it('refuses a birth year after the pay stub tax year', () => {
-    expect(readPlanDetails(draft({ birthYear: '2027' }), { taxYear: 2026 })).toEqual({
+  // Spec 018 rule 5e (issue 238): a birth year of 2020 was saved before.
+  it.each(['2013', '2020', '2026', '1899', '1800'])(
+    'refuses a birth year outside 1900 to 2012 in 2026: %j',
+    (birthYear) => {
+      expect(read(draft({ birthYear }))).toEqual({
+        ok: false,
+        errors: { birthYear: 'Enter a year from 1900 to 2012.' },
+      });
+    },
+  );
+
+  it('takes the years at either end of the range', () => {
+    expect(read(draft({ birthYear: '2012' })).ok).toBe(true);
+    expect(read(draft({ birthYear: '1900' })).ok).toBe(true);
+    expect(read(draft({ birthYear: '2013' }), { currentYear: 2027 }).ok).toBe(true);
+  });
+
+  it('asks for the salary when it is empty, and names its range when it is outside it', () => {
+    expect(read(draft({ salary: '' }))).toEqual({
       ok: false,
-      errors: { birthYear: 'Enter a year no later than 2026.' },
+      errors: { salary: 'Enter your yearly salary, like 65,000.00.' },
     });
-    expect(readPlanDetails(draft({ birthYear: '2026' }), { taxYear: 2026 }).ok).toBe(true);
+    for (const salary of ['0', '65,000,000', '10,000,000.01']) {
+      expect(read(draft({ salary }))).toEqual({
+        ok: false,
+        errors: { salary: 'Enter an amount above $0 and up to $10,000,000.00.' },
+      });
+    }
+    expect(read(draft({ salary: '65,000.123' }))).toEqual({
+      ok: false,
+      errors: { salary: 'Enter at most two digits after the decimal point, like 65,000.00.' },
+    });
+    expect(read(draft({ salary: '10,000,000.00' })).ok).toBe(true);
+  });
+
+  it('says a percentage has too many digits after the point', () => {
+    expect(read(draft({ tiers: [{ employerPct: '100', uptoPct: '4.555' }] }))).toEqual({
+      ok: false,
+      errors: {
+        tiers: 'Enter each percentage with at most two digits after the decimal point, like 4.5.',
+      },
+    });
   });
 
   it.each(['0', '101', '4.555', '-4', 'four'])('refuses the percentage %j', (pct) => {
-    expect(readPlanDetails(draft({ tiers: [{ employerPct: '100', uptoPct: pct }] })).ok).toBe(
-      false,
-    );
+    expect(read(draft({ tiers: [{ employerPct: '100', uptoPct: pct }] })).ok).toBe(false);
   });
 
   it('refuses a zero salary', () => {
-    expect(readPlanDetails(draft({ salary: '0' })).ok).toBe(false);
+    expect(read(draft({ salary: '0' })).ok).toBe(false);
   });
 
   it('needs each tier to reach further than the one before', () => {
@@ -180,7 +219,7 @@ describe('readPlanDetails', () => {
       { employerPct: '100', uptoPct: '5' },
       { employerPct: '50', uptoPct: '3' },
     ];
-    expect(readPlanDetails(draft({ tiers }))).toEqual({
+    expect(read(draft({ tiers }))).toEqual({
       ok: false,
       errors: { tiers: 'Each tier must reach a higher percentage of pay than the one before.' },
     });

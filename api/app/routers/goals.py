@@ -23,8 +23,7 @@ from app import decision_effects
 from app.deps import Day, Now, UserSession
 from app.errors import NotFound, error_responses
 from app.types import UtcDateTime
-from calc.emergency_fund import funded_pct
-from calc.types import Cents
+from calc.emergency_fund import MonthlyContribution, funded_pct
 from db.enums import GoalKind, GoalStatus
 from db.models import Account, BalanceSnapshot, Goal
 
@@ -56,7 +55,7 @@ class GoalPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: GoalStatus | None = None
-    monthly_contribution_cents: Cents | None = None
+    monthly_contribution_cents: MonthlyContribution | None = None
     # An account of the user's, or null to unlink.
     account_id: uuid.UUID | None = None
 

@@ -49,8 +49,8 @@ The browser's zone is `Intl.DateTimeFormat().resolvedOptions().timeZone`. Nothin
 
 | Where | Date | From |
 |---|---|---|
-| `GET /plan` (`app/plan.py:build_plan`) | `as_of`, `calendar_through` (`as_of` + 90 days), each event's `overdue` | `Day` |
-| `plan.export` job | the plan's `as_of`; the PDF's "Prepared" date and `prepared_on` | `person_day` at the job clock; the printed date is the plan's `as_of` (rule 12) |
+| `GET /plan` (`app/plan.py:build_plan`) | `as_of`, `calendar_through` (`as_of` + 90 days), each event's `overdue`, each decision's `saved_on` (the Plan page's "Saved" date, spec 016 rule 11a) | `Day`; `saved_on` is `day_of(created_at)` |
+| `plan.export` job | the plan's `as_of`; the PDF's "Prepared" date and `prepared_on`; each decision's "Saved" date | `person_day` at the job clock; the printed dates are the plan's `as_of` (rule 12) and each decision's `saved_on`, as the Plan page prints them |
 | `GET /plan/export/{job_id}` | the file name's date | the job result's `prepared_on` (rule 12) |
 | `GET /calendar` | `overdue` | `Day` |
 | `POST /decisions` side effects (spec 007 rule 16, spec 011, spec 012 rule 15, spec 014) | the next pay date after today; an enrollment deadline "not before today" | `Day` |
@@ -64,10 +64,10 @@ The browser's zone is `Intl.DateTimeFormat().resolvedOptions().timeZone`. Nothin
 | `schedule.tick` (spec 015 rule 14) | which month to queue for each user | rule 10 |
 | `recurring.detect` job (spec 009) | `today` (a charge's `overdue`), the month whose open check-in it refreshes (spec 015 rule 15) | `person_day` at the job clock |
 | `sync` jobs and `POST /accounts/import` (spec 002) | a holding's `as_of` when the provider sends none | `person_day` at the sync's clock |
-| `PUT /profile` (spec 005) | the birth year's upper bound, the current year | `Day` |
-| The web | today, this month (rule 6) | `GET /profile`'s `today` |
+| `PUT /profile` (spec 005, spec 006 open question 2) | the birth year's upper bound: the person's year less 14 (`latest_birth_year`, a `field_error` on `birth_year`) | `Day` |
+| The web | today, this month (rule 6), and the plan details' latest birth year (`PlanDetailsForm`, `latestBirthYear`) | `GET /profile`'s `today` |
 
-10. **What stays UTC, and why.** The LLM budget's day (spec 003 rule 21) and the rate limits' clock hours (spec 004 rule 5, `app/ratelimit.py`) are cost guards, not dates anyone reads: a day per zone would let a person who changes zone start a spent budget again, and an hour is the same span in every whole-hour zone. `DTSTAMP` in the `.ics` is UTC by RFC 5545. Retention ages (7 days for uploads and PDFs) are durations. Rate-limit and budget windows therefore keep their UTC wording in specs 003, 004 and 008.
+10. **What stays UTC, and why.** The LLM budget's day (spec 003 rule 21) and the rate limits' clock hours (spec 004 rule 5, `app/ratelimit.py`) are cost guards, not dates anyone reads: a day per zone would let a person who changes zone start a spent budget again, and an hour is the same span in every whole-hour zone. `DTSTAMP` in the `.ics` is UTC by RFC 5545. Retention ages (7 days for uploads and PDFs) are durations. Rate-limit and budget windows therefore keep their UTC wording in specs 003, 004 and 008. The entry limits (spec 007 rules 2a and 2b) and the `cash` category (spec 003 rule 9d) read no clock; a stored decision's inputs are read with `context=STORED` whatever the day.
 
 ### The month a check-in is for
 
@@ -106,7 +106,9 @@ The Pacific person has `time_zone` `America/Los_Angeles` (PDT, UTC-7, until 2026
 | 21a | `test_newest_snapshot_of_a_day_is_the_last_taken` (`tests/unit/calc/test_net_worth.py`) | Two snapshots dated the same day, 120,000 then 80,000, passed in the order taken | The day's balance is 80,000. Before this spec the larger balance won a tie (spec 015 rule 20 says the newest) |
 | 22 | `test_decided_on_is_the_persons_day` (`tests/unit/checkin/` facts) | A 401(k) decision saved 2026-11-15 05:00 UTC; Pacific person | `decided_on` 2026-11-14 |
 | 23 | `test_recurring_detect_uses_the_persons_day` | Pacific person, the job at 2026-12-01 05:00 UTC with November's check-in open | It queues November's `sync` refresh (December's check-in does not exist yet for them) |
-| 24 | `test_birth_year_bound_is_the_persons_year` | Pacific person, `PUT /profile` with `birth_year` 2027 at 2027-01-01 05:00 UTC (21:00 PST on December 31) | 422 "The birth year must be at most 2026" |
+| 24 | `test_birth_year_bound_is_the_persons_year` | Pacific person, `PUT /profile` with `birth_year` 2013 at 2027-01-01 05:00 UTC (21:00 PST on December 31, 2026); an Eastern person (already 2027) the same | Pacific: 422 `validation_error` "Enter a birth year from 1900 to 2012." with `details.errors` `[{path: ["birth_year"], ...}]`, and 2012 is saved; Eastern: 2013 is saved. The web's plan details form says "Enter a year from 1900 to 2012." for the Pacific person from `today` 2026-12-31, whatever the browser's clock |
+| 24a | `test_a_refused_time_zone_names_its_field` | `PUT /profile/time-zone` with `Mars/Olympus` | 422 with `details.errors` `[{path: ["time_zone"], message: rule 4's sentence}]` |
+| 24b | `test_a_decision_is_saved_on_the_persons_day` | A 401(k) decision saved 2026-10-22 05:30 UTC (22:30 PDT on October 21), for a Pacific and an Eastern person | `GET /plan`'s `saved_on` 2026-10-21 for the Pacific person, 2026-10-22 for the Eastern one; the PDF prints "Saved Oct 21, 2026" and "Saved Oct 22, 2026" (`test_the_pdf_names_calculators_as_the_plan_page_does`), and the Plan page prints the same `saved_on` |
 | 25 | `test_0026_keeps_each_check_ins_date` (`tests/integration/test_migrations.py`) | At 0025: an October check-in last run 2026-10-28 12:00 UTC and a November one last run 2026-11-10 06:27 UTC; upgrade to 0026 | `as_of` 2026-10-28 and 2026-11-10 (what they showed); `profiles.time_zone` null; downgrade drops both columns |
 | 26 | `persons-day.spec.ts` (web, project `persons-day`) | A new person (`E2E_DAY_USER_*`) signs in with the browser in a zone whose date differs from UTC's when the test runs ("The e2e test's zone", below); saves a health plan with the enrollment deadline on their today, imports a row dated today, checks in now, exports the PDF | `GET /profile` saves the browser's zone; the plan says "As of" their today and "Through" today + 90 days and lists the deadline without "Overdue"; Spending's "<Month> so far" ends on their today; the check-in list names their month; the PDF is `first-paycheck-plan-<their today>.pdf` |
 

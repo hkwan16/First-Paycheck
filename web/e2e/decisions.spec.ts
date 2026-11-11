@@ -311,6 +311,129 @@ test('reads the saved decisions into the W-4 and saves a version with its remind
   await expect(page).toHaveURL('/plan');
 });
 
+test('Edit plans names the plan beside the field and keeps the comparison (issue 228)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.goto('/setup/decisions/health-plan');
+  await waitForHydration(page);
+  const health = page.getByRole('region', { name: 'Health plan' });
+  const table = health.getByRole('table', { name: 'Expected yearly cost by plan' });
+  await expect(table).toBeVisible({ timeout: 30_000 });
+  const result = health.getByRole('group', { name: 'Your numbers' });
+  await expect(result).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
+  // The comparison and the choice the health plan test above saved.
+  const comparison = await table.textContent();
+  const choice = health.getByRole('group', { name: 'The plan you will enroll in' });
+  const chosen = await choice.getByRole('button', { pressed: true }).textContent();
+  expect(chosen).toBeTruthy();
+  await expect(health.getByText(/^Saved /)).toBeVisible();
+
+  await health.getByRole('button', { name: 'Edit plans' }).click();
+  const form = health.getByRole('form', { name: 'Your health plan options' });
+  await expect(form).toBeVisible();
+  // The high-deductible plan the test above typed: an out-of-pocket maximum
+  // under its deductible, and more employer HSA money than the year's limit.
+  const plans = form.getByRole('group', { name: /^Plan \d$/ });
+  let hdhp: Locator | null = null;
+  for (const plan of await plans.all()) {
+    if ((await plan.getByLabel('Plan type').inputValue()) === 'hdhp') hdhp = plan;
+  }
+  expect(hdhp, 'the health plan test saves a high-deductible plan').not.toBeNull();
+  const plan = hdhp!;
+  const name = await plan.getByLabel('Plan name').inputValue();
+  const deductible = await plan.getByLabel('Deductible').inputValue();
+  const oop = plan.getByLabel('Out-of-pocket maximum');
+  const oopBefore = await oop.inputValue();
+  const employerHsa = plan.getByLabel('Employer HSA money per year');
+  const compare = form.getByRole('button', { name: 'Compare these plans' });
+
+  // The table stays open, and the problem shows beside its field, naming the plan.
+  await oop.fill('100');
+  await compare.click();
+  await expect(oop).toHaveAccessibleDescription(
+    `${name}: enter an out-of-pocket maximum of at least the deductible, $${deductible}.`,
+    { timeout: 15_000 },
+  );
+  await expect(form).toBeVisible();
+
+  // With the plan's own fields right, the API checks the year's HSA limit.
+  await oop.fill(oopBefore);
+  await employerHsa.fill('99,999');
+  await compare.click();
+  await expect(employerHsa).toHaveAccessibleDescription(
+    `${name}: enter an employer HSA contribution up to $4,400.00, the 2026 HSA limit for one person.`,
+    { timeout: 15_000 },
+  );
+  await expect(oop).not.toHaveAttribute('aria-invalid', 'true');
+  await expect(form).toBeVisible();
+
+  // Cancel goes back to the comparison and the choice as they were.
+  await form.getByRole('button', { name: 'Cancel' }).click();
+  await expect(table).toBeVisible();
+  await expect(result).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 });
+  expect(await table.textContent()).toBe(comparison);
+  await expect(choice.getByRole('button', { pressed: true })).toHaveText(chosen!);
+  await expect(health.getByText(/^Saved /)).toBeVisible();
+});
+
+test('each decision field names what is wrong with what was typed (issue 238)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  // Emergency fund: too large, and too many digits after the point.
+  await page.goto('/setup/decisions/emergency-fund');
+  await waitForHydration(page);
+  const fund = page.getByRole('region', { name: 'Emergency fund' });
+  const essentials = fund.getByLabel('Essential spending per month');
+  await expect(essentials).toBeVisible({ timeout: 30_000 });
+  await essentials.fill('99999999999999');
+  await expect(essentials).toHaveAccessibleDescription(
+    'Enter an amount above $0 and up to $1,000,000.00.',
+  );
+  await essentials.fill('1,234.567');
+  await expect(essentials).toHaveAccessibleDescription(
+    'Enter at most two digits after the decimal point, like 1,823.25.',
+  );
+
+  // 401(k) plan details: a birth year too recent for someone starting a job.
+  await page.goto('/setup/decisions/401k');
+  await waitForHydration(page);
+  const k401 = card(page);
+  await k401.getByRole('button', { name: 'Change plan details' }).click({ timeout: 30_000 });
+  const details = k401.getByRole('form', { name: 'Your plan details' });
+  const birthYear = details.getByLabel('Year you were born');
+  const before = await birthYear.inputValue();
+  await birthYear.fill('2020');
+  const profileWrites: string[] = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/profile' && request.method() === 'PUT') {
+      profileWrites.push(request.url());
+    }
+  });
+  await details.getByRole('button', { name: 'Save plan details' }).click();
+  await expect(birthYear).toHaveAccessibleDescription(
+    // The browser's year, which is this one's and the person's (spec 019).
+    `Enter a year from 1900 to ${new Date().getFullYear() - 14}.`,
+  );
+  await expect(details).toBeVisible();
+  expect(profileWrites).toEqual([]);
+  await birthYear.fill(before);
+  await details.getByRole('button', { name: 'Cancel' }).click();
+
+  // W-4 Step 3: far more credits than any household's dependents give.
+  await page.goto('/setup/decisions/w4');
+  await waitForHydration(page);
+  const w4 = page.getByRole('region', { name: 'W-4, federal only' });
+  await w4
+    .getByRole('group', { name: 'Anything else on your W-4?' })
+    .getByRole('button', { name: 'Yes' })
+    .click({ timeout: 30_000 });
+  const credits = w4.getByLabel('Step 3: credits for dependents, for the year');
+  await credits.fill('999999');
+  await expect(credits).toHaveAccessibleDescription('Enter an amount from $0 to $100,000.00.');
+});
+
 /**
  * Save the e2e user's profile with another pay schedule, the way the plan
  * details form used to copy an older stub's schedule into it (issue 198). The

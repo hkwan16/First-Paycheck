@@ -1,6 +1,6 @@
 # 011: Emergency fund calculator, goals and their calendar
 
-Status: Implemented, M6; rule 17 revised (17a, 17b) for issues 165 and 166; rule 18 added for issue 162: the Why pages show the calculator's result for an emergency fund and never offer an explanation. Rule 17c (the card asks for a pay schedule when there is none) added for issue 198. Rule 18's wording revised for issue 209. Every example is a test. Explaining an emergency-fund decision is out of scope until the explain verifier can run without an IRS citation (see Out of scope).
+Status: Implemented, M6; rule 17 revised (17a, 17b) for issues 165 and 166; rule 18 added for issue 162: the Why pages show the calculator's result for an emergency fund and never offer an explanation. Rules 8a and 8b (entry limits and what the card says about them) added for issue 238 on 2026-11-11. Rule 17c (the card asks for a pay schedule when there is none) added for issue 198. Rule 18's wording revised for issue 209. Every example is a test. Explaining an emergency-fund decision is out of scope until the explain verifier can run without an IRS citation (see Out of scope).
 
 ## Goal
 
@@ -10,10 +10,10 @@ Size the user's emergency fund from their own essential spending, show how far t
 
 | Field | Type | Meaning and validation |
 |---|---|---|
-| `monthly_essentials_cents` | `PositiveCents` | Essential spending per month. The client sends what the user confirmed: their own figure, or the spending summary's `essentials_cents` (spec 007 part B). `calc/` never reads it from the database. Must be > 0. |
+| `monthly_essentials_cents` | `PositiveCents`, a monthly amount | Essential spending per month. The client sends what the user confirmed: their own figure, or the spending summary's `essentials_cents` (spec 007 part B). `calc/` never reads it from the database. Must be > 0 and at most $1,000,000.00 (rule 8a). |
 | `target_months` | int | How many months of essentials the fund should hold, 1 to 12. The product suggests 3 to 6. |
-| `current_balance_cents` | `Cents` | What the fund holds today: the balance of the account the user marked `emergency_fund`, or a figure the user typed (technical spec, Current savings). |
-| `monthly_contribution_cents` | `Cents` | What the user plans to add each month. May be 0. |
+| `current_balance_cents` | `Cents` | What the fund holds today: the balance of the account the user marked `emergency_fund`, or a figure the user typed (technical spec, Current savings). From $0 to $1,000,000,000.00. |
+| `monthly_contribution_cents` | `MonthlyContribution` | What the user plans to add each month. May be 0; at most $1,000,000.00 (rule 8a). |
 | `pay_periods_per_year` | int | One of 12, 24, 26, 52 (spec 006). |
 
 ## Outputs
@@ -43,6 +43,8 @@ Notation: `E = monthly_essentials_cents`, `m = target_months`, `B = current_bala
 6. **Per paycheck.** `per_paycheck_contribution_cents = round_half_up(C * 12 / P)`.
 7. **Purity.** No I/O, no clock; imports only the standard library, `pydantic` and `calc` (spec 006 rule 12).
 8. **Validation.** Any input outside the ranges above is a 422 from the route and a `ValidationError` from the model.
+8a. **Entry limits** (issue 238, spec 007 rules 2a and 2b). Essentials and the monthly contribution are monthly amounts (`calc.types.monthly`; the contribution is `calc.emergency_fund.MonthlyContribution`): at most $1,000,000.00, so the largest target, 12 months of the largest essentials, is $12,000,000.00 and every result fits its `Cents` (before, essentials of $1,000,000,000.00 a month overflowed the target and answered 500). The balance stays `Cents`: it is copied from an account, not typed as a monthly figure, and only ever lowers the shortfall. `PATCH /goals/{id}` takes a contribution under the same limit (rule 17). Each refusal names its field and the range: "Enter essential spending up to $1,000,000.00 a month." A stored decision is read without these limits.
+8b. **What the card says** (web, `EmergencyFundCard`, spec 018 rule 5e). Each amount field says what is wrong with what was typed: more than two digits after the point ("1,234.567": "Enter at most two digits after the decimal point, like 1,823.25."), or outside its range ("99999999999999" or "0" for essentials: "Enter an amount above $0 and up to $1,000,000.00."; a negative balance: "Enter an amount from $0 to $1,000,000,000.00."), or not an amount at all ("Enter an amount, like 1,823.25."). Before issue 238 every one of them read "Enter an amount above $0, like 1,823.25.", which named no problem for the first two.
 
 ### Properties (Hypothesis, `tests/unit/calc/test_emergency_fund_properties.py`)
 
@@ -65,7 +67,7 @@ Notation: `E = monthly_essentials_cents`, `m = target_months`, `B = current_bala
 
 15. **`goals` columns added in `0008`.** `status goal_status NOT NULL DEFAULT 'active'` (`active`, `paused`, `reached`) and `reached_at timestamptz` with `CHECK ((status = 'reached') = (reached_at IS NOT NULL))`.
 16. **`GET /goals`** lists the user's goals, oldest first, as `GoalOut`: `id`, `kind`, `status`, `target_amount_cents`, `monthly_contribution_cents`, `account_id`, `decision_id`, `target_date`, `reached_at`, `current_balance_cents` (the linked account's latest balance snapshot, or null), `progress_pct` (rule 3's percentage of that balance against the target, from `calc/emergency_fund.py:funded_pct`, or null without a balance), `created_at`, `updated_at`.
-17. **`PATCH /goals/{id}`** accepts any of `status` (`active`, `paused`, `reached`), `monthly_contribution_cents` (`Cents`) and `account_id` (an account id or null). Fields left out are unchanged. Setting `reached` sets `reached_at` to the request time; leaving it clears `reached_at`. A changed contribution re-projects `target_date` (rule 17a). An `account_id` the user cannot see is 404, the same as another user's goal. An empty body is 422.
+17. **`PATCH /goals/{id}`** accepts any of `status` (`active`, `paused`, `reached`), `monthly_contribution_cents` (`MonthlyContribution`, rule 8a) and `account_id` (an account id or null). Fields left out are unchanged. Setting `reached` sets `reached_at` to the request time; leaving it clears `reached_at`. A changed contribution re-projects `target_date` (rule 17a). An `account_id` the user cannot see is 404, the same as another user's goal. An empty body is 422.
 17a. **Re-projecting on a new contribution** (issue 165). When `monthly_contribution_cents` differs from the goal's, the route projects `target_date` exactly as saving would (rule 11): the goal's decision's inputs with the new contribution go through `calc/emergency_fund.py` (`calc/` stays pure; the route supplies the inputs), the first contribution date is the next expected pay date as of the request, and `target_date` is that date plus `months_to_target - 1` months, or null when the fund is funded or not reachable at the new amount. `target_amount_cents` does not depend on the contribution and stays. The decision is immutable and its calendar events belong to it (rule 12), so neither changes; the goal's contribution is what the check-in compares savings against (spec 015). The same contribution as the goal's changes nothing, so a repeated request never moves the date. A goal without an emergency-fund decision keeps a null `target_date`. Setting the contribution back to the decision's amount on the day it was saved gives the saved date again (example 5).
 
 **Why the goal re-projects**, of the ways to keep it from losing its date:
