@@ -934,11 +934,15 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
   explanation yet. Write the explanation" (spec 008 rule 19b). An emergency fund is never explained (spec 011), so
   it shows none (`explanationView`).
 - **Your paycheck** (`PaycheckCard`): the newest confirmed stub's gross and take-home tiles and
-  its deductions, or a link to Confirm. **Goals** (`GoalsCard`): status badge, contribution,
-  target and date, progress bar. **Next 90 days** (`PlanCalendarCard`): `calendar` through
+  its deductions (`PAYCHECK_TILES`, `PAYCHECK_LINES` in `plan-format.ts`), or a link to Confirm.
+  **Goals** (`GoalsCard`): status badge, contribution, target and date, progress bar. **Next 90 days** (`PlanCalendarCard`): `calendar` through
   `calendar_through`, each event in its decision's hue (`eventHue`) with a badge to its step;
   an event the API marks `overdue` (an open date that passed, spec 015 rule 24, issue 233)
   reads "Was due" with an `off` Overdue badge.
+- **The PDF says the same** (spec 016 rule 11a, issue 239): its calculator names are
+  `CALCULATOR_LABELS` and its paycheck labels are the card's. `plan-pdf-words.test.ts` reads the
+  API's rendered page (`api/tests/fixtures/export/plan.html`) and fails when either side renames
+  one, so rename in `api/export/` too and regenerate that fixture.
 - **Export** (`ExportCard`): Download PDF starts `useExportPlan`, shows `JobProgress` while the
   job runs, downloads once it succeeds (once per job), then says "Downloaded {name}." with
   Download again. A dead job offers Try again (a new export); a failed download offers Try
@@ -1118,7 +1122,10 @@ drives a node from the keyboard, changes the period and saves a category fix; `i
 imports `e2e/fixtures/bank-export.csv` (five synthetic rows) into a new CSV account ("Added 5
 transactions to ..."), imports it again without making a second account ("No new transactions: all
 5 were already in ...", issue 231), imports into another new account and removes it (the panel
-then reports nothing about it), and checks a broken file's row errors.
+then reports nothing about it), imports an ATM withdrawal and a transfer to savings dated the last
+day of last month into a new account and checks on Spending that the withdrawal is "Cash" and adds
+its $60.00 to the Flexible tile while the transfer stays out (issue 250; then removes the account),
+and checks a broken file's row errors.
 Both change the e2e user's data, so they are ordered projects with serial files rather than
 parallel tests. `confirm.spec.ts` (project `authenticated-confirm`) uploads
 `e2e/fixtures/acme-paystub.pdf`, a synthetic stub with an example SSN the API must redact and a

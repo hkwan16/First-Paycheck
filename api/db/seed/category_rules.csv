@@ -274,7 +274,16 @@ udemy,prefix,education
 chegg,prefix,education
 gofundme,prefix,gifts_donations
 red cross,prefix,gifts_donations
+atm withdrawal,prefix,cash
+atm withdraw,prefix,cash
+atm cash withdrawal,prefix,cash
+atm w d,prefix,cash
+cash withdrawal,prefix,cash
+withdrawal atm,prefix,cash
+non chase atm withdraw,prefix,cash
 atm fee,prefix,fees
+atm withdrawal fee,prefix,fees
+cash withdrawal fee,prefix,fees
 overdraft fee,prefix,fees
 monthly service fee,prefix,fees
 foreign transaction fee,prefix,fees

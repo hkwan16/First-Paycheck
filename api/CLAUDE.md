@@ -122,7 +122,8 @@ Rules:
   `model` = settings purpose, `effort`, `max_tokens`, `schema`), loaded and
   validated by `llm/prompts/__init__.py`. A released prompt file is never
   edited; a change is a new version.
-- One public method per prompt: `categorize` (`categorize/v3`),
+- One public method per prompt: `categorize` (`categorize/v4`: v3 with `cash` defined and
+  ATM withdrawals out of `transfer`, spec 003 rule 9d, issue 250),
   `extract_pay_stub` (`extract_pay_stub/v2`: a dash or `0.00` printed on a line is 0
   tied to that line, not null; spec 005 rule 1a, issue 195), `extract_benefits`
   (`extract_benefits/v2`), `explain` (`explain/v5`), `judge_rate_claim`
@@ -210,7 +211,16 @@ Rules:
   rule (`target optical`). `tests/unit/test_seed_rules.py` lists the names
   each way; check a new seed row against them. The model
   labels each merchant and direction separately (`CategorizeItem.direction`,
-  `categorize/v3`) and may call money in a refund. What a category means
+  `categorize/v4`) and may call money in a refund. Cash withdrawn is spending:
+  `cash`, a `flexible` category (spec 003 rule 9d, issue #250), by seed prefix
+  rules on the bank language (`atm withdrawal`, `cash withdrawal`, ...; never
+  the bare `withdrawal`, which banks put before card purchases, nor `atm`), so
+  an earlier `transfer` guess for one is relabeled by the rules pass; only money
+  between the person's own accounts, peers and cash deposits stay `transfer`. A
+  new category goes in `sync/categories.py` (list and `CATEGORY_BUCKETS`), a new
+  prompt version that names it, `web/src/lib/categories.ts` and `make types`; a
+  released prompt keeps the categories it had (`test_prompts.py:ADDED_AFTER`).
+  What a category means
   (a membership to a public radio station or another nonprofit is
   `gifts_donations`, issue #146) is the prompt's; which merchant a
   description names is the seed rules' (spec 003 rule 9a), and the two agree
@@ -807,6 +817,14 @@ table `plan_exports` (`enable_rls`, SELECT and INSERT only).
   everything) with no session open, and stores it in a second session; a rerun
   keeps the first PDF. `GET /plan/export/{job_id}` streams it only when the job
   is a succeeded `plan.export` of the user and the row exists, else 404.
+- **The Plan page's words** (spec 016 rule 11a, issue 239). The PDF says what the web
+  Plan page says: `export/html.py:CALCULATOR_TITLES` is the web's `CALCULATOR_LABELS`
+  ("401(k) match", "W-4, federal only"), the paycheck lines are the "Your paycheck"
+  card's, each decision shows "Saved <UTC day>" (no version number), the explanation
+  lines are the Plan page's (`EXPLANATION_LABELS`) and, on page 2, the Why page's notes
+  (`WHY_LABELS`), and an emergency fund (not `is_explainable`) prints no explanation line.
+  A word change on either side changes the other; `web/.../plan/plan-pdf-words.test.ts`
+  reads `tests/fixtures/export/plan.html` to catch a name or paycheck label that drifts.
 - **Worker only.** `app/` never imports `export.html`, `export.pdf`, `jinja2`
   or `weasyprint`, and `import app.main` loads none of them
   (`tests/unit/test_boundaries.py`). `export/store.py` is the only module that
@@ -820,6 +838,9 @@ table `plan_exports` (`enable_rls`, SELECT and INSERT only).
   decisions through the API at 2026-10-21 15:00 UTC and writes fixed
   explanations. `tests/fixtures/export/plan.html` is the expected page byte for
   byte; review a template change by rendering it and replacing the fixture.
+  Postgres stamps `decisions.created_at` with the test transaction's real start,
+  so `test_plan_html.py:plan_of` sets every decision's `created_at` to `NOW` before
+  rendering; without it the printed saved dates change every day the suite runs.
   PDF tests take the `weasyprint` fixture: they skip when pango cannot load and
   fail in CI, which installs pango and runs `tests/*/export` in the image too.
   On macOS run them with `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib uv run

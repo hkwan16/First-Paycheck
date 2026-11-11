@@ -5,6 +5,7 @@ import type {
   PlanCompleteness,
   PlanDecision,
   PlanFigure,
+  PlanPayStub,
 } from '@/lib/api/types';
 import { calculatorIdOf } from '@/lib/decisions';
 import type { Hue, Tone } from '@/lib/design/tone';
@@ -99,6 +100,24 @@ export function eventHue(event: CalendarEvent, decisions: readonly PlanDecision[
   const decision = decisions.find((d) => d.id === event.decision_id);
   return decision ? CALCULATOR_CARDS[calculatorIdOf(decision.calculator)].tone : 'neutral';
 }
+
+type PayStubCents = Extract<keyof PlanPayStub, `${string}_cents`>;
+
+/**
+ * The "Your paycheck" card's two tiles and its deductions, in the order a pay
+ * stub prints them. The PDF prints the same labels (spec 016 rule 11a), which
+ * `plan-pdf-words.test.ts` checks against the API's rendered page.
+ */
+export const PAYCHECK_TILES = { gross: 'Gross pay', net: 'Take-home pay' } as const;
+export const PAYCHECK_LINES: readonly (readonly [PayStubCents, string])[] = [
+  ['federal_withholding_cents', 'Federal withholding'],
+  ['social_security_cents', 'Social Security'],
+  ['medicare_cents', 'Medicare'],
+  ['state_tax_cents', 'State tax'],
+  ['retirement_contribution_cents', '401(k)'],
+  ['medical_premium_cents', 'Medical premium'],
+  ['other_deductions_cents', 'Other deductions'],
+];
 
 const FREQUENCIES: Record<PayFrequency, string> = {
   weekly: 'Weekly',
