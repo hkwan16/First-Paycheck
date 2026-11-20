@@ -83,7 +83,9 @@ export function PlanDetailsForm({
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const read = readPlanDetails(draft, {
-      taxYear: payStub?.tax_year,
+      // The person's year, from the today GET /profile answers (spec 019 rule 6),
+      // as PUT /profile counts it.
+      currentYear: Number(profile.today.slice(0, 4)),
       askSchedule: fromStub === null,
     });
     if (!read.ok) {

@@ -5,6 +5,7 @@ import {
   invalidateAfterConfirm,
   invalidateAfterDecision,
   invalidateAfterProfile,
+  invalidateAfterTimeZone,
   invalidateAfterUnlink,
   invalidateCheckIn,
   invalidateDecisions,
@@ -160,6 +161,19 @@ describe('document keys', () => {
     expect(invalidated(keys.plan)).toBe(true);
     expect(invalidated(keys.payStubs)).toBe(false);
     // The saved profile itself is written into its cache, not read again.
+    expect(invalidated(keys.profile)).toBe(false);
+  });
+
+  it('a new time zone refreshes every other read: any date the API answered may move', async () => {
+    const { client, keys, invalidated } = seededDocs();
+    client.setQueryData(queryKeys.plan(), {});
+    client.setQueryData(queryKeys.checkIns(), []);
+    await invalidateAfterTimeZone(client);
+    for (const key of [keys.list, keys.payStubs, keys.accounts, keys.decisions, keys.plan]) {
+      expect(invalidated(key)).toBe(true);
+    }
+    expect(client.getQueryState(queryKeys.checkIns())?.isInvalidated).toBe(true);
+    // The saved profile, today included, is written into its cache by the hook.
     expect(invalidated(keys.profile)).toBe(false);
   });
 });

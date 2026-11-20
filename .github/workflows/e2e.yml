@@ -1,6 +1,6 @@
 name: e2e
 
-# The web's real-API Playwright specs (alpha.spec.ts and the authenticated-*
+# The web's real-API Playwright specs (alpha.spec.ts, persons-day.spec.ts and the authenticated-*
 # projects) against the API and worker built from this commit, through the
 # same harness as `make e2e-full` (scripts/e2e_stack.py): a Postgres service,
 # a local stand-in for Supabase Auth with its own JWKS, LLM_FAKE=true. The
@@ -81,7 +81,7 @@ jobs:
           PLAID_SECRET: ${{ secrets.PLAID_SECRET }}
         run: >-
           uv run python -m scripts.e2e_stack run --
-          pnpm --dir web exec playwright test --project=alpha --project='authenticated*'
+          pnpm --dir web exec playwright test --project=alpha --project='authenticated*' --project=persons-day
       - name: Upload the report and the stack's logs on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

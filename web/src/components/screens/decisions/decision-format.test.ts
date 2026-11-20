@@ -15,30 +15,51 @@ import {
   saveErrorText,
   tiersText,
 } from './decision-format';
+import { MAX_PERIOD_CENTS } from '@/lib/entry-limits';
 
 const apiError = (code: string, message = 'The API said no') => ({ error: { code, message } });
 
 describe('readAmount and amountText', () => {
   const example = '300.00';
+  const max = MAX_PERIOD_CENTS;
 
   it('reads an amount as cents, the way it is typed', () => {
-    expect(readAmount('$1,823.25', { example })).toEqual({ cents: 182_325, error: null });
-    expect(readAmount(' 300 ', { example })).toEqual({ cents: 30_000, error: null });
-    expect(readAmount('0', { example })).toEqual({ cents: 0, error: null });
+    expect(readAmount('$1,823.25', { example, max })).toEqual({ cents: 182_325, error: null });
+    expect(readAmount(' 300 ', { example, max })).toEqual({ cents: 30_000, error: null });
+    expect(readAmount('0', { example, max })).toEqual({ cents: 0, error: null });
+    expect(readAmount('1,000,000.00', { example, max })).toEqual({ cents: max, error: null });
   });
 
-  it('is nothing yet when empty, and says what to fix otherwise', () => {
-    expect(readAmount('  ', { example })).toEqual({ cents: null, error: null });
-    for (const text of ['lots', '-5', '1.234']) {
-      expect(readAmount(text, { example })).toEqual({
+  it('is nothing yet when empty', () => {
+    expect(readAmount('  ', { example, max })).toEqual({ cents: null, error: null });
+  });
+
+  // Spec 018 rule 5e and its table: the message names the actual problem (issue 238).
+  it.each([
+    ['lots', 'Enter an amount, like 300.00.'],
+    ['12.', 'Enter an amount, like 300.00.'],
+    ['1,23', 'Enter an amount, like 300.00.'],
+    ['1.234', 'Enter at most two digits after the decimal point, like 300.00.'],
+    ['1,234.567', 'Enter at most two digits after the decimal point, like 300.00.'],
+    ['-5', 'Enter an amount from $0 to $1,000,000.00.'],
+    ['1,000,000.01', 'Enter an amount from $0 to $1,000,000.00.'],
+    ['99999999999999', 'Enter an amount from $0 to $1,000,000.00.'],
+    ['999999999999999999999', 'Enter an amount from $0 to $1,000,000.00.'],
+  ])('says what is wrong with %j', (text, error) => {
+    expect(readAmount(text, { example, max })).toEqual({ cents: null, error });
+  });
+
+  it('names a range above $0 for an amount the calculator needs above zero', () => {
+    const essentials = { example: '1,823.25', max, positive: true };
+    for (const text of ['0', '0.00', '-1', '99999999999999']) {
+      expect(readAmount(text, essentials)).toEqual({
         cents: null,
-        error: 'Enter an amount, like 300.00.',
+        error: 'Enter an amount above $0 and up to $1,000,000.00.',
       });
     }
-    expect(readAmount('0', { example: '1,823.25', positive: true })).toEqual({
-      cents: null,
-      error: 'Enter an amount above $0, like 1,823.25.',
-    });
+    expect(readAmount('1,234.567', essentials).error).toBe(
+      'Enter at most two digits after the decimal point, like 1,823.25.',
+    );
   });
 
   it('writes cents back the way a person types them', () => {

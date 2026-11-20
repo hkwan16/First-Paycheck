@@ -190,6 +190,9 @@ function seedAllDecided(seed: Seed) {
 
 /** Spec 015's November user, a month after the decisions: one check-in open (or done), October's done. */
 function seedCheckIns(seed: Seed, november: CheckInDetail) {
+  // The sample's today (October 17) is the profile's, never the browser's
+  // clock (spec 019 rule 6), so November is not this month's to check again.
+  seed(queryKeys.profile(), sampleProfile);
   seed(queryKeys.checkIns(), [summaryOf(november), summaryOf(octoberCheckIn())]);
   seed(queryKeys.checkIn(NOVEMBER_ID), november);
   const { queryKey } = $api.queryOptions('get', '/calendar', {
@@ -264,6 +267,8 @@ const SCREENS: Record<
   spending: {
     nav: 'spending',
     render: () => <SpendingScreen showSankey initialPeriod={SAMPLE_PERIOD} />,
+    // The picker counts its months from the profile's today (spec 019 rule 6).
+    seed: (seed) => seed(queryKeys.profile(), sampleProfile),
   },
   // Every calculator live and saved: one sample per step.
   'decisions-emergency-fund': decisionStep('emergency_fund'),

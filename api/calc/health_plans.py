@@ -15,13 +15,15 @@ import datetime as dt
 from collections.abc import Callable, Sequence
 from decimal import Decimal, localcontext
 from itertools import combinations
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     StringConstraints,
+    ValidationError,
+    ValidationInfo,
     field_validator,
     model_validator,
 )
@@ -29,18 +31,44 @@ from pydantic import (
 from calc.brackets import marginal_rate
 from calc.data import FilingStatus, HsaLimits, UnknownTaxYear, tax_year
 from calc.money import CONTEXT, pct_of, round_half_up
-from calc.types import Cents, PayPeriods, Percent, PositiveCents, ResultPercent, SignedCents
+from calc.types import (
+    Cents,
+    PayPeriods,
+    Percent,
+    ResultPercent,
+    Salary,
+    SignedCents,
+    dollars,
+    is_stored,
+    per_paycheck,
+    yearly,
+)
+
 
 # A person reaches these by typing a plan, and the API shows them as they are
-# (spec 008 rule 22a), so they are sentences. The benefits confirm shares them.
-DEDUCTIBLE_OVER_OOP = "A plan's deductible must not be more than its out-of-pocket maximum"
-HSA_WITHOUT_HDHP = "Only a high-deductible plan can have an employer HSA contribution"
+# (spec 008 rule 22a), so they are sentences that name the plan (rule 12, issue
+# 228). The benefits confirm shares them.
+def deductible_over_oop(plan: str, deductible_cents: int) -> str:
+    return (
+        f"{plan}: enter an out-of-pocket maximum of at least the deductible,"
+        f" {dollars(deductible_cents)}."
+    )
+
+
+def hsa_without_hdhp(plan: str) -> str:
+    return f"{plan}: only a high-deductible plan can have an employer HSA contribution."
+
+
+def employer_hsa_over_limit(plan: str, limit_cents: int, year: int) -> str:
+    return (
+        f"{plan}: enter an employer HSA contribution up to {dollars(limit_cents)},"
+        f" the {year} HSA limit for one person."
+    )
+
 
 __all__ = [
     "BASE_CITATION_KEYS",
-    "DEDUCTIBLE_OVER_OOP",
     "HDHP_CITATION_KEYS",
-    "HSA_WITHOUT_HDHP",
     "MAX_PLANS",
     "SCAN_LIMIT_CENTS",
     "SCAN_STEP_CENTS",
@@ -51,7 +79,10 @@ __all__ = [
     "PlanKind",
     "PlanPair",
     "Usage",
+    "deductible_over_oop",
+    "employer_hsa_over_limit",
     "health_plans",
+    "hsa_without_hdhp",
 ]
 
 PlanKind = Literal["hdhp", "ppo", "hmo"]
@@ -77,19 +108,37 @@ class HealthPlanOption(BaseModel):
 
     name: PlanName
     kind: PlanKind
-    premium_per_period_cents: Cents = Field(description="The employee's premium per paycheck")
-    deductible_cents: Cents
+    premium_per_period_cents: Annotated[Cents, per_paycheck("{plan}: enter a premium")] = Field(
+        description="The employee's premium per paycheck"
+    )
+    deductible_cents: Annotated[Cents, yearly("{plan}: enter a deductible")]
     coinsurance_pct: Percent = Field(description="The member's share after the deductible")
-    oop_max_cents: Cents = Field(description="The out-of-pocket maximum")
+    oop_max_cents: Annotated[Cents, yearly("{plan}: enter an out-of-pocket maximum")] = Field(
+        description="The out-of-pocket maximum"
+    )
     employer_hsa_cents: Cents = Field(description="The employer's annual HSA contribution")
 
-    @model_validator(mode="after")
-    def _consistent(self) -> Self:
-        if self.deductible_cents > self.oop_max_cents:
-            raise ValueError(DEDUCTIBLE_OVER_OOP)
-        if self.employer_hsa_cents > 0 and self.kind != "hdhp":
-            raise ValueError(HSA_WITHOUT_HDHP)
-        return self
+    # Rule 12, each on its field so the plan table can say where (rule 18b).
+    # The fields before them validated first, so info.data holds them when they read.
+    @field_validator("oop_max_cents")
+    @classmethod
+    def _covers_the_deductible(cls, value: int, info: ValidationInfo) -> int:
+        deductible = info.data.get("deductible_cents")
+        if deductible is not None and deductible > value:
+            raise ValueError(deductible_over_oop(_plan_name(info), deductible))
+        return value
+
+    @field_validator("employer_hsa_cents")
+    @classmethod
+    def _hsa_needs_an_hdhp(cls, value: int, info: ValidationInfo) -> int:
+        if value > 0 and info.data.get("kind", "hdhp") != "hdhp":
+            raise ValueError(hsa_without_hdhp(_plan_name(info)))
+        return value
+
+
+def _plan_name(info: ValidationInfo) -> str:
+    name = info.data.get("name")
+    return name if isinstance(name, str) else "This plan"
 
 
 class HealthPlansInput(BaseModel):
@@ -99,10 +148,10 @@ class HealthPlansInput(BaseModel):
 
     plans: list[HealthPlanOption] = Field(min_length=1, max_length=MAX_PLANS)
     pay_periods_per_year: PayPeriods
-    salary_cents: PositiveCents = Field(description="Annual salary, for the marginal rate")
+    salary_cents: Salary = Field(description="Annual salary, for the marginal rate")
     filing_status: FilingStatus
     tax_year: int = Field(strict=True, description="The pay stub's tax year")
-    employee_hsa_cents: Cents = Field(
+    employee_hsa_cents: Annotated[Cents, yearly("Enter your own HSA contribution")] = Field(
         description="What the user plans to put into an HSA in the year themselves"
     )
     expected_usage: Usage
@@ -126,6 +175,30 @@ class HealthPlansInput(BaseModel):
         except UnknownTaxYear as exc:
             raise ValueError(f"We do not have the federal tax figures for {value} yet") from exc
         return value
+
+    @model_validator(mode="after")
+    def _employer_hsa_within_the_limit(self, info: ValidationInfo) -> Self:
+        """Rule 12a: the employer's money counts toward the year's self-only limit,
+        so more is not an amount a plan can give. An entry limit (spec 007 rule 2b)."""
+        if is_stored(info.context):
+            return self
+        limit = tax_year(self.tax_year).hsa.self_only_limit_cents
+        # pydantic's InitErrorDetails, which calc cannot import (pydantic_core).
+        over: list[Any] = [
+            {
+                "type": "value_error",
+                "loc": ("plans", index, "employer_hsa_cents"),
+                "input": plan.employer_hsa_cents,
+                "ctx": {
+                    "error": ValueError(employer_hsa_over_limit(plan.name, limit, self.tax_year))
+                },
+            }
+            for index, plan in enumerate(self.plans)
+            if plan.employer_hsa_cents > limit
+        ]
+        if over:
+            raise ValidationError.from_exception_data(type(self).__name__, over)
+        return self
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:

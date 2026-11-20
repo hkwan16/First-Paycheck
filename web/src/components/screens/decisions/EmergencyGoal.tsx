@@ -13,6 +13,7 @@ import { cancelOnEscape } from '@/lib/escape-cancel';
 import { useFocusHandoff } from '@/lib/focus-handoff';
 import type { Account, Goal, GoalPatch } from '@/lib/api/types';
 import { formatRate } from '@/lib/money';
+import { MAX_PERIOD_CENTS } from '@/lib/entry-limits';
 import { AmountField } from './AmountField';
 import { amountText, readAmount } from './decision-format';
 import {
@@ -52,7 +53,10 @@ export function EmergencyGoal({ goal, accounts, funded, horizonMonths }: Emergen
 
   const saveContribution = (event: FormEvent) => {
     event.preventDefault();
-    const read = readAmount(draft ?? '', { example: CONTRIBUTION_EXAMPLE });
+    const read = readAmount(draft ?? '', {
+      example: CONTRIBUTION_EXAMPLE,
+      max: MAX_PERIOD_CENTS,
+    });
     if (read.cents === null) {
       setDraftError(read.error ?? `Enter an amount, like ${CONTRIBUTION_EXAMPLE}.`);
       return;

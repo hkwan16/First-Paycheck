@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { FieldError } from '@/components/ui/FieldError';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
+import { Notice } from '@/components/ui/Notice';
 import { Select } from '@/components/ui/Select';
 import type { HealthPlanOption, PlanKind } from '@/lib/api/types';
 import { cancelOnEscape } from '@/lib/escape-cancel';
@@ -19,12 +20,17 @@ import {
   readPlanDrafts,
   type PlanDraft,
   type PlanDraftErrors,
+  type PlanRefusal,
 } from './health-plan-format';
 
 export interface PlanOptionsFormProps {
   /** The plans to start from; none starts one empty plan. */
   initial: readonly HealthPlanOption[] | null;
-  onCompare: (plans: HealthPlanOption[]) => void;
+  /**
+   * Compare these plans: the card asks the API first (spec 012 rule 18b) and
+   * resolves null once it took them (the table then closes), else with why not.
+   */
+  onCompare: (plans: HealthPlanOption[]) => Promise<PlanRefusal | null>;
   /** Shown as Cancel when there are plans to go back to; Escape does it too. */
   onCancel?: () => void;
   /** Shown when a confirmed benefits summary has plans to go back to. */
@@ -56,19 +62,30 @@ export function PlanOptionsForm({
     initial && initial.length > 0 ? initial.map(draftFromOption) : [{ ...EMPTY_PLAN_DRAFT }],
   );
   const [errors, setErrors] = useState<PlanDraftErrors[]>([]);
+  // What the API said about the plans as a whole, above the buttons.
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
 
   const change = (index: number, next: Partial<PlanDraft>) =>
     setDrafts((all) => all.map((draft, i) => (i === index ? { ...draft, ...next } : draft)));
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (checking) return;
     const read = readPlanDrafts(drafts);
+    setRefusal(null);
     if (!read.ok) {
       setErrors(read.errors);
       return;
     }
     setErrors([]);
-    onCompare(read.plans);
+    setChecking(true);
+    const refused = await onCompare(read.plans);
+    // Taken: the card closes the table, so nothing here changes again.
+    if (refused === null) return;
+    setChecking(false);
+    setErrors(refused.errors);
+    setRefusal(refused.message);
   };
 
   return (
@@ -76,7 +93,7 @@ export function PlanOptionsForm({
       ref={ref}
       aria-label="Your health plan options"
       noValidate
-      onSubmit={submit}
+      onSubmit={(event) => void submit(event)}
       onKeyDown={cancelOnEscape(onCancel)}
       className="flex flex-col gap-4"
     >
@@ -212,8 +229,13 @@ export function PlanOptionsForm({
           </fieldset>
         );
       })}
+      {refusal && (
+        <Notice tone="warning" compact role="alert">
+          {refusal}
+        </Notice>
+      )}
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="primary" loading={checking}>
           Compare these plans
         </Button>
         {drafts.length < MAX_PLANS && (

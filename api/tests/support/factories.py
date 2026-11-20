@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import Connection, update
+from sqlalchemy.dialects.postgresql import insert
 
 from app.db import user_session_for
 from db.enums import (
@@ -39,6 +40,7 @@ from db.models import (
     Holding,
     Job,
     PayStub,
+    Profile,
     RecurringCharge,
     SyncItem,
     Transaction,
@@ -375,6 +377,8 @@ def make_check_in(
     triggered_by: CheckinTrigger = CheckinTrigger.SCHEDULE,
     **fields: Any,
 ) -> uuid.UUID:
+    # The run's date (spec 019 rule 11); a test that needs another passes as_of.
+    fields.setdefault("as_of", period)
     with user_session_for(user_id, bind=connection) as session:
         check_in = CheckIn(user_id=user_id, period=period, triggered_by=triggered_by, **fields)
         session.add(check_in)
@@ -422,3 +426,14 @@ def make_calendar_event(
         session.add(event)
         session.flush()
         return event.id
+
+
+def make_time_zone(connection: Connection, user_id: uuid.UUID, time_zone: str | None) -> None:
+    """The zone the person's browser reported (spec 019 rule 5), saved on the profile
+    as ``PUT /profile/time-zone`` saves it (the row is made when there is none)."""
+    with user_session_for(user_id, bind=connection) as session:
+        session.execute(
+            insert(Profile)
+            .values(user_id=user_id, time_zone=time_zone)
+            .on_conflict_do_update(index_elements=[Profile.user_id], set_={"time_zone": time_zone})
+        )

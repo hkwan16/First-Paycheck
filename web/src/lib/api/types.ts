@@ -45,6 +45,7 @@ export type Profile = Schemas['ProfileOut'];
 export type PaySchedule = Schemas['PaySchedule'];
 export type SalaryReview = Schemas['SalaryReview'];
 export type ProfileIn = Schemas['ProfileIn'];
+export type TimeZoneIn = Schemas['TimeZoneIn'];
 export type FilingStatus = Schemas['FilingStatus'];
 export type MatchTier = Schemas['MatchTier-Output'];
 export type MatchTierIn = Schemas['MatchTier-Input'];

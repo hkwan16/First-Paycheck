@@ -129,6 +129,8 @@ One row per user; the confirmed picture of the job and choices.
 | `start_date` | `date` | Null until confirmed |
 | `match_tiers` | `jsonb` | `NOT NULL DEFAULT '[]'`, `CHECK (jsonb_typeof(match_tiers) = 'array')`; items `{employee_pct_upto, employer_pct}`, validated by the Pydantic model in spec 006 |
 | `vesting_years` | `smallint` | Null when unknown; `CHECK (vesting_years >= 0)` |
+| `birth_year` | `smallint` | Null until answered; `CHECK (birth_year >= 1900)` (added in `0008`; the upper bound, the person's current year, is the route's) |
+| `time_zone` | `text` | Null until the browser first reports it; an IANA zone name (spec 019 rule 4), `CHECK (char_length(time_zone) BETWEEN 1 AND 64)` (added in `0026`). The zone the person's day is taken in; null reads as `America/New_York` |
 
 ### `documents`
 
@@ -357,6 +359,7 @@ Indexes: `(decision_id, created_at DESC)`, `(finding_id, created_at DESC)`. The 
 | `status` | `checkin_status` | `NOT NULL DEFAULT 'open'` |
 | `completed_at` | `timestamptz` | `CHECK ((status = 'completed') = (completed_at IS NOT NULL))` |
 | `last_run_at` | `timestamptz` | `NOT NULL DEFAULT now()`; when the finders last ran on it, set by every run that creates or refreshes it (spec 015 rule 9a; added in `0018`) |
+| `as_of` | `date` | `NOT NULL`; the date the last run judged the check-in as of, in the person's day and within `period`'s month, set by the same runs (spec 019 rules 11 and 12; added in `0026`) |
 
 ### `check_in_findings`
 
@@ -469,6 +472,7 @@ Reference data, no `user_id` (RLS exception).
 | `0023_salary_pay_stub` | `profiles.salary_pay_stub_id` and its same-user foreign key to `pay_stubs` (spec 005 rule 24c, issue 221). The downgrade drops the column |
 | `0024_document_review_draft` | `documents.review_draft` and its object check (spec 005 rules 23c-23e, issue 229). The downgrade drops the column |
 | `0025_account_role_fits_kind` | Nothing new. Clears every role its account's kind does not allow, then adds `ck_accounts_role_fits_kind` (spec 002 rule 31a, issue 241). The downgrade drops the check; cleared roles stay cleared |
+| `0026_the_persons_day` | Nothing new. `profiles.time_zone` with `ck_profiles_time_zone_length`, and `check_ins.as_of`, filled for existing rows with `min(UTC date of last_run_at, last day of period)` (what `GET /check-ins` showed for them) with the `updated_at` trigger off, then `NOT NULL` (spec 019, issue 232). The downgrade drops both columns |
 
 CI runs upgrade, downgrade, upgrade and `alembic check` on every pull request.
 

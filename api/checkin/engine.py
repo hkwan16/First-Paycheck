@@ -33,6 +33,7 @@ from db.enums import (
 )
 from db.models import CheckIn, CheckInFinding, Job, RecurringCharge
 from db.pay_stubs import paycheck_ids
+from db.person_day import person_day
 from jobs import queue
 
 __all__ = [
@@ -50,6 +51,7 @@ __all__ = [
     "queue_refresh",
     "reconcile",
     "run_check_in",
+    "run_date",
     "settle_status",
     "subject_gone",
 ]
@@ -203,6 +205,13 @@ def month_end(period: dt.date) -> dt.date:
     return period.replace(day=calendar.monthrange(period.year, period.month)[1])
 
 
+def run_date(period: dt.date, today: dt.date) -> dt.date:
+    """Rule 16 and spec 019 rule 11: the date a run judges ``period`` as of, the
+    person's ``today`` kept within the month: its last day once the month is over,
+    its first day when the run comes before the month began for the person."""
+    return max(period, min(today, month_end(period)))
+
+
 def _lock(session: Session, key: str) -> None:
     session.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": key})
 
@@ -247,11 +256,13 @@ def run_check_in(
     user_id: uuid.UUID,
     period: dt.date,
     *,
-    today: dt.date,
     now: dt.datetime,
     trigger: Trigger,
 ) -> CheckInRun:
-    """Rules 8-11, 9a and 13: get or create the month's check-in and refresh it."""
+    """Rules 8-11, 9a, 13 and 16: get or create the month's check-in and refresh it,
+    judged as of the person's today at ``now`` kept within the month (spec 019 rule 11)."""
+    day = person_day(session, user_id, now)
+    today = run_date(period, day.today)
     # Two refreshes for one user never interleave, nor does a refresh with a
     # detection run that could flag a charge this run is about to consume.
     _lock(session, f"checkin:{user_id}")
@@ -261,17 +272,21 @@ def run_check_in(
     if check_in is None:
         if trigger != "schedule":
             return CheckInRun(outcome="skipped")
-        check_in = CheckIn(user_id=user_id, period=period, triggered_by=CheckinTrigger.SCHEDULE)
+        check_in = CheckIn(
+            user_id=user_id, period=period, triggered_by=CheckinTrigger.SCHEDULE, as_of=today
+        )
         session.add(check_in)
         session.flush()
         outcome = "created"
     elif check_in.status is not CheckinStatus.OPEN:
         return CheckInRun(outcome="skipped", check_in_id=check_in.id)
-    # Rule 9a: the run is recorded even when reconcile changes nothing.
+    # Rule 9a: the run is recorded even when reconcile changes nothing, with the
+    # date it judged (spec 019 rule 12: stored, so a record keeps its date).
     check_in.last_run_at = now
+    check_in.as_of = today
 
     paychecks = paycheck_ids(session)
-    facts = load_facts(session, period, today, paychecks)
+    facts = load_facts(session, period, today, paychecks, zone=day.zone)
     candidates = all_findings(facts)
     rows = {
         row.id: row
@@ -348,9 +363,9 @@ def run_check_in(
     )
 
 
-def queue_refresh(session: Session, user_id: uuid.UUID, today: dt.date) -> uuid.UUID | None:
-    """Rule 15: queue a ``sync`` refresh when this month's check-in is open."""
-    period = today.replace(day=1)
+def queue_refresh(session: Session, user_id: uuid.UUID, period: dt.date) -> uuid.UUID | None:
+    """Rule 15: queue a ``sync`` refresh when ``period``'s check-in (the person's month,
+    spec 019) is open."""
     open_now = session.scalar(
         select(CheckIn.id).where(
             CheckIn.period == period,

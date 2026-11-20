@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any
 
-from checkin.engine import Trigger, month_end, run_check_in
+from checkin.engine import Trigger, run_check_in
 from jobs.context import JobContext
 
 TRIGGERS: tuple[Trigger, ...] = ("schedule", "sync")
@@ -28,9 +28,10 @@ def parse_payload(payload: dict[str, Any]) -> tuple[dt.date, Trigger]:
 
 def run(ctx: JobContext) -> dict[str, Any]:
     period, trigger = parse_payload(ctx.job.payload)
-    now = ctx.services.clock()
-    # Rule 16: a job that runs after its month judges the month's last day.
-    today = min(now.date(), month_end(period))
+    # Rule 16 and spec 019 rule 11: the run judges the person's today at the job
+    # clock, kept within the month (checkin.engine.run_date).
     with ctx.user_session() as session:
-        result = run_check_in(session, ctx.user_id, period, today=today, now=now, trigger=trigger)
+        result = run_check_in(
+            session, ctx.user_id, period, now=ctx.services.clock(), trigger=trigger
+        )
     return result.as_job_result()

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal, localcontext
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -32,11 +32,23 @@ from calc.data import (
 )
 from calc.k401 import deferral_limit_cents
 from calc.money import CONTEXT, pct_of, round_half_up
-from calc.types import Cents, PayPeriods, Percent, PositiveCents, ResultPercent, SignedCents
+from calc.types import (
+    Cents,
+    EntryLimit,
+    PayPeriods,
+    Percent,
+    ResultPercent,
+    Salary,
+    SignedCents,
+    dollars,
+    per_paycheck,
+    yearly,
+)
 
 __all__ = [
     "BASE_CITATION_KEYS",
     "DEPENDENTS_CREDIT_KEY",
+    "MAX_STEP3_CREDITS_CENTS",
     "MULTIPLE_JOBS_KEY",
     "PRETAX_DEFERRAL_KEY",
     "TARGET_CENTS",
@@ -53,6 +65,15 @@ Schedule = Literal["standard", "step2_checkbox"]
 Suggestion = Literal[
     "none", "increase_extra_withholding", "decrease_extra_withholding", "increase_deductions"
 ]
+
+# Rule 16a: Step 3's credits. The 2026 Form W-4 asks $2,200 for each child under
+# 17 and $500 for each other dependent, so the 20 dependents a profile holds
+# come to $44,000; $100,000 leaves room for other credits.
+MAX_STEP3_CREDITS_CENTS = 10_000_000
+STEP3_LIMIT = EntryLimit(
+    MAX_STEP3_CREDITS_CENTS,
+    f"Enter Step 3 credits up to {dollars(MAX_STEP3_CREDITS_CENTS)} for the year.",
+)
 
 # Rule 11: a projection within $100 of zero needs no change.
 TARGET_CENTS = 10_000
@@ -76,7 +97,7 @@ class W4Input(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    salary_cents: PositiveCents = Field(description="Annual salary from this job")
+    salary_cents: Salary = Field(description="Annual salary from this job")
     pay_periods_per_year: PayPeriods
     filing_status: FilingStatus = Field(description="Form W-4 Step 1(c)")
     tax_year: int = Field(strict=True, description="The pay stub's tax year")
@@ -90,26 +111,40 @@ class W4Input(BaseModel):
         le=130,
         description="Age reached by December 31 of tax_year, for the 401(k) catch-up",
     )
-    health_premium_per_paycheck_cents: Cents = Field(
-        default=0, description="Pre-tax health premium per paycheck, from the saved health plan"
+    health_premium_per_paycheck_cents: Annotated[Cents, per_paycheck("Enter a health premium")] = (
+        Field(
+            default=0, description="Pre-tax health premium per paycheck, from the saved health plan"
+        )
     )
     multiple_jobs: bool = Field(default=False, description="Step 2(c) is checked")
-    dependents_credit_cents: Cents = Field(default=0, description="Step 3, for the year")
-    other_income_cents: Cents = Field(default=0, description="Step 4(a), for the year")
-    deductions_cents: Cents = Field(default=0, description="Step 4(b), for the year")
-    extra_withholding_cents: Cents = Field(default=0, description="Step 4(c), per paycheck")
-    expected_deductions_cents: Cents | None = Field(
+    dependents_credit_cents: Annotated[Cents, STEP3_LIMIT] = Field(
+        default=0, description="Step 3, for the year"
+    )
+    other_income_cents: Annotated[Cents, yearly("Enter Step 4(a) other income")] = Field(
+        default=0, description="Step 4(a), for the year"
+    )
+    deductions_cents: Annotated[Cents, yearly("Enter Step 4(b) deductions")] = Field(
+        default=0, description="Step 4(b), for the year"
+    )
+    extra_withholding_cents: Annotated[Cents, per_paycheck("Enter Step 4(c) extra withholding")] = (
+        Field(default=0, description="Step 4(c), per paycheck")
+    )
+    expected_deductions_cents: (
+        Annotated[Cents, yearly("Enter the deductions you expect to claim")] | None
+    ) = Field(
         default=None,
         description="Deductions beyond the standard deduction expected on the return;"
         " null means the Step 4(b) entry",
     )
-    other_jobs_wages_cents: Cents = Field(
+    other_jobs_wages_cents: Annotated[Cents, yearly("Enter other jobs' wages")] = Field(
         default=0, description="The household's other jobs' annual wages, for the projection"
     )
-    other_jobs_withholding_cents: Cents = Field(
+    other_jobs_withholding_cents: Annotated[Cents, yearly("Enter other jobs' withholding")] = Field(
         default=0, description="Federal income tax those jobs withhold in the year"
     )
-    current_withholding_per_paycheck_cents: Cents | None = Field(
+    current_withholding_per_paycheck_cents: (
+        Annotated[Cents, per_paycheck("Enter federal withholding")] | None
+    ) = Field(
         default=None,
         description="Federal income tax withheld each paycheck now, from the newest confirmed"
         " pay stub, for the comparison only; null means none to compare with",

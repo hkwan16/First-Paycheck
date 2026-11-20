@@ -134,6 +134,9 @@ class Profile(Base):
         CheckConstraint("vesting_years >= 0", name="vesting_years_non_negative"),
         # The upper bound (the current year) is the route's: a CHECK cannot read the clock.
         CheckConstraint("birth_year >= 1900", name="birth_year_after_1900"),
+        # Which names are zones is the route's (spec 019 rule 4): a CHECK cannot
+        # read the tz database.
+        CheckConstraint("char_length(time_zone) BETWEEN 1 AND 64", name="time_zone_length"),
         # The stub the salary was last compared with (spec 005 rule 24c). The
         # column list keeps user_id; migration 0023 writes it by hand.
         ForeignKeyConstraint(
@@ -164,6 +167,9 @@ class Profile(Base):
     vesting_years: Mapped[int | None] = mapped_column(SmallInteger)
     # Spec 006 open question 2: the client derives age as tax_year - birth_year.
     birth_year: Mapped[int | None] = mapped_column(SmallInteger)
+    # The IANA zone the browser reported (spec 019 rule 5); null reads as
+    # db.person_day.DEFAULT_TIME_ZONE. Only PUT /profile/time-zone writes it.
+    time_zone: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[dt.datetime] = _created_at()
     updated_at: Mapped[dt.datetime] = _updated_at()
 
@@ -1015,6 +1021,9 @@ class CheckIn(Base):
         CheckConstraint(
             "(status = 'completed') = (completed_at IS NOT NULL)", name="completed_when_done"
         ),
+        CheckConstraint(
+            "as_of >= period AND as_of < period + interval '1 month'", name="as_of_in_period"
+        ),
         # The monthly enqueue is idempotent: one scheduled check-in per month.
         Index(
             "uq_check_ins_scheduled_period",
@@ -1037,6 +1046,9 @@ class CheckIn(Base):
     # When the finders last ran on it (spec 015 rule 9a), set by every run that
     # creates or refreshes it; updated_at moves only when this row changes.
     last_run_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=_NOW)
+    # The person's date the last run judged it as of, within the month (spec 019
+    # rules 11 and 12): stored, so a later change of zone never moves a record.
+    as_of: Mapped[dt.date] = mapped_column(Date)
     created_at: Mapped[dt.datetime] = _created_at()
     updated_at: Mapped[dt.datetime] = _updated_at()
 

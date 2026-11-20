@@ -20,13 +20,13 @@ from sqlalchemy.orm import Session
 
 from app import ratelimit
 from app.auth import CurrentUser
-from app.deps import Now, UserSession
+from app.deps import Day, Now, UserSession
 from app.errors import NotFound, error_responses
 from app.routers.cashflow import CashFlow, cash_flow_for
 from app.types import UtcDateTime
 from calc.cashflow import PlanLine, SpendingActuals, against_plan
 from checkin.engine import charge_gone, month_end, queue_check_in_now, settle_status
-from checkin.facts import plan_targets, utc_date
+from checkin.facts import plan_targets
 from checkin.findings import FindingPayload
 from db.enums import (
     CheckinStatus,
@@ -63,10 +63,11 @@ class CheckInSummary(BaseModel):
     # refreshed it, also one that changed nothing; updated_at moves only when
     # the check-in's own row changes.
     last_run_at: UtcDateTime
-    # The date its findings were judged as of: the last run's UTC date, capped at
-    # the month's last day as the job caps it (spec 015 rules 9b and 16).
+    # The date its findings were judged as of: the person's date of the last run,
+    # kept within the month as the job keeps it, stored by that run (spec 015 rules
+    # 9b and 16, spec 019 rules 11 and 12).
     as_of: dt.date
-    # The month has ended: no run reaches it again, so it is a record of as_of.
+    # The person's month has ended: no run reaches it again, so it is a record of as_of.
     past: bool
 
 
@@ -130,7 +131,7 @@ def _summary(check_in: CheckIn, total: int, handled: int, today: dt.date) -> Che
         created_at=check_in.created_at,
         updated_at=check_in.updated_at,
         last_run_at=check_in.last_run_at,
-        as_of=min(utc_date(check_in.last_run_at), last_day),
+        as_of=check_in.as_of,
         past=today > last_day,
     )
 
@@ -159,7 +160,7 @@ def _charge_ids(session: Session) -> set[uuid.UUID]:
 
 
 @router.get("", responses=error_responses(401))
-def list_check_ins(session: UserSession, now: Now) -> list[CheckInSummary]:
+def list_check_ins(session: UserSession, day: Day) -> list[CheckInSummary]:
     """The user's check-ins, newest month first, with finding counts."""
     rows = session.execute(
         select(
@@ -175,14 +176,15 @@ def list_check_ins(session: UserSession, now: Now) -> list[CheckInSummary]:
         .group_by(CheckIn.id)
         .order_by(CheckIn.period.desc(), CheckIn.created_at.desc(), CheckIn.id)
     ).all()
-    return [_summary(check_in, total, handled, now.date()) for check_in, total, handled in rows]
+    return [_summary(check_in, total, handled, day.today) for check_in, total, handled in rows]
 
 
 @router.post("", status_code=status.HTTP_202_ACCEPTED, responses=error_responses(401, 429))
-def check_in_now(session: UserSession, user: CurrentUser, now: Now) -> CheckInQueued:
+def check_in_now(session: UserSession, user: CurrentUser, now: Now, day: Day) -> CheckInQueued:
     """Create or refresh this month's check-in: queue its job, or return the waiting one."""
     ratelimit.consume(session, user.id, ratelimit.CHECK_INS, now=now)
-    period = now.astimezone(dt.UTC).date().replace(day=1)
+    # The person's month (spec 019 rule 14).
+    period = day.month
     job_id = queue_check_in_now(session, user.id, period)
     check_in_id = session.scalar(
         select(CheckIn.id).where(
@@ -214,7 +216,7 @@ def _cash_flow(session: Session, check_in: CheckIn, today: dt.date) -> CheckInCa
 
 
 @router.get("/{check_in_id}", responses=error_responses(401, 404))
-def get_check_in(check_in_id: uuid.UUID, session: UserSession, now: Now) -> CheckInDetail:
+def get_check_in(check_in_id: uuid.UUID, session: UserSession, day: Day) -> CheckInDetail:
     """One check-in: its findings and the month's cash flow against the plan."""
     check_in = session.get(CheckIn, check_in_id)
     if check_in is None:
@@ -231,13 +233,13 @@ def get_check_in(check_in_id: uuid.UUID, session: UserSession, now: Now) -> Chec
         )
     )
     summary = _summary(
-        check_in, len(rows), sum(row.user_action is not None for row in rows), now.date()
+        check_in, len(rows), sum(row.user_action is not None for row in rows), day.today
     )
     charge_ids = _charge_ids(session)
     return CheckInDetail(
         **summary.model_dump(),
         findings=[_finding_out(row, charge_ids) for row in rows],
-        cash_flow=_cash_flow(session, check_in, now.date()),
+        cash_flow=_cash_flow(session, check_in, day.today),
     )
 
 

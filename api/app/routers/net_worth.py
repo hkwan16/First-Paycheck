@@ -16,7 +16,7 @@ from sqlalchemy import func, select, tuple_
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
-from app.deps import Now, UserSession
+from app.deps import Day, UserSession
 from app.errors import error_responses
 from calc.net_worth import (
     AccountHoldings,
@@ -31,9 +31,9 @@ from calc.net_worth import (
     months_ending,
     net_worth,
 )
-from checkin.facts import utc_date
 from db.enums import AccountKind, AccountRole
 from db.models import Account, BalanceSnapshot, Holding, SyncItem
+from db.person_day import PersonDay
 
 router = APIRouter(tags=["net worth"])
 
@@ -81,13 +81,16 @@ class HoldingsOut(BaseModel):
     gain_cents: int | None
 
 
-def _snapshots(session: Session, account_ids: list[uuid.UUID], since: dt.date) -> list[Snapshot]:
-    """Snapshots from ``since`` on, plus each account's newest one before it."""
-    start = dt.datetime.combine(since, dt.time(), tzinfo=dt.UTC)
+def _snapshots(
+    session: Session, account_ids: list[uuid.UUID], since: dt.date, day: PersonDay
+) -> list[Snapshot]:
+    """Snapshots from the person's ``since`` on, plus each account's newest one before
+    it, in the order they were taken, each dated in the person's zone (spec 019 rule 3)."""
+    start = day.start_of(since)
     in_window = session.execute(
-        select(
-            BalanceSnapshot.account_id, BalanceSnapshot.as_of, BalanceSnapshot.balance_cents
-        ).where(BalanceSnapshot.account_id.in_(account_ids), BalanceSnapshot.as_of >= start)
+        select(BalanceSnapshot.account_id, BalanceSnapshot.as_of, BalanceSnapshot.balance_cents)
+        .where(BalanceSnapshot.account_id.in_(account_ids), BalanceSnapshot.as_of >= start)
+        .order_by(BalanceSnapshot.as_of, BalanceSnapshot.id)
     ).all()
     before = session.execute(
         select(BalanceSnapshot.account_id, BalanceSnapshot.as_of, BalanceSnapshot.balance_cents)
@@ -96,7 +99,7 @@ def _snapshots(session: Session, account_ids: list[uuid.UUID], since: dt.date) -
         .order_by(BalanceSnapshot.account_id, BalanceSnapshot.as_of.desc())
     ).all()
     return [
-        Snapshot(account_id=account_id, as_of=utc_date(as_of), balance_cents=cents)
+        Snapshot(account_id=account_id, as_of=day.day_of(as_of), balance_cents=cents)
         for account_id, as_of, cents in [*before, *in_window]
     ]
 
@@ -104,13 +107,13 @@ def _snapshots(session: Session, account_ids: list[uuid.UUID], since: dt.date) -
 @router.get("/net-worth", responses=error_responses(401, 422))
 def get_net_worth(
     session: UserSession,
-    now: Now,
+    day: Day,
     months: Annotated[
         int, Query(ge=1, le=MAX_MONTHS, description="Months in the series, ending this month")
     ] = 12,
 ) -> NetWorthOut:
     """Assets minus liabilities now and at the end of each month, from balance snapshots."""
-    today = now.date()
+    today = day.today
     rows = session.execute(
         select(Account, SyncItem.institution_name)
         .join(
@@ -123,7 +126,7 @@ def get_net_worth(
     accounts = {account.id: (account, institution) for account, institution in rows}
     result = net_worth(
         [NetWorthAccount(account_id=a.id, kind=a.kind.value) for a, _ in accounts.values()],
-        _snapshots(session, list(accounts), months_ending(today, months)[0]),
+        _snapshots(session, list(accounts), months_ending(today, months)[0], day),
         today=today,
         months=months,
     )

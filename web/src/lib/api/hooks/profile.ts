@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { $api, fetchClient } from '../client';
-import { invalidateAfterProfile, queryKeys } from '../keys';
+import { invalidateAfterProfile, invalidateAfterTimeZone, queryKeys } from '../keys';
 import type { ProfileIn } from '../types';
 import { unwrap } from './request';
 
@@ -27,6 +27,32 @@ export function useUpdateProfile() {
     onSuccess: async (saved) => {
       queryClient.setQueryData(queryKeys.profile(), saved);
       await invalidateAfterProfile(queryClient);
+    },
+  });
+}
+
+/**
+ * The person's today (`YYYY-MM-DD`) as `GET /profile` worked it out from
+ * their saved time zone (spec 019 rule 6), or null until it answers. Never
+ * the browser's clock: the API dates everything by this day.
+ */
+export function useToday(): string | null {
+  return useProfile().data?.today ?? null;
+}
+
+/**
+ * `PUT /profile/time-zone`: saves the browser's IANA zone (spec 019 rule 5).
+ * The saved profile, with the new today, replaces the cached one, and every
+ * other read is made again, since any date the API answered may have moved.
+ */
+export function useSaveTimeZone() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (timeZone: string) =>
+      unwrap(fetchClient.PUT('/profile/time-zone', { body: { time_zone: timeZone } })),
+    onSuccess: async (saved) => {
+      queryClient.setQueryData(queryKeys.profile(), saved);
+      await invalidateAfterTimeZone(queryClient);
     },
   });
 }

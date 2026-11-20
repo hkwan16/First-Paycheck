@@ -162,9 +162,29 @@ describe('EmergencyFundCard before a decision', () => {
     enter('Essential spending per month', 'a lot');
     await settle();
     expect(field('Essential spending per month')).toHaveAccessibleDescription(
-      'Enter an amount above $0, like 1,823.25.',
+      'Enter an amount, like 1,823.25.',
     );
     expect(result()).toHaveTextContent('Enter your essential spending to see your numbers.');
+    expect(seen.calc).toEqual([]);
+  });
+
+  it('names what is wrong with an amount: too large, or too many digits after the point (issue 238)', async () => {
+    decisionsReady();
+    const seen = requests();
+    await renderLoaded();
+    enter('Essential spending per month', '99999999999999');
+    expect(field('Essential spending per month')).toHaveAccessibleDescription(
+      'Enter an amount above $0 and up to $1,000,000.00.',
+    );
+    enter('Essential spending per month', '1,234.567');
+    expect(field('Essential spending per month')).toHaveAccessibleDescription(
+      'Enter at most two digits after the decimal point, like 1,823.25.',
+    );
+    enter('Saved so far', '-5');
+    expect(field('Saved so far')).toHaveAccessibleDescription(
+      'Enter an amount from $0 to $1,000,000,000.00.',
+    );
+    await settle();
     expect(seen.calc).toEqual([]);
   });
 

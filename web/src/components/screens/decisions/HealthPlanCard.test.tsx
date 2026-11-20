@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CALC_DEBOUNCE_MS } from '@/lib/api/hooks';
+import { formatMoney } from '@/lib/money';
 import {
   BRONZE_HSA,
   GOLD_PPO,
@@ -45,6 +46,8 @@ const card = () => screen.getByRole('region', { name: 'Health plan' });
 const result = () => within(card()).getByRole('group', { name: 'Your numbers' });
 const usage = () => within(card()).getByRole('group', { name: 'Expected healthcare use' });
 const choice = () => within(card()).getByRole('group', { name: 'The plan you will enroll in' });
+/** The choice once Compare's check has answered and the comparison is back (rule 18b). */
+const compared = () => within(card()).findByRole('group', { name: 'The plan you will enroll in' });
 const table = () => within(card()).getByRole('table', { name: 'Expected yearly cost by plan' });
 // "Save", "Save changes" or "Saved"; not the plan named "Saver HDHP".
 const saveButton = () =>
@@ -320,7 +323,7 @@ describe('HealthPlanCard saving', () => {
     await user.click(within(card()).getByRole('button', { name: 'Remove plan 1' }));
     await user.click(within(card()).getByRole('button', { name: 'Compare these plans' }));
 
-    expect(within(choice()).getByRole('button', { name: 'Gold PPO' })).toHaveAttribute(
+    expect(within(await compared()).getByRole('button', { name: 'Gold PPO' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
@@ -342,7 +345,7 @@ describe('HealthPlanCard saving', () => {
     });
     await user.click(within(card()).getByRole('button', { name: 'Compare these plans' }));
 
-    expect(within(choice()).getByRole('button', { name: 'Gold PPO' })).toHaveAttribute(
+    expect(within(await compared()).getByRole('button', { name: 'Gold PPO' })).toHaveAttribute(
       'aria-pressed',
       'false',
     );
@@ -573,6 +576,102 @@ describe('HealthPlanCard without a benefits summary', () => {
   });
 });
 
+describe('HealthPlanCard checks edited plans with the API (spec 012 rule 18b, issue 228)', () => {
+  const editPlans = async (user: Awaited<ReturnType<typeof renderReady>>['user']) => {
+    await user.click(within(card()).getByRole('button', { name: 'Edit plans' }));
+    return within(card()).getByRole('form', { name: 'Your health plan options' });
+  };
+
+  it('keeps the table open with the refusal beside its field, naming the plan', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const { user } = await renderReady();
+    const before = rows();
+    const form = await editPlans(user);
+    const gold = within(form).getByRole('group', { name: 'Plan 2' });
+    fireEvent.change(within(gold).getByLabelText('Out-of-pocket maximum'), {
+      target: { value: '100' },
+    });
+    await user.click(within(form).getByRole('button', { name: 'Compare these plans' }));
+
+    await waitFor(() =>
+      expect(within(gold).getByLabelText('Out-of-pocket maximum')).toHaveAccessibleDescription(
+        `Gold PPO: enter an out-of-pocket maximum of at least the deductible, ${formatMoney(GOLD_PPO.deductible_cents)}.`,
+      ),
+    );
+    expect(within(card()).getByRole('form', { name: 'Your health plan options' })).toBe(form);
+    // The badge holds (rule 18a): nothing changed until the API took the plans.
+    expect(badge()).toHaveTextContent(/^Saved /);
+
+    // Cancel goes back to the comparison and the choice as they were.
+    await user.click(within(form).getByRole('button', { name: 'Cancel' }));
+    expect(rows()).toEqual(before);
+    expect(within(choice()).getByRole('button', { name: 'Gold PPO' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(badge()).toHaveTextContent(/^Saved /);
+  });
+
+  it("names the year's HSA limit beside an employer's HSA money above it", async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const { user } = await renderReady();
+    const form = await editPlans(user);
+    const bronze = within(form).getByRole('group', { name: 'Plan 1' });
+    fireEvent.change(within(bronze).getByLabelText('Employer HSA money per year'), {
+      target: { value: '99,999' },
+    });
+    await user.click(within(form).getByRole('button', { name: 'Compare these plans' }));
+
+    await waitFor(() =>
+      expect(
+        within(bronze).getByLabelText('Employer HSA money per year'),
+      ).toHaveAccessibleDescription(
+        'Bronze HSA: enter an employer HSA contribution up to $4,400.00, the 2026 HSA limit for one person.',
+      ),
+    );
+    expect(within(card()).queryByRole('table')).toBeNull();
+  });
+
+  it('asks once and compares the plans the API took, with no second request', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const seen = requests();
+    const { user } = await renderReady();
+    const asked = seen.calc.length;
+    const form = await editPlans(user);
+    await user.click(within(form).getByRole('button', { name: 'Remove plan 1' }));
+    await user.click(within(form).getByRole('button', { name: 'Compare these plans' }));
+
+    await waitFor(() => expect(table()).toBeInTheDocument());
+    await settle();
+    await waitFor(() => expect(result()).not.toHaveAttribute('aria-busy', 'true'));
+    expect(seen.calc.slice(asked)).toHaveLength(1);
+    expect(seen.calc.at(-1)).toMatchObject({ plans: [GOLD_PPO, SAVER_HDHP] });
+  });
+
+  it('says the plans could not be checked, and keeps them, when the API does not answer', async () => {
+    decisionsReady();
+    benefitsConfirmed();
+    savedHealthPlan();
+    const { user } = await renderReady();
+    const form = await editPlans(user);
+    server.use(
+      http.post(apiUrl('/calc/health-plans'), () => HttpResponse.json(null, { status: 500 })),
+    );
+    await user.click(within(form).getByRole('button', { name: 'Compare these plans' }));
+
+    expect(await within(form).findByRole('alert')).toHaveTextContent(
+      'Could not check these plans. Try again.',
+    );
+    expect(within(card()).getByRole('form', { name: 'Your health plan options' })).toBe(form);
+  });
+});
+
 describe('HealthPlanCard focus (issue 167)', () => {
   const editPlans = () => within(card()).getByRole('button', { name: 'Edit plans' });
   const form = () => within(card()).getByRole('form', { name: 'Your health plan options' });
@@ -588,7 +687,8 @@ describe('HealthPlanCard focus (issue 167)', () => {
       await user.click(editPlans());
       expect(planName(1)).toHaveFocus();
       await user.click(within(form()).getByRole('button', { name: close }));
-      expect(editPlans()).toHaveFocus();
+      // Compare closes the table once the API has taken the plans (rule 18b).
+      await waitFor(() => expect(editPlans()).toHaveFocus());
     }
   });
 
@@ -631,7 +731,9 @@ describe('HealthPlanCard focus (issue 167)', () => {
     await user.type(within(plan).getByLabelText('Coinsurance, %'), '0');
     await user.type(within(plan).getByLabelText('Out-of-pocket maximum'), '2,500');
     await user.click(within(typed).getByRole('button', { name: 'Compare these plans' }));
-    expect(within(usage()).getByRole('button', { pressed: true })).toHaveFocus();
+    await waitFor(() =>
+      expect(within(usage()).getByRole('button', { pressed: true })).toHaveFocus(),
+    );
   });
 
   it('focuses a new plan, and the plan that takes the place of one removed', async () => {

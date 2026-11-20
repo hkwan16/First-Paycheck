@@ -1,6 +1,6 @@
 # 007: Decisions, versioning, the calendar and the spending summary
 
-Status: Implemented, M3. Part B (`GET /spending/summary`) is pulled forward from M5 because the Spending tiles need it. Rule 22a (income counts money in only) added in M10 after the October 22 production walkthrough showed negative income on a Plaid sandbox history. Rule 21a (cash accounts only) and the share limit of rule 25 added after the same walkthrough with Plaid's `user_transactions_dynamic` sandbox user, whose loan ledgers drove the summary (`uncategorized_cents` -5,498,010) and whose 12 cents of income gave an `essentials_pct` of 304000.0. Rules 19a-19e (a saved decision whose context changed needs review) added for issue 222.
+Status: Implemented, M3. Part B (`GET /spending/summary`) is pulled forward from M5 because the Spending tiles need it. Rule 22a (income counts money in only) added in M10 after the October 22 production walkthrough showed negative income on a Plaid sandbox history. Rule 21a (cash accounts only) and the share limit of rule 25 added after the same walkthrough with Plaid's `user_transactions_dynamic` sandbox user, whose loan ledgers drove the summary (`uncategorized_cents` -5,498,010) and whose 12 cents of income gave an `essentials_pct` of 304000.0. Rules 2a and 2b (entry limits, and stored versions read without them) added for issue 238 on 2026-11-11. Rules 19a-19e (a saved decision whose context changed needs review) added for issue 222.
 
 ## Goal
 
@@ -36,6 +36,16 @@ Save the calculator result a user picks as an immutable, versioned `decisions` r
 
 1. **Registry.** `calc/registry.py` maps each registered calculator name to its input model, result model and pure function. A test asserts every registered name is a `calculator_kind` value.
 2. **Validate, recompute, compare.** The route validates `inputs` with the input model, runs the calculator, validates `result` with the result model and compares the two models field by field (Decimal fields compare by value, so `"5"` equals `"5.00"`). Any difference is 422 `result_mismatch` with `details.fields` naming the differing fields. A `result` that does not validate is also `result_mismatch`. The client's `result` is never stored.
+2a. **Entry limits** (issue 238). What a person may enter is bounded more tightly than what a calculator can compute with, so a typo is refused before it reaches a result and every input within the limits gives one (before issue 238 a monthly essentials of $1 billion overflowed the result's `Cents` and answered 500). Each calculator's spec lists its limits (spec 006 rule 13a, spec 011 rule 8a, spec 012 rule 12a, spec 014 rule 16a); they follow one table, `calc/types.py`, where each limit is an `EntryLimit` on the field's type that also sets the field's `maximum` in the OpenAPI schema:
+
+    | Amount | Limit | Built with |
+    |---|---|---|
+    | A yearly amount (salary, wages, income, deductions, a plan's deductible and out-of-pocket maximum, the person's own HSA contribution) | $10,000,000.00 (`MAX_YEARLY_CENTS`) | `yearly(what)`; a salary is `Salary` |
+    | A monthly or per-paycheck amount (essentials, a monthly transfer, a premium, Step 4(c), a stub's withholding) | $1,000,000.00 (`MAX_PERIOD_CENTS`) | `monthly(what)` or `per_paycheck(what)` |
+    | A savings balance | $1,000,000,000.00 (`MAX_CENTS`) | `Cents` |
+
+    plus the limits a rule sets (Step 3's credits, spec 014; an employer's HSA contribution, spec 012). They hold wherever a person enters inputs: `POST /calc/*` and `POST /decisions`. A refusal is 422 `validation_error` whose `message` is one sentence per problem naming what is allowed ("Enter essential spending up to $1,000,000.00 a month."), and whose `details.errors` lists each problem as `{path, message}`, `path` the field's place in the body as a list (`["plans", 0, "oop_max_cents"]`; `POST /decisions` puts `inputs` first), so a form can show each message beside its field (spec 018 rule 5e). Every 422 `validation_error` from a request body carries `details.errors`.
+2b. **A stored version keeps its inputs.** Decisions are immutable (rule 9) and entry limits can tighten later (issue 238 tightened them), so a read of stored inputs (rule 19b's review, the plan's figures, explain's context and fallback, a goal's reprojection) validates them with `calc.types.STORED` as the validation context: the calculators' own invariants hold (types, signs, a deductible within its maximum), the entry limits do not, and a version saved under an older limit still reads. `api/tests/unit/test_stored_inputs.py` fails on a read of a calculator's input model outside `POST /calc/*` and `POST /decisions` without that context.
 3. **Canonical storage.** `decisions.inputs` and `decisions.result` hold the server's `model_dump(mode="json")` of the validated input and the recomputed result: money as integer cents, percentages as two-place strings, `tax_year` inside `inputs`.
 4. **Version.** With `supersedes_id` null the row is version 1. With `supersedes_id` set, the parent must be visible to the user (else 404 `not_found`, which is what another user's id gives), have the same calculator (else 422 `supersedes_mismatch`) and be current (else 409 `decision_conflict`); the new row is `parent.version + 1`.
 5. **Conflicts.** A version 1 when one already exists, or a second successor to the same parent, violates `UNIQUE (user_id, calculator, version)` or the partial unique index on `supersedes_id`; the route returns 409 `decision_conflict` and writes nothing. Concurrent saves of the same next version therefore cannot both succeed.
@@ -55,7 +65,7 @@ Save the calculator result a user picks as an immutable, versioned `decisions` r
 
 14. **401(k).** Saving a `k401_match` decision creates no goal and one `calendar_events` row: kind `election_check`, title "Check that your next pay stub shows your new 401(k) contribution", `due_at` the next expected pay date (rule 16), linked to the new decision. The previous version's `upcoming` `election_check` events become `dismissed` in the same transaction, so the calendar shows one check per calculator.
 15. Side effects run in the same transaction as the insert; a failure saves nothing.
-16. **Next expected pay date** (`calc/pay_dates.py:next_pay_date(frequency, anchor, today)`, pure). `today` is the request's UTC date. `frequency` is the user's pay schedule (spec 005 rule 25a: the newest current stub's `pay_frequency`, else the profile's; issue 198), or, when there is none, the one matching the decision's `pay_periods_per_year` (52 weekly, 26 biweekly, 24 semimonthly, 12 monthly). `anchor` is the latest current confirmed pay stub's `pay_date` (a superseded copy never counts, spec 005 rule 22d), or none. The result is the first date strictly after `today` in the schedule:
+16. **Next expected pay date** (`calc/pay_dates.py:next_pay_date(frequency, anchor, today)`, pure). `today` is the person's today (spec 019 rule 2). `frequency` is the user's pay schedule (spec 005 rule 25a: the newest current stub's `pay_frequency`, else the profile's; issue 198), or, when there is none, the one matching the decision's `pay_periods_per_year` (52 weekly, 26 biweekly, 24 semimonthly, 12 monthly). `anchor` is the latest current confirmed pay stub's `pay_date` (a superseded copy never counts, spec 005 rule 22d), or none. The result is the first date strictly after `today` in the schedule:
     - weekly and biweekly: `anchor + k * 7` or `anchor + k * 14` days for any integer `k`;
     - monthly: the anchor's day of month in every month, clamped to the month's last day;
     - semimonthly: the 15th and the last day of every month when the anchor is the 15th or a month's last day; otherwise the anchor's day `d` and `d + 15` (when `d <= 15`) or `d - 15` and `d` (when `d > 15`), each clamped to the month's last day;
@@ -107,7 +117,7 @@ Some of a decision's inputs are not what the person chose but what its step read
 
 ### Inputs
 
-`start` and `end`, inclusive ISO dates. Both or neither: one alone is 422. `start > end` is 422, as is a span over 366 days. Without them the period is the last complete calendar month in UTC (on 2026-10-21 that is 2026-09-01 to 2026-09-30).
+`start` and `end`, inclusive ISO dates. Both or neither: one alone is 422. `start > end` is 422, as is a span over 366 days. Without them the period is the last complete calendar month before the person's today (spec 019; on 2026-10-21 that is 2026-09-01 to 2026-09-30).
 
 ### Outputs (`SpendingSummary`)
 

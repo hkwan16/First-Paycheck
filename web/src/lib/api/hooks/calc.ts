@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { fetchClient } from '../client';
 import { queryKeys } from '../keys';
@@ -93,4 +93,29 @@ export function useCalc<P extends CalcPath>(path: P, inputs: CalcInput<P> | null
     isBusy: settling || query.isFetching,
     isCurrent: fresh && !settling && !query.isFetching,
   };
+}
+
+/**
+ * Ask a calculator once whether it takes `inputs`, before they go on screen
+ * (spec 012 rule 18b: the plan table stays open until the API takes its
+ * plans). It rejects with the API's `ApiError` (a 422's `details.errors` say
+ * where), and on success caches the result as `useCalc` would for the same
+ * inputs, so showing them asks nothing again.
+ */
+export function useCalcCheck<P extends CalcPath>(path: P) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (inputs: CalcInput<P>) =>
+      unwrap<CalcResult<P>>(
+        fetchClient.POST(path as CalcPath, { body: inputs as CalcInput<CalcPath> }),
+      ),
+    onSuccess: (result, inputs) => {
+      // `useCalc` keys a result by its body as JSON sends it.
+      const body = JSON.parse(JSON.stringify(inputs)) as CalcInput<P>;
+      queryClient.setQueryData<Calculated<P>>(queryKeys.calc(path, body), {
+        inputs: body,
+        result,
+      });
+    },
+  });
 }

@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE_URL } from '@/lib/api/base-url';
+import type { FieldProblem } from '@/lib/api/errors';
 import type {
   BenefitsPlan,
   BenefitsValues,
@@ -13,6 +14,7 @@ import type {
   GoalPatch,
   HealthPlansInput,
 } from '@/lib/api/types';
+import { formatMoney } from '@/lib/money';
 import { BENEFITS_DOC_ID, sampleBenefitsDocument } from '../fixtures/documents';
 import {
   EMERGENCY_DECISION_ID,
@@ -250,17 +252,67 @@ export const planningCalculators = {
 const missingCase = (file: string, inputs: unknown) =>
   appError(500, 'test_fixture_missing', `${file} has no case for these inputs`, { inputs });
 
+// The API's sentences for a plan it refuses (calc/health_plans.py, spec 012 rules 12 and 12a).
+const deductibleOverOop = (plan: string, deductibleCents: number) =>
+  `${plan}: enter an out-of-pocket maximum of at least the deductible, ${formatMoney(deductibleCents)}.`;
+const hsaWithoutHdhp = (plan: string) =>
+  `${plan}: only a high-deductible plan can have an employer HSA contribution.`;
+const employerHsaOverLimit = (plan: string, limitCents: number, year: number) =>
+  `${plan}: enter an employer HSA contribution up to ${formatMoney(limitCents)}, the ${year} HSA limit for one person.`;
+
+/** The HSA self-only limit of each tax year the API has figures for (api/calc/data/2026.json). */
+const HSA_SELF_ONLY_LIMIT_CENTS: Partial<Record<number, number>> = { 2026: 440_000 };
+
+const located = (errors: FieldProblem[]) =>
+  appError(422, 'validation_error', errors[0]!.message, { errors });
+
+/**
+ * What `POST /calc/health-plans` refuses before it compares, located as the API
+ * locates it (spec 007 rule 2a): each plan's own fields first, and only once
+ * they all hold, an employer's HSA money above the year's limit (a check over
+ * the whole body, which pydantic runs after the fields).
+ */
+function healthPlansRefusal(inputs: HealthPlansInput): Response | undefined {
+  const fields: FieldProblem[] = inputs.plans.flatMap((plan, index) => [
+    ...(plan.deductible_cents > plan.oop_max_cents
+      ? [
+          {
+            path: ['plans', index, 'oop_max_cents'],
+            message: deductibleOverOop(plan.name, plan.deductible_cents),
+          },
+        ]
+      : []),
+    ...(plan.employer_hsa_cents > 0 && plan.kind !== 'hdhp'
+      ? [{ path: ['plans', index, 'employer_hsa_cents'], message: hsaWithoutHdhp(plan.name) }]
+      : []),
+  ]);
+  if (fields.length > 0) return located(fields);
+  const limit = HSA_SELF_ONLY_LIMIT_CENTS[inputs.tax_year];
+  if (limit === undefined) return undefined;
+  const over: FieldProblem[] = inputs.plans.flatMap((plan, index) =>
+    plan.employer_hsa_cents > limit
+      ? [
+          {
+            path: ['plans', index, 'employer_hsa_cents'],
+            message: employerHsaOverLimit(plan.name, limit, inputs.tax_year),
+          },
+        ]
+      : [],
+  );
+  return over.length > 0 ? located(over) : undefined;
+}
+
 /** `PlanValues` and `RetirementValues` checks the API runs on a benefits confirm (spec 013 rules 10-11). */
 function benefitsProblem(values: BenefitsValues): string | null {
   if (values.plans.length === 0 && !values.retirement) {
     return 'give at least one plan or the retirement part';
   }
   for (const plan of values.plans) {
-    if (plan.employer_hsa_cents > 0 && plan.kind !== 'hdhp') {
-      return 'Only a high-deductible plan can have an employer HSA contribution';
-    }
     if (plan.deductible_cents > plan.oop_max_cents) {
-      return "A plan's deductible must not be more than its out-of-pocket maximum";
+      return deductibleOverOop(plan.name, plan.deductible_cents);
+    }
+    if (plan.employer_hsa_cents > 0 && plan.kind !== 'hdhp') {
+      return hsaWithoutHdhp(plan.name);
     }
   }
   const tiers = values.retirement?.match_tiers ?? [];
@@ -284,7 +336,9 @@ export const planningHandlers = [
   }),
 
   http.post(apiUrl('/calc/health-plans'), async ({ request }) => {
-    const inputs: unknown = await request.json();
+    const inputs = (await request.json()) as HealthPlansInput;
+    const refusal = healthPlansRefusal(inputs);
+    if (refusal) return refusal;
     const result = healthPlansResult(inputs);
     return result ? HttpResponse.json(result) : missingCase('health-plans-results.json', inputs);
   }),

@@ -23,10 +23,12 @@ from app.routers.explain import CitationOut, current_setup, is_explainable, is_s
 from app.routers.goals import GoalOut, goal_out
 from app.types import UtcDateTime
 from calc.registry import calculator
+from calc.types import STORED
 from db.calendar import open_events
 from db.enums import CalculatorKind, PayFrequency
 from db.models import CalendarEvent, Decision, Explanation, Goal
 from db.pay_stubs import NEWEST_FIRST, current_pay_stubs
+from db.person_day import PersonDay
 from retrieval.citations import by_key, for_calculator
 
 __all__ = [
@@ -78,6 +80,9 @@ class PlanDecision(BaseModel):
     calculator: CalculatorKind
     version: int
     created_at: UtcDateTime
+    # The person's day of ``created_at`` (spec 019 rule 3), the date the Plan page and
+    # the PDF print as "Saved" (spec 016 rule 11a), so the two agree.
+    saved_on: dt.date
     inputs: dict[str, Any]
     result: dict[str, Any]
     figures: list[PlanFigure]
@@ -225,7 +230,7 @@ def figures(
     wrong field.
     """
     spec = calculator(kind)
-    spec.input_model.model_validate(inputs)
+    spec.input_model.model_validate(inputs, context=STORED)
     spec.result_model.model_validate(result)
     return _FIGURES[kind]({"inputs": inputs, "result": result})
 
@@ -280,13 +285,16 @@ def _explanation(session: Session, decision: Decision) -> PlanExplanation:
     )
 
 
-def _decision(session: Session, decision: Decision, context: ReviewContext) -> PlanDecision:
+def _decision(
+    session: Session, decision: Decision, context: ReviewContext, day: PersonDay
+) -> PlanDecision:
     kind = CalculatorKind(decision.calculator)
     return PlanDecision(
         id=decision.id,
         calculator=kind,
         version=decision.version,
         created_at=decision.created_at,
+        saved_on=day.day_of(decision.created_at),
         inputs=decision.inputs,
         result=decision.result,
         figures=figures(kind, decision.inputs, decision.result),
@@ -295,14 +303,14 @@ def _decision(session: Session, decision: Decision, context: ReviewContext) -> P
     )
 
 
-def _decisions(session: Session) -> list[PlanDecision]:
+def _decisions(session: Session, day: PersonDay) -> list[PlanDecision]:
     order = {kind: index for index, kind in enumerate(CalculatorKind)}
     rows = session.scalars(
         select(Decision).where(Decision.id.in_(select(_current_decisions.c.id)))
     ).all()
     rows = sorted(rows, key=lambda row: order[CalculatorKind(row.calculator)])
     context = load_context(session)
-    return [_decision(session, row, context) for row in rows]
+    return [_decision(session, row, context, day) for row in rows]
 
 
 def _calendar(session: Session, today: dt.date, end: dt.date) -> list[CalendarEventOut]:
@@ -336,10 +344,12 @@ def _pay_stub(session: Session) -> PlanPayStub | None:
     )
 
 
-def build_plan(session: Session, today: dt.date) -> PlanOut:
-    """The plan as of ``today`` (UTC), read under the session's RLS."""
+def build_plan(session: Session, day: PersonDay) -> PlanOut:
+    """The plan as of the person's today, each save dated on their day (spec 019),
+    read under the session's RLS."""
+    today = day.today
     through = today + CALENDAR_WINDOW
-    decisions = _decisions(session)
+    decisions = _decisions(session, day)
     saved = [decision.calculator for decision in decisions]
     goals = session.scalars(select(Goal).order_by(Goal.created_at, Goal.id))
     return PlanOut(

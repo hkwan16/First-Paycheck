@@ -8,7 +8,9 @@ import type {
   PlanKind,
   PlanPair,
 } from '@/lib/api/types';
+import { apiErrorMessage, fieldProblems } from '@/lib/api/errors';
 import { deepEqual } from '@/lib/deep-equal';
+import { MAX_BALANCE_CENTS, MAX_PERIOD_CENTS, MAX_YEARLY_CENTS } from '@/lib/entry-limits';
 import { formatMoney, formatNetCost, formatRate, netCost } from '@/lib/money';
 import { amountText, readAmount } from './decision-format';
 
@@ -301,11 +303,13 @@ export function draftFromOption(plan: HealthPlanOption): PlanDraft {
 }
 
 const PERCENT = /^\d{1,3}(?:\.\d{1,2})?$/;
+const PERCENT_TOO_PRECISE = /^\d{1,3}\.\d{3,}$/;
 const PERCENT_ERROR = 'Enter a percentage from 0 to 100, like 20.';
+const PERCENT_PRECISION_ERROR = 'Enter at most two digits after the decimal point, like 20.';
 
 /** An amount a plan needs, with what to fix; empty is missing here. */
-function required(text: string, example: string) {
-  const read = readAmount(text, { example });
+function required(text: string, example: string, max: number) {
+  const read = readAmount(text, { example, max });
   return read.cents === null
     ? { cents: null, error: read.error ?? `Enter an amount, like ${example}.` }
     : read;
@@ -316,8 +320,10 @@ export type ReadPlans =
 
 /**
  * The typed plans as the calculator takes them (percentages in the API's
- * two-place form), or what to fix in each. The API checks again: a
- * deductible above the out-of-pocket maximum comes back as its 422.
+ * two-place form), or what to fix in each: what reads and the static ranges
+ * (spec 012 rule 12a, mirrored). A deductible above the out-of-pocket maximum
+ * and an employer's HSA money above the year's limit are the API's to decide,
+ * which the card asks before it compares (rule 18b, `planRefusal`).
  */
 export function readPlanDrafts(drafts: readonly PlanDraft[]): ReadPlans {
   const plans: HealthPlanOption[] = [];
@@ -326,17 +332,19 @@ export function readPlanDrafts(drafts: readonly PlanDraft[]): ReadPlans {
     const name = draft.name.trim();
     if (name === '') problems.name = 'Enter the plan name.';
     if (draft.kind === '') problems.kind = 'Choose the plan type.';
-    const premium = required(draft.premium, '62.50');
-    const deductible = required(draft.deductible, '250.00');
+    const premium = required(draft.premium, '62.50', MAX_PERIOD_CENTS);
+    const deductible = required(draft.deductible, '250.00', MAX_YEARLY_CENTS);
     const coinsurance = draft.coinsurance.trim();
-    const oopMax = required(draft.oopMax, '3,000.00');
+    const oopMax = required(draft.oopMax, '3,000.00', MAX_YEARLY_CENTS);
     const hsa =
       draft.kind === 'hdhp'
-        ? readAmount(draft.employerHsa, { example: '600.00' })
+        ? readAmount(draft.employerHsa, { example: '600.00', max: MAX_BALANCE_CENTS })
         : { cents: 0, error: null };
     if (premium.error) problems.premium = premium.error;
     if (deductible.error) problems.deductible = deductible.error;
-    if (!PERCENT.test(coinsurance) || Number(coinsurance) > 100) {
+    if (PERCENT_TOO_PRECISE.test(coinsurance)) {
+      problems.coinsurance = PERCENT_PRECISION_ERROR;
+    } else if (!PERCENT.test(coinsurance) || Number(coinsurance) > 100) {
       problems.coinsurance = PERCENT_ERROR;
     }
     if (oopMax.error) problems.oopMax = oopMax.error;
@@ -363,4 +371,45 @@ export function readPlanDrafts(drafts: readonly PlanDraft[]): ReadPlans {
   return errors.some((problems) => Object.keys(problems).length > 0)
     ? { ok: false, errors }
     : { ok: true, plans };
+}
+
+/** Each plan field the API names (`plans[i].<field>`), as the plan table's field. */
+const DRAFT_FIELDS: Record<string, PlanDraftField> = {
+  name: 'name',
+  kind: 'kind',
+  premium_per_period_cents: 'premium',
+  deductible_cents: 'deductible',
+  coinsurance_pct: 'coinsurance',
+  oop_max_cents: 'oopMax',
+  employer_hsa_cents: 'employerHsa',
+};
+
+export interface PlanRefusal {
+  /** What to fix beside each plan's fields, one entry per plan typed. */
+  errors: PlanDraftErrors[];
+  /** What is not about one plan's field, shown above the buttons; null when nothing is. */
+  message: string | null;
+}
+
+/**
+ * Why the API did not take the typed plans (spec 012 rule 18b, issue 228): each
+ * of its `details.errors` under `plans[i]` beside that field of the plan, in the
+ * API's words, which name the plan; anything else as one message. A refusal
+ * with nothing to read (a failure, no answer) says the plans could not be checked.
+ */
+export function planRefusal(error: unknown, count: number): PlanRefusal {
+  const errors: PlanDraftErrors[] = Array.from({ length: count }, () => ({}));
+  const problems = fieldProblems(error);
+  if (problems === null) {
+    return { errors, message: apiErrorMessage(error, 'Could not check these plans. Try again.') };
+  }
+  const others: string[] = [];
+  for (const { path, message } of problems) {
+    const [where, index, name] = path;
+    const field = typeof name === 'string' ? DRAFT_FIELDS[name] : undefined;
+    const plan = typeof index === 'number' ? errors[index] : undefined;
+    if (where === 'plans' && plan && field && path.length === 3) plan[field] ??= message;
+    else others.push(message);
+  }
+  return { errors, message: others.length > 0 ? others.join(' ') : null };
 }

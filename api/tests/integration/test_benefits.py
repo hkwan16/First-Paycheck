@@ -182,10 +182,12 @@ def test_a_typed_deductible_over_the_maximum_is_refused_in_words(
     document_id = proposed(client, empty_queue)
     response = confirm(client, document_id, {"plans": [{**PLAN, "deductible_cents": 900_000}]})
     assert response.status_code == 422, response.text
-    assert response.json()["error"] == {
-        "code": "validation_error",
-        "message": "A plan's deductible must not be more than its out-of-pocket maximum",
-    }
+    sentence = "Gold PPO: enter an out-of-pocket maximum of at least the deductible, $9,000.00."
+    error = response.json()["error"]
+    assert error["code"] == "validation_error"
+    assert error["message"] == sentence
+    # Spec 007 rule 2a: every body refusal lists its problems for the form.
+    assert [problem["message"] for problem in error["details"]["errors"]] == [sentence]
 
 
 def test_newest_document_first(

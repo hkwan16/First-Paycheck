@@ -358,7 +358,11 @@ describe('CheckInScreen', () => {
 describe('Check in now on a check-in', () => {
   afterEach(() => vi.useRealTimers());
 
-  const at = (now: string) => vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(now) });
+  const at = (now: string) => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(now) });
+    // The person's today is the API's (spec 019 rule 6): the screen reads no clock for it.
+    db.profile.today = now.slice(0, 10);
+  };
   const openAt = async () => {
     const view = render(<CheckInScreen checkInId={NOVEMBER_ID} />, {
       advanceTimers: vi.advanceTimersByTime,
@@ -402,5 +406,13 @@ describe('Check in now on a check-in', () => {
     at('2026-12-02T09:00:00Z');
     await openAt();
     expect(screen.queryByRole('button', { name: 'Check in now' })).toBeNull();
+  });
+
+  it('follows the person’s month, not the browser’s clock (issue 232)', async () => {
+    // 21:00 Pacific on November 30: December in UTC, still November for the person.
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date('2026-12-01T05:00:00Z') });
+    db.profile.today = '2026-11-30';
+    await openAt();
+    expect(await screen.findByRole('button', { name: 'Check in now' })).toBeInTheDocument();
   });
 });

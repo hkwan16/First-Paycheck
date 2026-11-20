@@ -27,6 +27,7 @@ from app.pay_schedule import pay_schedule
 from app.salary_review import SalaryReview, load_salary_review
 from calc.k401 import MatchTier
 from calc.registry import calculator
+from calc.types import STORED
 from db.enums import CalculatorKind
 from db.models import Decision, Profile
 from db.pay_stubs import newest_pay_stub
@@ -244,7 +245,7 @@ def review(
     """Why a current decision with these stored ``inputs`` needs review; empty when
     nothing does (rules 19b and 19c)."""
     # The registered model reads an older row's missing fields as their defaults.
-    saved = calculator(kind).input_model.model_validate(inputs)
+    saved = calculator(kind).input_model.model_validate(inputs, context=STORED)
     reasons = []
     for name in CONTEXT_INPUTS[kind]:
         check = _CHECKS[name]

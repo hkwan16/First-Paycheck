@@ -151,10 +151,16 @@ async function categoryOf(page: Page, merchant: string) {
   return select;
 }
 
-/** The last day of the month before today's (UTC), the Spending screen's default period. */
-function lastDayOfLastMonth(): Date {
+/**
+ * The last day of the month before today's, `YYYY-MM-DD`, in the browser's zone,
+ * which is this one's: the app saves it on the profile and the API's default
+ * period is the person's last complete month (spec 019 rules 5 and 9).
+ */
+function lastDayOfLastMonth(): string {
   const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
+  const day = new Date(now.getFullYear(), now.getMonth(), 0);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
 }
 
 test('a cash withdrawal counts as spending in Cash, and a transfer between your own accounts does not (issue 250)', async ({
@@ -164,8 +170,7 @@ test('a cash withdrawal counts as spending in Cash, and a transfer between your 
   // the month's spending, so what was left over was too high by the cash taken out.
   const account = 'E2E Cash Checking';
   const bank = 'E2E Cash Bank';
-  const day = lastDayOfLastMonth();
-  const iso = day.toISOString().slice(0, 10);
+  const iso = lastDayOfLastMonth();
   const mmdd = iso.slice(5).replace('-', '/');
   const withdrawal = `ATM WITHDRAWAL 001234 ${mmdd} 100 MAIN ST`;
   const transfer = 'ONLINE TRANSFER TO SAV 4567';

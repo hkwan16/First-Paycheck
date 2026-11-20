@@ -208,6 +208,13 @@ describe('W4Card', () => {
     expect(result()).toHaveTextContent('Enter each amount, or 0, to see your numbers.');
     expect(saveButton()).toBeDisabled();
 
+    // Issue 238: $999,999 of credits was calculated as no tax at all.
+    type('Step 3: credits for dependents, for the year', '999999');
+    expect(field('Step 3: credits for dependents, for the year')).toHaveAccessibleDescription(
+      'Enter an amount from $0 to $100,000.00.',
+    );
+    expect(result()).toHaveTextContent('Enter each amount, or 0, to see your numbers.');
+
     type('Step 3: credits for dependents, for the year', '2,200');
     await recalculated('Even at tax time');
     expect(seen.calc.at(-1)).toEqual(sampleW4Inputs({ dependents_credit_cents: 220_000 }));

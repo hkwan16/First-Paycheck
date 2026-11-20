@@ -10,7 +10,7 @@ Show the user their whole plan in one read: the current version of every saved d
 
 | Route | Input |
 |---|---|
-| `GET /plan` | None. Today is the request's UTC date (`Now`). |
+| `GET /plan` | None. Today is the person's today at the request clock (`Day`, spec 019). |
 | `GET /plan/calendar.ics` | None. `DTSTAMP` is the request's time (`Now`). |
 | `POST /plan/export` | None (no body). |
 | `GET /plan/export/{job_id}` | `job_id` (uuid): the job `POST /plan/export` returned. |
@@ -23,10 +23,10 @@ The data read, all under the user's RLS session: `current_decisions` and `decisi
 
 | Field | Type | Meaning |
 |---|---|---|
-| `as_of` | date | Today (UTC). |
+| `as_of` | date | The person's today (spec 019). |
 | `calendar_through` | date | `as_of + 90 days`, the last due date `calendar` includes. |
 | `completeness` | `PlanCompleteness` | `saved`, `missing` and `needs_review`: lists of `calculator_kind`, each in enum order (`emergency_fund`, `k401_match`, `health_plans`, `w4`). |
-| `decisions` | list of `PlanDecision` | One per saved calculator, in enum order: `id`, `calculator`, `version`, `created_at`, `inputs`, `result` (as stored, spec 007 rule 3), `figures`, `explanation` and `review` (spec 007 rule 19b). |
+| `decisions` | list of `PlanDecision` | One per saved calculator, in enum order: `id`, `calculator`, `version`, `created_at`, `saved_on` (the person's day of `created_at`, spec 019 rule 3), `inputs`, `result` (as stored, spec 007 rule 3), `figures`, `explanation` and `review` (spec 007 rule 19b). |
 | `goals` | list of `GoalOut` | Exactly what `GET /goals` returns (spec 011 rule 15). |
 | `calendar` | list of `CalendarEventOut` | Open events (spec 015 rule 24) due on or before `calendar_through`: the overdue ones (due before `as_of`, `overdue` true) and those due from `as_of` on. |
 | `pay_stub` | `PlanPayStub` or null | The newest current confirmed pay stub (spec 005 rule 22d): `id`, `employer_name`, `pay_frequency`, `pay_date`, `gross_cents`, `federal_withholding_cents`, `social_security_cents`, `medicare_cents`, `state_tax_cents`, `retirement_contribution_cents`, `medical_premium_cents`, `other_deductions_cents`, `net_cents`. |
@@ -45,7 +45,7 @@ The data read, all under the user's RLS session: `current_decisions` and `decisi
 
 ### `GET /plan/export/{job_id}`
 
-`200`, `Content-Type: application/pdf`, `Content-Disposition: attachment; filename="first-paycheck-plan-<YYYY-MM-DD>.pdf"` (the export's UTC creation date), the PDF bytes. `404 not_found` otherwise (rule 22).
+`200`, `Content-Type: application/pdf`, `Content-Disposition: attachment; filename="first-paycheck-plan-<YYYY-MM-DD>.pdf"` (the job result's `prepared_on`, the plan's `as_of`; an export without one is named by the UTC date of its `created_at`, spec 019 rule 12), the PDF bytes. `404 not_found` otherwise (rule 22).
 
 ## Rules
 
@@ -75,15 +75,15 @@ The data read, all under the user's RLS session: `current_decisions` and `decisi
 ### PDF export
 
 9. **Queue.** `POST /plan/export` enqueues `plan.export` for the user with payload `{}` (spec 001 rule 28) through `jobs.queue.enqueue_unless_queued`, so a second click while one is waiting returns the same job.
-10. **The job** (`jobs/handlers/plan_export.py`) reads the plan with `app.plan.build_plan` in one user session (`ctx.user_session()`, RLS), as of the job clock's UTC date (`Services.clock`), renders it with no session open, and stores the bytes in a second user session. Its result is `{"size_bytes": n}`. A rerun of the same job (a stale requeue after the bytes were stored) keeps the first export and renders nothing.
-11. **Template.** `api/export/templates/plan.html.j2` (Jinja2, autoescaped) renders `PlanOut` and the export time. Page 1 is the plan: the title, the employer and preparation date, the pay stub's figures, each saved decision with the date it was saved, its figures (or, for one that needs review, rule 3a's note) and its explanation status, the calculators still to decide, and the goals. Page 2 starts with the next 90 days (rule 6's events, an overdue one marked "Overdue") and then "Why, with sources": for each decision with an explanation, its concept and text and, for every citation, the title, the IRS document name and the full URL printed as text. A stale explanation (spec 008 rules 19a and 19b) is labeled "Written before some of your information changed. Open Why in First Paycheck to update the explanation." on both pages, and page 2 prints only that label for it, no concept, text or sources. Money is written `$1,234.56` (`verify.format.dollars`), a `net_cost` figure the same way unless it is negative, then as `$403.00 ahead` (`verify.format.net_cost`, spec 012 rule 17), a `refund` figure as `$0.02 refund`, `$3,918.70 due` or `Nothing due, no refund`, percentages `4%` (`verify.format.percent`), dates `Oct 31, 2026`. The page carries no ids and no times of day; its dates are UTC days (the preparation date, each decision's saved date and the calendar's), so the same plan renders to the same HTML.
+10. **The job** (`jobs/handlers/plan_export.py`) reads the plan with `app.plan.build_plan` in one user session (`ctx.user_session()`, RLS), as of the person's today at the job clock (`Services.clock`, spec 019), renders it with no session open, and stores the bytes in a second user session. Its result is `{"size_bytes": n, "prepared_on": "YYYY-MM-DD"}`, the plan's `as_of`. A rerun of the same job (a stale requeue after the bytes were stored) keeps the first export and renders nothing.
+11. **Template.** `api/export/templates/plan.html.j2` (Jinja2, autoescaped) renders `PlanOut`; the preparation date it prints is the plan's `as_of`. Page 1 is the plan: the title, the employer and preparation date, the pay stub's figures, each saved decision with the date it was saved, its figures (or, for one that needs review, rule 3a's note) and its explanation status, the calculators still to decide, and the goals. Page 2 starts with the next 90 days (rule 6's events, an overdue one marked "Overdue") and then "Why, with sources": for each decision with an explanation, its concept and text and, for every citation, the title, the IRS document name and the full URL printed as text. A stale explanation (spec 008 rules 19a and 19b) is labeled "Written before some of your information changed. Open Why in First Paycheck to update the explanation." on both pages, and page 2 prints only that label for it, no concept, text or sources. Money is written `$1,234.56` (`verify.format.dollars`), a `net_cost` figure the same way unless it is negative, then as `$403.00 ahead` (`verify.format.net_cost`, spec 012 rule 17), a `refund` figure as `$0.02 refund`, `$3,918.70 due` or `Nothing due, no refund`, percentages `4%` (`verify.format.percent`), dates `Oct 31, 2026`. The page carries no ids and no times of day. Its dates are the person's days (spec 019): the preparation date is the plan's `as_of`, each decision's saved date is `PlanDecision.saved_on` (the person's day of its `created_at`, `PersonDay.day_of`), and the calendar's due dates are plain dates. So the same plan renders to the same HTML.
 
 11a. **The Plan page's words** (issue 239). The PDF is the Plan page on paper, so where the two say the same thing they use the same words, and every label is one a person in their first job can read (no version numbers, no "calculator" or "verified"):
 
     | Where | The PDF prints | As the Plan page says |
     |---|---|---|
     | Calculator names (decision heads, "Why, with sources", the calendar, the ones still to decide) | Emergency fund, 401(k) match, Health plan, W-4, federal only (`export/html.py:CALCULATOR_TITLES`) | `web/src/lib/decisions.ts:CALCULATOR_LABELS` |
-    | A decision's head | "Saved Oct 21, 2026" (the UTC day of `created_at`), never "Version 2" | the "Saved Oct 21, 2026" badge |
+    | A decision's head | "Saved Oct 21, 2026" (`saved_on`, the person's day of `created_at`), never "Version 2" | the "Saved Oct 21, 2026" badge, from the same `saved_on` |
     | "Your paycheck" | Pay date, Gross pay, Federal withholding, Social Security, Medicare, State tax, 401(k), Medical premium, Other deductions, Take-home pay | the "Your paycheck" card's tiles and lines (`plan-format.ts:PAYCHECK_LINES`) |
     | Explanation, verified | "Explained under Why, with sources. We checked every number in it against the decision you saved." | "Read the explanation" |
     | Explanation, fallback | "We could not write this explanation. Open Why in First Paycheck to try again." | "We could not write this explanation. Try again on its page" |
@@ -157,7 +157,7 @@ The next pay date is 2026-10-31 (semimonthly, anchored on the 15th, spec 007 rul
 | 17 | `test_export_queues_one_job` | Plan user posts twice | 202 twice, the same `job_id`; one queued `plan.export` job with payload `{}` |
 | 18 | `test_download_is_404_until_the_job_succeeds` | Queued job | 404; after the worker runs it, 200 |
 | 19a | `test_a_decision_that_needs_review_prints_the_note` (`api/tests/integration/export/test_plan_html.py`, rule 3a) | The plan user's plan with the health plan's `review` set to the schedule reason | Its block prints "Needs review: Your pay schedule changed from 24 to 26 paychecks a year." and the note, and none of its figures; the other decisions print theirs |
-| 19 | `test_html_matches_the_fixture` | Plan user, export time 2026-10-21 15:00 UTC | `render_html` equals `api/tests/fixtures/export/plan.html` byte for byte |
+| 19 | `test_html_matches_the_fixture` | Plan user, plan as of 2026-10-21, decisions saved 2026-10-21 15:00 UTC (11:00 in New York, the default zone) | `render_html` equals `api/tests/fixtures/export/plan.html` byte for byte |
 | 19b | `test_the_pdf_names_calculators_as_the_plan_page_does` (rule 11a) | Plan user | Decision heads "1. Emergency fund" to "4. W-4, federal only", each "Saved Oct 21, 2026", no "Version"; "Why, with sources" headed "401(k) match", "Health plan", "W-4, federal only"; calendar rows end "· 401(k) match" and "· W-4, federal only" |
 | 19c | `test_an_emergency_fund_prints_no_explanation_line` (rule 11a) | Plan user | The emergency fund's block has its figures and no explanation line |
 | 19d | `test_explanation_lines_use_the_plan_page_words` (rule 11a) | Plan user, then the W-4's explanation taken out of the plan | Page 1: the 401(k) "Explained under Why, with sources. ...", the health plan "We could not write this explanation. ...", the W-4 "No explanation yet. Open Why in First Paycheck to write one."; page 2: the Why page's two notes |

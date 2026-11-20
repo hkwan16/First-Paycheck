@@ -24,6 +24,7 @@ import type {
   PayStubValues,
   Profile,
   ProfileIn,
+  TimeZoneIn,
   Transaction,
 } from '@/lib/api/types';
 import { deepEqual } from '@/lib/deep-equal';
@@ -809,10 +810,21 @@ export const handlers = [
       salary_pay_stub_id: stubId,
       salary_review: salaryReviewAfter(db.profile.salary_review, salary, stubId),
       start_date: body.start_date ?? null,
+      // PUT /profile neither takes nor changes these (spec 019 rule 5).
+      time_zone: db.profile.time_zone,
+      today: db.profile.today,
       updated_at: SAMPLE_NOW,
       vesting_years: body.vesting_years ?? null,
       pay_schedule: null,
     };
+    return HttpResponse.json(profileOut());
+  }),
+
+  // Spec 019 rule 5: only the zone changes. Tests that need another today set
+  // db.profile.today themselves; nothing here works a date out.
+  http.put<never, TimeZoneIn>(apiUrl('/profile/time-zone'), async ({ request }) => {
+    const body = await request.json();
+    db.profile = { ...db.profile, time_zone: body.time_zone };
     return HttpResponse.json(profileOut());
   }),
 

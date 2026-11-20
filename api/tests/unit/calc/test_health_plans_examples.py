@@ -20,6 +20,7 @@ from calc.health_plans import (
     HealthPlansResult,
     health_plans,
 )
+from calc.types import STORED
 
 A = {
     "name": "Bronze HSA",
@@ -215,8 +216,13 @@ def test_tiny_coinsurance_stops_the_scan_at_a_million_dollars() -> None:
 
 
 def test_employer_hsa_above_the_limit_leaves_no_room() -> None:
+    """Edge case: refused at entry since issue 228 (rule 12a); a decision stored
+    before then, computed again, leaves the employee no room."""
     plan = {**A, "employer_hsa_cents": 500_000}
-    result = run([plan], 6_500_000, 100_000)
+    with pytest.raises(ValidationError):
+        run([plan], 6_500_000, 100_000)
+    stored = HealthPlansInput.model_validate(payload([plan], 6_500_000, 100_000), context=STORED)
+    result = health_plans(stored)
     assert hsa(result, 0) == (True, 0, True, 0)
     assert result.plans[0].employer_hsa_cents == 500_000
 
@@ -247,11 +253,11 @@ def test_invalid_inputs_are_refused(change: dict[str, Any]) -> None:
     [
         (
             {"plans": [{**B, "deductible_cents": 400_000}]},
-            "A plan's deductible must not be more than its out-of-pocket maximum",
+            "Gold PPO: enter an out-of-pocket maximum of at least the deductible, $4,000.00.",
         ),
         (
             {"plans": [{**B, "employer_hsa_cents": 100}]},
-            "Only a high-deductible plan can have an employer HSA contribution",
+            "Gold PPO: only a high-deductible plan can have an employer HSA contribution.",
         ),
         (
             {"usage_low_cents": 300_000},

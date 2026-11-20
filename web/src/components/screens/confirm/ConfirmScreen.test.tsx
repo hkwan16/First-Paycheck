@@ -886,7 +886,7 @@ describe('ConfirmScreen benefits summary', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm all remaining' }));
     await user.click(continueButton());
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      "Could not save these fields. A plan's deductible must not be more than its out-of-pocket maximum",
+      'Could not save these fields. Bronze HSA: enter an out-of-pocket maximum of at least the deductible, $4,000.00.',
     );
     expect(benefitsCard()).toHaveTextContent('29 of 29 confirmed');
     expect(planningDb.benefitsPlans).toHaveLength(0);

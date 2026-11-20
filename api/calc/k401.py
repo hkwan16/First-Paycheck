@@ -23,9 +23,9 @@ from calc.types import (
     Cents,
     PayPeriods,
     Percent,
-    PositiveCents,
     PositivePercent,
     ResultPercent,
+    Salary,
 )
 
 __all__ = [
@@ -112,7 +112,7 @@ class K401MatchInput(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    salary_cents: PositiveCents = Field(description="Annual base salary in cents")
+    salary_cents: Salary = Field(description="Annual base salary in cents")
     pay_periods_per_year: PayPeriods
     match_tiers: list[MatchTier] = Field(
         max_length=MAX_TIERS,

@@ -34,6 +34,7 @@ PROFILE_CALLS = {"register_profile", "load_profile"}
 # The examples per test a module asks for; every other module runs the profile's.
 ASKED_EXAMPLES = {
     "tests.unit.calc.test_emergency_fund_properties": 300,
+    "tests.unit.calc.test_entry_limits": 150,
     "tests.unit.calc.test_health_plans_properties": 150,
     "tests.unit.calc.test_k401_properties": 300,
     "tests.unit.calc.test_w4_properties": 150,

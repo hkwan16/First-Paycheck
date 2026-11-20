@@ -58,7 +58,8 @@ def check_in(
     row_id: uuid.UUID = as_user(
         connection,
         user,
-        "INSERT INTO check_ins (user_id, period, triggered_by) VALUES (:u, :p, :t) RETURNING id",
+        "INSERT INTO check_ins (user_id, period, triggered_by, as_of)"
+        " VALUES (:u, :p, :t, CAST(:p AS date)) RETURNING id",
         u=user.id,
         p=period,
         t=triggered_by,

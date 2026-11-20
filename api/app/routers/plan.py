@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Response, status
 from pydantic import BaseModel
@@ -16,7 +17,7 @@ from sqlalchemy import select
 
 from app import ratelimit
 from app.auth import CurrentUser
-from app.deps import Now, UserSession
+from app.deps import Day, Now, UserSession
 from app.errors import NotFound, error_responses
 from app.plan import PlanOut, build_plan
 from db.enums import JobKind, JobStatus
@@ -34,10 +35,19 @@ class PlanExportQueued(BaseModel):
     job_id: uuid.UUID
 
 
+def prepared_on(result: dict[str, Any] | None, created_at: dt.datetime) -> str:
+    """The date the PDF prints, its job's ``prepared_on`` (spec 019 rule 12). An export
+    made before there was one printed, and is named by, the UTC date it was made."""
+    stored = (result or {}).get("prepared_on")
+    if isinstance(stored, str):
+        return dt.date.fromisoformat(stored).isoformat()
+    return created_at.astimezone(dt.UTC).date().isoformat()
+
+
 @router.get("", responses=error_responses(401))
-def get_plan(session: UserSession, now: Now) -> PlanOut:
+def get_plan(session: UserSession, day: Day) -> PlanOut:
     """Every current decision with its figures, the goals, the next 90 days and the pay stub."""
-    return build_plan(session, now.date())
+    return build_plan(session, day)
 
 
 @router.get(
@@ -88,7 +98,7 @@ def download_plan_export(job_id: uuid.UUID, session: UserSession) -> Response:
     stored = export_store.get(session, job_id)
     if stored is None:
         raise NotFound("This PDF is not available. Try again to make a new one.")
-    filename = f"first-paycheck-plan-{stored.created_at.astimezone(dt.UTC):%Y-%m-%d}.pdf"
+    filename = f"first-paycheck-plan-{prepared_on(job.result, stored.created_at)}.pdf"
     return Response(
         content=stored.data,
         media_type=stored.content_type,

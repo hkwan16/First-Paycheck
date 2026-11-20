@@ -10,7 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
-from app.deps import Now, UserSession
+from app.deps import Day, UserSession
 from app.errors import AppError, error_responses
 from db.calendar import is_overdue, open_events
 from db.enums import CalendarKind, CalendarStatus
@@ -46,7 +46,7 @@ def event_out(row: CalendarEvent, today: dt.date) -> CalendarEventOut:
 @router.get("", responses=error_responses(401, 422))
 def list_calendar(
     session: UserSession,
-    now: Now,
+    day: Day,
     start: Annotated[
         dt.date | None, Query(alias="from", description="Earliest due date, inclusive")
     ] = None,
@@ -65,4 +65,4 @@ def list_calendar(
     rows = session.scalars(
         query.order_by(CalendarEvent.due_at, CalendarEvent.created_at, CalendarEvent.id)
     )
-    return [event_out(row, now.date()) for row in rows]
+    return [event_out(row, day.today) for row in rows]

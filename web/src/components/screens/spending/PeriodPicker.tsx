@@ -2,14 +2,8 @@
 
 import { useId } from 'react';
 import { Select } from '@/components/ui/Select';
-import { useSpendingMonths, type Period } from '@/lib/api/hooks';
-import {
-  optionsWithin,
-  periodOptions,
-  selectedPeriodKey,
-  useToday,
-  type PeriodOption,
-} from '@/lib/periods';
+import { useSpendingMonths, useToday, type Period } from '@/lib/api/hooks';
+import { optionsWithin, periodOptions, selectedPeriodKey, type PeriodOption } from '@/lib/periods';
 import { periodText } from './spending-format';
 
 export interface PeriodPickerProps {
@@ -25,8 +19,8 @@ export interface PeriodPickerProps {
  * complete month (the API's default) or one of the four before it, each only
  * when it has a transaction or a pay stub to show (`GET /spending/months`,
  * spec 010 rule 5d; all six if that cannot be read). The months come from
- * today's date, which is only known on the client, so the server renders
- * just the month the API answered for.
+ * the person's today as `GET /profile` answers it (spec 019 rule 6), so
+ * until it has, only the month the API answered for is offered.
  */
 export function PeriodPicker({ value, shown, onChange }: PeriodPickerProps) {
   const id = useId();

@@ -37,7 +37,8 @@ def plan(draw: st.DrawFn) -> dict[str, Any]:
         "deductible_cents": deductible,
         "coinsurance_pct": Decimal(draw(st.integers(0, 10_000))) / 100,
         "oop_max_cents": oop_max,
-        "employer_hsa_cents": draw(st.integers(0, 600_000)) if kind == "hdhp" else 0,
+        # Up to the 2026 self-only HSA limit, the entry limit (spec 012 rule 12a).
+        "employer_hsa_cents": draw(st.integers(0, 440_000)) if kind == "hdhp" else 0,
     }
 
 
