@@ -1,5 +1,5 @@
 """calc/cashflow.py: the cash-flow diagram's nodes and bands (spec 010 rule 5b,
-hand-worked examples D1-D6, issue #236)."""
+hand-worked examples D1-D7, issues #236 and #250)."""
 
 from __future__ import annotations
 
@@ -239,6 +239,33 @@ def test_an_empty_period() -> None:
         "left_over": 0,
     }
     assert flow.links == []
+
+
+def test_cash_withdrawn_is_drawn_as_spending() -> None:
+    """D7, issue #250: the cash taken out is a flexible band; the transfer is none."""
+    flow = diagram(
+        stubs(0),
+        income_cents=200_000,
+        left_over_cents=91_500,
+        categories=categories(transfer=20_000, housing=100_000, dining=2_500, cash=6_000),
+    )
+    found = nodes(flow)
+    assert (found["income_deposited"], found["bucket:flexible"], found["left_over"]) == (
+        200_000,
+        8_500,
+        91_500,
+    )
+    assert found["category:cash"] == 6_000
+    assert "category:transfer" not in found
+    assert stage_two(flow) == [
+        ("income_deposited", "bucket:essentials", 100_000),
+        ("income_deposited", "bucket:flexible", 8_500),
+        ("income_deposited", "left_over", 91_500),
+    ]
+    assert [band for band in links(flow) if band[0] == "bucket:flexible"] == [
+        ("bucket:flexible", "category:dining", 2_500),
+        ("bucket:flexible", "category:cash", 6_000),
+    ]
 
 
 def test_income_and_transfers_are_not_drawn() -> None:

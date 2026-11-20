@@ -112,6 +112,7 @@ export const CATEGORY_BUCKETS: SpendingSummary['category_buckets'] = {
   personal_care: 'flexible',
   education: 'flexible',
   gifts_donations: 'flexible',
+  cash: 'flexible',
   fees: 'other',
   taxes: 'other',
   debt_payment: 'other',

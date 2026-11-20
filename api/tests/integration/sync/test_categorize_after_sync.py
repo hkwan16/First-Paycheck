@@ -161,8 +161,9 @@ def test_a_public_radio_membership_is_sent_with_the_donation_definition(
 ) -> None:
     """Issue #146: categorize/v2 listed memberships under subscriptions, so the
     model called a public radio station's member dues a subscription. The job
-    now sends categorize/v3, which defines such a membership as a donation
-    (spec 003 rule 9a), and applies the model's answer to the user's rows."""
+    now sends categorize/v4, which keeps v3's definition of such a membership as
+    a donation (spec 003 rule 9a), and applies the model's answer to the user's
+    rows."""
     api = AnsweringApi({"items": [{"id": 1, "category": "gifts_donations", "confidence": 0.92}]})
     sync_and_categorize(
         empty_queue,
@@ -177,7 +178,7 @@ def test_a_public_radio_membership_is_sent_with_the_donation_definition(
     versions = empty_queue.execute(
         text("SELECT prompt_version FROM llm_calls WHERE user_id = :u"), {"u": user_a.id}
     ).scalars()
-    assert list(versions) == ["categorize/v3"]
+    assert list(versions) == ["categorize/v4"]
     assert categories(client_as(user_a)) == {
         "kqed membership": ("gifts_donations", "llm"),
         "safeway": ("groceries", "rule"),
@@ -295,6 +296,134 @@ def test_an_earlier_guess_follows_a_seed_rule_added_later(
     body = october_summary.json()
     assert (body["savings_cents"], body["flexible_cents"]) == (0, 2_154 + 4_200)
     # Every run's result (one transaction, so their created_at is the same).
+    results = no_seed_rules.execute(
+        text("SELECT result FROM jobs WHERE kind = 'categorize.run' AND status = 'succeeded'")
+    ).scalars()
+    assert sorted(r["relabeled"] for r in results) == [0, 1]
+
+
+# The seed rows issue #250 added besides the `cash` ones: the fees beside them.
+CASH_FEE_RULES = {"atm withdrawal fee", "cash withdrawal fee"}
+
+
+def test_an_earlier_transfer_guess_for_a_withdrawal_becomes_cash(
+    no_seed_rules: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Issue #250: categorize/v3 told the model an ATM withdrawal is a
+    transfer, so the cash taken out was left out of the month's spending and
+    the left over was too high by it. Spec 003 rule 9d: seed rules name the
+    withdrawal descriptors `cash`, a flexible category, and the categorize run
+    every sync queues relabels the earlier guess (rule 7). The person's own
+    label stays, a transfer between their accounts stays a transfer, and a
+    guess no rule names keeps its label."""
+    no_seed_rules.execute(text("DELETE FROM jobs"))
+    from db.seed.load import load_category_rules, read_seed_rules
+
+    seed = read_seed_rules()
+    load_category_rules(
+        no_seed_rules,
+        [r for r in seed if r.category != "cash" and r.merchant_norm not in CASH_FEE_RULES],
+    )
+    item = make_item(no_seed_rules, user_a.id)
+    with user_session_for(user_a.id, bind=no_seed_rules) as session:
+        queue.enqueue(
+            session,
+            user_id=user_a.id,
+            kind=JobKind.SYNC_INITIAL,
+            payload={"sync_item_id": str(item)},
+        )
+    october = [
+        txn("t1", -200_000, "ACME CORP PAYROLL", posted_at=dt.date(2026, 10, 15)),
+        txn(
+            "t2", 6_000, "ATM WITHDRAWAL 001234 10/31 100 MAIN ST", posted_at=dt.date(2026, 10, 31)
+        ),
+        txn("t3", 30_000, "CASH WITHDRAWAL TELLER 0042", posted_at=dt.date(2026, 10, 20)),
+        txn("t4", 20_000, "ONLINE TRANSFER TO SAV 4567", posted_at=dt.date(2026, 10, 16)),
+        txn(
+            "t5",
+            8_000,
+            "BKOFAMERICA ATM 10/21 #000004321 WITHDRWL MAIN ST",
+            posted_at=dt.date(2026, 10, 21),
+        ),
+    ]
+    provider = FakeProvider(
+        accounts=[CHECKING],
+        pages={
+            None: page("c1", added=october),
+            # The next sync brings a November withdrawal at the same ATM.
+            "c1": page(
+                "c2",
+                added=[
+                    txn(
+                        "t6",
+                        4_000,
+                        "ATM WITHDRAWAL 005678 11/07 100 MAIN ST",
+                        posted_at=dt.date(2026, 11, 7),
+                    )
+                ],
+            ),
+        },
+    )
+    # What categorize/v3's definition of `transfer` told the model.
+    v3: dict[str, Category] = {
+        "atm withdrawal main st": "transfer",
+        "cash withdrawal teller": "transfer",
+        "bkofamerica atm withdrwl main st": "transfer",
+    }
+    run_worker(no_seed_rules, provider, ScriptedLabeler(v3))
+    client = client_as(user_a)
+    # The person files the teller withdrawal as a transfer themselves (they
+    # carried the cash to another bank): their choice, never relabeled.
+    teller = next(
+        row
+        for row in client.get("/transactions").json()["items"]
+        if row["merchant_norm"] == "cash withdrawal teller"
+    )
+    assert (
+        client.patch(f"/transactions/{teller['id']}", json={"category": "transfer"}).status_code
+        == 200
+    )
+    october_range = {"start": "2026-10-01", "end": "2026-10-31"}
+    body = client.get("/spending/summary", params=october_range).json()
+    assert (body["flexible_cents"], body["transfers_ignored_cents"], body["left_over_cents"]) == (
+        0,
+        6_000 + 30_000 + 20_000 + 8_000,
+        200_000,
+    )
+
+    # A deploy loads the new seed rules; the next sync runs the categorize job.
+    load_category_rules(no_seed_rules, seed)
+    with user_session_for(user_a.id, bind=no_seed_rules) as session:
+        queue.enqueue(
+            session,
+            user_id=user_a.id,
+            kind=JobKind.SYNC_INCREMENTAL,
+            payload={"sync_item_id": str(item)},
+        )
+    later = ScriptedLabeler(v3)
+    run_worker(no_seed_rules, provider, later)
+
+    rows = client.get("/transactions").json()["items"]
+    assert sorted(
+        (r["merchant_norm"], r["posted_at"], r["category"], r["category_source"]) for r in rows
+    ) == [
+        ("acme corp payroll", "2026-10-15", "income", "rule"),
+        ("atm withdrawal main st", "2026-10-31", "cash", "rule"),
+        ("atm withdrawal main st", "2026-11-07", "cash", "rule"),
+        ("bkofamerica atm withdrwl main st", "2026-10-21", "transfer", "llm"),
+        ("cash withdrawal teller", "2026-10-20", "transfer", "user"),
+        ("online transfer to sav", "2026-10-16", "transfer", "rule"),
+    ]
+    assert later.merchants == []
+    body = client.get("/spending/summary", params=october_range).json()
+    # The $60.00 taken out is spending now; the rest stays where it was.
+    assert (body["flexible_cents"], body["transfers_ignored_cents"], body["left_over_cents"]) == (
+        6_000,
+        30_000 + 20_000 + 8_000,
+        200_000 - 6_000,
+    )
+    totals = {c["category"]: (c["bucket"], c["total_cents"]) for c in body["categories"]}
+    assert totals["cash"] == ("flexible", 6_000)
     results = no_seed_rules.execute(
         text("SELECT result FROM jobs WHERE kind = 'categorize.run' AND status = 'succeeded'")
     ).scalars()

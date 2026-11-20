@@ -10,6 +10,7 @@ from hypothesis import strategies as st
 from pydantic import ValidationError
 
 from calc.spending import Bucket, CategorySum, SpendingTotals, summarize
+from sync.categories import CATEGORY_BUCKETS
 
 BUCKETS: dict[str, Bucket] = {
     "income": "income",
@@ -94,6 +95,38 @@ def test_an_income_labeled_outflow_is_not_income() -> None:
         ("income", "income", 200_422, 2),
         ("housing", "essentials", 50_000, 1),
         ("dining", "flexible", 1_633, 1),
+    ]
+
+
+def test_cash_withdrawn_is_spending() -> None:
+    # Spec 007 rule 20a, "Cash withdrawn" (issue #250): an ATM withdrawal is
+    # `cash`, flexible spending; the move to the person's own savings is a
+    # transfer. The sums come in category list order, as the route reads them.
+    sums = [
+        into("income", 200_000),
+        out("transfer", 20_000),
+        out("housing", 100_000),
+        out("dining", 2_500),
+        out("cash", 6_000),
+    ]
+    totals = summarize(sums, CATEGORY_BUCKETS)
+    assert totals.income_cents == 200_000
+    assert totals.essentials_cents == 100_000
+    assert totals.flexible_cents == 8_500
+    assert totals.savings_cents == totals.other_cents == 0
+    assert totals.transfers_ignored_cents == 20_000
+    # 97,500 when the withdrawal was a transfer: too high by the cash taken out.
+    assert totals.left_over_cents == 91_500
+    assert totals.essentials_pct == Decimal("50.0")
+    assert totals.flexible_pct == Decimal("4.3")
+    assert totals.savings_rate_pct == Decimal("0.0")
+    assert totals.transaction_count == 5
+    assert [(c.category, c.bucket, c.total_cents, c.count) for c in totals.categories] == [
+        ("income", "income", 200_000, 1),
+        ("transfer", "transfer", 20_000, 1),
+        ("housing", "essentials", 100_000, 1),
+        ("dining", "flexible", 2_500, 1),
+        ("cash", "flexible", 6_000, 1),
     ]
 
 

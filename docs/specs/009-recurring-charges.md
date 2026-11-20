@@ -33,7 +33,7 @@ Code: the pure detector and status rules in `api/sync/recurring.py`, the amount 
 1. Detection reads the user's posted transactions of active accounts, under RLS, and keeps those with `amount_cents > 0` (money out, spec 001 rule 21) and a non-empty `merchant_norm`. Refunds, deposits and income never form a recurring charge.
 1a. **Cash accounts only** (issue 200). Detection reads the same accounts as the spending summary: active `checking`, `savings` and `credit` accounts (`SPENDING_ACCOUNT_KINDS` in `api/db/accounts.py`, spec 007 rule 21a). A loan, investment or retirement account's rows are that account's own bookkeeping: a loan books accrued interest every month as money out (Plaid's `user_transactions_dynamic` student loan books "Interest" at a steady amount), though no cash left the user's accounts, so read as a bill it sat beside Netflix on the Spending screen. The payment that pays a loan leaves checking and is detected there. A stored charge whose merchant has no qualifying rows left once the ledgers are skipped is deleted at the next run (rule 14).
 2. Transactions are grouped by `merchant_norm` (spec 003 rule 1), across all of the user's accounts. Within a group they are ordered by `posted_at`, then `amount_cents`.
-3. Categories play no part: a monthly transfer to savings at a fixed amount is detected like any bill, and the user can mark it `ignored` (rule 17).
+3. Categories play no part: a monthly transfer to savings at a fixed amount is detected like any bill, and the user can mark it `ignored` (rule 17). So is a cash withdrawal (`cash`, spec 003 rule 9d): $60 from the same ATM every week is a weekly series like any other, and making `cash` spending (issue #250) changed nothing here.
 
 ### One merchant's series
 

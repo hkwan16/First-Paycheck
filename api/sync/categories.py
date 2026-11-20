@@ -27,6 +27,7 @@ Category = Literal[
     "personal_care",
     "education",
     "gifts_donations",
+    "cash",
     "fees",
     "taxes",
     "debt_payment",
@@ -56,6 +57,8 @@ CATEGORY_BUCKETS: Mapping[str, Bucket] = MappingProxyType(
         "personal_care": "flexible",
         "education": "flexible",
         "gifts_donations": "flexible",
+        # Cash withdrawn is spending on something unknown (spec 003 rule 9d).
+        "cash": "flexible",
         "fees": "other",
         "taxes": "other",
         "debt_payment": "other",

@@ -11,6 +11,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Connection, func, select, table, text
 
 from app.routers import accounts
+from jobs.context import Services
+from jobs.registry import default_handlers
+from jobs.worker import Worker
 from sync.pipeline import SyncResult
 from tests.conftest import FixtureUser
 from tests.support.factories import make_account, make_item
@@ -143,6 +146,53 @@ def test_categories_survive_a_reimport(
 
     category = scalar(db_connection, "SELECT category FROM transactions WHERE id = :id", id=txn)
     assert category == "subscriptions"
+
+
+CASH_EXPORT = (
+    "Date,Description,Amount\n"
+    "2026-10-15,ACME PAYROLL,2000.00\n"
+    "2026-10-20,TRADER JOE'S #123,-84.12\n"
+    "2026-10-31,ATM WITHDRAWAL 001234 10/31 100 MAIN ST,-60.00\n"
+    "2026-10-31,ONLINE TRANSFER TO SAV 4567,-200.00\n"
+)
+
+
+def test_an_imported_cash_withdrawal_is_spending(
+    seeded_rules: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Issue #250, the way the bug showed: a bank export with an ATM withdrawal,
+    imported and categorized by the job the import queues. The withdrawal is
+    `cash`, counted in the month's flexible spending and its left over (spec
+    003 rule 9d); the transfer to savings stays out of every total."""
+    seeded_rules.execute(text("DELETE FROM jobs"))
+    client = client_as(user_a)
+    assert upload(client, CASH_EXPORT, kind="checking").status_code == 200
+    worker = Worker(
+        handlers=default_handlers(),
+        services=Services(labeler=None),
+        queue_bind=seeded_rules,
+        user_bind=seeded_rules,
+    )
+    for _ in range(10):
+        if not worker.run_once():
+            break
+    failed = seeded_rules.execute(text("SELECT kind::text FROM jobs WHERE status <> 'succeeded'"))
+    assert failed.all() == []
+
+    labels = {
+        row["merchant_norm"]: row["category"] for row in client.get("/transactions").json()["items"]
+    }
+    assert labels["atm withdrawal main st"] == "cash"
+    assert labels["online transfer to sav"] == "transfer"
+    body = client.get("/spending/summary", params={"start": "2026-10-01", "end": "2026-10-31"})
+    summary = body.json()
+    assert (
+        summary["income_cents"],
+        summary["essentials_cents"],
+        summary["flexible_cents"],
+        summary["transfers_ignored_cents"],
+        summary["left_over_cents"],
+    ) == (200_000, 8_412, 6_000, 20_000, 200_000 - 8_412 - 6_000)
 
 
 def test_invalid_file_writes_nothing(

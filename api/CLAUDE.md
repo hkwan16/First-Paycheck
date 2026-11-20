@@ -113,7 +113,8 @@ Rules:
   `model` = settings purpose, `effort`, `max_tokens`, `schema`), loaded and
   validated by `llm/prompts/__init__.py`. A released prompt file is never
   edited; a change is a new version.
-- One public method per prompt: `categorize` (`categorize/v3`),
+- One public method per prompt: `categorize` (`categorize/v4`: v3 with `cash` defined and
+  ATM withdrawals out of `transfer`, spec 003 rule 9d, issue 250),
   `extract_pay_stub` (`extract_pay_stub/v2`: a dash or `0.00` printed on a line is 0
   tied to that line, not null; spec 005 rule 1a, issue 195), `extract_benefits`
   (`extract_benefits/v2`), `explain` (`explain/v5`), `judge_rate_claim`
@@ -201,7 +202,16 @@ Rules:
   rule (`target optical`). `tests/unit/test_seed_rules.py` lists the names
   each way; check a new seed row against them. The model
   labels each merchant and direction separately (`CategorizeItem.direction`,
-  `categorize/v3`) and may call money in a refund. What a category means
+  `categorize/v4`) and may call money in a refund. Cash withdrawn is spending:
+  `cash`, a `flexible` category (spec 003 rule 9d, issue #250), by seed prefix
+  rules on the bank language (`atm withdrawal`, `cash withdrawal`, ...; never
+  the bare `withdrawal`, which banks put before card purchases, nor `atm`), so
+  an earlier `transfer` guess for one is relabeled by the rules pass; only money
+  between the person's own accounts, peers and cash deposits stay `transfer`. A
+  new category goes in `sync/categories.py` (list and `CATEGORY_BUCKETS`), a new
+  prompt version that names it, `web/src/lib/categories.ts` and `make types`; a
+  released prompt keeps the categories it had (`test_prompts.py:ADDED_AFTER`).
+  What a category means
   (a membership to a public radio station or another nonprofit is
   `gifts_donations`, issue #146) is the prompt's; which merchant a
   description names is the seed rules' (spec 003 rule 9a), and the two agree

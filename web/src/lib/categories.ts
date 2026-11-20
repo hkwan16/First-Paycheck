@@ -11,11 +11,11 @@ import type { Category } from '@/lib/api/types';
  * gains one this file does not know.
  */
 
-export type Bucket = 'income' | 'essentials' | 'flexible' | 'savings' | 'other';
+export type Bucket = 'income' | 'essentials' | 'flexible' | 'savings' | 'other' | 'transfer';
 
 export interface BucketInfo {
   label: string;
-  /** The bucket's hue: plum income, blue essentials, coral flexible, teal savings. */
+  /** The bucket's hue: plum income, blue essentials, coral flexible, teal savings, gray the rest. */
   swatch: SwatchColor;
 }
 
@@ -24,10 +24,20 @@ export const BUCKETS: Record<Bucket, BucketInfo> = {
   essentials: { label: 'Essentials', swatch: 'blue' },
   flexible: { label: 'Flexible', swatch: 'coral' },
   savings: { label: 'Savings', swatch: 'teal' },
-  other: { label: 'Not spending', swatch: 'flow-tax' },
+  /** Fees, taxes, debt payments and other: spending the left over counts (spec 007 rule 24). */
+  other: { label: 'Other spending', swatch: 'flow-tax' },
+  /** Money moved between the person's own accounts: in no total (spec 007 rule 23). */
+  transfer: { label: 'Not spending', swatch: 'flow-tax' },
 };
 
-const BUCKET_ORDER: readonly Bucket[] = ['income', 'essentials', 'flexible', 'savings', 'other'];
+const BUCKET_ORDER: readonly Bucket[] = [
+  'income',
+  'essentials',
+  'flexible',
+  'savings',
+  'other',
+  'transfer',
+];
 
 export interface CategoryInfo {
   label: string;
@@ -51,8 +61,10 @@ export const CATEGORIES: Record<Category, CategoryInfo> = {
   personal_care: { label: 'Personal care', bucket: 'flexible' },
   education: { label: 'Education', bucket: 'flexible' },
   gifts_donations: { label: 'Gifts and donations', bucket: 'flexible' },
+  // Cash withdrawn is spending on something unknown (spec 003 rule 9d, issue 250).
+  cash: { label: 'Cash', bucket: 'flexible' },
   savings_investment: { label: 'Savings transfer', bucket: 'savings' },
-  transfer: { label: 'Transfer between accounts', bucket: 'other' },
+  transfer: { label: 'Transfer between accounts', bucket: 'transfer' },
   debt_payment: { label: 'Debt payment', bucket: 'other' },
   fees: { label: 'Fees', bucket: 'other' },
   taxes: { label: 'Taxes', bucket: 'other' },

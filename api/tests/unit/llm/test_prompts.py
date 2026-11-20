@@ -46,19 +46,32 @@ def test_version_matches_the_file_path() -> None:
         assert prompt.version == f"{path.parent.name}/{path.stem}"
 
 
-@pytest.mark.parametrize("version", ["v1", "v2", "v3"])
+# The categories a released prompt came before: it is never edited, so it does
+# not name them (spec 003 rule 9d: `cash` arrived with v4).
+ADDED_AFTER: dict[str, set[str]] = {"v1": {"cash"}, "v2": {"cash"}, "v3": {"cash"}, "v4": set()}
+
+
+@pytest.mark.parametrize("version", ["v1", "v2", "v3", "v4"])
 def test_categorize_prompts(version: str) -> None:
     prompt = load_prompt("categorize", version)
     assert prompt.version == f"categorize/{version}"
     assert prompt.purpose is LlmPurpose.CATEGORIZE
     assert prompt.effort == "low"
     assert prompt.schema is schemas.CategoryBatch
-    # The prompt names every category the schema accepts.
-    for category in schemas.CATEGORIES:
+    # The prompt names every category the schema accepted when it was released.
+    for category in set(schemas.CATEGORIES) - ADDED_AFTER[version]:
         assert f"`{category}`" in prompt.system
+    for category in ADDED_AFTER[version]:
+        assert f"`{category}`" not in prompt.system
 
 
-@pytest.mark.parametrize("version", ["v2", "v3"])
+def test_the_gateways_categorize_prompt_names_every_category() -> None:
+    system = load_prompt(*CATEGORIZE_PROMPT).system
+    for category in schemas.CATEGORIES:
+        assert f"`{category}`" in system
+
+
+@pytest.mark.parametrize("version", ["v2", "v3", "v4"])
 def test_categorize_explains_the_direction(version: str) -> None:
     """Spec 003 rule 9: the model is told what the direction means and that
     money in at a merchant is usually a refund unless it reads as pay."""
@@ -92,11 +105,12 @@ def definition(system: str, category: str) -> str:
     return next(line for line in system.splitlines() if line.startswith(f"- `{category}`"))
 
 
-def test_categorize_v3_definitions_agree_with_the_seed_rules() -> None:
+@pytest.mark.parametrize("version", ["v3", "v4"])
+def test_categorize_definitions_agree_with_the_seed_rules(version: str) -> None:
     """Spec 003 rule 9b: a merchant the model labels gets the category a seed
     rule gives a merchant of the same kind (costco and sams club shopping, a
     credit card payment transfer, turbotax taxes)."""
-    system = load_prompt("categorize", "v3").system
+    system = load_prompt("categorize", version).system
     assert "warehouse clubs" in definition(system, "shopping")
     assert "warehouse" not in definition(system, "groceries")
     assert "credit card payments" in definition(system, "transfer")
@@ -105,8 +119,28 @@ def test_categorize_v3_definitions_agree_with_the_seed_rules() -> None:
     assert "tax refunds" in definition(system, "income")
 
 
-def test_the_gateway_uses_categorize_v3() -> None:
-    assert CATEGORIZE_PROMPT == ("categorize", "v3")
+def test_categorize_v4_calls_cash_withdrawn_cash() -> None:
+    """Spec 003 rule 9d (issue #250): v3 listed ATM withdrawals under transfer,
+    so cash taken out was left out of spending. v4 defines `cash` for them and
+    keeps `transfer` for money moved between the person's own accounts; the
+    rest of the prompt is v3's."""
+    v3 = load_prompt("categorize", "v3").system
+    v4 = load_prompt("categorize", "v4").system
+    assert "ATM withdrawals" in definition(v3, "transfer")
+    transfer = definition(v4, "transfer")
+    assert "ATM" not in transfer
+    assert "withdraw" not in transfer.lower()
+    assert "moving money between the person's own accounts" in transfer
+    cash = definition(v4, "cash")
+    assert "ATM" in cash
+    assert "teller" in cash
+    assert "cash advance" in cash
+    changed = {line for line in set(v3.splitlines()) ^ set(v4.splitlines()) if line.strip()}
+    assert changed == {definition(v3, "transfer"), transfer, cash}
+
+
+def test_the_gateway_uses_categorize_v4() -> None:
+    assert CATEGORIZE_PROMPT == ("categorize", "v4")
 
 
 @pytest.mark.parametrize(

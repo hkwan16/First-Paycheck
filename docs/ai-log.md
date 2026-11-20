@@ -744,3 +744,26 @@ Every entry has a dated heading and these fields, in this order. A field that do
 - Printing a saved date made the byte-for-byte fixture depend on the day the suite runs: Postgres stamps `created_at` with the real start of the test transaction. The HTML tests set each decision's `created_at` to the plan user's `NOW` before rendering.
 
 **How it was caught:** The tester's notes, then the local stack: `plan.spec.ts` exported the PDF from the Plan screen and its text, read back from `plan_exports` with pdfplumber, showed all three before the fix; the new HTML tests and the web cross-check failed first.
+
+## 2026-11-11: cash withdrawals were counted as transfers, not spending (issue 250)
+
+**Task:** An ATM withdrawal was "Transfer between accounts", so it was in no total and the month's left over was too high by the cash taken out. Decided November 10: cash withdrawn is spending, in a category named "Cash"; a transfer between the person's own accounts still is not.
+
+**Tool:** Claude Code, an Opus 5.5 subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** The fix brief: spec first, the bug reproduced end to end on the local stack and kept as a Playwright test, failing unit and integration tests, earlier guesses relabeled through the categorize job's rules pass (PR 248), a new prompt version instead of an edited one, free evals only.
+
+**What it produced:** Spec 003 rule 9d, spec 007 rule 20a and its cash example, spec 010 example D7 and a note in spec 009 rule 3. The `cash` category in `sync/categories.py` (bucket `flexible`), seven seed prefix rules on bank language (`atm withdrawal`, `atm withdraw`, `atm cash withdrawal`, `atm w d`, `cash withdrawal`, `withdrawal atm`, `non chase atm withdraw`) and two fee rules that outrank them (`atm withdrawal fee`, `cash withdrawal fee`), and `categorize/v4` (v3 with `cash` defined and ATM withdrawals out of `transfer`). On the web, "Cash" under Flexible, and the category select's groups now follow the API's buckets: "Transfer between accounts" alone under "Not spending", fees, taxes, debt payments and Other under "Other spending". Seven eval rows (ids 541-547) and the `categorization-rules` baseline at 0.7806 over 547 rows.
+
+**What was wrong:**
+- The cause was the prompt, not the rules: no seed rule named a withdrawal, and `categorize/v1` to `v3` all listed "ATM withdrawals" under `transfer`, so the model did as told. The recorded and live Plaid sandbox users (`user_good`, `user_transactions_dynamic`) have no ATM withdrawal, so the reproduction went through a CSV import.
+- The e2e stack runs the fake model, which answers `other` for a merchant it does not know, so with the committed fixtures an imported withdrawal read "Other" and counted as spending: the bug did not show. For the reproduction only, the fake was told to answer `transfer` for `atm withdrawal main st`, as v3 instructs the live model; the new `import.spec.ts` test then failed with "Expected: cash, Received: transfer". The fixture change was not committed; the integration test scripts the same v3 answer with a `ScriptedLabeler`.
+- `withdrawal` alone could not be a rule: the dynamic sandbox begins card purchases with it (`WITHDRAWAL DEBIT CARD CONSUMER DEBIT PULSZ`, `WITHDRAWAL 02178293119 POS POUR CHOICES`). Neither could `atm` or `atm cash`, which begin ATM deposits. `atm withdrawal` alone would also have taken `ATM WITHDRAWAL FEE` from `fees`, hence the longer fee rules.
+- Adding a category broke the test that every categorize prompt names every category, since v1 to v3 cannot be edited; it now knows which categories came after each version.
+- The category select filed Fees, Taxes, Debt payment and Other under "Not spending", though the left over counts them; fixed along the way.
+
+**How it was caught:** The new Playwright test on the local stack before the fix, and a failing unit or integration test per rule.
+
+**Fix:** As above, on `fix/cash-withdrawals`. Earlier `transfer` guesses for a descriptor the seed rules name become `cash` on the user's next categorize run (rule 7); a guess for any other descriptor keeps its label until the person fixes it, and a person's own label is never changed. Whether Sonnet on `categorize/v4` calls an unnamed withdrawal `cash` was not measured: no paid eval was run.
+
+**Time saved or lost:** Not measured.
