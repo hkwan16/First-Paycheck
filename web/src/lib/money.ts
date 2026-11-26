@@ -149,6 +149,23 @@ export function formatRate(points: number | string): string {
   return `${rate.format(value)}%`;
 }
 
+/**
+ * A funded share the API sends in percentage points with two places
+ * (`funded_pct`, `progress_pct`: `"39.12"`, capped at `"100.00"`, spec 011
+ * rule 3), as a whole percent: `"39%"`. It rounds down, so a fund 99.6% of
+ * the way there reads `"99%"`, never "100% of the target" beside a "Still to
+ * save" that is not zero (issue 285); `"100%"` is reached only at the API's
+ * own `"100.00"`. The floor is a formatting choice for this one figure, and
+ * nothing in the client decides anything by it.
+ */
+export function formatFundedShare(points: number | string): string {
+  const value = typeof points === 'string' ? Number(points.trim() || Number.NaN) : points;
+  if (!Number.isFinite(value)) {
+    throw new RangeError(`Not a percentage: ${String(points)}`);
+  }
+  return `${wholeNumber.format(Math.min(100, Math.floor(value)))}%`;
+}
+
 export interface FormatNumberOptions {
   decimals?: number;
   signed?: boolean;

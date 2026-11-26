@@ -7,8 +7,9 @@ Cases: the mockup's sample (J. Rivera, essentials of $1,823.25 a month from
 the sample spending summary, $2,140.00 in Chase Savings, semi-monthly pay) at
 every target from 3 to 12 months and four monthly contributions ($0, $10,
 $300 and $500), then three single cases a test types: $2,000.00 of
-essentials, a $0 balance, and a $6,000.00 balance that already funds three
-months.
+essentials, a $0 balance, a $6,000.00 balance that already funds three
+months, and balances 99.4% and 99.6% of the way to the three-month target
+(issue 285: the funded share rounds down on screen).
 
 Run from the repository root, then format:
     uv run --project api python web/src/test/fixtures/make-emergency-fund-results.py
@@ -46,6 +47,8 @@ cases += [
     case({**single, "monthly_essentials_cents": 200_000}),
     case({**single, "current_balance_cents": 0}),
     case({**single, "current_balance_cents": 600_000}),
+    case({**single, "current_balance_cents": 543_693}),
+    case({**single, "current_balance_cents": 544_787}),
 ]
 Path(__file__).with_name("emergency-fund-results.json").write_text(
     json.dumps(cases, indent=2) + "\n"

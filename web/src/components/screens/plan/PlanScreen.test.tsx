@@ -189,7 +189,7 @@ describe('PlanScreen with every decision saved', () => {
     expect(goal).toHaveTextContent('By Sep 30, 2027');
     expect(
       within(goal).getByRole('progressbar', { name: 'Emergency fund progress' }),
-    ).toHaveAttribute('aria-valuetext', '39.12% of the target');
+    ).toHaveAttribute('aria-valuetext', '39% of the target');
   });
 
   it('gives a paused goal no date (issue 166)', async () => {

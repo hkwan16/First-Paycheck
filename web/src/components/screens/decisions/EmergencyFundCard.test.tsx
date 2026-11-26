@@ -116,7 +116,7 @@ describe('EmergencyFundCard before a decision', () => {
     expect(rows).toEqual([
       ['Target, 3 months of essentials', '$5,469.75'],
       ['Suggested range, 3 to 6 months', '$5,469.75 to $10,939.50'],
-      ['Already saved', '39.12% of the target'],
+      ['Already saved', '39% of the target'],
       ['Still to save', '$3,329.75'],
       ['Months to reach it', '12 months'],
       ['Per paycheck, 24 paychecks a year', '$150.00'],
@@ -152,6 +152,36 @@ describe('EmergencyFundCard before a decision', () => {
       expect(result()).toHaveTextContent('Your savings already cover the $5,470 target'),
     );
     expect(within(result()).getByText('Already there')).toBeInTheDocument();
+  });
+
+  it('rounds the funded share down, so 99.6% is not "100% of the target" (issue 285)', async () => {
+    decisionsReady();
+    await renderLoaded();
+    enter('Monthly transfer to savings', '300');
+    const bar = () =>
+      within(result()).getByRole('progressbar', { name: 'Emergency fund progress' });
+    const row = (label: string) =>
+      within(result()).getByText(label, { selector: 'dt' }).nextElementSibling?.textContent;
+
+    // The API's own results for a balance 99.4% and 99.6% of the way there, then at it.
+    enter('Saved so far', '5,436.93');
+    await settle();
+    await waitFor(() => expect(row('Still to save')).toBe('$32.82'));
+    expect(row('Already saved')).toBe('99% of the target');
+    expect(bar()).toHaveAttribute('aria-valuetext', '99% of the target');
+    expect(bar()).toHaveAttribute('aria-valuenow', '99.4');
+
+    enter('Saved so far', '5,447.87');
+    await settle();
+    await waitFor(() => expect(row('Still to save')).toBe('$21.88'));
+    expect(row('Already saved')).toBe('99% of the target');
+    expect(bar()).toHaveAttribute('aria-valuetext', '99% of the target');
+
+    enter('Saved so far', '6,000');
+    await settle();
+    await waitFor(() => expect(row('Still to save')).toBe('$0.00'));
+    expect(row('Already saved')).toBe('100% of the target');
+    expect(bar()).toHaveAttribute('aria-valuetext', '100% of the target');
   });
 
   it('says what to fix in an amount and sends nothing until it reads', async () => {

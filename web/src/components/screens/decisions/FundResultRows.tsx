@@ -2,7 +2,7 @@ import type { ComponentProps } from 'react';
 import { KV, KVList } from '@/components/ui/KV';
 import { Money } from '@/components/ui/Money';
 import type { EmergencyFundResult } from '@/lib/api/types';
-import { formatRate } from '@/lib/money';
+import { formatFundedShare } from '@/lib/money';
 import { monthsText } from './emergency-fund-format';
 
 export interface FundResultRowsProps {
@@ -51,7 +51,7 @@ export function FundResultRows({
           </>
         }
       />
-      <KV label="Already saved" value={`${formatRate(result.funded_pct)} of the target`} />
+      <KV label="Already saved" value={`${formatFundedShare(result.funded_pct)} of the target`} />
       <KV label="Still to save" value={<Money cents={result.shortfall_cents} />} />
       <KV label="Months to reach it" value={reachText(result)} />
       <KV

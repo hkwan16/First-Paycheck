@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatFundedShare,
   formatMoney,
   formatNetCost,
   formatNumber,
@@ -145,6 +146,34 @@ describe('formatPct', () => {
 
   it('rejects text that is not a number', () => {
     expect(() => formatPct('four')).toThrow(RangeError);
+  });
+});
+
+describe('formatFundedShare', () => {
+  // Issue 285: a fund that is 99.6% there is not "100% of the target" while
+  // something is still to save, so the share rounds down to a whole percent.
+  it.each([
+    ['39.12', '39%'],
+    ['0.00', '0%'],
+    ['0.56', '0%'],
+    ['99.40', '99%'],
+    ['99.60', '99%'],
+    ['99.99', '99%'],
+    ['100.00', '100%'],
+    [100, '100%'],
+  ] as const)('shows the API share %j as %s, rounding down', (points, out) => {
+    expect(formatFundedShare(points)).toBe(out);
+  });
+
+  it('reads 100% only once the API says the target is reached, and never more', () => {
+    // Spec 011 rule 3 caps funded_pct at 100; a share above it would still read 100%.
+    expect(formatFundedShare('120.00')).toBe('100%');
+    expect(formatFundedShare(99.999)).toBe('99%');
+  });
+
+  it('rejects text that is not a number', () => {
+    expect(() => formatFundedShare('')).toThrow(RangeError);
+    expect(() => formatFundedShare('most')).toThrow(RangeError);
   });
 });
 

@@ -290,7 +290,7 @@ describe('WhyScreen for an emergency fund (spec 011 rule 18, issue 162)', () => 
     expect(rows).toEqual([
       ['Target, 3 months of essentials', '$5,469.75'],
       ['Suggested range, 3 to 6 months', '$5,469.75 to $10,939.50'],
-      ['Already saved', '39.12% of the target'],
+      ['Already saved', '39% of the target'],
       ['Still to save', '$3,329.75'],
       ['Months to reach it', '12 months'],
       ['Per paycheck, 24 paychecks a year', '$150.00'],
