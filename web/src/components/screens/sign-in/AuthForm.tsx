@@ -15,6 +15,7 @@ import { validateEmail, validatePassword } from '@/lib/auth/validation';
 import { hardNavigate } from '@/lib/navigation';
 import { signInRoute, type AuthMode } from '@/lib/routes';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { SIGN_IN_TITLE } from './sign-in-title';
 
 export interface AuthFormProps {
   mode: AuthMode;
@@ -32,12 +33,12 @@ type Status =
 
 const COPY = {
   'sign-in': {
-    title: 'Sign in',
+    title: SIGN_IN_TITLE['sign-in'],
     submit: 'Sign in',
     passwordAutoComplete: 'current-password',
   },
   'sign-up': {
-    title: 'Create an account',
+    title: SIGN_IN_TITLE['sign-up'],
     submit: 'Create account',
     passwordAutoComplete: 'new-password',
   },

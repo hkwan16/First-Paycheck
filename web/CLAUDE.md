@@ -1033,7 +1033,9 @@ off: the guard lets every screen render and the API client sends no token (unit 
 previews without secrets).
 
 - **Sign-in** (`/sign-in`, `AuthForm`): password (`signInWithPassword`), account creation
-  (`?mode=sign-up`, `signUp`), magic link (`signInWithOtp`). Email links return through
+  (`?mode=sign-up`, `signUp`), magic link (`signInWithOtp`). The form's heading and the tab's
+  title both read `SIGN_IN_TITLE[mode]` (`sign-in-title.ts`; the page's `generateMetadata`
+  reads the mode from the query, issue 271). Email links return through
   `/auth/callback?next=`, which exchanges the PKCE code (so the link must be opened in the browser
   that asked for it) and falls back to `/sign-in?error=link`. Success is `hardNavigate(next ?? '/')`,
   a full navigation, so server components re-render with the new cookies and no client cache
