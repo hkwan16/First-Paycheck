@@ -79,8 +79,9 @@ async function download(call: () => BlobCall, fallback: string): Promise<string>
   let answer: Awaited<BlobCall>;
   try {
     answer = await call();
-  } catch {
-    throw new DownloadError(0, null);
+  } catch (error) {
+    // A non-2xx answer with no API body keeps its status (issue 289); no answer at all is 0.
+    throw new DownloadError(error instanceof ApiError ? error.status : 0, null);
   }
   const { data, error, response } = answer;
   if (error !== undefined || !data) {

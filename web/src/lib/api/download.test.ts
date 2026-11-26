@@ -155,6 +155,15 @@ describe('downloadCalendar', () => {
     expect(clicks).toEqual([]);
   });
 
+  it('keeps the status of a non-2xx answer with no body (issue 289)', async () => {
+    fakeFetch(() => new Response(null, { status: 502 }));
+    const { clicks } = watch();
+    const error = await downloadCalendar().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(DownloadError);
+    expect(error).toMatchObject({ status: 502, code: null });
+    expect(clicks).toEqual([]);
+  });
+
   it('fails with status 0 when the API cannot be reached', async () => {
     vi.stubGlobal(
       'fetch',

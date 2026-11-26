@@ -3,6 +3,7 @@ import createQueryClient from 'openapi-react-query';
 import { hardNavigate } from '@/lib/navigation';
 import { signInRoute } from '@/lib/routes';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { answerMiddleware } from './answer-middleware';
 import { createAuthMiddleware, createSessionTokens } from './auth-middleware';
 import { API_BASE_URL } from './base-url';
 import { sessionStatus } from './session-status';
@@ -30,6 +31,12 @@ export const sessionTokens = createSessionTokens({
   // A read that timed out shows SessionProblemNotice until one answers (issue 225).
   onSessionReadable: sessionStatus.report,
 });
+
+// A non-2xx answer the API did not write (a bare 502, a cut-off connection) is an
+// error, never empty data (issue 289). openapi-fetch runs onResponse in reverse
+// order of use(), so this one is first here to run last, on the answer the auth
+// middleware settled on: a bodiless 401 is still refreshed and retried first.
+fetchClient.use(answerMiddleware);
 
 // Bearer token on every request; one refresh and retry on 401, then sign in again;
 // a 401 account_deleted signs out at once.
