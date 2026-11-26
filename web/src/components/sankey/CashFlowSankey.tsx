@@ -193,6 +193,7 @@ export function CashFlowSankey({
             <button
               key={node.id}
               type="button"
+              data-flow-node={node.id}
               ref={(el) => {
                 if (el) buttons.current.set(node.id, el);
                 else buttons.current.delete(node.id);

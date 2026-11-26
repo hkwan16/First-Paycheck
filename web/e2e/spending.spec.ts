@@ -133,14 +133,22 @@ test('the cash flow and the summary tiles show the same totals from the API', as
   // Both routes compute the period with the same code (spec 010 rule 5):
   // every bucket the diagram draws matches its tile. A bucket with refunds is
   // drawn before them (rule 5b) and its details give the tile's amount.
-  for (const bucket of ['Essentials', 'Flexible', 'Savings', 'Other']) {
-    // Anchored on the amount: "Savings transfer" is a category under Savings.
-    const node = card.getByRole('button', { name: new RegExp(`^${bucket} \\$`) });
+  const buckets = {
+    essentials: 'Essentials',
+    flexible: 'Flexible',
+    savings: 'Savings',
+    other: 'Other',
+  };
+  for (const [key, bucket] of Object.entries(buckets)) {
+    // By the API's node id, not by name: "Savings transfer" is a category under
+    // Savings, and the Other bucket's "Other" category is named like it (issue 268).
+    const node = card.locator(`[data-flow-node="bucket:${key}"]`);
     // A $0 Other bucket is not drawn (spec 010 rule 5c); its tile still reads $0.00 (issue 268).
-    if (bucket === 'Other' && (await node.count()) === 0) {
+    if (key === 'other' && (await node.count()) === 0) {
       await expect(summary.getByText('Other', { exact: true })).toBeVisible();
       continue;
     }
+    await expect(node).toHaveAccessibleName(new RegExp(`^${bucket} \\$`));
     let amount = ((await node.textContent()) ?? '').replace(bucket, '').trim();
     await node.focus();
     const details = card.getByRole('group', { name: bucket });

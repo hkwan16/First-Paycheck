@@ -35,6 +35,13 @@ describe('CashFlowSankey', () => {
     expect(node('Left over $1,618.94')).toBeInTheDocument();
     expect(node('Phone and internet $70.00')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /\$/ })).toHaveLength(22);
+    // Each button carries the API's node id, so a test can tell the Other
+    // bucket from the "Other" category drawn under it (issue 268).
+    expect(node('Essentials $1,823.25')).toHaveAttribute('data-flow-node', 'bucket:essentials');
+    expect(node('Phone and internet $70.00')).toHaveAttribute(
+      'data-flow-node',
+      'category:phone_internet',
+    );
   });
 
   it('draws the bands as one decorative SVG image, each band in its token color', () => {
