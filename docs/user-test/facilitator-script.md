@@ -150,7 +150,7 @@ Ask, and let the note taker write the answers down as said:
 "Thank you. Everything you entered was made up, and I will delete the test account now."
 
 Stop the recording. Then, with the participant gone, sign in as the test account, open the
-account menu, choose Delete account, type `delete` and confirm. Record the time on the
+account menu, choose Account, then Delete account, type `delete` and confirm. Record the time on the
 observation sheet, and score both quizzes on the scoring sheet in `quiz.md`.
 
 ## Notes for the facilitator

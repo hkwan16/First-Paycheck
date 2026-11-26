@@ -22,9 +22,9 @@ import { buttonClasses } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import { UserMenu } from './UserMenu';
 
-/** A full-width Button's classes in a variant, as Button merges them (issue 205). */
-const blockButton = (variant: 'default' | 'destructive') =>
-  cn(buttonClasses({ variant, block: true }));
+/** A full-width Button's classes in a variant and size, as Button merges them (issue 205). */
+const blockButton = (variant: 'default' | 'destructive', size: 'md' | 'sm' = 'md') =>
+  cn(buttonClasses({ variant, size, block: true }));
 
 const LABEL = 'alex@example.com';
 
@@ -71,38 +71,90 @@ describe('UserMenu, the account menu (issue 242)', () => {
       within(menu)
         .getAllByRole('menuitem')
         .map((element) => element.textContent),
-    ).toEqual(['Sign out', 'Delete account']);
+    ).toEqual(['Sign out', 'Account']);
     expect(item('Sign out')).toHaveFocus();
   });
 
-  it('sets deleting the account apart from signing out (issue 205)', async () => {
+  it('keeps Delete account behind an Account item, so one stray click cannot start a deletion (issues 205, 267)', async () => {
     const { user, trigger } = setup();
     await user.click(trigger);
-    const separator = within(screen.getByRole('menu')).getByRole('separator');
-    // Sign out, then a rule, then the destructive action.
+    const menu = screen.getByRole('menu', { name: LABEL });
+    expect(screen.queryByRole('menuitem', { name: 'Delete account' })).toBeNull();
+    const account = item('Account');
+    expect(account).toHaveAttribute('aria-haspopup', 'menu');
+    expect(account).toHaveAttribute('aria-expanded', 'false');
+    const separator = within(menu).getByRole('separator');
+    // Sign out, then a rule, then the quieter Account item.
     expect(item('Sign out').compareDocumentPosition(separator)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(separator.compareDocumentPosition(item('Delete account'))).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-    expect(item('Delete account').className).toBe(blockButton('destructive'));
+    expect(separator.compareDocumentPosition(account)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(item('Sign out').className).toBe(blockButton('default'));
+    expect(account.className).not.toBe(blockButton('default'));
+
+    // One click opens the Account section; deleting still needs a second one.
+    await user.click(account);
+    expect(account).toHaveAttribute('aria-expanded', 'true');
+    const section = within(menu).getByRole('menu', { name: 'Account' });
+    expect(account).toHaveAttribute('aria-controls', section.id);
+    const remove = within(section).getByRole('menuitem', { name: 'Delete account' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // Smaller than Sign out, in the destructive style.
+    expect(remove.className).toBe(blockButton('destructive', 'sm'));
+
+    // The same click folds the section away again.
+    await user.click(account);
+    expect(account).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('menuitem', { name: 'Delete account' })).toBeNull();
   });
 
   it('moves between items with the arrow keys, Home and End, and wraps', async () => {
     const { user, trigger } = setup();
     await user.click(trigger);
     await user.keyboard('{ArrowDown}');
-    expect(item('Delete account')).toHaveFocus();
+    expect(item('Account')).toHaveFocus();
     await user.keyboard('{ArrowDown}');
     expect(item('Sign out')).toHaveFocus();
     await user.keyboard('{ArrowUp}');
-    expect(item('Delete account')).toHaveFocus();
+    expect(item('Account')).toHaveFocus();
     await user.keyboard('{Home}');
     expect(item('Sign out')).toHaveFocus();
     await user.keyboard('{End}');
+    expect(item('Account')).toHaveFocus();
+  });
+
+  it('opens the Account section with ArrowRight or Enter, moves through it, and closes it with ArrowLeft', async () => {
+    const { user, trigger } = setup();
+    await user.click(trigger);
+    await user.keyboard('{End}');
+    expect(item('Account')).toHaveFocus();
+    await user.keyboard('{ArrowRight}');
     expect(item('Delete account')).toHaveFocus();
+    expect(item('Account')).toHaveAttribute('aria-expanded', 'true');
+    // The section's item joins the arrow order and End reaches it.
+    await user.keyboard('{ArrowDown}');
+    expect(item('Sign out')).toHaveFocus();
+    await user.keyboard('{End}');
+    expect(item('Delete account')).toHaveFocus();
+    await user.keyboard('{ArrowLeft}');
+    expect(item('Account')).toHaveFocus();
+    expect(item('Account')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('menuitem', { name: 'Delete account' })).toBeNull();
+
+    await user.keyboard('{Enter}');
+    expect(item('Delete account')).toHaveFocus();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('folds the Account section away with the menu, so it opens closed next time', async () => {
+    const { user, trigger } = setup();
+    await user.click(trigger);
+    await user.click(item('Account'));
+    expect(item('Delete account')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await user.click(trigger);
+    expect(item('Account')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('menuitem', { name: 'Delete account' })).toBeNull();
   });
 
   it('keeps the items out of the Tab order, so the menu is one stop', async () => {
@@ -125,7 +177,7 @@ describe('UserMenu, the account menu (issue 242)', () => {
     await user.keyboard('{Escape}');
 
     await user.keyboard('{ArrowUp}');
-    expect(item('Delete account')).toHaveFocus();
+    expect(item('Account')).toHaveFocus();
   });
 
   it('closes on Escape and returns focus to the chip', async () => {
@@ -184,10 +236,11 @@ describe('UserMenu, signing out (issue 224)', () => {
 });
 
 describe('UserMenu, deleting the account (issue 242)', () => {
-  /** Opens the menu and the confirmation dialog. */
+  /** Opens the menu, its Account section and the confirmation dialog. */
   async function confirmation() {
     const context = setup();
     await context.user.click(context.trigger);
+    await context.user.click(item('Account'));
     await context.user.click(item('Delete account'));
     const dialog = screen.getByRole('dialog', { name: 'Delete your account?' });
     return { ...context, dialog };
@@ -309,6 +362,7 @@ describe('UserMenu, deleting the account (issue 242)', () => {
     );
     await user.keyboard('{Escape}');
     await user.click(trigger);
+    await user.click(item('Account'));
     await user.click(item('Delete account'));
     expect(screen.getByRole('textbox', { name: 'Type delete to confirm' })).toHaveValue('');
   });

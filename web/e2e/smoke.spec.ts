@@ -368,16 +368,28 @@ test('the plan and the sign-in page name none of the app internals (issue 209)',
   expect(await page.getByRole('main').innerText()).not.toMatch(INTERNALS);
 });
 
-test('the account menu sets deleting apart from signing out (issue 205)', async ({ page }) => {
+test('the account menu sets deleting apart from signing out (issues 205, 267)', async ({
+  page,
+}) => {
   await open(page, screenAt('/dev/screens/account'));
   await page.getByRole('button', { name: 'J. Rivera' }).click();
-  const signOut = page.getByRole('menuitem', { name: 'Sign out' });
-  const remove = page.getByRole('menuitem', { name: 'Delete account' });
-  await expect(page.getByRole('menu').getByRole('separator')).toBeVisible();
+  const menu = page.getByRole('menu', { name: 'J. Rivera' });
+  const signOut = menu.getByRole('menuitem', { name: 'Sign out' });
+  const account = menu.getByRole('menuitem', { name: 'Account', exact: true });
+  const remove = menu.getByRole('menuitem', { name: 'Delete account' });
+  await expect(menu.getByRole('separator')).toBeVisible();
+  // Delete account is a step away: one click on the menu can only unfold the Account section.
+  await expect(remove).toHaveCount(0);
+  await account.click();
+  await expect(account).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const box = async (locator: Locator) => (await locator.boundingBox())!;
+  expect((await box(remove)).height).toBeLessThan((await box(signOut)).height);
   const color = (locator: Locator) =>
     locator.evaluate((element) => getComputedStyle(element).color);
   const removeColor = await color(remove);
   expect(removeColor).not.toBe(await color(signOut));
+  expect(await blockingViolations(page)).toEqual([]);
 
   await remove.click();
   const confirm = page.getByRole('dialog', { name: 'Delete your account?' });
@@ -575,12 +587,18 @@ test('the account menu is a menu the keyboard drives (issue 242)', async ({ page
   const menu = page.getByRole('menu', { name: 'J. Rivera' });
   await expect(menu.getByRole('menuitem', { name: 'Sign out' })).toBeFocused();
   await page.keyboard.press('ArrowDown');
-  await expect(menu.getByRole('menuitem', { name: 'Delete account' })).toBeFocused();
+  await expect(menu.getByRole('menuitem', { name: 'Account', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await expect(menu.getByRole('menuitem', { name: 'Sign out' })).toBeFocused();
   await page.keyboard.press('End');
+  await expect(menu.getByRole('menuitem', { name: 'Account', exact: true })).toBeFocused();
+  // ArrowRight unfolds the Account section onto Delete account; ArrowLeft folds it (issue 267).
+  await page.keyboard.press('ArrowRight');
   await expect(menu.getByRole('menuitem', { name: 'Delete account' })).toBeFocused();
   expect(await blockingViolations(page)).toEqual([]);
+  await page.keyboard.press('ArrowLeft');
+  await expect(menu.getByRole('menuitem', { name: 'Account', exact: true })).toBeFocused();
+  await expect(menu.getByRole('menuitem', { name: 'Delete account' })).toHaveCount(0);
 
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
@@ -604,6 +622,8 @@ test('deleting the account asks in a modal dialog that holds the focus (issue 24
   const chip = page.getByRole('button', { name: 'J. Rivera' });
   await chip.focus();
   await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('menuitem', { name: 'Account', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
   await expect(page.getByRole('menuitem', { name: 'Delete account' })).toBeFocused();
   await page.keyboard.press('Enter');
 
@@ -634,6 +654,7 @@ test('deleting the account asks in a modal dialog that holds the focus (issue 24
 
   // Escape closes it too, and starts over next time.
   await chip.press('ArrowUp');
+  await page.keyboard.press('Enter');
   await page.keyboard.press('Enter');
   await expect(field).toHaveValue('');
   await page.keyboard.press('Escape');

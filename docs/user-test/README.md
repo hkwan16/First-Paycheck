@@ -47,8 +47,8 @@ is deleted at the end. No participant enters anything about themselves.
 
 ## After each session
 
-1. Sign in as that participant's test account and delete it from the account menu (Delete account,
-   type `delete`). This removes the sandbox bank at Plaid and every row in the database. Note the
+1. Sign in as that participant's test account and delete it from the account menu (Account, then
+   Delete account, type `delete`). This removes the sandbox bank at Plaid and every row in the database. Note the
    time on the observation sheet.
 2. Score both quizzes with the key in `quiz.md` and fill in the scoring sheet.
 3. File any bug as an issue with the participant number, never a name.

@@ -167,10 +167,11 @@ A `destructive` Button (Yes, unlink; Delete account) sits beside a safe choice t
 Chrome (`components/chrome`): `Wordmark`, `Header` (`chips`, `account` slot, `minimal`),
 `TimeZoneSync` (renders nothing: saves the browser's time zone on the profile, see "The
 person's day"), `HeaderAccount` (server: "Sample data" chip, `UserMenu` and `RestoredPageGuard` from the Supabase
-user), `UserMenu` (the user chip as an APG menu button: a `role="menu"` with "Sign out" and
-"Delete account" as `menuitem`s, one Tab stop, arrows, Home, End, Escape back to the chip, Tab or a
-click elsewhere closes it; see "Auth" and "Deleting the account"), `DeleteAccountConfirm` (a native
-modal `<dialog>`), `RestoredPageGuard` (see "Auth"), `NavStep` (`size` md 22px, sm 18px for a decision step), `SideNav`
+user), `UserMenu` (the user chip as an APG menu button: a `role="menu"` with "Sign out" and, below
+a rule, a quieter "Account" `menuitem` that unfolds a nested menu holding "Delete account"; one Tab
+stop, arrows, Home, End, ArrowRight or Enter unfolds Account and ArrowLeft folds it, Escape back to
+the chip, Tab or a click elsewhere closes it; see "Auth" and "Deleting the account"),
+`DeleteAccountConfirm` (a native modal `<dialog>`), `RestoredPageGuard` (see "Auth"), `NavStep` (`size` md 22px, sm 18px for a decision step), `SideNav`
 (`current`, `done` from `lib/setup-progress.ts`, `hrefs` for id-bound screens, `calculators`;
 "Decisions" nests its four steps, see "Decisions screen"; one list, stacked at every width),
 `AppSideNav` (current item from the URL), `Shell` (header, nav column `1 1 200px` up to 240px,
@@ -524,9 +525,13 @@ or checked for a phone.
 
 ## Deleting the account
 
-The header's account menu (`UserMenu`) has Delete account under Sign out, behind a hairline and in
-the `destructive` Button style (issue 205). It closes the menu and opens `DeleteAccountConfirm`, a
-native `<dialog>` opened with `showModal()` (issue 242: the dialog role, named by its heading, the
+The header's account menu (`UserMenu`) keeps Delete account a step away from Sign out (issues 205
+and 267): under Sign out and a hairline sits a quieter "Account" item (`aria-haspopup="menu"`,
+`aria-expanded`), and only once it is unfolded does the nested menu show Delete account, small
+(`size="sm"`) and in the `destructive` Button style, so one stray click on the open menu can at most
+unfold the section. Unfolding it (a click, Enter or ArrowRight) focuses Delete account, ArrowLeft
+folds it back onto Account, and it is folded again whenever the menu reopens. Delete account closes
+the menu and opens `DeleteAccountConfirm`, a native `<dialog>` opened with `showModal()` (issue 242: the dialog role, named by its heading, the
 page behind inert so Tab stays inside, Escape closes it except while the deletion runs): what goes,
 a field labeled "Type delete to confirm" (focused; capitals and spaces around the word do not
 matter; Enter submits only once it says delete), Delete my account and Keep my account. Keep and
