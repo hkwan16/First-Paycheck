@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-import shutil
 import uuid
 from collections.abc import Iterator, Sequence
 from typing import Any
@@ -18,15 +16,6 @@ from llm.gateway import ModelPage
 from llm.schemas import PayStubExtraction
 
 FIXTURES = load_fixtures()
-
-
-@pytest.fixture
-def tesseract() -> None:
-    if shutil.which("tesseract"):
-        return
-    if os.environ.get("CI"):
-        pytest.fail("tesseract must be installed in CI")
-    pytest.skip("tesseract is not installed")
 
 
 class LabelReader:

@@ -270,5 +270,6 @@ def test_the_committed_baseline_covers_every_registered_suite() -> None:
     assert set(baseline) == set(run.SUITES)
 
 
-def test_free_suites_pass_against_the_committed_baseline() -> None:
+def test_free_suites_pass_against_the_committed_baseline(tesseract: None) -> None:
+    """The free alias includes extraction-smoke, which OCRs the stubs."""
     assert run.main(["--suite", "free", "--max-cost-cents", "0"]) == 0
