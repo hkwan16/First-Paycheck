@@ -2961,7 +2961,7 @@ export interface components {
       /** Plan Cents */
       plan_cents: number | null;
       /** Status */
-      status: ('on_plan' | 'over' | 'under') | null;
+      status: ('on_plan' | 'ahead' | 'behind' | 'over' | 'under') | null;
     };
     /** PlanOut */
     PlanOut: {

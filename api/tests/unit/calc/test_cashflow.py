@@ -11,6 +11,8 @@ from hypothesis import strategies as st
 
 from calc.cashflow import (
     LINES,
+    PLAN_DIRECTIONS,
+    PlanDirection,
     PlanTargets,
     RoleTotals,
     SpendingActuals,
@@ -160,19 +162,17 @@ def plan_lines(targets: PlanTargets) -> dict[str, tuple[int, int | None, int | N
     return {line.key: (line.actual_cents, line.plan_cents, line.difference_cents) for line in lines}
 
 
+ROW_2_TARGETS = PlanTargets(
+    contribution_pct=Decimal("4"), premium_per_period_cents=6_250, monthly_savings_cents=50_000
+)
+
+
 def test_cash_flow_against_the_plan() -> None:
-    # Spec 015 route row 2.
-    lines = plan_lines(
-        PlanTargets(
-            contribution_pct=Decimal("4"),
-            premium_per_period_cents=6_250,
-            monthly_essentials_cents=250_000,
-            monthly_savings_cents=50_000,
-        )
-    )
+    # Spec 015 route row 2: the essentials have no plan (issue 269).
+    lines = plan_lines(ROW_2_TARGETS)
     assert lines == {
         "income": (399_208, None, None),
-        "essentials": (180_000, 250_000, -70_000),
+        "essentials": (180_000, None, None),
         "flexible": (8_500, None, None),
         "other": (3_900, None, None),
         "savings": (40_000, 50_000, -10_000),
@@ -185,6 +185,10 @@ def test_cash_flow_against_the_plan() -> None:
 def test_without_decisions_every_plan_is_null() -> None:
     lines = plan_lines(PlanTargets())
     assert all(plan is None and difference is None for _, plan, difference in lines.values())
+    assert all(
+        line.status is None
+        for line in against_plan(withholding([]).total, 0, SEPTEMBER_SPENDING, PlanTargets())
+    )
     assert list(lines) == [
         "income",
         "essentials",
@@ -197,32 +201,50 @@ def test_without_decisions_every_plan_is_null() -> None:
     ]
 
 
-def test_plan_line_status_in_route_row_2() -> None:
-    # Spec 015 rule 19a: the route row 2 lines with their statuses.
+def september_lines(targets: PlanTargets) -> dict[str, Any]:
     september = withholding(
         [PayStubAmounts.model_validate(MOCKUP), PayStubAmounts.model_validate(MOCKUP)]
     )
-    lines = against_plan(
-        september.total,
-        september.paycheck_count,
-        SEPTEMBER_SPENDING,
-        PlanTargets(
-            contribution_pct=Decimal("4"),
-            premium_per_period_cents=6_250,
-            monthly_essentials_cents=250_000,
-            monthly_savings_cents=50_000,
-        ),
-    )
-    assert {line.key: line.status for line in lines} == {
+    return {
+        line.key: line
+        for line in against_plan(
+            september.total, september.paycheck_count, SEPTEMBER_SPENDING, targets
+        )
+    }
+
+
+def test_plan_line_status_in_route_row_2() -> None:
+    # Spec 015 rule 19a: the route row 2 lines with their statuses.
+    lines = september_lines(ROW_2_TARGETS)
+    assert {key: line.status for key, line in lines.items()} == {
         "income": None,
-        "essentials": "under",
+        "essentials": None,
         "flexible": None,
         "other": None,
-        "savings": "under",
-        "retirement": "under",
+        "savings": "behind",
+        "retirement": "behind",
         "health": "on_plan",
         "left_over": None,
     }
+
+
+def test_saving_more_than_planned_is_ahead_of_plan() -> None:
+    """Spec 015 route row 2b, issue 269: more saved than planned is ahead, not
+    "over", which read the same as overspending."""
+    lines = september_lines(ROW_2_TARGETS.model_copy(update={"monthly_savings_cents": 30_000}))
+    savings = lines["savings"]
+    assert (savings.actual_cents, savings.plan_cents, savings.difference_cents) == (
+        40_000,
+        30_000,
+        10_000,
+    )
+    assert savings.status == "ahead"
+    essentials = lines["essentials"]
+    assert (essentials.plan_cents, essentials.difference_cents, essentials.status) == (
+        None,
+        None,
+        None,
+    )
 
 
 def test_deposits_are_income_deposited() -> None:
@@ -238,9 +260,7 @@ def test_a_period_without_a_pay_stub_has_no_pay_stub_plan_yet() -> None:
     """Spec 015 rule 19: with no stub the 401(k) and health plans are not known;
     they read "plan $0.00, On plan" before."""
     targets = PlanTargets(
-        contribution_pct=Decimal("4"),
-        premium_per_period_cents=6_250,
-        monthly_essentials_cents=250_000,
+        contribution_pct=Decimal("4"), premium_per_period_cents=6_250, monthly_savings_cents=50_000
     )
     lines = {
         line.key: line
@@ -251,7 +271,7 @@ def test_a_period_without_a_pay_stub_has_no_pay_stub_plan_yet() -> None:
         assert (lines[key].difference_cents, lines[key].status) == (None, None)
         assert lines[key].needs_pay_stub is True
     assert [key for key, line in lines.items() if line.needs_pay_stub] == ["retirement", "health"]
-    assert lines["essentials"].plan_cents == 250_000
+    assert (lines["savings"].plan_cents, lines["savings"].status) == (50_000, "behind")
 
 
 def test_without_a_decision_a_missing_stub_waits_for_nothing() -> None:
@@ -271,39 +291,65 @@ def test_a_period_with_a_stub_needs_none() -> None:
 
 
 @pytest.mark.parametrize(
-    ("plan", "actual", "expected"),
+    ("direction", "plan", "actual", "expected"),
     [
-        (250_000, 180_000, "under"),
-        (50_000, 40_000, "under"),
-        (21_667, 0, "under"),
-        (12_500, 12_500, "on_plan"),
-        (250_000, 262_500, "on_plan"),
-        (250_000, 262_501, "over"),
-        (250_000, 237_500, "on_plan"),
-        (250_000, 237_499, "under"),
-        (10_000, 12_500, "on_plan"),
-        (10_000, 7_499, "under"),
-        (0, 2_501, "over"),
-        (250_010, 262_511, "on_plan"),
-        (250_010, 262_512, "over"),
-        (None, 999_999, None),
+        ("match", 250_000, 180_000, "under"),
+        ("more_is_better", 50_000, 40_000, "behind"),
+        ("more_is_better", 21_667, 0, "behind"),
+        ("match", 12_500, 12_500, "on_plan"),
+        ("match", 250_000, 262_500, "on_plan"),
+        ("match", 250_000, 262_501, "over"),
+        ("match", 250_000, 237_500, "on_plan"),
+        ("match", 250_000, 237_499, "under"),
+        ("more_is_better", 10_000, 12_500, "on_plan"),
+        ("more_is_better", 10_000, 7_499, "behind"),
+        ("match", 0, 2_501, "over"),
+        ("match", 250_010, 262_511, "on_plan"),
+        ("match", 250_010, 262_512, "over"),
+        ("more_is_better", 10_000, 13_983, "ahead"),
+        ("more_is_better", 21_667, 24_168, "ahead"),
+        ("more_is_better", 50_000, 62_501, "ahead"),
     ],
-    ids=[f"row-{n}" for n in range(1, 15)],
+    ids=[f"row-{n}" for n in (*range(1, 14), 15, 16, 17)],
 )
-def test_plan_status_examples(plan: int | None, actual: int, expected: str | None) -> None:
-    # Spec 015 plan line status table: 5% of the plan or $25, whichever is larger.
-    assert plan_status(actual, plan) == expected
+def test_plan_status_examples(
+    direction: PlanDirection, plan: int, actual: int, expected: str
+) -> None:
+    # Spec 015 plan line status table: 5% of the plan or $25, whichever is larger,
+    # then what the side means for the line (row 14, no plan, is the route rows).
+    assert plan_status(actual, plan, direction) == expected
+
+
+def test_each_line_with_a_plan_has_a_direction() -> None:
+    # Spec 015 rule 19a: saving and contributing more is better; premiums should match.
+    assert PLAN_DIRECTIONS == {
+        "savings": "more_is_better",
+        "retirement": "more_is_better",
+        "health": "match",
+    }
 
 
 @given(
+    direction=st.sampled_from(["more_is_better", "match"]),
     plan=st.integers(min_value=0, max_value=10**9),
     actual=st.integers(min_value=0, max_value=10**9),
 )
-def test_plan_status_is_symmetric_around_the_plan(plan: int, actual: int) -> None:
-    status = plan_status(actual, plan)
-    mirrored = plan_status(2 * plan - actual, plan)
-    flip = {"over": "under", "under": "over", "on_plan": "on_plan"}
-    assert status is not None
+def test_plan_status_is_symmetric_around_the_plan(
+    direction: PlanDirection, plan: int, actual: int
+) -> None:
+    status = plan_status(actual, plan, direction)
+    mirrored = plan_status(2 * plan - actual, plan, direction)
+    flip = {
+        "over": "under",
+        "under": "over",
+        "ahead": "behind",
+        "behind": "ahead",
+        "on_plan": "on_plan",
+    }
     assert mirrored == flip[status]
     if actual == plan:
         assert status == "on_plan"
+    if direction == "more_is_better":
+        assert status not in ("over", "under")
+    else:
+        assert status not in ("ahead", "behind")

@@ -255,7 +255,6 @@ def plan_targets(session: Session) -> PlanTargets:
     current = current_decisions(session)
     k401 = current.get(CalculatorKind.K401_MATCH)
     health = current.get(CalculatorKind.HEALTH_PLANS)
-    emergency_fund = current.get(CalculatorKind.EMERGENCY_FUND)
     plan = _selected_plan(health) if health is not None else None
     goal = session.scalars(
         select(Goal).where(Goal.kind == GoalKind.EMERGENCY_FUND, Goal.status == GoalStatus.ACTIVE)
@@ -266,11 +265,6 @@ def plan_targets(session: Session) -> PlanTargets:
         ),
         premium_per_period_cents=(
             int(plan["premium_per_period_cents"]) if plan is not None else None
-        ),
-        monthly_essentials_cents=(
-            int(emergency_fund.inputs["monthly_essentials_cents"])
-            if emergency_fund is not None
-            else None
         ),
         monthly_savings_cents=goal.monthly_contribution_cents if goal is not None else None,
     )

@@ -66,9 +66,12 @@ function Line({ line }: { line: PlanLine }) {
  * actual beside the target its decision set, and the difference, all as the
  * API worked them out. A line's bar shows how much of its target the month
  * has reached so far, colored by the API's status for it (rule 19a) and the
- * status said in words beside the actual: the client only decides which side
- * of the plan matters for the line (`planStatusTone`), never the side itself.
- * A 401(k) or health line whose plan waits for the month's first pay stub
+ * status said in words beside the actual: the API says what the line's side
+ * of the plan means for it ("Ahead of plan" on savings, "Over plan" on a
+ * premium), and the client only puts that in words and a tone
+ * (`planStatusText`, `planStatusTone`). A spending bucket has no target
+ * (issue 269: the essentials were measured against the emergency fund's
+ * sizing input). A 401(k) or health line whose plan waits for the month's first pay stub
  * (`needs_pay_stub`) says so instead of "No target". The card is read when the
  * page is, so on a past check-in (`past`) it is the whole month against the
  * choices saved now, and says that.

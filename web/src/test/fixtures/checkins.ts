@@ -375,7 +375,7 @@ export const novemberCashflow = (): CashFlow => ({
   diagram: diagramOf('november'),
 });
 
-const line = (
+export const line = (
   key: PlanLine['key'],
   label: string,
   actual_cents: number,
@@ -386,17 +386,18 @@ const line = (
 ): PlanLine => ({ key, label, actual_cents, plan_cents, difference_cents, status, needs_pay_stub });
 
 /**
- * Spec 015 rule 19 for November: essentials 182,300 from the emergency fund
- * decision, savings 30,000 from its goal, the 401(k) at 4% of S2's gross
- * (10,833) and the HDHP premium for one paycheck (3,125).
+ * Spec 015 rule 19 for November: savings 30,000 from the emergency fund's
+ * goal, the 401(k) at 4% of S2's gross (10,833) and the HDHP premium for one
+ * paycheck (3,125). The spending buckets have no plan (issue 269: the
+ * essentials were measured against the fund's sizing input).
  */
 export const novemberPlan = (): PlanLine[] => [
   line('income', 'Income deposited', 205_892, null, null),
-  line('essentials', 'Essentials', 25_860, 182_300, -156_440, 'under'),
+  line('essentials', 'Essentials', 25_860, null, null),
   line('flexible', 'Flexible', 22_349, null, null),
   line('other', 'Other spending', 0, null, null),
   line('savings', 'Savings', 30_000, 30_000, 0, 'on_plan'),
-  line('retirement', '401(k) from pay stubs', 5_417, 10_833, -5_416, 'under'),
+  line('retirement', '401(k) from pay stubs', 5_417, 10_833, -5_416, 'behind'),
   line('health', 'Health premiums', 3_125, 3_125, 0, 'on_plan'),
   line('left_over', 'Left over', 127_683, null, null),
 ];

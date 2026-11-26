@@ -114,7 +114,7 @@ describe('planStatusTone', () => {
   it('reads the API status on the November lines', () => {
     expect(novemberPlan().map((l) => [l.key, planStatusTone(l)])).toEqual([
       ['income', 'neutral'],
-      ['essentials', 'confirmed'],
+      ['essentials', 'neutral'],
       ['flexible', 'neutral'],
       ['other', 'neutral'],
       ['savings', 'confirmed'],
@@ -124,29 +124,19 @@ describe('planStatusTone', () => {
     ]);
   });
 
-  it('is confirmed on plan, whatever the line', () => {
-    for (const key of ['essentials', 'savings', 'retirement', 'health'] as const) {
+  it('is confirmed on plan and ahead of it, whatever the line (spec 015 rule 19a)', () => {
+    for (const key of ['savings', 'retirement', 'health'] as const) {
       expect(planStatusTone(line(key, 'on_plan'))).toBe('confirmed');
+      expect(planStatusTone(line(key, 'ahead'))).toBe('confirmed');
     }
   });
 
-  it('asks for a look above the plan on spending lines, where less is not a problem', () => {
-    for (const key of ['essentials', 'flexible', 'other'] as const) {
+  it('asks for a look behind the plan, and either side of a plan to be matched', () => {
+    for (const key of ['savings', 'retirement', 'health'] as const) {
+      expect(planStatusTone(line(key, 'behind'))).toBe('warning');
       expect(planStatusTone(line(key, 'over'))).toBe('warning');
-      expect(planStatusTone(line(key, 'under'))).toBe('confirmed');
-    }
-  });
-
-  it('asks for a look below the plan where more is not a problem', () => {
-    for (const key of ['savings', 'retirement', 'income', 'left_over'] as const) {
       expect(planStatusTone(line(key, 'under'))).toBe('warning');
-      expect(planStatusTone(line(key, 'over'))).toBe('confirmed');
     }
-  });
-
-  it('asks for a look either side on health premiums, which should match the chosen plan', () => {
-    expect(planStatusTone(line('health', 'over'))).toBe('warning');
-    expect(planStatusTone(line('health', 'under'))).toBe('warning');
   });
 
   it('stays neutral without a plan', () => {
@@ -158,6 +148,9 @@ describe('planStatusTone', () => {
 describe('planStatusText', () => {
   it('says the status in words, and nothing without one', () => {
     expect(planStatusText('on_plan')).toBe('On plan');
+    // Issue 269: saving more than planned is ahead, not "over" like overspending.
+    expect(planStatusText('ahead')).toBe('Ahead of plan');
+    expect(planStatusText('behind')).toBe('Behind plan');
     expect(planStatusText('over')).toBe('Over plan');
     expect(planStatusText('under')).toBe('Under plan');
     expect(planStatusText(null)).toBeNull();

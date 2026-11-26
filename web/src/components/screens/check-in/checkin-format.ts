@@ -131,42 +131,27 @@ export const handledText = ({
   `${formatNumber(handled_count)} of ${formatNumber(finding_count)} handled`;
 
 /**
- * Which side of the plan needs a look, by line (spec 015 rule 19a: the API
- * says the side, the client says whether it matters). Spending more than the
- * plan does, spending less does not. Where more is not a problem (saving or
- * contributing more, more pay, more left over), only falling short does.
- * Health premiums should match the chosen plan, so either side does: a
- * premium off the plan means the election is not the one saved.
- */
-const NEEDS_A_LOOK: Record<PlanLine['key'], ReadonlySet<'over' | 'under'>> = {
-  income: new Set(['under']),
-  essentials: new Set(['over']),
-  flexible: new Set(['over']),
-  other: new Set(['over']),
-  savings: new Set(['under']),
-  retirement: new Set(['under']),
-  health: new Set(['over', 'under']),
-  left_over: new Set(['under']),
-};
-
-/**
- * A line's state against its plan, from the API's `status`: on plan is
- * confirmed, a side that needs a look is a warning, a side that does not is
- * confirmed too, and a line with no plan (no status) stays neutral.
+ * A line's state against its plan, from the API's `status` (spec 015 rule
+ * 19a), which already says what the line's side of the plan means for it:
+ * `on_plan` and `ahead` (more saved or contributed than planned) are
+ * confirmed; `behind`, and `over` or `under` a plan that should be matched
+ * (the health premium), need a look; a line with no plan (no status) stays
+ * neutral. The client decides nothing about sides (issue 269).
  */
 export function planStatusTone(line: PlanLine): Tone {
   if (line.status === null) return 'neutral';
-  if (line.status === 'on_plan') return 'confirmed';
-  return NEEDS_A_LOOK[line.key].has(line.status) ? 'warning' : 'confirmed';
+  return line.status === 'on_plan' || line.status === 'ahead' ? 'confirmed' : 'warning';
 }
 
 const STATUS_WORDS: Record<NonNullable<PlanLine['status']>, string> = {
   on_plan: 'On plan',
+  ahead: 'Ahead of plan',
+  behind: 'Behind plan',
   over: 'Over plan',
   under: 'Under plan',
 };
 
-/** The API's status in words ("Under plan"), or null for a line with no plan. */
+/** The API's status in words ("Ahead of plan"), or null for a line with no plan. */
 export const planStatusText = (status: PlanLine['status']): string | null =>
   status === null ? null : STATUS_WORDS[status];
 
