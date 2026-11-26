@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -263,6 +264,96 @@ def test_a_stopped_run_still_writes_its_report(tmp_path: Path) -> None:
     data = json.loads(report.read_text())
     assert data["suites"]["calc"]["regressions"] == []
     assert data["stopped"] == "pricey: stopped, spent 50.00 cents, cap is 10.00 cents"
+
+
+TESSERACT_MISSING = (
+    "tesseract is not installed; extraction-smoke needs it "
+    "(brew install tesseract on macOS, apt-get install tesseract-ocr on Debian)"
+)
+
+
+def needing(name: str, missing: str) -> Suite:
+    """A free suite this machine lacks ``missing`` for; running it would be a bug."""
+
+    def execute(budget: Budget) -> SuiteResult:
+        raise AssertionError(f"{name} ran without {missing}")
+
+    return Suite(name=name, llm=False, run=execute, missing_requirement=lambda: missing)
+
+
+def test_a_suite_declares_nothing_missing_by_default() -> None:
+    assert REGISTRY["calc"].missing_requirement() is None
+
+
+def test_extraction_smoke_says_what_it_needs(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    assert run.SUITES["extraction-smoke"].missing_requirement() == TESSERACT_MISSING
+    monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/tesseract")
+    assert run.SUITES["extraction-smoke"].missing_requirement() is None
+
+
+def test_an_alias_skips_an_unavailable_suite_and_runs_the_rest(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``make eval`` on a laptop without tesseract: one line says what is missing
+    and how to install it, the other free suites run and the exit code is theirs."""
+    monkeypatch.delenv("CI", raising=False)
+    baseline = write_baseline(
+        tmp_path / "baseline.json",
+        {"ocr": {"ssn_free": 1.0}, "calc": {"pass_rate": 1.0}, "rules": {"accuracy": 0.9}},
+    )
+    registry = {"ocr": needing("ocr", TESSERACT_MISSING), **REGISTRY}
+    report = tmp_path / "report.json"
+    argv = ["--suite", "free", "--max-cost-cents", "0", "--baseline", str(baseline)]
+    assert run.main([*argv, "--report", str(report)], registry=registry) == 0
+    out = capsys.readouterr().out
+    assert f"ocr: unavailable, {TESSERACT_MISSING}" in out
+    assert "calc: ok" in out
+    assert "rules: ok" in out
+    data = json.loads(report.read_text())
+    assert data["unavailable"] == {"ocr": TESSERACT_MISSING}
+    assert set(data["suites"]) == {"calc", "rules"}
+    # A regression among the suites that ran is still exit 1.
+    write_baseline(baseline, {"ocr": {"ssn_free": 1.0}, "calc": {"pass_rate": 1.0}})
+    assert run.main(argv, registry=registry) == 1
+
+
+def test_a_suite_asked_for_by_name_must_run(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("CI", raising=False)
+    baseline = write_baseline(
+        tmp_path / "baseline.json", {"ocr": {"ssn_free": 1.0}, "calc": {"pass_rate": 1.0}}
+    )
+    registry = {"ocr": needing("ocr", TESSERACT_MISSING), "calc": REGISTRY["calc"]}
+    argv = ["--suite", "ocr", "--suite", "calc", "--max-cost-cents", "0"]
+    assert run.main([*argv, "--baseline", str(baseline)], registry=registry) == 2
+    out = capsys.readouterr().out
+    assert f"ocr: unavailable, {TESSERACT_MISSING}" in out
+    # The run still goes on, so the person sees what did run.
+    assert "calc: ok" in out
+
+
+def test_ci_has_no_unavailable_suites(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """CI installs what every suite needs, so a suite that cannot run there is a
+    broken job, not a laptop, whichever way it was asked for."""
+    monkeypatch.setenv("CI", "true")
+    baseline = write_baseline(
+        tmp_path / "baseline.json", {"ocr": {"ssn_free": 1.0}, "calc": {"pass_rate": 1.0}}
+    )
+    registry = {"ocr": needing("ocr", TESSERACT_MISSING), "calc": REGISTRY["calc"]}
+    argv = ["--suite", "free", "--max-cost-cents", "0", "--baseline", str(baseline)]
+    assert run.main(argv, registry=registry) == 2
+
+
+def test_extraction_smoke_without_tesseract_is_one_plain_line(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Issue 280: the runner says what is missing before pytesseract can raise."""
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    assert run.main(["--suite", "extraction-smoke", "--max-cost-cents", "0"]) == 2
+    assert capsys.readouterr().out == f"extraction-smoke: unavailable, {TESSERACT_MISSING}\n"
 
 
 def test_the_committed_baseline_covers_every_registered_suite() -> None:

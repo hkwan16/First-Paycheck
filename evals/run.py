@@ -7,8 +7,15 @@
 ``llm`` (suites that call Claude) or ``all``. It can be repeated.
 
 Exit codes: 0 every metric meets its baseline; 1 a regression or a suite with
-no baseline; 2 the cost cap was hit, a suite cannot run here (no API key) or the
-arguments are wrong.
+no baseline; 2 the cost cap was hit, the arguments are wrong, or a suite that
+cannot run here was asked for by name or is missing in CI.
+
+A suite that cannot run here (no API key, no tesseract binary) is reported on
+one line saying what is missing and the run goes on with the other suites. Asked
+for through an alias on a laptop, that notice is all, and the exit code is the
+suites' that ran (``make eval`` without tesseract still reports the suites it
+could run). Asked for by name, or with ``CI`` set (CI installs what every suite
+needs, so a missing requirement there is a broken job), the run exits 2.
 
 Deterministic suites may not drop below their baseline at all (tolerance 0).
 An LLM metric may drop by 2 points or by one case's worth, whichever is larger
@@ -16,13 +23,15 @@ An LLM metric may drop by 2 points or by one case's worth, whichever is larger
 next does not fail a metric measured over few cases. A metric above its
 baseline passes. ``--update-baseline`` rewrites the baseline from this run;
 commit that change on its own. ``--report`` is written even when the cost cap
-or an unavailable suite stops the run, with the reason under ``stopped``.
+stops the run, with the reason under ``stopped``; the suites that could not run
+are under ``unavailable`` with what each is missing.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -85,6 +94,14 @@ def regressions(
     return found
 
 
+def run_suite(suite: Suite, budget: Budget) -> SuiteResult:
+    """``suite``'s result; ``SuiteUnavailable`` when it names a missing requirement."""
+    missing = suite.missing_requirement()
+    if missing is not None:
+        raise SuiteUnavailable(missing)
+    return suite.run(budget)
+
+
 def _parser(registry: Mapping[str, Suite]) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m evals.run", description=__doc__.split("\n")[0])
     parser.add_argument(
@@ -123,18 +140,25 @@ def main(argv: Sequence[str] | None = None, *, registry: Mapping[str, Suite] = S
     baseline: dict[str, dict[str, float]] = (
         json.loads(args.baseline.read_text()) if args.baseline.exists() else {}
     )
+    named = {name for name in args.suite if name not in ALIASES}
     budget = Budget(args.max_cost_cents)
-    report: dict[str, Any] = {"suites": {}}
+    report: dict[str, Any] = {"suites": {}, "unavailable": {}}
     failed = False
+    unavailable = False
     for suite in suites:
         try:
-            result = suite.run(budget)
-        except (CostCapExceeded, SuiteUnavailable) as exc:
-            word = "stopped" if isinstance(exc, CostCapExceeded) else "unavailable"
-            report["stopped"] = f"{suite.name}: {word}, {exc}"
+            result = run_suite(suite, budget)
+        except CostCapExceeded as exc:
+            report["stopped"] = f"{suite.name}: stopped, {exc}"
             print(report["stopped"])
             _write_report(args.report, report, budget)
             return 2
+        except SuiteUnavailable as exc:
+            # An alias asks for whatever can run here; a name, or CI, asks for this one.
+            report["unavailable"][suite.name] = str(exc)
+            print(f"{suite.name}: unavailable, {exc}")
+            unavailable = unavailable or suite.name in named or bool(os.environ.get("CI"))
+            continue
         allowed = tolerances(result, llm=suite.llm)
         if args.update_baseline:
             baseline[suite.name] = dict(result.metrics)
@@ -164,6 +188,8 @@ def main(argv: Sequence[str] | None = None, *, registry: Mapping[str, Suite] = S
         args.baseline.write_text(json.dumps(baseline, indent=2, sort_keys=True) + "\n")
         print(f"baseline written to {args.baseline}")
     _write_report(args.report, report, budget)
+    if unavailable:
+        return 2
     return 1 if failed else 0
 
 

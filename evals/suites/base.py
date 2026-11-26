@@ -43,6 +43,11 @@ class SuiteResult:
     case_worth: dict[str, float] = field(default_factory=dict)
 
 
+def nothing_missing() -> str | None:
+    """The default ``Suite.missing_requirement``: the suite can run anywhere."""
+    return None
+
+
 @dataclass(frozen=True)
 class Suite:
     name: str
@@ -50,3 +55,7 @@ class Suite:
     # points of drift, whichever is larger; deterministic suites tolerate none.
     llm: bool
     run: Callable[[Budget], SuiteResult]
+    # What this machine lacks for the suite to run, as one plain sentence naming
+    # it and how to install it, or None. The runner asks before ``run`` and
+    # reports the suite unavailable instead of letting it fail inside.
+    missing_requirement: Callable[[], str | None] = nothing_missing
