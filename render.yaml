@@ -5,7 +5,8 @@
 # pre-deploy command. app.serve supervises uvicorn and `python -m jobs.worker`
 # in one container; migrations and seeds run from CI (deploy.yml) before the
 # deploy hook fires. A free instance spins down after 15 idle minutes, so
-# .github/workflows/keepalive.yml pings /health every 10 minutes.
+# app.serve requests KEEPALIVE_URL (its own /health) every 10 minutes while it
+# is up, and .github/workflows/keepalive.yml wakes an instance that did sleep.
 #
 # Deploys are triggered only by deploy.yml after CI passes on main
 # (autoDeploy: false). Secrets are `sync: false`: Render asks for them when the
@@ -59,6 +60,10 @@ envVarGroups:
       # Sentry free tier; API and worker events are tagged by component.
       - key: SENTRY_DSN
         sync: false
+      # The service's own public /health, requested every 10 minutes so the
+      # free instance never idles (app/keepalive.py).
+      - key: KEEPALIVE_URL
+        value: https://first-paycheck-api.onrender.com/health
 
 services:
   - type: web

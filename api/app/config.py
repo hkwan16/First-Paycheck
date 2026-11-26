@@ -81,6 +81,11 @@ class Settings(BaseSettings):
     # Error reporting (app/sentry.py); unset means no Sentry at all.
     sentry_dsn: SecretStr | None = None
 
+    # Keep-alive (app/keepalive.py): the deployed API's own public URL, requested
+    # every 10 minutes so Render Free never sees the instance idle. Unset means
+    # no self-ping; only Render sets it.
+    keepalive_url: str | None = None
+
     @classmethod
     def settings_customise_sources(
         cls,
@@ -129,6 +134,13 @@ class Settings(BaseSettings):
                 re.compile(value)
             except re.error as exc:
                 raise ValueError(f"CORS_ORIGIN_REGEX is not a valid regex: {exc}") from exc
+        return value
+
+    @field_validator("keepalive_url")
+    @classmethod
+    def _http_url(cls, value: str | None) -> str | None:
+        if value is not None and not value.startswith(("http://", "https://")):
+            raise ValueError("KEEPALIVE_URL must be an http:// or https:// URL")
         return value
 
     @model_validator(mode="after")

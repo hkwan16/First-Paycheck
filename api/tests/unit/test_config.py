@@ -14,6 +14,7 @@ from app.config import REPO_ROOT, Settings
 
 ENV_EXAMPLE = REPO_ROOT / ".env.example"
 RENDER_BLUEPRINT = REPO_ROOT / "render.yaml"
+KEEPALIVE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "keepalive.yml"
 
 
 @pytest.fixture(autouse=True)
@@ -87,6 +88,15 @@ def test_cors_origins_parse_from_a_comma_separated_env_value(
 def test_invalid_cors_regex_is_rejected() -> None:
     with pytest.raises(ValidationError, match="CORS_ORIGIN_REGEX"):
         make(cors_origin_regex="([unclosed")
+
+
+def test_keepalive_url_must_be_an_http_url() -> None:
+    with pytest.raises(ValidationError, match="KEEPALIVE_URL"):
+        make(keepalive_url="ftp://first-paycheck-api.onrender.com/health")
+
+
+def test_blank_keepalive_url_turns_the_self_ping_off() -> None:
+    assert make(keepalive_url="").keepalive_url is None
 
 
 def test_git_sha_reads_render_git_commit(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -236,3 +246,17 @@ def test_render_blueprint_model_ids_match_the_defaults() -> None:
         if var["key"].startswith("LLM_MODEL_")
     }
     assert deployed == _model_defaults()
+
+
+def test_render_blueprint_keepalive_url_is_the_health_url_the_cron_pings() -> None:
+    """Issue #197: the deployed API requests its own /health; the GitHub cron wakes the same URL."""
+    blueprint = yaml.safe_load(RENDER_BLUEPRINT.read_text())
+    deployed = {
+        var["key"]: var.get("value")
+        for group in blueprint["envVarGroups"]
+        for var in group["envVars"]
+    }
+    workflow = yaml.safe_load(KEEPALIVE_WORKFLOW.read_text())
+    [step] = workflow["jobs"]["ping"]["steps"]
+    assert deployed["KEEPALIVE_URL"] == "https://first-paycheck-api.onrender.com/health"
+    assert deployed["KEEPALIVE_URL"] in step["run"]

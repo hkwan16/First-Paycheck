@@ -12,6 +12,12 @@ other is terminated and the supervisor exits 1, so Render restarts the service
 instead of running half of it. Migrations run from CI before the deploy hook
 fires (see .github/workflows/deploy.yml), not here.
 
+When ``KEEPALIVE_URL`` is set (Render only) the supervisor also runs
+``app.keepalive.Pinger`` on a thread: a request to the service's own public
+URL every 10 minutes, so Render Free never sees the instance idle while it is
+up (issue 197). The GitHub cron remains the restarter for an instance that
+did sleep.
+
 ``python -m app.serve api`` runs uvicorn in-process with the logging config
 from ``app.logs``, so uvicorn's own lines are JSON like the app's and its
 access log gives way to ``app.request``'s one line per request.
@@ -33,6 +39,8 @@ from typing import Any
 
 import uvicorn
 
+from app.config import get_settings
+from app.keepalive import Pinger, pinger_for
 from app.logs import configure_logging, logging_config
 
 log = logging.getLogger(__name__)
@@ -78,8 +86,9 @@ def commands_from_env() -> dict[str, list[str]]:
 
 
 class Supervisor:
-    def __init__(self, commands: Mapping[str, list[str]]) -> None:
+    def __init__(self, commands: Mapping[str, list[str]], *, pinger: Pinger | None = None) -> None:
         self.commands = dict(commands)
+        self.pinger = pinger
         self.processes: dict[str, subprocess.Popen[bytes]] = {}
 
     def start(self) -> None:
@@ -109,6 +118,15 @@ class Supervisor:
     def run(self, stop_requested: Callable[[float], bool] | None = None) -> int:
         """Supervise until a stop is requested or a child exits. Returns the exit code."""
         self.start()
+        if self.pinger is not None:
+            self.pinger.start()
+        try:
+            return self._wait_for_exit(stop_requested)
+        finally:
+            if self.pinger is not None:
+                self.pinger.stop()
+
+    def _wait_for_exit(self, stop_requested: Callable[[float], bool] | None) -> int:
         while True:
             if stop_requested is not None and stop_requested(time.monotonic()):
                 log.info("stop requested, terminating children")
@@ -127,6 +145,10 @@ class Supervisor:
             time.sleep(POLL_SECONDS)
 
 
+def supervisor_from_env() -> Supervisor:
+    return Supervisor(commands_from_env(), pinger=pinger_for(get_settings()))
+
+
 def supervise() -> int:
     stop = {"requested": False}
 
@@ -135,8 +157,7 @@ def supervise() -> int:
 
     for signum in (signal.SIGTERM, signal.SIGINT):
         signal.signal(signum, request_stop)
-    supervisor = Supervisor(commands_from_env())
-    return supervisor.run(stop_requested=lambda _: stop["requested"])
+    return supervisor_from_env().run(stop_requested=lambda _: stop["requested"])
 
 
 def main(argv: Sequence[str] | None = None) -> int:

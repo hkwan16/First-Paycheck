@@ -16,11 +16,13 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
-from app import logs, serve
+from app import keepalive, logs, serve
+from app.config import get_settings
 from tests.support.net import free_port
 
 # Child commands that behave like the real processes: run until SIGTERM, exit 0.
@@ -56,6 +58,51 @@ def test_a_child_dying_stops_the_other_and_exits_nonzero() -> None:
     code = supervisor.run()
     assert code == 1
     assert all(proc.returncode is not None for proc in supervisor.processes.values())
+
+
+def test_the_pinger_runs_beside_the_children_and_stops_with_them() -> None:
+    """Issue #197: the API requests its own public URL so Render Free never sees it idle."""
+    calls: list[str] = []
+
+    def fetch(url: str, _timeout: float) -> int:
+        calls.append(url)
+        return 200
+
+    pinger = keepalive.Pinger("https://api.example/health", interval=0.02, fetch=fetch)
+    supervisor = serve.Supervisor(
+        {"api": SLEEP_UNTIL_TERM, "worker": SLEEP_UNTIL_TERM}, pinger=pinger
+    )
+    started = time.monotonic()
+    code = supervisor.run(stop_requested=lambda _: time.monotonic() - started >= 0.3)
+    assert code == 0
+    assert calls
+    assert set(calls) == {"https://api.example/health"}
+    seen = len(calls)
+    time.sleep(0.1)
+    assert len(calls) == seen
+
+
+@pytest.fixture
+def settings_from_env() -> Iterator[None]:
+    get_settings.cache_clear()
+    try:
+        yield
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.usefixtures("settings_from_env")
+def test_the_supervisor_pings_the_configured_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KEEPALIVE_URL", "https://first-paycheck-api.onrender.com/health")
+    supervisor = serve.supervisor_from_env()
+    assert supervisor.pinger is not None
+    assert supervisor.pinger.url == "https://first-paycheck-api.onrender.com/health"
+
+
+@pytest.mark.usefixtures("settings_from_env")
+def test_the_supervisor_has_no_pinger_without_a_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("KEEPALIVE_URL", raising=False)
+    assert serve.supervisor_from_env().pinger is None
 
 
 def test_children_are_the_api_server_and_the_worker() -> None:

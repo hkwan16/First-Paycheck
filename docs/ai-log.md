@@ -811,3 +811,23 @@ Every entry has a dated heading and these fields, in this order. A field that do
 **Merge with the second wave (PRs 252, 253, 255):** those branches still dated by UTC. PR 255's birth-year bound (`latest_birth_year(now.year)`, a `field_error`) now counts from the person's year, on the API and in the plan details form (which read `new Date().getUTCFullYear()`); PR 252's "Saved Oct 21, 2026" on each PDF decision (`utc_day(created_at)`) became `PlanDecision.saved_on`, the person's day of the save, which the Plan page now prints too instead of `created_at` in the browser's zone, so the two agree. Two e2e helpers from those branches (`import.spec.ts`'s last day of last month, `decisions.spec.ts`'s latest birth year) used the UTC date and now use the browser's. A failing test came first for both behavior changes: on the API (`test_birth_year_bound_is_the_persons_year`, `test_a_decision_is_saved_on_the_persons_day`) and on the web (`Match401kCard`, `PlanScreen`).
 
 **Time saved or lost:** Not measured.
+
+## 2026-11-26: the API slept because GitHub ran the keep-alive cron a few times a day (issue 197)
+
+**Task:** `keepalive.yml` asked GitHub Actions for a `/health` ping every 10 minutes; GitHub ran it three times in eight hours on November 1 and two to four times a day since, so Render Free spun the API down and a first visit waited 20 to 60 seconds.
+
+**Tool:** Claude Code, a subagent in its own worktree, orchestrated from the main session.
+
+**Prompt or skill:** Evaluate a long-running pinger job, staggered cron schedules, and a self-ping from the API; pick one, failing unit test first, document the external option.
+
+**What it produced:** `app/keepalive.py`: a `Pinger` thread that `app.serve` runs beside the API and the worker, requesting `KEEPALIVE_URL` (the service's own public `/health`, set only in `render.yaml`) every 10 minutes with `http.client`; a failed request is a warning. The GitHub cron stays as the restarter for an instance that did sleep, now on two schedules off the top of the hour (`3-59/10`, `8-59/10`). `test_config.py` holds `render.yaml`'s `KEEPALIVE_URL` to the URL the cron pings.
+
+**What was wrong:**
+- `urllib.request.urlopen` with a non-literal URL is ruff S310, and the repo takes no suppressions, so the fetch uses `http.client` with the scheme restricted by the settings validator.
+- The first ping waits one interval rather than firing at start, so a deploy whose API is still coming up is not logged as a failure.
+
+**How it was caught:** `test_keepalive.py` and the new `test_serve.py` cases failing on import before the module existed; the Actions run history for the cadence.
+
+**Fix:** As above, on `fix/keepalive-cadence`. Whether Render counts the self-request as inbound traffic can only be seen after deploy: a day of `/health` spot checks.
+
+**Time saved or lost:** Not measured.

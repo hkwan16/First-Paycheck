@@ -579,6 +579,12 @@ explanation, `GET /calendar` shows the check it implies.
   the privileged connection; spec 002 rule 38). It stays 200 when the worker is
   stale or the read fails. Tests point `get_queue_bind` at their connection
   (the `app` fixture does) or override `worker_state`.
+- `app/keepalive.py` keeps the Render Free instance warm (issue 197): when
+  `KEEPALIVE_URL` is set (Render only; blank elsewhere) `app.serve` runs a
+  `Pinger` thread that requests the service's own public `/health` every 10
+  minutes with plain `http.client`, logging `keepalive ping` with its status.
+  The GitHub cron (`keepalive.yml`, two schedules off the top of the hour) only
+  wakes an instance that did sleep. Tests pass a fake `fetch`.
 
 ## Recurring charges, cash flow and CSV import (from M5)
 
