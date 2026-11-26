@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CALCULATORS } from '@/lib/features';
+import { SCHEDULE_CHANGED } from '@/test/fixtures/decisions';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
-import { decisionsReady, savedDecision } from '@/test/msw/db';
+import { db, decisionsReady, savedDecision } from '@/test/msw/db';
 import {
   benefitsConfirmed,
   savedEmergencyFund,
@@ -95,6 +96,41 @@ describe('DecisionStepScreen (spec 018)', () => {
       await within(screen.getByRole('region', { name: 'W-4, federal only' })).findByText(
         'Saved Oct 17',
       ),
+    ).toBeInTheDocument();
+  });
+
+  it('counts the decisions that need review with the plan, the card and the nav (issue 257)', async () => {
+    savedDecision();
+    savedEmergencyFund();
+    savedHealthPlan();
+    savedW4();
+    for (const row of db.decisions) {
+      if (row.calculator === 'health_plans' || row.calculator === 'w4') {
+        row.review = [SCHEDULE_CHANGED];
+      }
+    }
+    renderWithProviders(<DecisionStepScreen calculator="401k_match" calculators={CALCULATORS} />);
+    await waitFor(() =>
+      expect(screen.getByText(/of 4 saved/)).toHaveTextContent('4 of 4 saved, 2 need review'),
+    );
+    // The 401(k) itself needs none, so its card still reads as saved.
+    expect(
+      await within(screen.getByRole('region', { name: '401(k) match' })).findByText('Saved Oct 17'),
+    ).toBeInTheDocument();
+  });
+
+  it('says "1 needs review" for one, on the page of the decision that needs it', async () => {
+    savedDecision();
+    savedEmergencyFund();
+    savedHealthPlan();
+    savedW4();
+    db.decisions.find((row) => row.calculator === 'health_plans')!.review = [SCHEDULE_CHANGED];
+    renderWithProviders(<DecisionStepScreen calculator="health_plan" calculators={CALCULATORS} />);
+    await waitFor(() =>
+      expect(screen.getByText(/of 4 saved/)).toHaveTextContent('4 of 4 saved, 1 needs review'),
+    );
+    expect(
+      await within(screen.getByRole('region', { name: 'Health plan' })).findByText('Needs review'),
     ).toBeInTheDocument();
   });
 

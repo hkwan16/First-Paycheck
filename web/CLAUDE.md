@@ -659,7 +659,10 @@ Spec 018. Decisions is four steps, one page per calculator, in the mockup's orde
 fund (`/setup/decisions/emergency-fund`), 401(k) (`/401k`), health plan (`/health-plan`), W-4
 (`/w4`, last because it reads the saved 401(k) and health plan). Each `page.tsx` renders
 `DecisionStepScreen` with its `calculator`: an eyebrow "Decision n of 4" with the "n of 4 saved"
-badge (every saved calculator), the step's question as the h1 (`STEP_TEXT` in
+badge (every saved calculator, with ", 2 need review" while any does; `SavedCountBadge` over
+`decisionProgress` in `lib/decisions.ts`, the same reading of `GET /decisions` as the side nav's
+done marks and the Plan's completeness badge, and the same words as `savedCountText`, with each
+count a `Num` as the chip always drew it, issue 257), the step's question as the h1 (`STEP_TEXT` in
 `lib/decision-steps.ts`, which also has the tab title, the nav label and the footer's name), the
 lead (live calculators only), the one card in its `CardErrorBoundary` in a `max-w-3xl` column,
 and a `StepFooter` from `stepFooter(calculator, live)` (`step-footer.ts`): Back to the previous
@@ -682,7 +685,8 @@ Cards share `DecisionCard`, `SaveButton`, `AmountField` and `saveErrorText`
   indented behind a hairline, each a 44px link with an 18px `NavStep` (a dot, or a check once
   done). The current step has `aria-current="page"`; "Decisions" never does on a step. A step is
   done when its calculator is live and its saved decision needs no review (`setupProgress` over
-  `settledDecisionCalculators`, keyed by the calculator id; spec 018 rule 8, issue 222);
+  `settledDecisionCalculators`, `decisionProgress(list).settled`, keyed by the calculator id;
+  spec 018 rule 8, issue 222);
   "Decisions" when every live one is. A step that is not live is muted with "After alpha" under
   its label (its name ends ", After alpha") and still links to its placeholder page.
   `navKeyForPath` returns the calculator id for a step's path.
@@ -930,7 +934,9 @@ nav's "Plan and calendar" gets its done mark when the plan's `completeness.missi
 
 - **Completeness**: an "n of 4 decisions saved" badge (`completenessText`, counting the API's
   lists, with ", 3 need review" or ", 1 needs review" while any does; `completenessTone`:
-  `confirmed` when nothing is missing or needs review, `warning` while any needs review) and
+  `confirmed` when nothing is missing or needs review, `warning` while any needs review; both
+  word it through `savedCountText` and `savedCountTone` in `lib/decisions.ts`, as the decision
+  steps' chip does) and
   "Still to decide" linking each missing calculator to its step (`decisionKindRoute`).
 - **Needs review** (spec 016 rule 3a): a decision with `review` reasons shows a "Needs review"
   badge, the reasons in the API's words and "Review your health plan" (its step) in place of its
