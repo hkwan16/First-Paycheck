@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import io
 import re
+import shutil
 from collections.abc import Sequence
 
 from PIL import Image
@@ -98,4 +99,14 @@ def run(budget: Budget) -> SuiteResult:
     return score(load_fixtures())
 
 
-SUITE = Suite(name="extraction-smoke", llm=False, run=run)
+def missing_requirement() -> str | None:
+    """The tesseract binary, named with how to install it, when it is absent."""
+    if shutil.which("tesseract") is None:
+        return (
+            "tesseract is not installed; extraction-smoke needs it "
+            "(brew install tesseract on macOS, apt-get install tesseract-ocr on Debian)"
+        )
+    return None
+
+
+SUITE = Suite(name="extraction-smoke", llm=False, run=run, missing_requirement=missing_requirement)

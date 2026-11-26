@@ -14,12 +14,27 @@ uv run python -m evals.run --suite free --max-cost-cents 0 --report evals/result
 ```
 
 Run from the repo root (`evals` is imported as a package). Exit code 0 means
-every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
+every metric met its baseline, 1 a regression, 2 the cost cap, bad arguments or
+a suite that cannot run here and was asked for by name.
+
+A suite that cannot run here (an LLM suite without `ANTHROPIC_API_KEY`,
+`extraction-smoke` without the tesseract binary) is reported on one line,
+`<suite>: unavailable, <what is missing and how to install it>`, and the run
+goes on with the other suites; the report lists it under `unavailable`. The
+exit code is 2 when that suite was asked for by name, or when `CI` is set (CI
+installs what every suite needs, so a missing requirement there is a broken
+job); through the `free`, `llm` or `all` alias on a laptop the notice is all,
+and the exit code is the suites' that ran, so `make eval` without tesseract
+still reports the suites it could run (issue #280). The same rule for free and
+LLM suites: an alias asks for whatever can run here, a name asks for that one.
+A suite declares what it needs in `Suite.missing_requirement`, a plain sentence
+the runner asks for before `run`, so the suite never fails inside.
 
 ## Layout
 
 - `run.py`: CLI, suite selection (`free`, `llm`, `all` aliases), baseline comparison.
-- `suites/base.py`: `Suite`, `SuiteResult`, `Budget`. `suites/__init__.py`: the registry.
+- `suites/base.py`: `Suite` (name, `llm`, `run`, `missing_requirement`), `SuiteResult`,
+  `Budget`. `suites/__init__.py`: the registry.
 - `suites/<name>.py`: one module per suite exposing `SUITE`.
 - `suites/live.py`: `live_gateway(budget)`, the real-model gateway every LLM
   suite's `run` uses, its ledger charging the run's `Budget` (and
@@ -94,7 +109,7 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
 - `suites/extraction.py` (`extraction`, LLM): the real pipeline and Sonnet over
   the stubs; `field_accuracy`, `document_accuracy`. Redaction runs before the
   model, so `extraction-smoke` scores it, at zero tolerance. Raises
-  `SuiteUnavailable` (exit 2) without `ANTHROPIC_API_KEY`. Its baseline is
+  `SuiteUnavailable` without `ANTHROPIC_API_KEY` (Run, above). Its baseline is
   measured: 1.0 on both in every live run on October 29, about 55 cents a run
   (spec 005 targets 0.95, 0.70), and again with `extract_pay_stub/v2` over the
   34 stubs on November 1, about 63 cents a run (v1 scored 0.9118 there: it
@@ -102,7 +117,10 @@ every metric met its baseline, 1 a regression, 2 the cost cap or bad arguments.
 - `suites/extraction_smoke.py` (`extraction-smoke`, free): the same pipeline
   with `FakeGateway`; checks every stub yields a proposal, SSNs are redacted,
   and neither the SSN nor an unmasked account number reaches the model input
-  (image pages are OCR'd again to check). Needs the tesseract binary.
+  (image pages are OCR'd again to check). Needs the tesseract binary: its
+  `missing_requirement` names it, with the brew and apt-get lines, when
+  `shutil.which` cannot find it, and the runner reports the suite unavailable
+  instead of letting pytesseract raise (issue #280).
 - `fixtures/calc/k401.json`: every spec 006 example (ids are the spec's test
   names, `spec-006-<name>`) plus the no-match edge case. A test fails if a row
   of the spec's example table has no case.
