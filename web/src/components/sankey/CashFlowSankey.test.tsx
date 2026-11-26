@@ -35,6 +35,13 @@ describe('CashFlowSankey', () => {
     expect(node('Left over $1,618.94')).toBeInTheDocument();
     expect(node('Phone and internet $70.00')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /\$/ })).toHaveLength(22);
+    // Each button carries the API's node id, so a test can tell the Other
+    // bucket from the "Other" category drawn under it (issue 268).
+    expect(node('Essentials $1,823.25')).toHaveAttribute('data-flow-node', 'bucket:essentials');
+    expect(node('Phone and internet $70.00')).toHaveAttribute(
+      'data-flow-node',
+      'category:phone_internet',
+    );
   });
 
   it('draws the bands as one decorative SVG image, each band in its token color', () => {
@@ -78,6 +85,9 @@ describe('CashFlowSankey', () => {
     expect(group).toHaveAccessibleName('Essentials');
     expect(group).toHaveTextContent('$1,823.25');
     expect(within(group).getByText('Details for bucket:essentials')).toBeInTheDocument();
+    // Opaque: the amounts behind it do not show through (issue 268).
+    expect(group).toHaveClass('bg-surface');
+    expect(group.className).not.toMatch(/bg-surface\/|backdrop-/);
     expect(node('Essentials $1,823.25')).toHaveAttribute('aria-expanded', 'true');
     expect(node('Essentials $1,823.25')).toHaveAttribute('aria-controls', group.id);
     expect(node('Flexible $249.89')).toHaveAttribute('aria-expanded', 'false');

@@ -17,8 +17,7 @@ import { isQuietFlow, type FlowColor } from '@/lib/design/tone';
  * bands into and out of a node add up to its amount. This module only turns
  * cents into pixels: a node is as tall as its amount (or tall enough for its
  * words) and a band as thick as its cents, at one scale that puts the largest
- * node at a target height, so "1 px is about $N" is computed rather than
- * printed. Nothing it computes is ever shown as money except that scale.
+ * node at a target height. Nothing it computes is ever shown as money.
  */
 
 /** Node width and the narrowest gap between columns. */
@@ -89,10 +88,9 @@ export interface FlowLink {
   d: string;
 }
 
+/** Pixels per cent, never shown: a "1 px is about $N" note was jargon (issue 268). */
 export interface FlowScale {
   pxPerCent: number;
-  /** The badge's "1 px is about": whole cents. */
-  centsPerPx: number;
 }
 
 export interface FlowLayout {
@@ -239,10 +237,7 @@ function bandPath(x1: number, ya: number, x2: number, yb: number, t: number): st
 export function flowScale(flow: CashFlow): FlowScale | null {
   const reference = Math.max(0, ...flow.diagram.nodes.map((n) => n.cents));
   if (reference <= 0) return null;
-  return {
-    pxPerCent: TARGET_GROSS_PX / reference,
-    centsPerPx: Math.round(reference / TARGET_GROSS_PX),
-  };
+  return { pxPerCent: TARGET_GROSS_PX / reference };
 }
 
 /** The popover's width; its height is measured. */

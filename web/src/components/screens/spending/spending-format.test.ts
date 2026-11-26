@@ -7,6 +7,7 @@ import {
   payStubsText,
   periodText,
   shareText,
+  SOURCE_TEXT,
   sourceBadge,
 } from './spending-format';
 
@@ -47,6 +48,16 @@ describe('sourceBadge', () => {
     expect(sourceBadge({ ...txn, category: null, category_source: null })).toEqual({
       tone: 'neutral',
       text: 'No category',
+    });
+  });
+
+  it('uses one set of words, for the table and the diagram alike (issue 268)', () => {
+    expect(SOURCE_TEXT).toEqual({
+      user: 'You',
+      guess: 'Our guess',
+      check: 'Guess, check it',
+      rule: 'Known merchant',
+      none: 'No category',
     });
   });
 });

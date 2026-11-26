@@ -8,7 +8,7 @@ import type { CashFlow, SpendingSummary, Transaction, WithholdingLine } from '@/
 import { categoryLabel } from '@/lib/categories';
 import { formatDate } from '@/lib/dates';
 import { formatNumber, formatTransactionAmount } from '@/lib/money';
-import { shareText } from './spending-format';
+import { OTHER_BUCKET_TEXT, shareText } from './spending-format';
 import { SourceBadge } from './TransactionTable';
 import { decisionStepRoute } from '@/lib/routes';
 
@@ -210,7 +210,7 @@ export function FlowDetails({ node, flow, transactions, masks }: FlowDetailsProp
       const about = share ? (
         <Muted>{shareText(share(flow.spending), (p) => `${p} of income`, 1)}</Muted>
       ) : (
-        <Muted>Debt payments, fees, taxes and other spending</Muted>
+        <Muted>{OTHER_BUCKET_TEXT}</Muted>
       );
       if (node.refundsCents === null || !isBucketKey(node.key)) return about;
       // The node is the spending before the money back (spec 010 rule 5b); the
