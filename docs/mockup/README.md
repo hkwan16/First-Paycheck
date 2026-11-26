@@ -1,6 +1,6 @@
 # Mockup B: design reference
 
-These files are the source of Mockup B, the clickable design that settles the look and interactions of the First Paycheck web app. The live version is the Design artifact at <https://claude.ai/artifact/K4UZ8HBNWQ8Ku1F783pm5v>; open it to click through the screens. The files here are copied verbatim from that artifact and are not edited in this repo.
+These files are the source of Mockup B, the clickable design that settles the look and interactions of the First Paycheck web app. The live version is the Design artifact at <https://claude.ai/artifact/K4UZ8HBNWQ8Ku1F783pm5v>; open it to click through the screens. The files here are copied verbatim from that artifact and are not edited in this repo. Where the product has since moved past a screen, [Divergences from the product](#divergences-from-the-product) lists it and the product is the reference for that part.
 
 The mockup is a reference, not code to ship. The React port in `web/` keeps its layout, tokens, components and interactions, and replaces its sample data and client-side formulas with API calls (see [What must change in the port](#what-must-change-in-the-port)).
 
@@ -58,3 +58,12 @@ The mockup takes shortcuts a product cannot. The port fixes each of these:
 6. **A real disabled continue button.** On Confirm, "Confirm and continue" is a link whose style changes when every field is confirmed. The port renders a `button` that is `disabled` until all fields are confirmed and the arithmetic check passes, and the server repeats the check as a 422.
 7. **Derived nav marks.** The side navigation's done marks are written into each artboard. The port derives them from data in `web/src/lib/setup-progress.ts`.
 8. **A stacked Sankey under 640 px.** The mockup scrolls the Sankey horizontally at any narrow width. The port lays it out at `max(880, containerWidth)` with horizontal scroll below 880 px, and under 640 px renders a stacked `Bar` variant that shows the same amounts.
+
+## Divergences from the product
+
+The artboards are not edited after the fact, so when a product change is settled against the mockup the difference is recorded here and the product is the reference for that part. Everything not listed still follows the mockup.
+
+| Screen | Part | Product since | Divergence |
+|---|---|---|---|
+| `Spending.dc.html` | Summary tiles | #268 | Five tiles, not four: an "Other" tile (neutral tone, sub line "Debt payments, fees, taxes and other spending") follows Savings, so income minus the four bucket tiles is the "Left over" line. The grid is five columns. |
+| `Spending.dc.html` | Cash-flow card | #268 | No "Scale: 1 px is about $N" badge. The band widths carry the scale; it is computed by the layout and never written out (spec 010 rule 5c). |
