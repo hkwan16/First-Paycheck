@@ -116,11 +116,11 @@ describe('layoutCashFlow', () => {
     expect(color('category:savings_investment')).toBe('teal');
   });
 
-  it('derives the scale from a target height for the largest node, for the "1 px is about" badge', () => {
+  it('derives the scale from a target height for the largest node, and shows it to no one', () => {
     expect(layout.scale).not.toBeNull();
     expect(layout.scale!.pxPerCent).toBeCloseTo(TARGET_GROSS_PX / 541_666, 12);
-    // 541,666 cents over 240 px is 2,256.94 cents a pixel.
-    expect(layout.scale!.centsPerPx).toBe(2_257);
+    // Pixels only: no cents a pixel for a "1 px is about" note (issue 268).
+    expect(Object.keys(layout.scale!)).toEqual(['pxPerCent']);
     expect(node(layout, 'gross').valuePx).toBeCloseTo(TARGET_GROSS_PX, 6);
   });
 
@@ -297,7 +297,7 @@ describe('layoutCashFlow', () => {
     expect(ids(sandbox, 3)).not.toContain('category:travel');
     // The largest node sets the scale: spending beyond the income, 1,685.41, at 240 px.
     expect(node(sandbox, 'beyond_income').valuePx).toBeCloseTo(TARGET_GROSS_PX, 6);
-    expect(sandbox.scale!.centsPerPx).toBe(702);
+    expect(sandbox.scale!.pxPerCent).toBeCloseTo(TARGET_GROSS_PX / 168_541, 12);
     expectEveryNodeIsItsAmount(sandbox);
   });
 

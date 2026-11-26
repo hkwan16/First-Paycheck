@@ -78,6 +78,9 @@ describe('CashFlowSankey', () => {
     expect(group).toHaveAccessibleName('Essentials');
     expect(group).toHaveTextContent('$1,823.25');
     expect(within(group).getByText('Details for bucket:essentials')).toBeInTheDocument();
+    // Opaque: the amounts behind it do not show through (issue 268).
+    expect(group).toHaveClass('bg-surface');
+    expect(group.className).not.toMatch(/bg-surface\/|backdrop-/);
     expect(node('Essentials $1,823.25')).toHaveAttribute('aria-expanded', 'true');
     expect(node('Essentials $1,823.25')).toHaveAttribute('aria-controls', group.id);
     expect(node('Flexible $249.89')).toHaveAttribute('aria-expanded', 'false');

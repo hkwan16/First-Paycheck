@@ -48,12 +48,30 @@ export function payStubsText(count: number): string {
   return `${formatNumber(count)} ${count === 1 ? 'pay stub' : 'pay stubs'}`;
 }
 
+/**
+ * What the Other bucket holds (spec 007 rule 20): the summary tile's sub line
+ * and the diagram's popover say it in the same words.
+ */
+export const OTHER_BUCKET_TEXT = 'Debt payments, fees, taxes and other spending';
+
 /** Below this confidence a guessed category asks to be checked. */
 export const LOW_CONFIDENCE = 0.7;
 
+/**
+ * Where a category came from, in the person's words. One set, so the
+ * transactions table and the diagram's popover never disagree (issue 268).
+ */
+export const SOURCE_TEXT = {
+  user: 'You',
+  guess: 'Our guess',
+  check: 'Guess, check it',
+  rule: 'Known merchant',
+  none: 'No category',
+} as const;
+
 export interface SourceBadgeView {
   tone: Tone;
-  text: string;
+  text: (typeof SOURCE_TEXT)[keyof typeof SOURCE_TEXT];
 }
 
 /**
@@ -65,15 +83,15 @@ export interface SourceBadgeView {
 export function sourceBadge(txn: Transaction): SourceBadgeView {
   switch (txn.category_source) {
     case 'user':
-      return { tone: 'confirmed', text: 'You' };
+      return { tone: 'confirmed', text: SOURCE_TEXT.user };
     case 'llm':
       return txn.confidence !== null && txn.confidence < LOW_CONFIDENCE
-        ? { tone: 'warning', text: 'Guess, check it' }
-        : { tone: 'blue', text: 'Our guess' };
+        ? { tone: 'warning', text: SOURCE_TEXT.check }
+        : { tone: 'blue', text: SOURCE_TEXT.guess };
     case 'rule':
-      return { tone: 'neutral', text: 'Known merchant' };
+      return { tone: 'neutral', text: SOURCE_TEXT.rule };
     default:
-      return { tone: 'neutral', text: 'No category' };
+      return { tone: 'neutral', text: SOURCE_TEXT.none };
   }
 }
 

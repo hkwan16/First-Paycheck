@@ -88,9 +88,10 @@ function Popover({
         el.current = element;
         ref(element);
       }}
+      // Opaque: it sits over other nodes' amounts, which must not show through (issue 268).
       className={cn(
-        'absolute z-30 flex flex-col gap-2 rounded-control bg-surface/95 px-3.5 py-3 text-ink shadow-pop backdrop-blur-lg backdrop-saturate-150',
-        'animate-pop-in motion-reduce:animate-pop-fade reduce-transparency:bg-surface reduce-transparency:backdrop-blur-none',
+        'absolute z-30 flex flex-col gap-2 rounded-control bg-surface px-3.5 py-3 text-ink shadow-pop',
+        'animate-pop-in motion-reduce:animate-pop-fade',
         place.side === 'right' ? 'origin-top-left' : 'origin-top-right',
       )}
       style={{ left: place.left, top: place.top, width: POPOVER_W }}

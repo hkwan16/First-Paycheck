@@ -4,7 +4,6 @@ import { useMemo } from 'react';
 import {
   CashFlowSankey,
   DEFAULT_HEADINGS,
-  flowScale,
   FlowStack,
   layoutCashFlow,
   legendFor,
@@ -13,14 +12,12 @@ import {
   useContainerWidth,
   type FlowNode,
 } from '@/components/sankey';
-import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Money } from '@/components/ui/Money';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Swatch } from '@/components/ui/Swatch';
 import { periodFilters, useAccounts, useTransactions } from '@/lib/api/hooks';
 import type { CashFlow } from '@/lib/api/types';
-import { formatMoney } from '@/lib/money';
 import { FlowDetails } from './FlowDetails';
 import { monthName, payStubsText, periodText } from './spending-format';
 
@@ -49,10 +46,6 @@ function Sources({ flow }: { flow: CashFlow }) {
 const isEmpty = (flow: CashFlow) =>
   flow.withholding.paycheck_count === 0 && flow.spending.transaction_count === 0;
 
-/** "about $14": the scale, in whole dollars once it is a dollar or more. */
-const scaleText = (centsPerPx: number) =>
-  formatMoney(centsPerPx, { decimals: centsPerPx >= 100 ? 0 : 2 });
-
 export interface CashFlowCardProps {
   /** `GET /cashflow` for the period; undefined while it loads. */
   flow: CashFlow | undefined;
@@ -63,8 +56,8 @@ export interface CashFlowCardProps {
 /**
  * The mockup's "Where each dollar of October pay went": the cash-flow
  * Sankey (components/sankey) at the card's width, or stacked bars under
- * 640 px. Every amount is from `GET /cashflow`; the scale badge is computed
- * from the diagram's target height.
+ * 640 px. Every amount is from `GET /cashflow`; the diagram's scale is never
+ * written out (issue 268: "1 px is about $17" was jargon).
  */
 export function CashFlowCard({ flow, updating }: CashFlowCardProps) {
   const { ref, width } = useContainerWidth<HTMLDivElement>();
@@ -78,7 +71,6 @@ export function CashFlowCard({ flow, updating }: CashFlowCardProps) {
 
   const month = flow ? monthName(flow.start) : null;
   const stacked = width < STACK_BELOW;
-  const scale = flow && !stacked ? flowScale(flow) : null;
   // Only the groups this period draws (spec 010 rule 5c); the colors and
   // amounts do not depend on the width.
   const legend = useMemo(() => (flow ? legendFor(layoutCashFlow(flow, MIN_HOST_W)) : []), [flow]);
@@ -125,18 +117,15 @@ export function CashFlowCard({ flow, updating }: CashFlowCardProps) {
 
   return (
     <Card aria-labelledby="flow-title" gap={12} aria-busy={updating || undefined}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <h2 id="flow-title" className="m-0">
-            {month ? `Where each dollar of ${month} pay went` : 'Where each dollar of pay went'}
-          </h2>
-          {flow && !isEmpty(flow) && (
-            <p className="m-0 text-small text-ink-3">
-              <Sources flow={flow} />
-            </p>
-          )}
-        </div>
-        {scale && <Badge>Scale: 1 px is about {scaleText(scale.centsPerPx)}</Badge>}
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <h2 id="flow-title" className="m-0">
+          {month ? `Where each dollar of ${month} pay went` : 'Where each dollar of pay went'}
+        </h2>
+        {flow && !isEmpty(flow) && (
+          <p className="m-0 text-small text-ink-3">
+            <Sources flow={flow} />
+          </p>
+        )}
       </div>
       <div ref={ref}>{body}</div>
       {flow && !isEmpty(flow) && legend.length > 0 && (

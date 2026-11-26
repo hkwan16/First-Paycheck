@@ -11,7 +11,13 @@ import { institutionName, maskLabel } from '@/lib/accounts';
 import { apiErrorMessage } from '@/lib/api/errors';
 import { useAccounts } from '@/lib/api/hooks';
 import type { Account, AccountKind, SpendingSummary } from '@/lib/api/types';
-import { ledgerNote, payStubsText, periodText, shareText as share } from './spending-format';
+import {
+  ledgerNote,
+  OTHER_BUCKET_TEXT,
+  payStubsText,
+  periodText,
+  shareText as share,
+} from './spending-format';
 
 const list = new Intl.ListFormat('en-US', { style: 'long', type: 'conjunction' });
 
@@ -57,8 +63,9 @@ export interface SummaryCardProps {
 }
 
 /**
- * The mockup's summary card: income, essentials, flexible and savings for
- * the period, and what is left. Every total and percentage is the API's
+ * The mockup's summary card: income, then every bucket the API takes from it
+ * (essentials, flexible, savings and other, spec 007 rule 24) for the period,
+ * and what is left. Every total and percentage is the API's
  * (`calc/spending.py`); the card only formats them.
  */
 export function SummaryCard({ summary, updating, error, onRetry, picker }: SummaryCardProps) {
@@ -93,7 +100,7 @@ export function SummaryCard({ summary, updating, error, onRetry, picker }: Summa
           </div>
         </Notice>
       )}
-      <div className="grid grid-cols-4 gap-3 max-wide:grid-cols-2">
+      <div className="grid grid-cols-5 gap-3 max-wide:grid-cols-2">
         <StatTile
           tone="plum"
           label="Income deposited"
@@ -121,6 +128,12 @@ export function SummaryCard({ summary, updating, error, onRetry, picker }: Summa
           loading={loading}
           value={summary && <Money cents={summary.savings_cents} />}
           sub={summary && share(summary.savings_rate_pct, (p) => `Savings rate ${p}`)}
+        />
+        <StatTile
+          label="Other"
+          loading={loading}
+          value={summary && <Money cents={summary.other_cents} />}
+          sub={summary && OTHER_BUCKET_TEXT}
         />
       </div>
       {summary ? (

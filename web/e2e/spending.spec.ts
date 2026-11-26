@@ -116,12 +116,8 @@ test('the cash flow and the summary tiles show the same totals from the API', as
     test.info().annotations.push({ type: 'note', description: 'No money in the default period' });
     return;
   }
-  // The scale comes from the largest node (spec 010 rule 5c): whatever the
-  // period holds, a stub, deposits or only spending, any amount gives one.
-  const scale = card.getByText(/^Scale: 1 px is about \$[\d,.]+$/);
-  const amounts = card.getByRole('button', { name: /\$(?!0\.00$)[\d,]+\.\d{2}$/ });
-  if ((await amounts.count()) > 0) await expect(scale).toBeVisible();
-  else await expect(scale).toHaveCount(0);
+  // Issue 268: the scale sizes the bands and is written nowhere.
+  await expect(card.getByText(/1 px is about/)).toHaveCount(0);
   // Spec 007 rule 26a and spec 010 rule 5a (issue 164): income is deposits, and
   // the pay stubs are counted for this period only, whatever other months hold.
   await expect(summary.getByText('Income deposited', { exact: true })).toBeVisible();
@@ -137,9 +133,14 @@ test('the cash flow and the summary tiles show the same totals from the API', as
   // Both routes compute the period with the same code (spec 010 rule 5):
   // every bucket the diagram draws matches its tile. A bucket with refunds is
   // drawn before them (rule 5b) and its details give the tile's amount.
-  for (const bucket of ['Essentials', 'Flexible', 'Savings']) {
+  for (const bucket of ['Essentials', 'Flexible', 'Savings', 'Other']) {
     // Anchored on the amount: "Savings transfer" is a category under Savings.
     const node = card.getByRole('button', { name: new RegExp(`^${bucket} \\$`) });
+    // A $0 Other bucket is not drawn (spec 010 rule 5c); its tile still reads $0.00 (issue 268).
+    if (bucket === 'Other' && (await node.count()) === 0) {
+      await expect(summary.getByText('Other', { exact: true })).toBeVisible();
+      continue;
+    }
     let amount = ((await node.textContent()) ?? '').replace(bucket, '').trim();
     await node.focus();
     const details = card.getByRole('group', { name: bucket });

@@ -14,6 +14,7 @@ import { server } from '@/test/msw/server';
 import { spendingDb } from '@/test/msw/spending-handlers';
 import type { Transaction } from '@/lib/api/types';
 import { renderWithProviders, screen, waitFor, within } from '@/test/render';
+import { OTHER_BUCKET_TEXT, SOURCE_TEXT } from './spending-format';
 import { SpendingScreen } from './SpendingScreen';
 
 // A row's accessible name is all of its text, its category select's options included, which
@@ -66,7 +67,7 @@ describe('SpendingScreen summary', () => {
   beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(SAMPLE_NOW) }));
   afterEach(() => vi.useRealTimers());
 
-  it('shows the four bucket tiles from GET /cashflow, exactly as the API totals them', async () => {
+  it('shows the income and the four bucket tiles from GET /cashflow, exactly as the API totals them', async () => {
     await renderSpending();
     await waitFor(() => expect(summaryRegion()).not.toHaveAttribute('aria-busy'));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
@@ -81,7 +82,19 @@ describe('SpendingScreen summary', () => {
     expect(tile('Flexible')).toHaveTextContent('6% of income');
     expect(tile('Savings')).toHaveTextContent('$300.00');
     expect(tile('Savings')).toHaveTextContent('Savings rate 8%');
+    expect(tile('Other')).toHaveTextContent('$0.00');
+    expect(tile('Other')).toHaveTextContent(OTHER_BUCKET_TEXT);
     expect(summaryRegion()).toHaveTextContent('Left over: $1,618.94, still in your accounts.');
+  });
+
+  it('shows the Other bucket as its own tile, so the tiles account for what is left over (issue 268)', async () => {
+    // Debt payments, fees and taxes came off the income too, with no tile saying so.
+    spendingDb.cashflow.spending.other_cents = 45_421;
+    spendingDb.cashflow.spending.left_over_cents = 116_473;
+    await renderSpending();
+    await waitFor(() => expect(tile('Other')).toHaveTextContent('$454.21'));
+    expect(tile('Other')).toHaveTextContent('Debt payments, fees, taxes and other spending');
+    expect(summaryRegion()).toHaveTextContent('Left over: $1,164.73, still in your accounts.');
   });
 
   it('shows skeletons, never client sums, until the totals arrive', async () => {
@@ -303,12 +316,13 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
   const card = () => screen.getByRole('region', { name: /Where each dollar/ });
   const node = (name: string) => within(card()).getByRole('button', { name });
 
-  it('draws the period as a Sankey with the computed scale', async () => {
+  it('draws the period as a Sankey, with no scale note (issue 268)', async () => {
     await renderSpending({ showSankey: true });
     expect(
       await screen.findByRole('heading', { name: 'Where each dollar of October pay went' }),
     ).toBeInTheDocument();
-    expect(within(card()).getByText('Scale: 1 px is about $23')).toBeInTheDocument();
+    // "Scale: 1 px is about $23" was jargon; the bands' widths say it.
+    expect(within(card()).queryByText(/Scale:|1 px is about/)).not.toBeInTheDocument();
     expect(node('Gross pay, 2 stubs $5,416.66')).toBeInTheDocument();
     expect(node('Take-home $3,992.08')).toBeInTheDocument();
     expect(within(card()).getByText('Pay stubs, October')).toBeInTheDocument();
@@ -332,6 +346,23 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
       'Costco WholesaleGuess, check it-$142.60Oct 13 · ··4821',
       'AmazonOur guess-$62.30Oct 9 · ··4821',
     ]);
+  });
+
+  it("names where a category came from with the table's words (issue 268)", async () => {
+    const { user } = await renderSpending({ showSankey: true });
+    await showAll(user);
+    await user.hover(await within(card()).findByRole('button', { name: 'Shopping $204.90' }));
+    const popover = within(card()).getByRole('group', { name: 'Shopping' });
+    // Which of the source words an element carries.
+    const sources = (element: HTMLElement) =>
+      Object.values(SOURCE_TEXT).filter((text) => within(element).queryByText(text) !== null);
+    for (const merchant of ['Costco Wholesale', 'Amazon']) {
+      const line = within(popover).getByText(merchant).closest('li')!;
+      expect(sources(line)).toHaveLength(1);
+      expect(sources(line)).toEqual(sources(row(merchant)));
+    }
+    expect(sources(row('Costco Wholesale'))).toEqual([SOURCE_TEXT.check]);
+    expect(sources(row('Amazon'))).toEqual([SOURCE_TEXT.guess]);
   });
 
   it("leaves a loan ledger's rows out of a category's popover, as the API leaves them out of its total", async () => {
@@ -431,8 +462,8 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
     expect(node('Flexible $500.00')).toBeInTheDocument();
     // A source beside the deposits, never a negative amount (spec 010 rule 5b).
     expect(node('Spent beyond income $506.33')).toBeInTheDocument();
-    // The largest node sets the scale: 506.33 over 240 px is about $2 a pixel.
-    expect(within(card()).getByText('Scale: 1 px is about $2')).toBeInTheDocument();
+    // The largest node sets the scale: it is drawn 240 px tall.
+    expect(parseFloat(node('Spent beyond income $506.33').style.height)).toBeCloseTo(240, 6);
   });
 
   it('draws the sandbox month the API counts money in for, at a scale its tallest node sets', async () => {
@@ -445,10 +476,10 @@ describe('SpendingScreen cash flow (sankey flag on)', () => {
     expect(node('Refunds $500.00')).toBeInTheDocument();
     expect(node('Spent beyond income $1,685.41')).toBeInTheDocument();
     expect(tile('Income deposited')).toHaveTextContent('$4.22');
-    // The largest node, spending beyond the income, is drawn 240 px tall:
-    // $1,685.41 / 240 is $7.02, shown in whole dollars. (Scaled by the $4.22
-    // of income, it read "$0.01".)
-    expect(within(card()).getByText('Scale: 1 px is about $7')).toBeInTheDocument();
+    // The largest node, spending beyond the income, is drawn 240 px tall, and
+    // the $4.22 of income a sliver beside it.
+    expect(parseFloat(node('Spent beyond income $1,685.41').style.height)).toBeCloseTo(240, 6);
+    expect(parseFloat(node('Income deposited $4.22').style.height)).toBeLessThan(240);
   });
 
   it('issue 236: draws take-home shorter than gross pay, and where the rest of the spending came from', async () => {

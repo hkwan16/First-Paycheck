@@ -976,8 +976,8 @@ for the amounts over one SVG of cubic bands. Not d3-sankey and not a chart libra
   deposited and left over; categories), every column stacked from the top (issue 201). A node is
   as tall as its own amount (at least `MIN_NODE_H`, tall enough for its words), never as the
   bands through it; each band is its cents (at least `MIN_BAND_PX`), stacked along each node in
-  the API's link order. One scale puts the largest node at 240 px, so the "1 px is about $N"
-  badge is computed; there is none only when every node is $0. A bucket with refunds is drawn
+  the API's link order. One scale puts the largest node at 240 px; there is none only when every
+  node is $0, and it is never written out (issue 268). A bucket with refunds is drawn
   before them (`refundsCents`; its popover says what the summary counts after them). Hidden: a $0
   withholding line other than the 401(k) ("401(k), not elected"), and a $0 Other bucket. Nothing
   is added or re-signed here. The legend is `legendFor(layout)`: one item per color, naming only
