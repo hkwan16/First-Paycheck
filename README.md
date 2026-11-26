@@ -16,6 +16,7 @@ First Paycheck guides a new salaried employee through their first-month money de
 | [Mockup B](docs/mockup/README.md) | The design reference the web app is ported from |
 | [AI tool log](docs/ai-log.md) | Where AI tools helped, failed and how it was caught |
 | [Alpha release](docs/alpha/README.md) | The alpha deliverable, against the [alpha brief](docs/alpha-brief.md) |
+| [Quality numbers](docs/quality.md) | Test counts, coverage and the eval scorecard against the spec's targets |
 
 ## Quick start
 
@@ -29,7 +30,7 @@ make lint    # ruff, mypy, eslint, tsc and the no-em-dash check
 make eval    # run the free eval suites (calculators, categorization rules)
 ```
 
-The Makefile also defines `test-api`, `eval-llm`, `migrate`, `revision`, `seed`, `types` and `worker`.
+The Makefile also defines `test-api`, `coverage`, `eval-llm`, `migrate`, `revision`, `seed`, `types` and `worker`.
 
 ## Layout
 

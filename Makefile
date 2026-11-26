@@ -37,6 +37,11 @@ test: ## All Python tests (api, evals, scripts) and web unit tests
 test-api: ## API tests only
 	uv run pytest api/tests -m "$(PYTEST_DEFAULT_MARKS)"
 
+.PHONY: coverage
+coverage: ## API tests with coverage (missing lines) and web unit tests with coverage; see docs/quality.md
+	uv run pytest api/tests -m "$(PYTEST_DEFAULT_MARKS)" --cov=api --cov-report=term-missing
+	@$(call in_web,pnpm --dir web test:coverage)
+
 .PHONY: lint
 lint: ## ruff, ruff format, mypy, the em-dash check, eslint, prettier and tsc
 	uv run ruff check .
