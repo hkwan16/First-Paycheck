@@ -22,5 +22,13 @@ export default defineConfig({
     restoreMocks: true,
     unstubEnvs: true,
     css: false,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary'],
+      include: ['src/**'],
+      // Tests, test support, the dev-only sample screens and the generated
+      // API types are not product code.
+      exclude: ['src/**/*.test.*', 'src/test/**', 'src/app/dev/**', 'src/lib/api/schema.d.ts'],
+    },
   },
 });
