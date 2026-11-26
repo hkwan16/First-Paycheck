@@ -24,7 +24,7 @@ import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/dates';
 import { asEmergencyFundInputs, currentDecision, decisionSaveState } from '@/lib/decisions';
 import { toneText } from '@/lib/design/tone';
-import { formatMoney, formatRate } from '@/lib/money';
+import { formatFundedShare, formatMoney } from '@/lib/money';
 import { MAX_BALANCE_CENTS, MAX_PERIOD_CENTS } from '@/lib/entry-limits';
 import { AmountField } from './AmountField';
 import { CALCULATOR_CARDS, DecisionCard, SaveButton } from './DecisionCard';
@@ -304,7 +304,7 @@ function FundResult({ inputs, missing, calc, periods, monthsValue }: FundResultP
           tone={fundBarTone(result)}
           value={Number(result.funded_pct)}
           label="Emergency fund progress"
-          valueText={`${formatRate(result.funded_pct)} of the target`}
+          valueText={`${formatFundedShare(result.funded_pct)} of the target`}
         />
         <FundResultRows
           result={result}

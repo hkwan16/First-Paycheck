@@ -12,7 +12,7 @@ import { useUpdateGoal } from '@/lib/api/hooks';
 import { cancelOnEscape } from '@/lib/escape-cancel';
 import { useFocusHandoff } from '@/lib/focus-handoff';
 import type { Account, Goal, GoalPatch } from '@/lib/api/types';
-import { formatRate } from '@/lib/money';
+import { formatFundedShare } from '@/lib/money';
 import { MAX_PERIOD_CENTS } from '@/lib/entry-limits';
 import { AmountField } from './AmountField';
 import { amountText, readAmount } from './decision-format';
@@ -88,14 +88,17 @@ export function EmergencyGoal({ goal, accounts, funded, horizonMonths }: Emergen
         <div className="flex flex-col gap-2">
           <p className="m-0 text-small text-ink-3">
             <Money cents={goal.current_balance_cents} /> in {accountName(account)}
-            {goal.progress_pct !== null && <>, {formatRate(goal.progress_pct)} of the target</>}.
+            {goal.progress_pct !== null && (
+              <>, {formatFundedShare(goal.progress_pct)} of the target</>
+            )}
+            .
           </p>
           {goal.progress_pct !== null && (
             <Bar
               tone={goal.status === 'reached' ? 'confirmed' : 'teal'}
               value={Number(goal.progress_pct)}
               label="Goal progress"
-              valueText={`${formatRate(goal.progress_pct)} of the target`}
+              valueText={`${formatFundedShare(goal.progress_pct)} of the target`}
               height={6}
             />
           )}

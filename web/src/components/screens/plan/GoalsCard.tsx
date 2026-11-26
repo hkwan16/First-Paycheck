@@ -5,7 +5,7 @@ import { ListRows } from '@/components/ui/ListRows';
 import { Money } from '@/components/ui/Money';
 import type { Goal } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
-import { formatRate } from '@/lib/money';
+import { formatFundedShare } from '@/lib/money';
 import { goalStatusBadge } from '../decisions/emergency-fund-format';
 import { goalLabel } from './plan-format';
 
@@ -39,13 +39,13 @@ function GoalRow({ goal }: { goal: Goal }) {
                 <Money cents={goal.current_balance_cents} /> saved,{' '}
               </>
             )}
-            {formatRate(goal.progress_pct)} of the target
+            {formatFundedShare(goal.progress_pct)} of the target
           </p>
           <Bar
             tone={goal.status === 'reached' ? 'confirmed' : 'teal'}
             value={Number(goal.progress_pct)}
             label={`${label} progress`}
-            valueText={`${formatRate(goal.progress_pct)} of the target`}
+            valueText={`${formatFundedShare(goal.progress_pct)} of the target`}
             height={6}
           />
         </>

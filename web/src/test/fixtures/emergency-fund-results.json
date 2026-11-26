@@ -901,5 +901,47 @@
       "per_paycheck_contribution_cents": 15000,
       "horizon_months": 120
     }
+  },
+  {
+    "inputs": {
+      "monthly_essentials_cents": 182325,
+      "target_months": 3,
+      "current_balance_cents": 543693,
+      "monthly_contribution_cents": 30000,
+      "pay_periods_per_year": 24
+    },
+    "result": {
+      "target_cents": 546975,
+      "three_month_target_cents": 546975,
+      "six_month_target_cents": 1093950,
+      "shortfall_cents": 3282,
+      "funded": false,
+      "funded_pct": "99.40",
+      "months_to_target": 1,
+      "reachable": true,
+      "per_paycheck_contribution_cents": 15000,
+      "horizon_months": 120
+    }
+  },
+  {
+    "inputs": {
+      "monthly_essentials_cents": 182325,
+      "target_months": 3,
+      "current_balance_cents": 544787,
+      "monthly_contribution_cents": 30000,
+      "pay_periods_per_year": 24
+    },
+    "result": {
+      "target_cents": 546975,
+      "three_month_target_cents": 546975,
+      "six_month_target_cents": 1093950,
+      "shortfall_cents": 2188,
+      "funded": false,
+      "funded_pct": "99.60",
+      "months_to_target": 1,
+      "reachable": true,
+      "per_paycheck_contribution_cents": 15000,
+      "horizon_months": 120
+    }
   }
 ]
