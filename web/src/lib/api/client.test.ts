@@ -20,6 +20,7 @@ vi.mock('@/lib/supabase/client', () => ({
 }));
 vi.mock('@/lib/navigation', () => ({ hardNavigate: mocks.hardNavigate }));
 
+import { NoApiAnswer } from './answer-middleware';
 import { SESSION_READ_TIMEOUT_MS, SessionUnavailable } from './auth-middleware';
 import { fetchClient } from './client';
 import { sessionStatus } from './session-status';
@@ -62,6 +63,13 @@ describe('fetchClient', () => {
     expect(data).toBeUndefined();
     expect(response.status).toBe(503);
     expect(error).toEqual({ error: { code: 'unavailable', message: 'db down' } });
+  });
+
+  it('rejects a non-2xx answer with no body instead of reading it as empty data (issue 289)', async () => {
+    server.use(http.get(apiUrl('/health'), () => new HttpResponse(null, { status: 502 })));
+    const error: unknown = await fetchClient.GET('/health').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(NoApiAnswer);
+    expect(error).toMatchObject({ status: 502, code: null });
   });
 
   it('sends no token and never redirects when Supabase is not configured', async () => {
@@ -154,11 +162,31 @@ describe('fetchClient with a Supabase session', () => {
     expect(mocks.hardNavigate).toHaveBeenCalledExactlyOnceWith('/sign-in?deleted=1');
   });
 
-  it('leaves other errors alone', async () => {
+  it('neither refreshes nor redirects for another refusal, and still reports it', async () => {
     server.use(http.get(apiUrl('/health'), () => new HttpResponse(null, { status: 403 })));
-    const { response } = await fetchClient.GET('/health');
-    expect(response.status).toBe(403);
+    await expect(fetchClient.GET('/health')).rejects.toMatchObject({
+      name: 'NoApiAnswer',
+      status: 403,
+    });
     expect(mocks.auth.refreshSession).not.toHaveBeenCalled();
+    expect(mocks.hardNavigate).not.toHaveBeenCalled();
+  });
+
+  it('refreshes and retries a bodiless 401 before judging the answer (issue 289)', async () => {
+    const seen: (string | null)[] = [];
+    server.use(
+      http.get(apiUrl('/health'), ({ request }) => {
+        const header = request.headers.get('authorization');
+        seen.push(header);
+        return header === 'Bearer access-2'
+          ? HttpResponse.json(HEALTH)
+          : new HttpResponse(null, { status: 401 });
+      }),
+    );
+    const { data, response } = await fetchClient.GET('/health');
+    expect(response.status).toBe(200);
+    expect(data).toEqual(HEALTH);
+    expect(seen).toEqual(['Bearer access-1', 'Bearer access-2']);
     expect(mocks.hardNavigate).not.toHaveBeenCalled();
   });
 

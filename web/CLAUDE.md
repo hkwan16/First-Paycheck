@@ -197,7 +197,11 @@ or checked for a phone.
   `fetchClient`, through `unwrap()`, which throws an `ApiError` (`lib/api/errors.ts`): `status`,
   `code`, `error` (the body's error, so it reads like a bare body) and `retryAfterSeconds` from
   Retry-After. A mutation that throws its own class (`ResultMismatch`, `PayStubUnbalanced`) extends
-  `ApiError`, and so do `UploadError` and `DownloadError`. Turn errors into sentences with
+  `ApiError`, and so do `UploadError` and `DownloadError`. A non-2xx answer the API did not write
+  (a bare 502 with no body, a host's page) rejects from the client itself as `NoApiAnswer`
+  (`answer-middleware.ts`: an `ApiError` with the status and no code, registered before the auth
+  middleware so openapi-fetch runs it last, after a 401's refresh and retry), so a screen shows
+  its error and never an empty state (issue 289). Turn errors into sentences with
   `apiErrorMessage(error, fallback)`, never by printing the object. It shows the API's message
   only when it reads as a sentence for people (`isPersonMessage`: no word with an underscore,
   such as `emergency_fund` or a field path), else the caller's fallback (spec 008 rule 22a,
