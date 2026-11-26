@@ -25,10 +25,15 @@ type Opening = 'first' | 'last';
 
 /**
  * The header's user chip as a menu button (WAI-ARIA APG menu button, issue
- * 242): it opens a small `role="menu"` with "Sign out" and, below a rule and
- * in the destructive style, "Delete account" (issue 205). The items are one
- * Tab stop: the arrow keys, Home and End move between them, Escape closes the
- * menu and returns to the chip, Tab or a click elsewhere closes it.
+ * 242): it opens a small `role="menu"` with "Sign out" and, below a rule, a
+ * quieter "Account" item that holds a nested menu with "Delete account"
+ * (issues 205 and 267). Deleting is a step away from signing out, smaller and
+ * in the destructive style, so a stray click on the open menu can at most
+ * unfold the Account section, never start a deletion. The items are one Tab
+ * stop: the arrow keys, Home and End move between them (through the Account
+ * section while it is open), ArrowRight or Enter on Account opens the section
+ * and ArrowLeft closes it, Escape closes the menu and returns to the chip, Tab
+ * or a click elsewhere closes it.
  *
  * Sign out submits a form to `/auth/sign-out` (issue 224): a full navigation
  * that ends this browser's session on the server even when Supabase fails,
@@ -163,19 +168,13 @@ export function UserMenu({ label }: UserMenuProps) {
             Sign out
           </Button>
           <hr className="m-0 border-0 border-t border-line" />
-          <Button
-            role="menuitem"
-            tabIndex={-1}
-            variant="destructive"
-            block
+          <AccountSection
             disabled={signingOut}
-            onClick={() => {
+            onDelete={() => {
               setOpening(null);
               setDeleting(true);
             }}
-          >
-            Delete account
-          </Button>
+          />
         </div>
       )}
       <DeleteAccountConfirm
@@ -187,5 +186,96 @@ export function UserMenu({ label }: UserMenuProps) {
         }}
       />
     </div>
+  );
+}
+
+/**
+ * The menu's "Account" item and the nested menu it unfolds, holding "Delete
+ * account" (issue 267). It unmounts with the menu, so it is folded again the
+ * next time the menu opens. Opening it from the keyboard or a click focuses
+ * Delete account, as the APG has a submenu do; ArrowLeft folds it and returns
+ * to Account. Delete account is small and destructive, never the full-size
+ * action Sign out is.
+ */
+function AccountSection({ disabled, onDelete }: { disabled: boolean; onDelete: () => void }) {
+  const itemId = useId();
+  const sectionId = useId();
+  const [expanded, setExpanded] = useState(false);
+  const itemRef = useRef<HTMLButtonElement>(null);
+  const sectionRef = useRef<HTMLDivElement>(null);
+
+  const focusFirst = () =>
+    sectionRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+
+  useEffect(() => {
+    if (expanded) focusFirst();
+  }, [expanded]);
+
+  const onItemKeyDown = (event: ReactKeyboardEvent) => {
+    if (event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    if (expanded) focusFirst();
+    else setExpanded(true);
+  };
+
+  const onSectionKeyDown = (event: ReactKeyboardEvent) => {
+    if (event.key !== 'ArrowLeft') return;
+    event.preventDefault();
+    setExpanded(false);
+    itemRef.current?.focus();
+  };
+
+  return (
+    <>
+      <button
+        ref={itemRef}
+        id={itemId}
+        type="button"
+        role="menuitem"
+        tabIndex={-1}
+        aria-haspopup="menu"
+        aria-expanded={expanded}
+        aria-controls={expanded ? sectionId : undefined}
+        disabled={disabled}
+        onClick={() => setExpanded((was) => !was)}
+        onKeyDown={onItemKeyDown}
+        className={cn(
+          'flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-control border-0 bg-transparent px-3',
+          'text-small font-medium text-ink-2 hover:bg-fill hover:text-ink',
+          'disabled:cursor-not-allowed disabled:text-ink-3 disabled:hover:bg-transparent',
+        )}
+      >
+        Account
+        <ArrowSmallIcon
+          size={8}
+          className={cn(
+            'transition-[rotate] duration-(--duration-fast)',
+            expanded ? 'rotate-90' : 'rotate-0',
+          )}
+        />
+      </button>
+      {expanded && (
+        <div
+          ref={sectionRef}
+          id={sectionId}
+          role="menu"
+          aria-labelledby={itemId}
+          onKeyDown={onSectionKeyDown}
+          className="flex flex-col"
+        >
+          <Button
+            role="menuitem"
+            tabIndex={-1}
+            variant="destructive"
+            size="sm"
+            block
+            disabled={disabled}
+            onClick={onDelete}
+          >
+            Delete account
+          </Button>
+        </div>
+      )}
+    </>
   );
 }
