@@ -121,6 +121,11 @@
   --breakpoint-nav: 48.75rem;
   --breakpoint-wide: 56.25rem;
 
+  /* Chrome: the header's height, and where the nav column rests below it (the shell's padding
+     further down), which is also where it stays while the page scrolls (Shell, issue 262). */
+  --spacing-header: 51px;
+  --spacing-nav-top: calc(var(--spacing-header) + var(--spacing) * 6);
+
   /* Motion: short, ease-out, and zeroed under reduced motion (below). */
   --duration-press: 100ms;
   --duration-fast: 120ms;

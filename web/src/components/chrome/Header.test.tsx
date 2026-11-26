@@ -9,6 +9,7 @@ describe('Header', () => {
     expect(banner).toHaveClass(
       'sticky',
       'top-0',
+      'min-h-header',
       'bg-ground/72',
       'backdrop-blur-[20px]',
       'border-b',
