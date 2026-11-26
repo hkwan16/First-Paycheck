@@ -13,8 +13,12 @@ import {
   calculatorIdOf,
   CALCULATOR_KINDS,
   currentDecision,
+  decisionProgress,
   decisionSaveState,
+  needsReview,
   percentInput,
+  savedCountText,
+  savedCountTone,
 } from './decisions';
 import { CALCULATORS } from './features';
 
@@ -158,6 +162,77 @@ describe('currentDecision', () => {
     expect(currentDecision(list, 'k401_match')?.id).toBe('dec-2');
     expect(currentDecision(list, 'w4')).toBeUndefined();
     expect(currentDecision(undefined, 'k401_match')).toBeUndefined();
+  });
+});
+
+describe('decisionProgress (issue 257)', () => {
+  const review = [
+    {
+      kind: 'changed' as const,
+      input: 'pay_periods_per_year' as const,
+      text: 'Your pay schedule changed from 26 to 24 paychecks a year.',
+    },
+  ];
+  const item = (calculator: Decision['calculator'], overrides: Partial<Decision> = {}) => ({
+    calculator,
+    current: decision({ calculator, ...overrides }),
+    versions: [],
+  });
+
+  it('needs review only when the API lists a reason', () => {
+    expect(needsReview(decision())).toBe(false);
+    expect(needsReview(decision({ review }))).toBe(true);
+  });
+
+  it('sorts the saved calculators into settled and needing review, by their ids', () => {
+    const list: DecisionList = {
+      items: [
+        item('emergency_fund'),
+        item('k401_match'),
+        item('health_plans', { review }),
+        item('w4', { review }),
+      ],
+    };
+    expect(decisionProgress(list)).toEqual({
+      saved: ['emergency_fund', '401k_match', 'health_plan', 'w4'],
+      settled: ['emergency_fund', '401k_match'],
+      needsReview: ['health_plan', 'w4'],
+      total: CALCULATORS.length,
+    });
+    expect(decisionProgress({ items: [] })).toEqual({
+      saved: [],
+      settled: [],
+      needsReview: [],
+      total: 4,
+    });
+  });
+});
+
+describe('savedCountText and savedCountTone (spec 016 rule 3a, spec 018 rule 5)', () => {
+  it('counts the saved against the total, with how many need review', () => {
+    expect(savedCountText({ saved: 0, total: 4, needsReview: 0 })).toBe('0 of 4 saved');
+    expect(savedCountText({ saved: 4, total: 4, needsReview: 2 })).toBe(
+      '4 of 4 saved, 2 need review',
+    );
+    expect(savedCountText({ saved: 3, total: 4, needsReview: 1 })).toBe(
+      '3 of 4 saved, 1 needs review',
+    );
+  });
+
+  it('names what is counted when asked, as the plan does', () => {
+    expect(savedCountText({ saved: 4, total: 4, needsReview: 0 }, 'decisions')).toBe(
+      '4 of 4 decisions saved',
+    );
+    expect(savedCountText({ saved: 3, total: 4, needsReview: 3 }, 'decisions')).toBe(
+      '3 of 4 decisions saved, 3 need review',
+    );
+  });
+
+  it('is confirmed when whole, warning while any needs review, else neutral', () => {
+    expect(savedCountTone({ saved: 4, total: 4, needsReview: 0 })).toBe('confirmed');
+    expect(savedCountTone({ saved: 4, total: 4, needsReview: 1 })).toBe('warning');
+    expect(savedCountTone({ saved: 1, total: 4, needsReview: 0 })).toBe('neutral');
+    expect(savedCountTone({ saved: 0, total: 4, needsReview: 0 })).toBe('neutral');
   });
 });
 

@@ -11,7 +11,9 @@ import type {
 } from './api/types';
 import { formatDate } from './dates';
 import { deepEqual } from './deep-equal';
-import type { CalculatorId } from './features';
+import type { Tone } from './design/tone';
+import { CALCULATORS, type CalculatorId } from './features';
+import { formatNumber } from './money';
 
 /*
  * Saved decisions (spec 007): which calculator is which, and whether what the
@@ -48,6 +50,70 @@ export function currentDecision(
   calculator: CalculatorKind,
 ): Decision | undefined {
   return list?.items.find((item) => item.calculator === calculator)?.current;
+}
+
+/**
+ * Whether a current decision needs review: the API lists why (`review`, spec
+ * 007 rule 19b); nothing here compares the context. The one reading of it the
+ * card's badge, the side nav's done marks and the step's saved count share
+ * (issue 257).
+ */
+export const needsReview = (decision: Decision): boolean => decision.review.length > 0;
+
+/** Which calculators `GET /decisions` lists, and which of those need review. */
+export interface DecisionProgress {
+  /** Every calculator with a saved decision. */
+  saved: CalculatorId[];
+  /** The saved ones whose decision needs no review: done, in the side nav's sense (spec 018 rule 8). */
+  settled: CalculatorId[];
+  /** The saved ones whose decision needs review. */
+  needsReview: CalculatorId[];
+  /** All the calculators, live in this build or not. */
+  total: number;
+}
+
+/**
+ * The saved, settled and needing-review calculators of `GET /decisions`, by
+ * their ids, in the API's order. Counting only: the step's "4 of 4 saved, 2
+ * need review" chip and the side nav's done marks both read this, so they
+ * cannot disagree (issue 257).
+ */
+export function decisionProgress(list: DecisionList): DecisionProgress {
+  const saved: CalculatorId[] = [];
+  const settled: CalculatorId[] = [];
+  const review: CalculatorId[] = [];
+  for (const item of list.items) {
+    const id = calculatorIdOf(item.calculator);
+    saved.push(id);
+    (needsReview(item.current) ? review : settled).push(id);
+  }
+  return { saved, settled, needsReview: review, total: CALCULATORS.length };
+}
+
+/** How many decisions are saved, of how many, and how many of those need review. */
+export interface SavedCount {
+  saved: number;
+  total: number;
+  needsReview: number;
+}
+
+/**
+ * "3 of 4 saved", or "3 of 4 decisions saved" with `noun`, with ", 3 need
+ * review" or ", 1 needs review" while any does (spec 016 rule 3a, spec 018
+ * rule 5): the Plan's completeness badge and each step's chip, worded once.
+ * Counting the API's lists, not computing a figure.
+ */
+export function savedCountText({ saved, total, needsReview: review }: SavedCount, noun?: string) {
+  const what = noun ? `${noun} saved` : 'saved';
+  const text = `${formatNumber(saved)} of ${formatNumber(total)} ${what}`;
+  if (review === 0) return text;
+  return `${text}, ${formatNumber(review)} ${review === 1 ? 'needs' : 'need'} review`;
+}
+
+/** The saved count's badge: warning while any needs review, confirmed once every one is saved. */
+export function savedCountTone({ saved, total, needsReview: review }: SavedCount): Tone {
+  if (review > 0) return 'warning';
+  return saved === total ? 'confirmed' : 'neutral';
 }
 
 /**
@@ -104,7 +170,7 @@ export function decisionSaveState(
   { ignore = [] }: { ignore?: readonly string[] } = {},
 ): DecisionSaveState {
   if (!current) return { status: 'unsaved', action: 'Save', label: 'Not saved' };
-  if (current.review.length > 0) {
+  if (needsReview(current)) {
     return { status: 'review', action: 'Save again', label: 'Needs review' };
   }
   const without = (value: unknown) =>

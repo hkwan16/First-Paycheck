@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { features } from '@/lib/features';
 import { setupProgress, type SetupFacts, type SetupProgress } from '@/lib/setup-progress';
-import { calculatorIdOf } from '@/lib/decisions';
+import { decisionProgress } from '@/lib/decisions';
 import { useAccounts } from './accounts';
 import { useDecisions } from './decisions';
 import { useDocuments } from './documents';
@@ -32,10 +32,7 @@ export function useSetupFacts(): SetupFacts {
       confirmedPayStubs: payStubs?.length ?? 0,
       categorizationFinished: summary !== undefined && summary.uncategorized_count === 0,
       liveCalculators: features.calculators,
-      settledDecisionCalculators:
-        decisions?.items
-          .filter((d) => d.current.review.length === 0)
-          .map((d) => calculatorIdOf(d.calculator)) ?? [],
+      settledDecisionCalculators: decisions ? decisionProgress(decisions).settled : [],
       planMissingCount: plan ? plan.completeness.missing.length : null,
       planNeedsReviewCount: plan ? plan.completeness.needs_review.length : null,
     }),

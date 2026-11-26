@@ -7,7 +7,7 @@ import type {
   PlanFigure,
   PlanPayStub,
 } from '@/lib/api/types';
-import { calculatorIdOf } from '@/lib/decisions';
+import { calculatorIdOf, savedCountText, savedCountTone } from '@/lib/decisions';
 import type { Hue, Tone } from '@/lib/design/tone';
 import { isExplained } from '@/lib/explanations';
 import { formatMoney, formatNetCost, formatNumber, formatRate, formatRefund } from '@/lib/money';
@@ -70,22 +70,25 @@ export function explanationView(decision: PlanDecision): ExplanationView {
   return status === 'verified' && stale ? 'stale' : status;
 }
 
+/** The plan's completeness as counts of the API's lists: saved, of all, and needing review. */
+const completenessCount = ({ saved, missing, needs_review }: PlanCompleteness) => ({
+  saved: saved.length,
+  total: saved.length + missing.length,
+  needsReview: needs_review.length,
+});
+
 /**
  * "3 of 4 decisions saved", with ", 3 need review" while any does (spec 016
- * rule 3a): counting the API's lists, not computing a figure.
+ * rule 3a): counting the API's lists, not computing a figure, in the words
+ * the decision steps' chip uses (`savedCountText`, issue 257).
  */
-export function completenessText({ saved, missing, needs_review }: PlanCompleteness): string {
-  const total = saved.length + missing.length;
-  const text = `${formatNumber(saved.length)} of ${formatNumber(total)} decisions saved`;
-  if (needs_review.length === 0) return text;
-  const verb = needs_review.length === 1 ? 'needs' : 'need';
-  return `${text}, ${formatNumber(needs_review.length)} ${verb} review`;
+export function completenessText(completeness: PlanCompleteness): string {
+  return savedCountText(completenessCount(completeness), 'decisions');
 }
 
 /** The completeness badge: confirmed only when the plan is whole and nothing in it needs review. */
-export function completenessTone({ missing, needs_review }: PlanCompleteness): Tone {
-  if (needs_review.length > 0) return 'warning';
-  return missing.length === 0 ? 'confirmed' : 'neutral';
+export function completenessTone(completeness: PlanCompleteness): Tone {
+  return savedCountTone(completenessCount(completeness));
 }
 
 const GOAL_LABELS: Record<Goal['kind'], string> = {
