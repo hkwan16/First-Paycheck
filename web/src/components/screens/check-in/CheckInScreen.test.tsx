@@ -1,14 +1,17 @@
 import { delay, http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JOB_POLL_MS } from '@/lib/api/hooks';
+import { toneSoft } from '@/lib/design/tone';
 import { dynamicCashflow } from '@/test/fixtures/cashflow';
 import {
   checkInJobId,
   checkInJobStates,
   completedNovemberCheckIn,
+  line,
   NOVEMBER_ID,
   novemberCalendar,
   novemberCheckIn,
+  novemberPlan,
   OCTOBER_ID,
 } from '@/test/fixtures/checkins';
 import { checkinDb } from '@/test/msw/checkin-handlers';
@@ -196,16 +199,21 @@ describe('CheckInScreen', () => {
     });
     expect(bar).toHaveAttribute('aria-valuetext', '$54.17 of $108.33 planned');
     // The API's status, in words beside the actual.
-    expect(within(row).getByText('Under plan')).toBeVisible();
+    expect(within(row).getByText('Behind plan')).toBeVisible();
     expect(within(card).getByRole('row', { name: /^Health premiums/ })).toHaveTextContent(
       'On plan',
     );
     // A line with no plan has no target, no bar and no status.
     const flexible = within(card).getByRole('row', { name: /^Flexible/ });
     expect(flexible).toHaveTextContent('No target');
-    expect(flexible).not.toHaveTextContent(/(On|Over|Under) plan/);
+    expect(flexible).not.toHaveTextContent(/(On|Ahead of|Behind|Over|Under) plan/);
     expect(within(card).queryByRole('progressbar', { name: 'Flexible against plan' })).toBeNull();
-    expect(within(card).getAllByRole('progressbar')).toHaveLength(4);
+    // Issue 269: the essentials are a spending bucket with no plan, like Flexible.
+    const essentials = within(card).getByRole('row', { name: /^Essentials/ });
+    expect(essentials).toHaveTextContent('$258.60');
+    expect(essentials).toHaveTextContent('No target');
+    expect(essentials).not.toHaveTextContent(/plan/);
+    expect(within(card).getAllByRole('progressbar')).toHaveLength(3);
     expect(within(card).getByRole('link', { name: 'See your spending' })).toHaveAttribute(
       'href',
       '/setup/spending',
@@ -232,6 +240,27 @@ describe('CheckInScreen', () => {
       'Not counted: 165 transactions on loan, investment and retirement accounts. A loan payment counts once, when it leaves checking.',
     );
     expect(card).not.toHaveTextContent('%');
+  });
+
+  it('says saving more than planned is ahead of plan, as a good state (issue 269)', async () => {
+    const plan = novemberPlan().map((l) =>
+      l.key === 'savings' ? line('savings', 'Savings', 13_983, 10_000, 3_983, 'ahead') : l,
+    );
+    checkinDb.checkIns[0] = novemberCheckIn({
+      cash_flow: { ...novemberCheckIn().cash_flow, plan },
+    });
+    await open();
+    const card = await screen.findByRole('region', {
+      name: 'November cash flow against your plan',
+    });
+    const row = within(card).getByRole('row', { name: /^Savings/ });
+    expect(row).toHaveTextContent('$139.83');
+    expect(row).toHaveTextContent('$100.00');
+    expect(row).toHaveTextContent('+$39.83');
+    const badge = within(row).getByText('Ahead of plan');
+    expect(badge).toBeVisible();
+    expect(badge).toHaveClass(...toneSoft.confirmed.split(' '));
+    expect(row).not.toHaveTextContent('Over plan');
   });
 
   it('says nothing about ledgers when none were left out', async () => {

@@ -4894,6 +4894,8 @@
               {
                 "enum": [
                   "on_plan",
+                  "ahead",
+                  "behind",
                   "over",
                   "under"
                 ],

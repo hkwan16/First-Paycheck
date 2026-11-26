@@ -150,10 +150,12 @@ def test_detail_orders_findings_by_severity(
     )
 
 
-def test_cash_flow_against_the_plan(
-    frozen: FastAPI, db_connection: Connection, client_as: Client, user_a: FixtureUser
-) -> None:
-    # Spec 015 route row 2: spec 007's September beside the saved decisions.
+def september_with_a_plan(
+    db_connection: Connection, user_a: FixtureUser, *, monthly_contribution_cents: int
+) -> uuid.UUID:
+    """Spec 015 route row 2's setup: spec 007's September beside the saved
+    decisions, with the emergency-fund goal's contribution; the September
+    check-in's id."""
     item = make_item(db_connection, user_a.id)
     september(db_connection, user_a, make_account(db_connection, user_a.id, item))
     make_decision(
@@ -174,9 +176,19 @@ def test_cash_flow_against_the_plan(
         created_at=DECIDED_AT,
     )
     make_goal(
-        db_connection, user_a.id, decision_id=emergency_fund, monthly_contribution_cents=50_000
+        db_connection,
+        user_a.id,
+        decision_id=emergency_fund,
+        monthly_contribution_cents=monthly_contribution_cents,
     )
-    check_in = make_check_in(db_connection, user_a.id, period=dt.date(2026, 9, 1))
+    return make_check_in(db_connection, user_a.id, period=dt.date(2026, 9, 1))
+
+
+def test_cash_flow_against_the_plan(
+    frozen: FastAPI, db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    # Spec 015 route row 2.
+    check_in = september_with_a_plan(db_connection, user_a, monthly_contribution_cents=50_000)
 
     response = client_as(user_a).get(f"/check-ins/{check_in}")
 
@@ -189,9 +201,10 @@ def test_cash_flow_against_the_plan(
         line["key"]: (line["actual_cents"], line["plan_cents"], line["difference_cents"])
         for line in flow["plan"]
     }
+    # Issue 269: the essentials are not measured against the fund's 250,000.
     assert lines == {
         "income": (399_208, None, None),
-        "essentials": (180_000, 250_000, -70_000),
+        "essentials": (180_000, None, None),
         "flexible": (8_500, None, None),
         "other": (3_900, None, None),
         "savings": (40_000, 50_000, -10_000),
@@ -199,17 +212,43 @@ def test_cash_flow_against_the_plan(
         "health": (12_500, 12_500, 0),
         "left_over": (166_808, None, None),
     }
-    # Rule 19a: which side of the plan each line is on, null without a plan.
+    # Rule 19a: what each line's side of the plan means for it, null without a plan.
     assert {line["key"]: line["status"] for line in flow["plan"]} == {
         "income": None,
-        "essentials": "under",
+        "essentials": None,
         "flexible": None,
         "other": None,
-        "savings": "under",
-        "retirement": "under",
+        "savings": "behind",
+        "retirement": "behind",
         "health": "on_plan",
         "left_over": None,
     }
+
+
+def test_saving_more_than_planned_is_ahead_of_plan(
+    frozen: FastAPI, db_connection: Connection, client_as: Client, user_a: FixtureUser
+) -> None:
+    """Spec 015 route row 2b, issue 269: $400.00 saved against a $300.00 plan
+    is ahead of plan, not "over" like overspending."""
+    check_in = september_with_a_plan(db_connection, user_a, monthly_contribution_cents=30_000)
+
+    response = client_as(user_a).get(f"/check-ins/{check_in}")
+
+    assert response.status_code == 200, response.text
+    lines = {line["key"]: line for line in response.json()["cash_flow"]["plan"]}
+    savings = lines["savings"]
+    assert (savings["actual_cents"], savings["plan_cents"], savings["difference_cents"]) == (
+        40_000,
+        30_000,
+        10_000,
+    )
+    assert savings["status"] == "ahead"
+    essentials = lines["essentials"]
+    assert (essentials["plan_cents"], essentials["difference_cents"], essentials["status"]) == (
+        None,
+        None,
+        None,
+    )
 
 
 def test_cash_flow_skips_loan_ledgers(

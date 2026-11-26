@@ -10,8 +10,8 @@ band's, from the period's withholding and spending summary, so what flows into
 a node equals what flows out of it and the client only draws.
 
 ``against_plan`` sets a month's actuals beside the saved decisions' targets
-for the check-in screen (spec 015 rule 19), and ``plan_status`` says which
-side of its plan each line is on (rule 19a).
+for the check-in screen (spec 015 rule 19), and ``plan_status`` says what each
+line's side of its plan means for that line (rule 19a).
 """
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ from calc.spending import Bucket, CategoryTotal
 __all__ = [
     "DIAGRAM_BUCKETS",
     "LINES",
+    "PLAN_DIRECTIONS",
     "PLAN_TOLERANCE_FLOOR_CENTS",
     "PLAN_TOLERANCE_PCT",
     "CashFlowWithholding",
@@ -38,6 +39,7 @@ __all__ = [
     "FlowNode",
     "FlowNodeKind",
     "LineSpec",
+    "PlanDirection",
     "PlanLine",
     "PlanLineKey",
     "PlanLineStatus",
@@ -403,7 +405,12 @@ class SpendingActuals(BaseModel):
 
 
 class PlanTargets(BaseModel):
-    """What the saved decisions planned for a month; None where nothing was decided."""
+    """What the saved decisions planned for a month; None where nothing was decided.
+
+    The spending buckets have no target: the emergency-fund decision's
+    ``monthly_essentials_cents`` says what a month of essentials costs, to
+    size the fund by, not what to keep them under (spec 015 rule 19, issue 269).
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -411,13 +418,23 @@ class PlanTargets(BaseModel):
     contribution_pct: Decimal | None = None
     # The selected health plan's premium per paycheck.
     premium_per_period_cents: Cents | None = None
-    # The emergency-fund decision's essential spending per month.
-    monthly_essentials_cents: Cents | None = None
     # The active emergency-fund goal's monthly contribution.
     monthly_savings_cents: Cents | None = None
 
 
-PlanLineStatus = Literal["on_plan", "over", "under"]
+# Rule 19a: ``on_plan`` within the tolerance; beyond it, what the side means for
+# the line: ``ahead`` or ``behind`` where more is better, ``over`` or ``under``
+# where the plan should be matched.
+PlanLineStatus = Literal["on_plan", "ahead", "behind", "over", "under"]
+PlanDirection = Literal["more_is_better", "match"]
+
+# Rule 19a: the direction of each line that has a plan. Saving and contributing
+# more than planned is ahead; a premium should match the chosen plan's.
+PLAN_DIRECTIONS: dict[PlanLineKey, PlanDirection] = {
+    "savings": "more_is_better",
+    "retirement": "more_is_better",
+    "health": "match",
+}
 
 # Rule 19a: a line is on plan within 5% of the plan or $25, whichever is larger.
 PLAN_TOLERANCE_PCT = Decimal("5")
@@ -433,8 +450,9 @@ class PlanLine(BaseModel):
     plan_cents: Cents | None
     # Actual minus plan: positive when the month ran over the plan.
     difference_cents: Cents | None
-    # Which side of the plan the line is on, beyond the tolerance; null without
-    # a plan. Whether over is good depends on the line (spending vs saving).
+    # What the line's side of the plan means for it, beyond the tolerance:
+    # ``on_plan`` and ``ahead`` are good, ``behind``, ``over`` and ``under``
+    # need a look; null without a plan.
     status: PlanLineStatus | None
     # A decision sets this line's plan from the period's pay stubs, and the
     # period has none yet, so the plan is not known (spec 015 rule 19).
@@ -446,17 +464,16 @@ def plan_tolerance(plan_cents: int) -> int:
     return max(round_half_up(pct_of(plan_cents, PLAN_TOLERANCE_PCT)), PLAN_TOLERANCE_FLOOR_CENTS)
 
 
-def plan_status(actual_cents: int, plan_cents: int | None) -> PlanLineStatus | None:
-    """Rule 19a: ``on_plan`` within the tolerance, else ``over`` or ``under``."""
-    if plan_cents is None:
-        return None
+def plan_status(actual_cents: int, plan_cents: int, direction: PlanDirection) -> PlanLineStatus:
+    """Rule 19a: ``on_plan`` within the tolerance; beyond it ``ahead`` or
+    ``behind`` where more is better, ``over`` or ``under`` where the plan
+    should be matched."""
     difference = actual_cents - plan_cents
-    tolerance = plan_tolerance(plan_cents)
-    if difference > tolerance:
-        return "over"
-    if -difference > tolerance:
-        return "under"
-    return "on_plan"
+    if abs(difference) <= plan_tolerance(plan_cents):
+        return "on_plan"
+    if direction == "more_is_better":
+        return "ahead" if difference > 0 else "behind"
+    return "over" if difference > 0 else "under"
 
 
 def _line(
@@ -468,7 +485,7 @@ def _line(
         actual_cents=actual,
         plan_cents=plan,
         difference_cents=None if plan is None else actual - plan,
-        status=plan_status(actual, plan),
+        status=None if plan is None else plan_status(actual, plan, PLAN_DIRECTIONS[key]),
         needs_pay_stub=needs_pay_stub,
     )
 
@@ -501,9 +518,7 @@ def against_plan(
     )
     return [
         _line("income", "Income deposited", spending.income_cents, None),
-        _line(
-            "essentials", "Essentials", spending.essentials_cents, targets.monthly_essentials_cents
-        ),
+        _line("essentials", "Essentials", spending.essentials_cents, None),
         _line("flexible", "Flexible", spending.flexible_cents, None),
         _line("other", "Other spending", spending.other_cents, None),
         _line("savings", "Savings", spending.savings_cents, targets.monthly_savings_cents),

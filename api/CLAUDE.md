@@ -802,8 +802,13 @@ finding by its day, folding a reminder a newer decision version repeated
 - **Routes.** `GET /check-ins`, `GET /check-ins/{id}` (findings by severity,
   `cash_flow`: `GET /cashflow`'s body for the month to date via
   `routers/cashflow.py:cash_flow_for`, plus `calc/cashflow.py:against_plan`
-  lines, each with a `status` `on_plan | over | under` within
-  `max(5% of plan, $25)` from `plan_status`, null without a plan; the deposits
+  lines, each with a `status` from `plan_status`: `on_plan` within
+  `max(5% of plan, $25)`, beyond it what the side means for the line
+  (`PLAN_DIRECTIONS`: `ahead | behind` on `savings` and `retirement`, where
+  more is better; `over | under` on `health`, whose premium should match),
+  null without a plan; the spending buckets have no plan (the emergency
+  fund's `monthly_essentials_cents` sizes the fund, it is no spending target,
+  issue 269); the deposits
   line is `income`, "Income deposited", and with no stub in the period the
   `retirement` and `health` plans are null with `needs_pay_stub`), `POST
   /check-ins` (`check_in_now`, 202 `{job_id, check_in_id}`: queues the
