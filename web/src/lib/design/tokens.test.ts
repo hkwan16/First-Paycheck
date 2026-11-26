@@ -112,6 +112,13 @@ describe('design tokens', () => {
     expect(theme).toMatch(new RegExp(`--text-${name}: ${size};`));
   });
 
+  it('@theme sizes the chrome: the header, and where the nav rests below it', () => {
+    expect(theme).toMatch(/--spacing-header: 51px;/);
+    expect(theme).toMatch(
+      /--spacing-nav-top: calc\(var\(--spacing-header\) \+ var\(--spacing\) \* 6\);/,
+    );
+  });
+
   it('@theme names the system font stacks', () => {
     expect(theme).toMatch(/--font-sans:\s+-apple-system,/);
     expect(theme).toMatch(/--font-mono:\s+ui-monospace,/);

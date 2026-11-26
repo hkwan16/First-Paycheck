@@ -174,7 +174,10 @@ modal `<dialog>`), `RestoredPageGuard` (see "Auth"), `NavStep` (`size` md 22px, 
 (`current`, `done` from `lib/setup-progress.ts`, `hrefs` for id-bound screens, `calculators`;
 "Decisions" nests its four steps, see "Decisions screen"; one list, stacked at every width),
 `AppSideNav` (current item from the URL), `Shell` (header, nav column `1 1 200px` up to 240px,
-full width above the page under 780px, main `999 1 560px`, skip link), `PageTitle` (`title`, `lead`, `aside`,
+full width above the page under 780px, and from 780px up stuck in view while the page scrolls at
+`--spacing-nav-top`, the header's height `--spacing-header` plus the row's padding, no taller than
+the window below it so a short window scrolls the nav on its own, issue 262; main `999 1 560px`,
+skip link), `PageTitle` (`title`, `lead`, `aside`,
 `eyebrow`), `StepFooter` (`back`, `next` with `primary`, `disabled` and `loading`; a disabled
 next is a real disabled button, never a dead link; its links land the next page at the top, with
 Next's scroll off and `onNavigate={requestLandAtTop}`, which the new page's `HydrationMarker`
