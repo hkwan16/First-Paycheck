@@ -16,6 +16,7 @@ First Paycheck guides a new salaried employee through their first-month money de
 | [Mockup B](docs/mockup/README.md) | The design reference the web app is ported from |
 | [AI tool log](docs/ai-log.md) | Where AI tools helped, failed and how it was caught |
 | [Alpha release](docs/alpha/README.md) | The alpha deliverable, against the [alpha brief](docs/alpha-brief.md) |
+| [Final report (draft)](docs/final/report.md) | The CS146S final report: context, design, AI tool use, testing, process and reflection |
 
 ## Quick start
 
