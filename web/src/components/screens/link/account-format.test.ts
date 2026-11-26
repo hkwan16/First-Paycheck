@@ -10,6 +10,7 @@ import {
   removalWords,
   roleOptions,
   roleSelectName,
+  roleText,
   roleValue,
   transactionCountText,
 } from './account-format';
@@ -48,15 +49,36 @@ describe('account roles', () => {
 
   it("offers no role, the kind's roles from the API, and not used (issue 241)", () => {
     expect(roleOptions({ ...checking, allowed_roles: ['spending', 'emergency_fund'] })).toEqual([
-      { value: '', label: 'No role' },
+      { value: '', label: 'No role (counted in spending and net worth)' },
       { value: 'spending', label: 'Spending' },
       { value: 'emergency_fund', label: 'Emergency fund' },
-      { value: 'unused', label: 'Not used' },
+      { value: 'unused', label: 'Not used (left out of spending and net worth)' },
     ]);
-    expect(roleOptions({ allowed_roles: [] })).toEqual([
-      { value: '', label: 'No role' },
-      { value: 'unused', label: 'Not used' },
+  });
+
+  it('says what the two "none" choices do to spending and net worth, by kind (issue 265)', () => {
+    // Checking, savings and credit feed Spending (spec 007 rule 21a); the rest only net worth.
+    expect(
+      roleOptions({ ...savings, allowed_roles: ['emergency_fund'] }).map((o) => o.label),
+    ).toEqual([
+      'No role (counted in spending and net worth)',
+      'Emergency fund',
+      'Not used (left out of spending and net worth)',
     ]);
+    expect(
+      roleOptions({ kind: 'investment', allowed_roles: ['retirement'] }).map((o) => o.label),
+    ).toEqual(['No role (counted in net worth)', 'Retirement', 'Not used (left out of net worth)']);
+  });
+
+  it('says where a loan stands beside its checkbox, since it has no role to pick (issue 265)', () => {
+    const loan = { kind: 'loan' as const, allowed_roles: [], is_active: true };
+    expect(roleText(loan)).toBe('Money owed, counted against net worth');
+    expect(roleText({ ...loan, is_active: false })).toBe('Left out of net worth');
+    // An account with a role to choose gets the picker, so no text.
+    expect(roleText(checking)).toBeNull();
+    expect(
+      roleText({ kind: 'investment', allowed_roles: ['retirement'], is_active: true }),
+    ).toBeNull();
   });
 
   it('names each select for its account (issue 242)', () => {

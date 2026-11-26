@@ -234,8 +234,14 @@ or checked for a phone.
   (`lib/accounts.ts`: its name, else "Imported CSV" or "Linked bank") everywhere: the Link
   group heading, the account's initials tile and the Spending summary (issue 183).
   An account's role select (`roleOptions`; `roleSelectName` names it "Role for Plaid Checking ··0000", issue 242)
-  offers "No role", only the roles its kind takes (`account.allowed_roles`, spec 002 rule
-  31a; the API refuses any other with 422 `role_not_allowed`) and "Not used" (issue 241). Its
+  offers "No role (counted in spending and net worth)", only the roles its kind takes
+  (`account.allowed_roles`, spec 002 rule 31a; the API refuses any other with 422
+  `role_not_allowed`) and "Not used (left out of spending and net worth)" (issue 241); an
+  investment or retirement account's two say "net worth" alone, since Spending never reads it
+  (spec 002 rule 31b, issue 265). A kind with no roles (a loan) gets no select but one `Checkbox`
+  named for it ("Count Plaid Mortgage in net worth", `is_active`; unchecked sends what "Not used"
+  sends) with `roleText` beside it ("Money owed, counted against net worth" or "Left out of net
+  worth", spec 002 rule 31d). Its
   transaction count is `account.transaction_count` and `first_posted_at`
   (`transactionCountText`), never a page of transactions read to count them.
   Documents: `invalidateDocuments` after an upload or extraction, `invalidateAfterConfirm`

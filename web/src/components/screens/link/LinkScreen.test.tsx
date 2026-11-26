@@ -160,6 +160,26 @@ describe('LinkScreen accounts', () => {
   });
 
   it("offers each account only its kind's roles, and a way to clear one (issue 241)", async () => {
+    const patches = requests('PATCH', `/accounts/${SAVINGS_ID}`);
+    const { user } = renderLink();
+    const savings = await screen.findByRole('group', { name: 'Chase Savings' });
+    const select = within(savings).getByRole('combobox', { name: 'Role for Chase Savings ··7730' });
+    // The two "none" choices say what each does (issue 265).
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((o) => [o.textContent, (o as HTMLOptionElement).disabled]),
+    ).toEqual([
+      ['No role (counted in spending and net worth)', false],
+      ['Emergency fund', false],
+      ['Not used (left out of spending and net worth)', false],
+    ]);
+    await user.selectOptions(select, ['No role (counted in spending and net worth)']);
+    await waitFor(() => expect(patches).toEqual(['{"role":null,"is_active":true}']));
+    expect(select).toHaveValue('');
+  });
+
+  it('gives a loan no role picker, only a box that counts it in net worth (issue 265)', async () => {
     db.accounts.push({
       ...sampleAccounts[0]!,
       id: 'loan-1',
@@ -169,29 +189,35 @@ describe('LinkScreen accounts', () => {
       role: null,
       allowed_roles: [],
     });
-    const patches = requests('PATCH', `/accounts/${SAVINGS_ID}`);
+    const patches = requests('PATCH', '/accounts/loan-1');
     const { user } = renderLink();
     const loan = await screen.findByRole('group', { name: 'Plaid Mortgage' });
-    const options = (select: HTMLElement) =>
-      within(select)
-        .getAllByRole('option')
-        .map((o) => [o.textContent, (o as HTMLOptionElement).disabled]);
+    expect(within(loan).queryByRole('combobox')).toBeNull();
+    // One checkbox, named for its account (issue 242), where the select would be.
+    const box = within(loan).getByRole('checkbox', { name: 'Count Plaid Mortgage in net worth' });
+    expect(box).toBeChecked();
+    expect(within(loan).getByText('Money owed, counted against net worth')).toBeInTheDocument();
+    // Its neighbours keep their selects, each named for its account.
     expect(
-      options(within(loan).getByRole('combobox', { name: 'Role for Plaid Mortgage ··9002' })),
-    ).toEqual([
-      ['No role', false],
-      ['Not used', false],
-    ]);
-    const savings = screen.getByRole('group', { name: 'Chase Savings' });
-    const select = within(savings).getByRole('combobox', { name: 'Role for Chase Savings ··7730' });
-    expect(options(select)).toEqual([
-      ['No role', false],
-      ['Emergency fund', false],
-      ['Not used', false],
-    ]);
-    await user.selectOptions(select, ['No role']);
-    await waitFor(() => expect(patches).toEqual(['{"role":null,"is_active":true}']));
-    expect(select).toHaveValue('');
+      screen
+        .getAllByRole('combobox', { name: /^Role for / })
+        .map((s) => s.getAttribute('aria-label')),
+    ).toEqual(['Role for Chase Total Checking ··4821', 'Role for Chase Savings ··7730']);
+
+    // Unchecking is what "Not used" was; checking again is what "No role" was.
+    await user.click(box);
+    await waitFor(() => expect(patches).toEqual(['{"role":null,"is_active":false}']));
+    expect(box).not.toBeChecked();
+    expect(within(loan).getByText('Left out of net worth')).toBeInTheDocument();
+    await user.click(box);
+    await waitFor(() =>
+      expect(patches).toEqual([
+        '{"role":null,"is_active":false}',
+        '{"role":null,"is_active":true}',
+      ]),
+    );
+    expect(box).toBeChecked();
+    expect(within(loan).getByText('Money owed, counted against net worth')).toBeInTheDocument();
   });
 
   it('saves a new role and shows the server result, including the moved emergency fund', async () => {
@@ -213,7 +239,7 @@ describe('LinkScreen accounts', () => {
     const { user } = renderLink();
     const checking = await screen.findByRole('group', { name: 'Chase Total Checking' });
     await user.selectOptions(within(checking).getByRole('combobox', { name: /^Role for/ }), [
-      'Not used',
+      'Not used (left out of spending and net worth)',
     ]);
     await waitFor(() => expect(patches).toEqual(['{"role":null,"is_active":false}']));
     expect(within(checking).getByRole('combobox', { name: /^Role for/ })).toHaveValue('unused');

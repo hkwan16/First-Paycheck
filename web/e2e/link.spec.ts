@@ -60,16 +60,21 @@ test('each account offers only the roles its kind takes, and a role can be clear
   const savingRole = page
     .getByRole('group', { name: 'Plaid Saving' })
     .getByRole('combobox', { name: /^Role for Plaid Saving/ });
+  // The two "none" choices say what each does (spec 002 rule 31b, issue 265).
   await expect(checkingRole.locator('option')).toHaveText([
-    'No role',
+    'No role (counted in spending and net worth)',
     'Spending',
     'Emergency fund',
-    'Not used',
+    'Not used (left out of spending and net worth)',
   ]);
   // A savings account is never the spending account (spec 002 rule 31a).
-  await expect(savingRole.locator('option')).toHaveText(['No role', 'Emergency fund', 'Not used']);
+  await expect(savingRole.locator('option')).toHaveText([
+    'No role (counted in spending and net worth)',
+    'Emergency fund',
+    'Not used (left out of spending and net worth)',
+  ]);
 
-  await checkingRole.selectOption('No role');
+  await checkingRole.selectOption({ value: '' });
   await expect(checkingRole).not.toHaveAttribute('aria-busy', 'true');
   await page.reload();
   await openLink(page);
