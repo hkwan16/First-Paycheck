@@ -636,6 +636,13 @@ offer letter states).
   `/setup/confirm` with every stub confirmed are titled by their state ("Your pay stub is
   confirmed"), with the next step, never as a review (issue 209). A field opened to type starts
   without an error; what to fix shows once it is saved (issue 195).
+- **The stub the plan uses** (rule 22i, issue 263): `planPayStub` (`hooks/profile.ts`) is the
+  first of `GET /pay-stubs`, the API's order (spec 016 rule 7); the client never orders stubs.
+  `/setup/confirm` with every stub confirmed names it (`payStubSubject`), shows its values in
+  `ConfirmedPayStub` titled "The pay stub your plan uses" and links to Link to add a newer one.
+  A confirmed document's page says the plan uses what was checked only for that stub; an older
+  paycheck's (and a superseded copy's) names the plan's stub with a link to its page
+  (`PayStubConfirmed`). Until the list answers it says only that the amounts were stored.
 - **Benefits summary** (`BenefitsReview`, spec 013): `initBenefitsState` (`benefits-fields.ts`)
   lays the proposal's plans, match tiers and vesting out as reducer fields keyed
   `plans.1.deductible_cents`, `match_tiers.0.employer_pct`, `vesting_years`, each with a `group`

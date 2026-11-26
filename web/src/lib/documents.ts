@@ -3,6 +3,7 @@ import type {
   DocumentStatusReason,
   DocumentSummary,
   DocumentType,
+  PayStub,
 } from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import type { Tone } from '@/lib/design/tone';
@@ -49,6 +50,15 @@ function andList(words: readonly string[]): string {
 }
 
 /**
+ * A confirmed pay stub's name wherever one is pointed at: "Acme Corp, paid
+ * Oct 15, 2026", or "paid Oct 15, 2026" for one confirmed without an employer.
+ */
+export function payStubSubject(stub: Pick<PayStub, 'employer_name' | 'pay_date'>): string {
+  const paid = `paid ${formatDate(stub.pay_date)}`;
+  return stub.employer_name ? `${stub.employer_name}, ${paid}` : paid;
+}
+
+/**
  * What was confirmed from a document, so a list of them tells them apart (spec
  * 005 rule 22g, issue 243): "Acme Corp, paid Oct 15, 2026" for a pay stub,
  * "Gold PPO and Silver HMO" for a benefits summary; null before a confirm.
@@ -57,8 +67,7 @@ export function documentSubject(
   document: Pick<DocumentSummary, 'employer_name' | 'pay_date' | 'plan_names'>,
 ): string | null {
   if (document.pay_date !== null) {
-    const paid = `paid ${formatDate(document.pay_date)}`;
-    return document.employer_name ? `${document.employer_name}, ${paid}` : paid;
+    return payStubSubject({ employer_name: document.employer_name, pay_date: document.pay_date });
   }
   return document.plan_names.length > 0 ? andList(document.plan_names) : null;
 }

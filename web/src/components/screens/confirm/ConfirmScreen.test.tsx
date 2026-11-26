@@ -11,6 +11,7 @@ import {
   samplePayStub,
   sampleProposal,
   sampleValues,
+  stub01PayStub,
 } from '@/test/fixtures/documents';
 import { SAMPLE_NOW } from '@/test/fixtures/sample';
 import { sampleBenefitsProposal, sampleBenefitsValues } from '@/test/fixtures/planning';
@@ -23,6 +24,9 @@ import { ConfirmScreen } from './ConfirmScreen';
 
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
+
+/** An older paycheck's document, confirmed before the sample stub. */
+const OLDER_DOC_ID = '4d000000-0000-4000-8000-000000000a10';
 
 function confirmBodies() {
   const bodies: unknown[] = [];
@@ -622,27 +626,61 @@ describe('ConfirmScreen document states', () => {
   });
 
   it('says a confirmed document is done, with nothing to check, and points on to Spending', async () => {
-    db.documents = [sampleDocument({ status: 'confirmed' })];
+    db.documents = [confirmedDocument()];
+    db.payStubs = [samplePayStub()];
     renderConfirm();
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Your pay stub is confirmed' }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Your plan now uses the amounts you checked/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Your plan now uses the amounts you checked/),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Continue to spending/ })).toHaveAttribute(
       'href',
       '/setup/spending',
     );
   });
 
+  it('says the plan uses a newer pay stub on an older paycheck, naming it (issue 263)', async () => {
+    db.documents = [
+      confirmedDocument(),
+      confirmedDocument({ id: OLDER_DOC_ID, pay_date: '2026-04-10' }),
+    ];
+    db.payStubs = [samplePayStub(), stub01PayStub({ document_id: OLDER_DOC_ID })];
+    renderConfirm(OLDER_DOC_ID);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Your pay stub is confirmed' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText(/Your plan uses a newer pay stub:/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Acme Corp, paid Oct 15, 2026' })).toHaveAttribute(
+      'href',
+      `/setup/confirm/${PAY_STUB_DOC_ID}`,
+    );
+    expect(screen.queryByText(/amounts you checked/)).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'What you confirmed' })).toHaveTextContent(
+      '$2,750.86',
+    );
+  });
+
   it('says a newer copy of the paycheck replaced a superseded one (issue 199)', async () => {
-    db.documents = [sampleDocument({ status: 'confirmed', superseded: true })];
-    renderConfirm();
+    db.documents = [confirmedDocument(), confirmedDocument({ id: OLDER_DOC_ID, superseded: true })];
+    db.payStubs = [
+      samplePayStub(),
+      samplePayStub({ id: '6e000000-0000-4000-8000-000000000a10', document_id: OLDER_DOC_ID }),
+    ];
+    renderConfirm(OLDER_DOC_ID);
     expect(
       await screen.findByRole('heading', { level: 1, name: 'A newer copy replaced this pay stub' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('You confirmed this paycheck again, so the newer copy counts.'),
+      screen.getByText(/You confirmed this paycheck again, so the newer copy counts\./),
     ).toBeInTheDocument();
+    // The plan's stub is named, with the newest copy's page (issue 263).
+    expect(await screen.findByText(/Your plan uses this pay stub:/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Acme Corp, paid Oct 15, 2026' })).toHaveAttribute(
+      'href',
+      `/setup/confirm/${PAY_STUB_DOC_ID}`,
+    );
     expect(screen.getByRole('link', { name: 'Back to documents' })).toHaveAttribute(
       'href',
       '/setup/link',

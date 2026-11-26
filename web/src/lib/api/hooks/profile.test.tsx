@@ -1,13 +1,20 @@
 import { act, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
-import { emptyProfile, samplePayStub } from '@/test/fixtures/documents';
+import { emptyProfile, samplePayStub, stub01PayStub } from '@/test/fixtures/documents';
 import { db } from '@/test/msw/db';
 import { apiUrl, profileOut } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderHookWithClient } from '@/test/render';
 import { queryKeys } from '../keys';
-import { usePayStubs, useProfile, useSaveTimeZone, useToday, useUpdateProfile } from './profile';
+import {
+  planPayStub,
+  usePayStubs,
+  useProfile,
+  useSaveTimeZone,
+  useToday,
+  useUpdateProfile,
+} from './profile';
 
 describe('usePayStubs', () => {
   it('reads the confirmed pay stubs', async () => {
@@ -15,6 +22,18 @@ describe('usePayStubs', () => {
     const { result } = renderHookWithClient(() => usePayStubs());
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.[0]?.net_cents).toBe(199_604);
+  });
+});
+
+describe('planPayStub', () => {
+  it('is the first stub listed: the newest pay date, which the plan is built on (spec 016 rule 7)', () => {
+    const newest = samplePayStub();
+    expect(planPayStub([newest, stub01PayStub()])).toBe(newest);
+  });
+
+  it('is undefined before the list answers or when no stub is confirmed', () => {
+    expect(planPayStub(undefined)).toBeUndefined();
+    expect(planPayStub([])).toBeUndefined();
   });
 });
 
