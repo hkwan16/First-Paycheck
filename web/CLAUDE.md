@@ -659,9 +659,10 @@ Spec 018. Decisions is four steps, one page per calculator, in the mockup's orde
 fund (`/setup/decisions/emergency-fund`), 401(k) (`/401k`), health plan (`/health-plan`), W-4
 (`/w4`, last because it reads the saved 401(k) and health plan). Each `page.tsx` renders
 `DecisionStepScreen` with its `calculator`: an eyebrow "Decision n of 4" with the "n of 4 saved"
-badge (every saved calculator, with ", 2 need review" while any does; `decisionProgress` and
-`savedCountText` in `lib/decisions.ts`, the same reading of `GET /decisions` as the side nav's done
-marks and the Plan's completeness badge, issue 257), the step's question as the h1 (`STEP_TEXT` in
+badge (every saved calculator, with ", 2 need review" while any does; `SavedCountBadge` over
+`decisionProgress` in `lib/decisions.ts`, the same reading of `GET /decisions` as the side nav's
+done marks and the Plan's completeness badge, and the same words as `savedCountText`, with each
+count a `Num` as the chip always drew it, issue 257), the step's question as the h1 (`STEP_TEXT` in
 `lib/decision-steps.ts`, which also has the tab title, the nav label and the footer's name), the
 lead (live calculators only), the one card in its `CardErrorBoundary` in a `max-w-3xl` column,
 and a `StepFooter` from `stepFooter(calculator, live)` (`step-footer.ts`): Back to the previous

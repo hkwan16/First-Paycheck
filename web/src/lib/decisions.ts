@@ -97,17 +97,21 @@ export interface SavedCount {
   needsReview: number;
 }
 
+/** "needs" for one decision, "need" for more: the verb of ", 2 need review". */
+export const reviewVerb = (review: number): 'needs' | 'need' => (review === 1 ? 'needs' : 'need');
+
 /**
  * "3 of 4 saved", or "3 of 4 decisions saved" with `noun`, with ", 3 need
  * review" or ", 1 needs review" while any does (spec 016 rule 3a, spec 018
- * rule 5): the Plan's completeness badge and each step's chip, worded once.
+ * rule 5): the Plan's completeness badge and each step's chip
+ * (`SavedCountBadge`, which says the same in the same order), worded once.
  * Counting the API's lists, not computing a figure.
  */
 export function savedCountText({ saved, total, needsReview: review }: SavedCount, noun?: string) {
   const what = noun ? `${noun} saved` : 'saved';
   const text = `${formatNumber(saved)} of ${formatNumber(total)} ${what}`;
   if (review === 0) return text;
-  return `${text}, ${formatNumber(review)} ${review === 1 ? 'needs' : 'need'} review`;
+  return `${text}, ${formatNumber(review)} ${reviewVerb(review)} review`;
 }
 
 /** The saved count's badge: warning while any needs review, confirmed once every one is saved. */

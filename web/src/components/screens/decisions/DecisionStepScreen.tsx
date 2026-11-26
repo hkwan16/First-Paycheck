@@ -2,22 +2,17 @@
 
 import { PageTitle } from '@/components/chrome/PageTitle';
 import { StepFooter } from '@/components/chrome/StepFooter';
-import { Badge } from '@/components/ui/Badge';
 import { CardErrorBoundary } from '@/components/ui/CardErrorBoundary';
 import { useDecisions } from '@/lib/api/hooks';
 import { DECISION_STEPS, STEP_TEXT, stepNumber } from '@/lib/decision-steps';
-import {
-  decisionProgress,
-  savedCountText,
-  type DecisionProgress,
-  type SavedCount,
-} from '@/lib/decisions';
+import { decisionProgress, type DecisionProgress, type SavedCount } from '@/lib/decisions';
 import { features, type CalculatorId } from '@/lib/features';
 import type { ComponentType } from 'react';
 import { calculatorTitle, PlaceholderCard } from './DecisionCard';
 import { EmergencyFundCard } from './EmergencyFundCard';
 import { HealthPlanCard } from './HealthPlanCard';
 import { Match401kCard } from './Match401kCard';
+import { SavedCountBadge } from './SavedCountBadge';
 import { stepFooter } from './step-footer';
 import { W4Card } from './W4Card';
 
@@ -73,7 +68,7 @@ export function DecisionStepScreen({
             <span className="text-small font-semibold text-ink-3">
               Decision {stepNumber(calculator)} of {DECISION_STEPS.length}
             </span>
-            {count && <Badge>{savedCountText(count)}</Badge>}
+            {count && <SavedCountBadge count={count} />}
           </>
         }
         title={STEP_TEXT[calculator].title}
