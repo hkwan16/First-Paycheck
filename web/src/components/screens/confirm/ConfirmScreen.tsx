@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 import { PageTitle } from '@/components/chrome/PageTitle';
 import { Bar } from '@/components/ui/Bar';
@@ -9,9 +10,14 @@ import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ArrowRightIcon } from '@/components/icons';
 import { apiErrorCode, apiErrorMessage } from '@/lib/api/errors';
-import { isReviewable, useDocument } from '@/lib/api/hooks';
-import type { Confirmed, DocumentDetail, DocumentType } from '@/lib/api/types';
-import { documentTypeLabel, statusReasonText, SUPERSEDED_TEXT } from '@/lib/documents';
+import { isReviewable, planPayStub, useDocument, usePayStubs } from '@/lib/api/hooks';
+import type { Confirmed, DocumentDetail, DocumentType, PayStub } from '@/lib/api/types';
+import {
+  documentTypeLabel,
+  payStubSubject,
+  statusReasonText,
+  SUPERSEDED_TEXT,
+} from '@/lib/documents';
 import { formatNumber } from '@/lib/money';
 import { pageTitle } from '@/lib/page-title';
 import { confirmRoute, decisionRouteFor } from '@/lib/routes';
@@ -135,6 +141,70 @@ function Replaced({ type, replacedBy }: { type: DocumentType; replacedBy: string
   );
 }
 
+/** The plan's stub, named and linked to its page: "Acme Corp, paid Oct 15, 2026". */
+function PlanStubLink({ stub }: { stub: PayStub }) {
+  return <Link href={confirmRoute(stub.document_id)}>{payStubSubject(stub)}</Link>;
+}
+
+/**
+ * A confirmed pay stub with what was stored from it (spec 005 rule 22h). The
+ * plan is built on the newest current stub (`planPayStub`), so only that
+ * stub's page says the plan uses what was checked: an older paycheck's names
+ * the stub the plan uses, and so does a superseded copy's (rule 22f) after
+ * saying the newer copy counts (issue 263). The list is read as the API
+ * orders it. Until it answers, nothing is said about the plan; while it does
+ * not list this stub yet (right after a confirm, before it is read again) the
+ * page says the plan uses the amounts, as before, rather than naming a stale
+ * stub as newer.
+ */
+function PayStubConfirmed({ document }: { document: DocumentDetail }) {
+  const payStubs = usePayStubs();
+  const stub = document.pay_stub;
+  const current = planPayStub(payStubs.data);
+  const planUsesAnother = current !== undefined && current.id !== stub?.id ? current : null;
+  if (document.superseded) {
+    return (
+      <Status title="A newer copy replaced this pay stub">
+        <Notice>
+          {SUPERSEDED_TEXT}
+          {planUsesAnother && (
+            <>
+              {' '}
+              Your plan uses this pay stub: <PlanStubLink stub={planUsesAnother} />.
+            </>
+          )}
+        </Notice>
+        {stub && <ConfirmedPayStub stub={stub} />}
+        <BackToDocuments />
+      </Status>
+    );
+  }
+  const listed = payStubs.data?.some((s) => s.id === stub?.id) ?? false;
+  return (
+    <Status title="Your pay stub is confirmed">
+      {listed && planUsesAnother ? (
+        <Notice>
+          Your plan uses a newer pay stub: <PlanStubLink stub={planUsesAnother} />. We deleted the
+          file.
+        </Notice>
+      ) : (
+        <Notice tone="confirmed">
+          {payStubs.isPending
+            ? 'We stored the amounts you checked and deleted the file.'
+            : 'Your plan now uses the amounts you checked. We deleted the file.'}
+        </Notice>
+      )}
+      {stub && <ConfirmedPayStub stub={stub} />}
+      <div>
+        <Button href="/setup/spending" variant="primary">
+          Continue to spending
+          <ArrowRightIcon />
+        </Button>
+      </div>
+    </Status>
+  );
+}
+
 function NotReviewable({ document }: { document: DocumentDetail }) {
   const reason = statusReasonText(document.status_reason);
   const noun = documentTypeLabel(document.type).toLowerCase();
@@ -163,30 +233,7 @@ function NotReviewable({ document }: { document: DocumentDetail }) {
           </Status>
         );
       }
-      // A newer confirm of the same paycheck counts instead (spec 005 rule 22f).
-      if (document.superseded) {
-        return (
-          <Status title="A newer copy replaced this pay stub">
-            <Notice>{SUPERSEDED_TEXT}</Notice>
-            {document.pay_stub && <ConfirmedPayStub stub={document.pay_stub} />}
-            <BackToDocuments />
-          </Status>
-        );
-      }
-      return (
-        <Status title="Your pay stub is confirmed">
-          <Notice tone="confirmed">
-            Your plan now uses the amounts you checked. We deleted the file.
-          </Notice>
-          {document.pay_stub && <ConfirmedPayStub stub={document.pay_stub} />}
-          <div>
-            <Button href="/setup/spending" variant="primary">
-              Continue to spending
-              <ArrowRightIcon />
-            </Button>
-          </div>
-        </Status>
-      );
+      return <PayStubConfirmed document={document} />;
     case 'manual_entry_required':
       // A pay stub in manual entry is reviewable; only a benefits summary lands here.
       return <BenefitsUnread document={document} />;

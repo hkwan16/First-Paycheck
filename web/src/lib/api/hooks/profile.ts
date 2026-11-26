@@ -1,13 +1,23 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { $api, fetchClient } from '../client';
 import { invalidateAfterProfile, invalidateAfterTimeZone, queryKeys } from '../keys';
-import type { ProfileIn } from '../types';
+import type { PayStub, ProfileIn } from '../types';
 import { unwrap } from './request';
 
 /** `GET /pay-stubs`: confirmed pay stubs, newest pay date first. */
 export function usePayStubs() {
   return $api.useQuery('get', '/pay-stubs');
 }
+
+/**
+ * The stub the plan is built on, from a `GET /pay-stubs` list: the confirmed
+ * stub with the greatest pay date, ties to the newest confirm (spec 016 rule
+ * 7), which is the order the list comes in (spec 005 rule 24), so it is the
+ * first. Undefined before the list answers or without a confirmed stub. The
+ * client never orders stubs itself.
+ */
+export const planPayStub = (stubs: readonly PayStub[] | undefined): PayStub | undefined =>
+  stubs?.[0];
 
 /** `GET /profile`: the saved profile, or the defaults when nothing is saved. */
 export function useProfile() {

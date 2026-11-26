@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { PageTitle } from '@/components/chrome/PageTitle';
@@ -9,17 +10,20 @@ import { Card } from '@/components/ui/Card';
 import { Notice } from '@/components/ui/Notice';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { apiErrorMessage } from '@/lib/api/errors';
-import { newestReviewable, useDocuments, usePayStubs } from '@/lib/api/hooks';
+import { newestReviewable, planPayStub, useDocuments, usePayStubs } from '@/lib/api/hooks';
+import { payStubSubject } from '@/lib/documents';
 import { confirmRoute } from '@/lib/routes';
+import { ConfirmedPayStub } from './ConfirmedValues';
 
 const TITLE = 'Check what we read from your pay stub';
 
 /**
  * `/setup/confirm` without a document (the side nav's Confirm step): goes to
  * the newest pay stub waiting for review or manual entry; otherwise, once
- * both lists have loaded (issue 196), says the pay stub is confirmed and what
- * comes next, or that there is none yet and where to add one. Neither of
- * those is titled as a review: there is nothing to check (issue 209).
+ * both lists have loaded (issue 196), shows the stub the plan uses with its
+ * confirmed amounts and where to add a newer one (issue 263), or says there
+ * is none yet and where to add one. Neither of those is titled as a review:
+ * there is nothing to check (issue 209).
  */
 export function ConfirmIndexScreen() {
   const router = useRouter();
@@ -56,14 +60,16 @@ export function ConfirmIndexScreen() {
     );
   }
 
-  if ((payStubs.data?.length ?? 0) > 0) {
+  const current = planPayStub(payStubs.data);
+  if (current) {
     return (
       <>
         <PageTitle title="Your pay stub is confirmed" />
         <Notice tone="confirmed">
-          Your plan uses the amounts you checked. When your pay changes, add your newest pay stub on
-          the first step.
+          Your plan uses this pay stub: {payStubSubject(current)}. When your pay changes,{' '}
+          <Link href="/setup/link">add your newest pay stub on the first step</Link>.
         </Notice>
+        <ConfirmedPayStub stub={current} title="The pay stub your plan uses" />
         <div>
           <Button href="/setup/spending" variant="primary">
             Continue to spending

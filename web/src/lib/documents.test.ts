@@ -5,6 +5,7 @@ import {
   documentSubject,
   documentTypeLabel,
   hiddenText,
+  payStubSubject,
   statusReasonText,
 } from './documents';
 
@@ -92,6 +93,17 @@ describe('reasons as past events (spec 004 rule 37, issue 163)', () => {
     for (const reason of ['no_model', 'budget', 'extraction_failed'] as const) {
       expect(statusReasonText(reason)).not.toMatch(/right now|is used up|is off/);
     }
+  });
+});
+
+describe('payStubSubject', () => {
+  it('names a stub by its employer and pay date, as a document row does', () => {
+    expect(payStubSubject({ employer_name: 'Acme Corp', pay_date: '2026-10-15' })).toBe(
+      'Acme Corp, paid Oct 15, 2026',
+    );
+    expect(payStubSubject({ employer_name: null, pay_date: '2026-10-15' })).toBe(
+      'paid Oct 15, 2026',
+    );
   });
 });
 

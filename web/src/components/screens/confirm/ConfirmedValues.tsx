@@ -26,13 +26,16 @@ const AMOUNTS: readonly [CentsKey, string][] = [
 
 const NOT_SHOWN = 'Not shown on the stub';
 
-function ValuesCard({ children }: { children: ReactNode }) {
+/** The card's title on a document's page; the Confirm step names the plan's stub instead. */
+const WHAT_YOU_CONFIRMED = 'What you confirmed';
+
+function ValuesCard({ title, children }: { title: string; children: ReactNode }) {
   const titleId = useId();
   return (
     <Card aria-labelledby={titleId} gap={12}>
       <div>
         <h2 id={titleId} className="m-0">
-          What you confirmed
+          {title}
         </h2>
         <p className="m-0 text-small text-ink-3">
           Confirmed values stay as they are. If one is wrong, replace the document from your
@@ -47,11 +50,18 @@ function ValuesCard({ children }: { children: ReactNode }) {
 /**
  * A confirmed pay stub's values, read-only (spec 005 rule 22h, issue 243): the
  * file and the proposal are gone once it is confirmed, so this is the one place
- * to see what was stored from it.
+ * to see what was stored from it. The Confirm step shows the plan's stub under
+ * its own `title` (issue 263).
  */
-export function ConfirmedPayStub({ stub }: { stub: PayStub }) {
+export function ConfirmedPayStub({
+  stub,
+  title = WHAT_YOU_CONFIRMED,
+}: {
+  stub: PayStub;
+  title?: string;
+}) {
   return (
-    <ValuesCard>
+    <ValuesCard title={title}>
       <KVList spacing="comfortable">
         <KV label="Employer" value={stub.employer_name ?? NOT_SHOWN} />
         <KV label="Pay date" value={formatDate(stub.pay_date)} />
@@ -94,7 +104,7 @@ function PlanValues({ plan }: { plan: BenefitsPlan }) {
 /** A confirmed benefits summary's plans, read-only, in the summary's order (rule 22h). */
 export function ConfirmedPlans({ plans }: { plans: readonly BenefitsPlan[] }) {
   return (
-    <ValuesCard>
+    <ValuesCard title={WHAT_YOU_CONFIRMED}>
       <div className="flex flex-col gap-5">
         {plans.map((plan) => (
           <PlanValues key={plan.id} plan={plan} />
