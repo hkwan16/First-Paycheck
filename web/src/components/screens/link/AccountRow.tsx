@@ -1,6 +1,7 @@
 'use client';
 
 import { useId } from 'react';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { IconTile } from '@/components/ui/IconTile';
 import { Label } from '@/components/ui/Label';
 import { Money } from '@/components/ui/Money';
@@ -15,6 +16,7 @@ import {
   patchForRole,
   roleOptions,
   roleSelectName,
+  roleText,
   roleValue,
   transactionCountText,
   type RoleValue,
@@ -40,7 +42,10 @@ function Activity({ account }: { account: Account }) {
  * From the mockup's account row: institution initials, name and mask, when
  * it last synced and what it holds, and the Role select. The select is
  * optimistic (useUpdateAccount); a failed save puts the old role back and
- * says why under the row.
+ * says why under the row. An account with no role to choose (a loan) gets no
+ * picker: one checkbox, named for it, that counts it in net worth or leaves
+ * it out (the select's "No role" and "Not used"), with where it stands beside
+ * it (issue 265).
  */
 export function AccountRow({ account }: { account: Account }) {
   const nameId = useId();
@@ -48,6 +53,7 @@ export function AccountRow({ account }: { account: Account }) {
   const errorId = useId();
   const update = useUpdateAccount();
   const mask = maskLabel(account.mask);
+  const standing = roleText(account);
 
   const onChange = (value: RoleValue) =>
     update.mutate({ accountId: account.id, patch: patchForRole(value) });
@@ -74,27 +80,39 @@ export function AccountRow({ account }: { account: Account }) {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Label htmlFor={selectId} className="m-0">
-            Role
-          </Label>
-          {/* Named for its account, starting with the visible label (issue 242). */}
-          <Select
-            id={selectId}
-            aria-label={roleSelectName(account)}
-            className="w-auto min-w-40"
-            value={roleValue(account)}
-            aria-busy={update.isPending || undefined}
-            aria-describedby={update.isError ? errorId : undefined}
-            onChange={(event) => onChange(event.currentTarget.value as RoleValue)}
-          >
-            {roleOptions(account).map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        </div>
+        {standing !== null ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <Checkbox
+              checked={account.is_active}
+              onChange={(checked) => onChange(checked ? '' : 'unused')}
+            >
+              Count <span className="sr-only">{account.name}</span> in net worth
+            </Checkbox>
+            <span className="text-small text-ink-3">{standing}</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <Label htmlFor={selectId} className="m-0">
+              Role
+            </Label>
+            {/* Named for its account, starting with the visible label (issue 242). */}
+            <Select
+              id={selectId}
+              aria-label={roleSelectName(account)}
+              className="w-auto min-w-40"
+              value={roleValue(account)}
+              aria-busy={update.isPending || undefined}
+              aria-describedby={update.isError ? errorId : undefined}
+              onChange={(event) => onChange(event.currentTarget.value as RoleValue)}
+            >
+              {roleOptions(account).map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
       </div>
       {update.isError && (
         <p id={errorId} role="alert" className="m-0 text-small text-ink-2">

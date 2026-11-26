@@ -1,5 +1,12 @@
 import { institutionName, maskLabel } from '@/lib/accounts';
-import type { Account, AccountPatch, AccountRole, CsvImport, SyncProvider } from '@/lib/api/types';
+import type {
+  Account,
+  AccountKind,
+  AccountPatch,
+  AccountRole,
+  CsvImport,
+  SyncProvider,
+} from '@/lib/api/types';
 import { formatDate } from '@/lib/dates';
 import { formatNumber } from '@/lib/money';
 
@@ -25,18 +32,50 @@ const ROLE_LABELS: Record<AccountRole, string> = {
 };
 
 /**
- * The role select's options: "No role", the roles the API says the account's
- * kind allows (spec 002 rule 31a; a loan has none), and "Not used". Every
- * one can be chosen, so a role once set can be cleared (issue 241).
+ * The kinds whose transactions Spending reads (spec 007 rule 21a, the API's
+ * `SPENDING_ACCOUNT_KINDS`). The rest only count in net worth.
+ */
+const SPENDING_KINDS = new Set<AccountKind>(['checking', 'savings', 'credit']);
+
+/** The kinds whose balance is money owed, subtracted from net worth (spec 015 rule 20). */
+const OWED_KINDS = new Set<AccountKind>(['credit', 'loan']);
+
+/** "spending and net worth" or "net worth": what an account of this kind feeds. */
+const countedIn = (kind: AccountKind) =>
+  SPENDING_KINDS.has(kind) ? 'spending and net worth' : 'net worth';
+
+/**
+ * The role select's options: no role, the roles the API says the account's
+ * kind allows (spec 002 rule 31a), and not used. The two "none" choices say
+ * what each does (spec 002 rule 31b, issue 265): with no role the account is
+ * still counted in spending (its kind permitting) and net worth; not used
+ * leaves it out of both (`is_active` false, spec 015 rule 20). Every one can
+ * be chosen, so a role once set can be cleared (issue 241).
  */
 export function roleOptions(
-  account: Pick<Account, 'allowed_roles'>,
+  account: Pick<Account, 'kind' | 'allowed_roles'>,
 ): { value: RoleValue; label: string }[] {
+  const counted = countedIn(account.kind);
   return [
-    { value: '', label: 'No role' },
+    { value: '', label: `No role (counted in ${counted})` },
     ...account.allowed_roles.map((role) => ({ value: role, label: ROLE_LABELS[role] })),
-    { value: 'unused', label: 'Not used' },
+    { value: 'unused', label: `Not used (left out of ${counted})` },
   ];
+}
+
+/**
+ * What the row says beside its "Count ... in net worth" checkbox when the kind
+ * has no role to choose (a loan, spec 002 rule 31d, issue 265): where the
+ * account stands. Null when there is a role to pick, so the select renders.
+ */
+export function roleText(
+  account: Pick<Account, 'kind' | 'allowed_roles' | 'is_active'>,
+): string | null {
+  if (account.allowed_roles.length > 0) return null;
+  if (!account.is_active) return `Left out of ${countedIn(account.kind)}`;
+  return OWED_KINDS.has(account.kind)
+    ? 'Money owed, counted against net worth'
+    : `Counted in ${countedIn(account.kind)}`;
 }
 
 /** "Role for Chase Total Checking ··4821": each select named for its account (issue 242). */
