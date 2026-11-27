@@ -1247,11 +1247,11 @@ for transactions when the stack has no Plaid keys, then run the config with `E2E
 
 `NEXT_PUBLIC_FEATURES` is a comma-separated list, parsed by `lib/features.ts`:
 
-| Flag                    | Effect                                                                                                                                                                                       |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `calculators=<id>+<id>` | Live calculators (`401k_match`, `emergency_fund`, `health_plan`, `w4`); the rest render as muted "After alpha" placeholders. Unset means all live. The alpha ships `calculators=401k_match`. |
-| `sankey`                | Show the cash-flow diagram on the Spending screen (`/dev/screens/spending` shows it regardless).                                                                                             |
-| `e2e`                   | Test affordances: the sandbox-link button, and no React Query devtools.                                                                                                                      |
+| Flag                    | Effect                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `calculators=<id>+<id>` | Live calculators (`401k_match`, `emergency_fund`, `health_plan`, `w4`); the rest render as muted "After alpha" placeholders. Unset means all live. The alpha ships `calculators=401k_match`.                                                                                                                                              |
+| `sankey`                | Show the cash-flow diagram on the Spending screen (`/dev/screens/spending` shows it regardless).                                                                                                                                                                                                                                          |
+| `e2e`                   | Test affordances: the sandbox-link button, no React Query devtools, and no Next security-advisory check (`next.config.ts` reads the flag at config time and sets `experimental.agentUpgrade: false`), so an advisory against the pinned Next cannot draw the dev-tools badge into the smoke screenshots or stop `next dev`'s first start. |
 
 ## Gotchas
 
@@ -1267,6 +1267,13 @@ for transactions when the stack has no Plaid keys, then run the config with `E2E
   `text-ink-3` would collide.
 - jsdom is pinned to 29 because jsdom 30 needs Node 22.22+; bump it with the Node floor.
 - `next dev` writes `AGENTS.md` here; it is gitignored and this file is the agent guide.
+- `devIndicators: false` hides the dev indicator, not the dev-tools badge Next draws when it has
+  something to show: a build error, or the security "Insight" it adds when the installed Next has
+  an open npm advisory. That badge failed every darwin baseline by 3,505 pixels, and under a
+  coding agent (`CLAUDECODE` and the like) the same check stops the first `next dev` with an
+  upgrade reminder, which killed Playwright's web server once per run (issue 279). The fix is the
+  upgrade: `pnpm add --save-exact next@<version> eslint-config-next@<version>` (both pinned
+  exactly), then the whole gate. The e2e flag turns the check off for the Playwright server only.
 - `pnpm e2e` should leave the `next dev` log empty. Dev prerenders each route to validate its
   instant UI, so nothing may read the clock while rendering (no `Date.now()`, no `new Date()`
   outside an effect; the sample QueryClient uses `staleTime: 'static'` and stamps its data) and
