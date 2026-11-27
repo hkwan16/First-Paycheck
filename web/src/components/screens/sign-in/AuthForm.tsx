@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/Label';
 import { Notice } from '@/components/ui/Notice';
 import { authErrorMessage } from '@/lib/auth/errors';
 import { authCallbackUrl } from '@/lib/auth/next-path';
+import { withAuthTimeout } from '@/lib/auth/timeout';
 import { validateEmail, validatePassword } from '@/lib/auth/validation';
 import { hardNavigate } from '@/lib/navigation';
 import { signInRoute, type AuthMode } from '@/lib/routes';
@@ -69,7 +70,10 @@ export function AuthForm({ mode, next, linkError }: AuthFormProps) {
   const busy = status.kind === 'busy';
   const destination = next ?? '/';
 
-  /** Run one Supabase call; a thrown error (fetch rejected) reads as a network failure. */
+  /**
+   * Run one Supabase call; a thrown error (fetch rejected, or no answer within
+   * `AUTH_TIMEOUT_MS`, issue 288) reads as a network failure and frees the buttons.
+   */
   async function attempt(action: 'password' | 'link', run: () => Promise<Status | 'navigate'>) {
     setStatus({ kind: 'busy', action });
     let result: Status | 'navigate';
@@ -100,13 +104,15 @@ export function AuthForm({ mode, next, linkError }: AuthFormProps) {
 
     void attempt('password', async () => {
       if (mode === 'sign-in') {
-        const { error } = await supabase.auth.signInWithPassword(credentials);
+        const { error } = await withAuthTimeout(supabase.auth.signInWithPassword(credentials));
         return error ? { kind: 'error', message: authErrorMessage(error) } : 'navigate';
       }
-      const { data, error } = await supabase.auth.signUp({
-        ...credentials,
-        options: { emailRedirectTo: authCallbackUrl(window.location.origin, next) },
-      });
+      const { data, error } = await withAuthTimeout(
+        supabase.auth.signUp({
+          ...credentials,
+          options: { emailRedirectTo: authCallbackUrl(window.location.origin, next) },
+        }),
+      );
       if (error) return { kind: 'error', message: authErrorMessage(error) };
       // With email confirmation on, Supabase creates the user without a session.
       if (data.session) return 'navigate';
@@ -135,10 +141,12 @@ export function AuthForm({ mode, next, linkError }: AuthFormProps) {
     const address = email.trim();
 
     void attempt('link', async () => {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: address,
-        options: { emailRedirectTo: authCallbackUrl(window.location.origin, next) },
-      });
+      const { error } = await withAuthTimeout(
+        supabase.auth.signInWithOtp({
+          email: address,
+          options: { emailRedirectTo: authCallbackUrl(window.location.origin, next) },
+        }),
+      );
       if (error) return { kind: 'error', message: authErrorMessage(error) };
       return {
         kind: 'sent',

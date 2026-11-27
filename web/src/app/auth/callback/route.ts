@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { safeNextPath } from '@/lib/auth/next-path';
+import { withAuthTimeout } from '@/lib/auth/timeout';
 import { signInRoute } from '@/lib/routes';
 import { getSupabaseServerClient } from '@/lib/supabase/server';
 
@@ -8,7 +9,8 @@ import { getSupabaseServerClient } from '@/lib/supabase/server';
  * one-time code for a session cookie, then go to `next` when it is a safe
  * relative path, or home. A missing, expired or already used code (or a link
  * opened in a different browser than the one that asked for it) goes back to
- * sign in with `?error=link`.
+ * sign in with `?error=link`, as does an exchange Auth does not answer within
+ * `AUTH_TIMEOUT_MS` (issue 288): the link is single-use, so a new one is the way on.
  */
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code');
@@ -24,7 +26,7 @@ async function exchange(code: string): Promise<boolean> {
   const supabase = await getSupabaseServerClient();
   if (!supabase) return false;
   try {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await withAuthTimeout(supabase.auth.exchangeCodeForSession(code));
     return !error;
   } catch {
     return false;

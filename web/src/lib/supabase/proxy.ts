@@ -1,5 +1,6 @@
 import { createServerClient, type SetAllCookies } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { encodeVerifiedUser, VERIFIED_USER_HEADER, verifiedUser } from '@/lib/auth/verified-user';
 import { readSupabaseEnv } from './env';
 
 export type ProxySession = {
@@ -13,7 +14,8 @@ export type ProxySession = {
 
 /**
  * Refresh the Supabase session cookie on every request so Server Components
- * see a valid token, forward `extraHeaders` to the app, and report whether the
+ * see a valid token, forward `extraHeaders` and the user the verified JWT
+ * names (`VERIFIED_USER_HEADER`, issue 288) to the app, and report whether the
  * request is signed in. Without Supabase env vars it only forwards the headers.
  */
 export async function updateSession(
@@ -22,9 +24,12 @@ export async function updateSession(
 ): Promise<ProxySession> {
   // Built from the request each time, so cookies written by setAll below
   // reach the Server Components rendering this same request.
-  const next = () => {
+  const next = (verified: string | null = null) => {
     const headers = new Headers(request.headers);
     for (const [name, value] of Object.entries(extraHeaders)) headers.set(name, value);
+    // Only this proxy says who the verified user is: whatever the browser sent is dropped.
+    if (verified) headers.set(VERIFIED_USER_HEADER, verified);
+    else headers.delete(VERIFIED_USER_HEADER);
     return NextResponse.next({ request: { headers } });
   };
 
@@ -64,5 +69,8 @@ export async function updateSession(
   // refreshes an expired token (triggering setAll above). It verifies the JWT
   // against the project's signing keys, so it needs no Auth round trip.
   const { data } = await supabase.auth.getClaims();
-  return { response, signedIn: Boolean(data?.claims), redirectTo };
+  const claims = data?.claims;
+  // Server Components fall back to this user when Auth does not answer getUser() in time.
+  if (claims) response = withSession(next(encodeVerifiedUser(verifiedUser(claims))));
+  return { response, signedIn: Boolean(claims), redirectTo };
 }
