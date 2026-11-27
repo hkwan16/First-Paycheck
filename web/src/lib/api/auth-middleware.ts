@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Middleware } from 'openapi-fetch';
+import { AUTH_TIMEOUT_MS } from '@/lib/auth/timeout';
 import { withTimeout } from '@/lib/timeout';
 import { ApiError, apiErrorCode } from './errors';
 
@@ -10,9 +11,9 @@ export type SessionAuth = Pick<SupabaseClient['auth'], 'getSession' | 'refreshSe
  * How long a request waits for supabase-js to read (or refresh) the session
  * before it fails (issue 225). A read is local unless the access token
  * expired; then it waits on a token refresh, which supabase-js sends with no
- * timeout of its own. A healthy refresh takes well under a second.
+ * timeout of its own. The same bound as every other call to Auth.
  */
-export const SESSION_READ_TIMEOUT_MS = 10_000;
+export const SESSION_READ_TIMEOUT_MS = AUTH_TIMEOUT_MS;
 
 export const SESSION_UNAVAILABLE_MESSAGE =
   'We could not check that you are signed in. Reload the page, or sign in again.';

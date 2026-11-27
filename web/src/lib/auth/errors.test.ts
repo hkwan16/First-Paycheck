@@ -4,6 +4,7 @@ import {
   AuthWeakPasswordError,
 } from '@supabase/supabase-js';
 import { describe, expect, it } from 'vitest';
+import { TimedOut } from '@/lib/timeout';
 import { authErrorMessage, NETWORK_ERROR_MESSAGE } from './errors';
 
 const apiError = (message: string, status: number, code: string) =>
@@ -23,6 +24,8 @@ describe('authErrorMessage', () => {
       NETWORK_ERROR_MESSAGE,
     );
     expect(authErrorMessage(new TypeError('Failed to fetch'))).toBe(NETWORK_ERROR_MESSAGE);
+    // A request Auth never answered (issue 288) reads the same way.
+    expect(authErrorMessage(new TimedOut(10_000))).toBe(NETWORK_ERROR_MESSAGE);
     expect(NETWORK_ERROR_MESSAGE).toBe(
       'We could not reach the sign-in service. Check your connection and try again.',
     );

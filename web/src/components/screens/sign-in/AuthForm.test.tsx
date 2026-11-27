@@ -1,7 +1,9 @@
 import { AuthApiError, AuthRetryableFetchError } from '@supabase/supabase-js';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { NETWORK_ERROR_MESSAGE } from '@/lib/auth/errors';
+import { AUTH_TIMEOUT_MS } from '@/lib/auth/timeout';
 import { toneSoft } from '@/lib/design/tone';
-import { render, screen, userEvent, waitFor } from '@/test/render';
+import { act, render, screen, userEvent, waitFor } from '@/test/render';
 
 const mocks = vi.hoisted(() => {
   const auth = {
@@ -25,8 +27,11 @@ import { AuthForm, type AuthFormProps } from './AuthForm';
 const EMAIL = 'alex@example.com';
 const PASSWORD = 'correct horse battery';
 
-function setup(props: Partial<AuthFormProps> = {}) {
-  const user = userEvent.setup();
+function setup(
+  props: Partial<AuthFormProps> = {},
+  options: Parameters<typeof userEvent.setup>[0] = {},
+) {
+  const user = userEvent.setup(options);
   render(<AuthForm mode="sign-in" next={null} linkError={false} {...props} />);
   return {
     user,
@@ -48,6 +53,9 @@ describe('AuthForm, sign in', () => {
   beforeEach(() => {
     mocks.auth.signInWithPassword.mockResolvedValue({ data: { session }, error: null });
     mocks.auth.signInWithOtp.mockResolvedValue({ data: {}, error: null });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('keeps the mockup copy and autocomplete hints', () => {
@@ -167,6 +175,35 @@ describe('AuthForm, sign in', () => {
         'We could not reach the sign-in service. Check your connection and try again.',
       );
     }
+    expect(mocks.hardNavigate).not.toHaveBeenCalled();
+  });
+
+  it('gives up on a request Auth never answers, says so, and frees the buttons (issue 288)', async () => {
+    vi.useFakeTimers();
+    mocks.auth.signInWithPassword.mockReturnValueOnce(new Promise(() => undefined));
+    mocks.auth.signInWithOtp.mockReturnValueOnce(new Promise(() => undefined));
+    const { user, email, password } = setup({}, { advanceTimers: vi.advanceTimersByTime });
+    await user.type(email, EMAIL);
+    await user.type(password, PASSWORD);
+
+    const signIn = screen.getByRole('button', { name: 'Sign in' });
+    const link = screen.getByRole('button', { name: 'Email me a sign-in link' });
+    await user.click(signIn);
+    expect(signIn).toHaveAttribute('aria-busy', 'true');
+    await act(() => vi.advanceTimersByTimeAsync(AUTH_TIMEOUT_MS - 1));
+    expect(screen.queryByRole('alert')).toBeNull();
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(screen.getByRole('alert')).toHaveTextContent(NETWORK_ERROR_MESSAGE);
+    expect(signIn).not.toHaveAttribute('aria-busy');
+    expect(link).toBeEnabled();
+
+    await user.click(link);
+    expect(link).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByRole('alert')).toBeNull();
+    await act(() => vi.advanceTimersByTimeAsync(AUTH_TIMEOUT_MS));
+    expect(screen.getByRole('alert')).toHaveTextContent(NETWORK_ERROR_MESSAGE);
+    expect(link).not.toHaveAttribute('aria-busy');
+    expect(signIn).toBeEnabled();
     expect(mocks.hardNavigate).not.toHaveBeenCalled();
   });
 

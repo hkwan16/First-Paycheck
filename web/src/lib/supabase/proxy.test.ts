@@ -18,6 +18,11 @@ const mocks = vi.hoisted(() => {
 });
 vi.mock('@supabase/ssr', () => ({ createServerClient: mocks.createServerClient }));
 
+import {
+  encodeVerifiedUser,
+  parseVerifiedUser,
+  VERIFIED_USER_HEADER,
+} from '@/lib/auth/verified-user';
 import { updateSession } from './proxy';
 
 const request = () =>
@@ -119,6 +124,51 @@ describe('updateSession', () => {
     }
     expect(session.response.headers.get('x-middleware-request-cookie')).toBe(
       'sb-access=new; sb-refresh=r2',
+    );
+  });
+
+  it('tells Server Components which user the verified JWT names, over any claim the browser made (issue 288)', async () => {
+    mocks.getClaims.mockImplementationOnce(async () => {
+      const options = mocks.createServerClient.mock.calls.at(-1)?.[2];
+      options?.cookies.setAll([{ name: 'sb-access', value: 'new', options: { path: '/' } }], {});
+      return {
+        data: {
+          claims: { sub: 'u1', email: 'alex@example.com', user_metadata: { name: 'Alex' } },
+        },
+        error: null,
+      };
+    });
+    const forged = new NextRequest('http://localhost:3000/setup/link', {
+      headers: {
+        cookie: 'sb-access=old',
+        [VERIFIED_USER_HEADER]: encodeVerifiedUser({ id: 'u2', user_metadata: {} }),
+      },
+    });
+    const { response } = await updateSession(forged);
+    expect(
+      parseVerifiedUser(response.headers.get(`x-middleware-request-${VERIFIED_USER_HEADER}`)),
+    ).toEqual({ id: 'u1', email: 'alex@example.com', user_metadata: { name: 'Alex' } });
+    // The refreshed cookie written during getClaims() still reaches the app.
+    expect(response.headers.get('x-middleware-request-cookie')).toBe('sb-access=new');
+    expect(response.cookies.get('sb-access')?.value).toBe('new');
+  });
+
+  it('forwards no verified user for a signed-out request or with auth off, whatever the browser sent', async () => {
+    const forged = () =>
+      new NextRequest('http://localhost:3000/setup/link', {
+        headers: { [VERIFIED_USER_HEADER]: encodeVerifiedUser({ id: 'u2', user_metadata: {} }) },
+      });
+    const { response: signedOut } = await updateSession(forged());
+    expect(signedOut.headers.get(`x-middleware-request-${VERIFIED_USER_HEADER}`)).toBeNull();
+    expect(signedOut.headers.get('x-middleware-override-headers')).not.toContain(
+      VERIFIED_USER_HEADER,
+    );
+
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
+    const { response: authOff } = await updateSession(forged());
+    expect(authOff.headers.get(`x-middleware-request-${VERIFIED_USER_HEADER}`)).toBeNull();
+    expect(authOff.headers.get('x-middleware-override-headers')).not.toContain(
+      VERIFIED_USER_HEADER,
     );
   });
 });

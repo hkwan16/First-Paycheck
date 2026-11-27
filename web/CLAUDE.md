@@ -1037,7 +1037,9 @@ previews without secrets).
   `/auth/callback?next=`, which exchanges the PKCE code (so the link must be opened in the browser
   that asked for it) and falls back to `/sign-in?error=link`. Success is `hardNavigate(next ?? '/')`,
   a full navigation, so server components re-render with the new cookies and no client cache
-  survives from another session. Supabase errors become sentences in `lib/auth/errors.ts`.
+  survives from another session. Supabase errors become sentences in `lib/auth/errors.ts`; a
+  request Auth never answers (`withAuthTimeout`, issue 288) ends in the network sentence with the
+  buttons free again, never a button busy forever.
 - **`next` paths** are untrusted: always pass them through `safeNextPath` (relative, same site, not
   an auth page) and build sign-in links with `signInRoute({ mode, next, error })`.
 - **Guard**: the proxy redirects a signed-out request for a signed-in screen (`requiresSignIn` in
@@ -1048,6 +1050,16 @@ previews without secrets).
   URL. Redirect in the proxy, not while rendering: `next dev` validates each route's instant UI
   and logs an error when a redirect stops the segment from rendering. `/` sends a signed-in person
   to `/setup/link`.
+- **Auth that does not answer the server** (issue 288): `getCurrentUser()` waits `AUTH_TIMEOUT_MS`
+  for `getUser()`. When it runs out nothing says the session was revoked, and the proxy has already
+  verified the request's JWT, so the screen renders for the user that JWT names instead of bouncing
+  to sign-in, and the request logs one `console.warn`. The proxy forwards that user in the
+  `x-first-paycheck-user` header (`lib/auth/verified-user.ts`: `verifiedUser` from the claims,
+  `encodeVerifiedUser` as ASCII JSON, `parseVerifiedUser`), set or removed on every request it
+  handles so the browser cannot plant one; it is read only after a timeout, never while `getUser()`
+  answers. The API verifies the token on every call, so no data shows on the proxy's word alone.
+  `/auth/callback` gives `exchangeCodeForSession` the same wait and treats a timeout as a failed
+  exchange (`/sign-in?error=link`): the code is single-use, so a new link is the way on.
 - **Proxy**: `src/proxy.ts` refreshes the session with `getClaims()` on every request except build
   assets, image optimization, the favicon and paths with a file extension.
 - **Server client**: `getSupabaseServerClient()` awaits `connection()` first. supabase-js checks
@@ -1059,7 +1071,8 @@ previews without secrets).
   `/sign-in?next=<current path>`.
 - **Session reads** (issue 225): every request waits on supabase-js's `getSession()`, which waits
   on any token refresh in flight, and that refresh has no timeout of its own. The middleware gives
-  each read and refresh `SESSION_READ_TIMEOUT_MS` (10 s, `withTimeout` from `lib/timeout.ts`);
+  each read and refresh `SESSION_READ_TIMEOUT_MS` (`AUTH_TIMEOUT_MS` from `lib/auth/timeout.ts`,
+  10 s, the bound on every call to Auth; `withTimeout` from `lib/timeout.ts`);
   one that runs out sends nothing and throws `SessionUnavailable` (an `ApiError`, status 0), so a
   card shows its error instead of a skeleton forever, and `query-client.ts` does not retry it.
   `sessionStatus` (`lib/api/session-status.ts`) records whether the last read answered, and

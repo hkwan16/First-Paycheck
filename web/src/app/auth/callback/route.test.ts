@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AUTH_TIMEOUT_MS } from '@/lib/auth/timeout';
 
 const mocks = vi.hoisted(() => {
   const exchangeCodeForSession = vi.fn();
@@ -23,6 +24,9 @@ const location = (response: Response) => response.headers.get('location');
 describe('GET /auth/callback', () => {
   beforeEach(() => {
     mocks.exchangeCodeForSession.mockResolvedValue({ data: {}, error: null });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('exchanges the code for a session and goes home', async () => {
@@ -63,6 +67,14 @@ describe('GET /auth/callback', () => {
     mocks.exchangeCodeForSession.mockRejectedValueOnce(new TypeError('fetch failed'));
     const response = await callback('?code=abc');
     expect(location(response)).toBe('http://localhost:3000/sign-in?error=link');
+  });
+
+  it('treats an exchange Auth never answers as a link error after AUTH_TIMEOUT_MS (issue 288)', async () => {
+    vi.useFakeTimers();
+    mocks.exchangeCodeForSession.mockReturnValueOnce(new Promise(() => undefined));
+    const pending = callback('?code=abc&next=%2Fplan');
+    await vi.advanceTimersByTimeAsync(AUTH_TIMEOUT_MS);
+    expect(location(await pending)).toBe('http://localhost:3000/sign-in?next=/plan&error=link');
   });
 
   it('reports a link error when Supabase is not configured', async () => {

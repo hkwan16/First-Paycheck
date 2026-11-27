@@ -4,6 +4,7 @@ import {
   isAuthRetryableFetchError,
   isAuthWeakPasswordError,
 } from '@supabase/supabase-js';
+import { TimedOut } from '@/lib/timeout';
 
 export const NETWORK_ERROR_MESSAGE =
   'We could not reach the sign-in service. Check your connection and try again.';
@@ -26,11 +27,14 @@ const BY_CODE: Partial<Record<string, string>> = {
 };
 
 /**
- * A sentence a person can act on for an error from Supabase Auth (or a fetch
- * that threw before reaching it). Never echoes the raw server message.
+ * A sentence a person can act on for an error from Supabase Auth (a fetch
+ * that threw before reaching it, or a request it never answered, issue 288).
+ * Never echoes the raw server message.
  */
 export function authErrorMessage(error: unknown): string {
-  if (isAuthRetryableFetchError(error) || error instanceof TypeError) return NETWORK_ERROR_MESSAGE;
+  if (isAuthRetryableFetchError(error) || error instanceof TypeError || error instanceof TimedOut) {
+    return NETWORK_ERROR_MESSAGE;
+  }
   if (isAuthWeakPasswordError(error)) return WEAK_PASSWORD;
   if (isAuthError(error)) {
     const byCode = error.code ? BY_CODE[error.code] : undefined;
